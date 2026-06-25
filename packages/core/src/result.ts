@@ -1,9 +1,11 @@
-// unthrown — explicit errors as values, with a separate defect (panic) channel.
+// unthrown — explicit errors as values, with a separate defect channel for the
+// unexpected.
 //
-// Three runtime states — Ok | Err | Panic — but the public type exposes only
-// T and E. A Panic carries an unknown `cause` and is NEVER part of E.
+// Three runtime states — Ok | Err | Defect — but the public type exposes only
+// T and E. A Defect carries an unknown `cause` and is NEVER part of E. A defect
+// stays a value until `unwrap`, the one place it finally throws (it "panics").
 //
-// Invariant to memorize: a Panic flows through every method untouched EXCEPT
+// Invariant to memorize: a Defect flows through every method untouched EXCEPT
 // `match()` and `recoverDefect()`. Everything else (unwrapOr, getOrNull, ...)
 // recovers your modeled Err, never an unmodeled defect.
 
@@ -27,7 +29,10 @@ export function defect(cause: unknown): Defect {
   return { [DEFECT]: true, cause };
 }
 
-export function isDefect(x: unknown): x is Defect {
+// Internal guard for the qualify-time marker. Distinct from the public
+// `isDefect(result)` state guard below — this one narrows the `E | Defect`
+// union a `qualify` function returns, not a Result.
+function isDefectMarker(x: unknown): x is Defect {
   return (
     typeof x === "object" && x !== null && (x as Record<PropertyKey, unknown>)[DEFECT] === true
   );
@@ -49,19 +54,19 @@ export class UnwrapError<E = unknown> extends Error {
 // ----------------------------------------------------------------------------
 
 export type Result<T, E> = {
-  // success channel — runs on Ok; passes Err/Panic through untouched
+  // success channel — runs on Ok; passes Err/Defect through untouched
   map<U>(f: (value: T) => U): Result<U, E>;
   flatMap<U, E2>(f: (value: T) => Result<U, E2>): Result<U, E | E2>;
   tap(f: (value: T) => void): Result<T, E>;
   as<U>(value: U): Result<U, E>;
 
-  // error channel — touches Err only, NEVER Panic
+  // error channel — touches Err only, NEVER Defect
   mapErr<E2>(f: (error: E) => E2): Result<T, E2>;
   orElse<U, E2>(f: (error: E) => Result<U, E2>): Result<T | U, E2>;
   recover<U>(f: (error: E) => U): Result<T | U, never>;
   tapErr(f: (error: E) => void): Result<T, E>;
 
-  // defect channel — the only door to Panic
+  // defect channel — the only door to a Defect
   recoverDefect<U, E2>(f: (cause: unknown) => Result<U, E2>): Result<T | U, E | E2>;
   tapDefect(f: (cause: unknown) => void): Result<T, E>;
 
@@ -76,7 +81,7 @@ export type Result<T, E> = {
 
   isOk(): boolean;
   isErr(): boolean;
-  isPanic(): boolean;
+  isDefect(): boolean;
 
   toAsync(): AsyncResult<T, E>;
 };
@@ -117,7 +122,7 @@ export type AsyncResult<T, E> = PromiseLike<Result<T, E>> & {
 // Narrowing views exposed by the standalone guards (handy in tests & call sites)
 export type OkView<T> = Result<T, never> & { readonly value: T };
 export type ErrView<E> = Result<never, E> & { readonly error: E };
-export type PanicView = Result<never, never> & { readonly cause: unknown };
+export type DefectView = Result<never, never> & { readonly cause: unknown };
 
 // ----------------------------------------------------------------------------
 // Internal representation
@@ -126,7 +131,7 @@ export type PanicView = Result<never, never> & { readonly cause: unknown };
 type State<T, E> =
   | { readonly tag: "ok"; readonly value: T }
   | { readonly tag: "err"; readonly error: E }
-  | { readonly tag: "panic"; readonly cause: unknown };
+  | { readonly tag: "defect"; readonly cause: unknown };
 
 class Res<T, E> implements Result<T, E> {
   // public-at-runtime, but absent from the Result<T,E> interface, so user code
@@ -153,7 +158,7 @@ class Res<T, E> implements Result<T, E> {
     try {
       return new Res<U, E>({ tag: "ok", value: f(this._state.value) });
     } catch (cause) {
-      return panicRes<U, E>(cause);
+      return defectRes<U, E>(cause);
     }
   }
 
@@ -162,7 +167,7 @@ class Res<T, E> implements Result<T, E> {
     try {
       return f(this._state.value) as Result<U, E | E2>;
     } catch (cause) {
-      return panicRes<U, E | E2>(cause);
+      return defectRes<U, E | E2>(cause);
     }
   }
 
@@ -172,7 +177,7 @@ class Res<T, E> implements Result<T, E> {
       f(this._state.value);
       return this;
     } catch (cause) {
-      return panicRes<T, E>(cause);
+      return defectRes<T, E>(cause);
     }
   }
 
@@ -186,7 +191,7 @@ class Res<T, E> implements Result<T, E> {
     try {
       return new Res<T, E2>({ tag: "err", error: f(this._state.error) });
     } catch (cause) {
-      return panicRes<T, E2>(cause);
+      return defectRes<T, E2>(cause);
     }
   }
 
@@ -195,7 +200,7 @@ class Res<T, E> implements Result<T, E> {
     try {
       return f(this._state.error) as Result<T | U, E2>;
     } catch (cause) {
-      return panicRes<T | U, E2>(cause);
+      return defectRes<T | U, E2>(cause);
     }
   }
 
@@ -204,7 +209,7 @@ class Res<T, E> implements Result<T, E> {
     try {
       return new Res<T | U, never>({ tag: "ok", value: f(this._state.error) });
     } catch (cause) {
-      return panicRes<T | U, never>(cause);
+      return defectRes<T | U, never>(cause);
     }
   }
 
@@ -214,26 +219,26 @@ class Res<T, E> implements Result<T, E> {
       f(this._state.error);
       return this;
     } catch (cause) {
-      return panicRes<T, E>(cause);
+      return defectRes<T, E>(cause);
     }
   }
 
   recoverDefect<U, E2>(f: (cause: unknown) => Result<U, E2>): Result<T | U, E | E2> {
-    if (this._state.tag !== "panic") return this as unknown as Result<T | U, E | E2>;
+    if (this._state.tag !== "defect") return this as unknown as Result<T | U, E | E2>;
     try {
       return f(this._state.cause) as Result<T | U, E | E2>;
     } catch (cause) {
-      return panicRes<T | U, E | E2>(cause);
+      return defectRes<T | U, E | E2>(cause);
     }
   }
 
   tapDefect(f: (cause: unknown) => void): Result<T, E> {
-    if (this._state.tag !== "panic") return this;
+    if (this._state.tag !== "defect") return this;
     try {
       f(this._state.cause);
       return this;
     } catch (cause) {
-      return panicRes<T, E>(cause);
+      return defectRes<T, E>(cause);
     }
   }
 
@@ -243,7 +248,7 @@ class Res<T, E> implements Result<T, E> {
         return cases.ok(this._state.value);
       case "err":
         return cases.err(this._state.error);
-      case "panic":
+      case "defect":
         return cases.defect(this._state.cause);
     }
   }
@@ -254,7 +259,7 @@ class Res<T, E> implements Result<T, E> {
         return this._state.value;
       case "err":
         throw new UnwrapError(this._state.error);
-      case "panic":
+      case "defect":
         throw this._state.cause; // rethrow original cause, original stack
     }
   }
@@ -265,32 +270,32 @@ class Res<T, E> implements Result<T, E> {
         return this._state.error;
       case "ok":
         throw new UnwrapError(this._state.value);
-      case "panic":
+      case "defect":
         throw this._state.cause;
     }
   }
 
   unwrapOr(fallback: T): T {
     if (this._state.tag === "ok") return this._state.value;
-    if (this._state.tag === "panic") throw this._state.cause;
+    if (this._state.tag === "defect") throw this._state.cause;
     return fallback;
   }
 
   unwrapOrElse(f: (error: E) => T): T {
     if (this._state.tag === "ok") return this._state.value;
-    if (this._state.tag === "panic") throw this._state.cause;
+    if (this._state.tag === "defect") throw this._state.cause;
     return f(this._state.error);
   }
 
   getOrNull(): T | null {
     if (this._state.tag === "ok") return this._state.value;
-    if (this._state.tag === "panic") throw this._state.cause;
+    if (this._state.tag === "defect") throw this._state.cause;
     return null;
   }
 
   getOrUndefined(): T | undefined {
     if (this._state.tag === "ok") return this._state.value;
-    if (this._state.tag === "panic") throw this._state.cause;
+    if (this._state.tag === "defect") throw this._state.cause;
     return undefined;
   }
 
@@ -300,8 +305,8 @@ class Res<T, E> implements Result<T, E> {
   isErr(): boolean {
     return this._state.tag === "err";
   }
-  isPanic(): boolean {
-    return this._state.tag === "panic";
+  isDefect(): boolean {
+    return this._state.tag === "defect";
   }
 
   toAsync(): AsyncResult<T, E> {
@@ -309,8 +314,8 @@ class Res<T, E> implements Result<T, E> {
   }
 }
 
-function panicRes<T, E>(cause: unknown): Result<T, E> {
-  return new Res<T, E>({ tag: "panic", cause });
+function defectRes<T, E>(cause: unknown): Result<T, E> {
+  return new Res<T, E>({ tag: "defect", cause });
 }
 
 // ----------------------------------------------------------------------------
@@ -325,11 +330,6 @@ export function err<E>(error: E): Result<never, E> {
   return new Res<never, E>({ tag: "err", error });
 }
 
-/** Construct an already-defected Result. Rare; usually defects arise via `qualify`. */
-export function panic(cause: unknown): Result<never, never> {
-  return new Res<never, never>({ tag: "panic", cause });
-}
-
 // ----------------------------------------------------------------------------
 // Guards (standalone — narrow and expose the relevant field)
 // ----------------------------------------------------------------------------
@@ -340,8 +340,8 @@ export function isOk<T, E>(r: Result<T, E>): r is OkView<T> {
 export function isErr<T, E>(r: Result<T, E>): r is ErrView<E> {
   return r.isErr();
 }
-export function isPanic<T, E>(r: Result<T, E>): r is PanicView {
-  return r.isPanic();
+export function isDefect<T, E>(r: Result<T, E>): r is DefectView {
+  return r.isDefect();
 }
 
 // ----------------------------------------------------------------------------
@@ -367,7 +367,7 @@ class AsyncRes<T, E> implements AsyncResult<T, E> {
         try {
           return new Res<U, E>({ tag: "ok", value: await f(r._state.value) });
         } catch (cause) {
-          return new Res<U, E>({ tag: "panic", cause });
+          return new Res<U, E>({ tag: "defect", cause });
         }
       }),
     );
@@ -382,7 +382,7 @@ class AsyncRes<T, E> implements AsyncResult<T, E> {
         try {
           return (await f(r._state.value)) as Res<U, E | E2>;
         } catch (cause) {
-          return new Res<U, E | E2>({ tag: "panic", cause });
+          return new Res<U, E | E2>({ tag: "defect", cause });
         }
       }),
     );
@@ -396,7 +396,7 @@ class AsyncRes<T, E> implements AsyncResult<T, E> {
           await f(r._state.value);
           return r;
         } catch (cause) {
-          return new Res<T, E>({ tag: "panic", cause });
+          return new Res<T, E>({ tag: "defect", cause });
         }
       }),
     );
@@ -417,7 +417,7 @@ class AsyncRes<T, E> implements AsyncResult<T, E> {
         try {
           return new Res<T, E2>({ tag: "err", error: await f(r._state.error) });
         } catch (cause) {
-          return new Res<T, E2>({ tag: "panic", cause });
+          return new Res<T, E2>({ tag: "defect", cause });
         }
       }),
     );
@@ -432,7 +432,7 @@ class AsyncRes<T, E> implements AsyncResult<T, E> {
         try {
           return (await f(r._state.error)) as Res<T | U, E2>;
         } catch (cause) {
-          return new Res<T | U, E2>({ tag: "panic", cause });
+          return new Res<T | U, E2>({ tag: "defect", cause });
         }
       }),
     );
@@ -448,7 +448,7 @@ class AsyncRes<T, E> implements AsyncResult<T, E> {
             value: await f(r._state.error),
           });
         } catch (cause) {
-          return new Res<T | U, never>({ tag: "panic", cause });
+          return new Res<T | U, never>({ tag: "defect", cause });
         }
       }),
     );
@@ -462,7 +462,7 @@ class AsyncRes<T, E> implements AsyncResult<T, E> {
           await f(r._state.error);
           return r;
         } catch (cause) {
-          return new Res<T, E>({ tag: "panic", cause });
+          return new Res<T, E>({ tag: "defect", cause });
         }
       }),
     );
@@ -473,11 +473,11 @@ class AsyncRes<T, E> implements AsyncResult<T, E> {
   ): AsyncResult<T | U, E | E2> {
     return new AsyncRes<T | U, E | E2>(
       this.promise.then(async (r) => {
-        if (r._state.tag !== "panic") return r as unknown as Res<T | U, E | E2>;
+        if (r._state.tag !== "defect") return r as unknown as Res<T | U, E | E2>;
         try {
           return (await f(r._state.cause)) as Res<T | U, E | E2>;
         } catch (cause) {
-          return new Res<T | U, E | E2>({ tag: "panic", cause });
+          return new Res<T | U, E | E2>({ tag: "defect", cause });
         }
       }),
     );
@@ -486,12 +486,12 @@ class AsyncRes<T, E> implements AsyncResult<T, E> {
   tapDefect(f: (cause: unknown) => void | Promise<void>): AsyncResult<T, E> {
     return new AsyncRes<T, E>(
       this.promise.then(async (r) => {
-        if (r._state.tag !== "panic") return r;
+        if (r._state.tag !== "defect") return r;
         try {
           await f(r._state.cause);
           return r;
         } catch (cause) {
-          return new Res<T, E>({ tag: "panic", cause });
+          return new Res<T, E>({ tag: "defect", cause });
         }
       }),
     );
@@ -518,7 +518,7 @@ class AsyncRes<T, E> implements AsyncResult<T, E> {
     return this.promise.then(async (r) => {
       const s = r._state;
       if (s.tag === "ok") return s.value;
-      if (s.tag === "panic") throw s.cause;
+      if (s.tag === "defect") throw s.cause;
       return f(s.error);
     });
   }
@@ -576,7 +576,7 @@ export function fromSafePromise<T>(
   const p = typeof promise === "function" ? Promise.resolve().then(promise) : promise;
   const settled: Promise<Res<T, never>> = p.then(
     (value) => new Res<T, never>({ tag: "ok", value }),
-    (cause) => new Res<T, never>({ tag: "panic", cause }),
+    (cause) => new Res<T, never>({ tag: "defect", cause }),
   );
   return new AsyncRes<T, never>(settled);
 }
@@ -587,10 +587,10 @@ function qualifyToResult<T, E>(
 ): Result<T, E> {
   try {
     const q = qualify(cause);
-    return isDefect(q) ? panicRes<T, E>(q.cause) : (err(q) as Result<T, E>);
+    return isDefectMarker(q) ? defectRes<T, E>(q.cause) : (err(q) as Result<T, E>);
   } catch (qErr) {
     // a throw inside qualify is itself a defect
-    return panicRes<T, E>(qErr);
+    return defectRes<T, E>(qErr);
   }
 }
 
@@ -601,22 +601,44 @@ function qualifyToResult<T, E>(
 export type OkOf<R> = R extends Result<infer T, unknown> ? T : never;
 export type ErrOf<R> = R extends Result<unknown, infer E> ? E : never;
 
-/** Collect a tuple of Results. First Err short-circuits; any Panic dominates. */
+/** Collect a tuple of Results. First Err short-circuits; any Defect dominates. */
 export function all<Rs extends readonly Result<unknown, unknown>[]>(
   results: readonly [...Rs],
 ): Result<{ [K in keyof Rs]: OkOf<Rs[K]> }, ErrOf<Rs[number]>> {
   const values: unknown[] = [];
   let firstErr: Result<unknown, unknown> | undefined;
-  let firstPanic: Result<unknown, unknown> | undefined;
+  let firstDefect: Result<unknown, unknown> | undefined;
 
   for (const r of results) {
     const s = (r as Res<unknown, unknown>)._state;
-    if (s.tag === "panic") firstPanic ??= r;
+    if (s.tag === "defect") firstDefect ??= r;
     else if (s.tag === "err") firstErr ??= r;
     else values.push(s.value);
   }
 
-  if (firstPanic) return firstPanic as Result<{ [K in keyof Rs]: OkOf<Rs[K]> }, ErrOf<Rs[number]>>;
+  if (firstDefect)
+    return firstDefect as Result<{ [K in keyof Rs]: OkOf<Rs[K]> }, ErrOf<Rs[number]>>;
   if (firstErr) return firstErr as Result<{ [K in keyof Rs]: OkOf<Rs[K]> }, ErrOf<Rs[number]>>;
   return ok(values as { [K in keyof Rs]: OkOf<Rs[K]> });
 }
+
+// ----------------------------------------------------------------------------
+// Result facade — a discoverable namespace alias for the standalone entry
+// points. The free functions above remain the primary, tree-shakeable API;
+// this object is a separate export, so `import { ok }` never pulls it in.
+// (Value and type both named `Result` — the companion-object pattern.)
+// ----------------------------------------------------------------------------
+
+export const Result = {
+  ok,
+  err,
+  defect,
+  fromNullable,
+  fromThrowable,
+  fromPromise,
+  fromSafePromise,
+  all,
+  isOk,
+  isErr,
+  isDefect,
+} as const;
