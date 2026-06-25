@@ -87,6 +87,9 @@ channel to model). Its **combinator callbacks are synchronous** (no raw
   (`Result.ok`/`err`/`defect`/`from*`/`all`/`is*`) for discoverability; the free
   functions remain the primary, tree-shakeable API. One concept, two import
   styles — not a second concept.
+- tagged errors: `TaggedError(tag)` (the error-class factory) and
+  `matchTags(result, handlers)` (an exhaustive `{ Ok, Defect } & per-tag` fold);
+  see the `TaggedError` convention in Thesis #4.
 
 Deliberately **excluded** for now: `gen`/do-notation (heaviest possible
 addition; revisit only if sequential code demands it), accumulation/`Validation`,
@@ -103,12 +106,13 @@ Never pull `ts-pattern` or `vitest` into core.
 
 ## Roadmap (suggested order)
 
-1. **Scaffold the workspace.** package.json `exports`, build (tsup or tsc),
-   `tsconfig` (strict + `exactOptionalPropertyTypes` + `noUncheckedIndexedAccess`),
-   the `@unthrown` scope placeholder publishes so the util packages can depend on
-   it. Publish `unthrown` and an empty `@unthrown/core` early to claim the names.
-2. **`packages/core/src/tagged.ts`** — `TaggedError(tag)` factory (extends
-   `Error`, `_tag`, no-arg constructor when payload is empty via the
+1. ✅ **Scaffold the workspace.** Done — pnpm + turbo workspace, dual CJS/ESM
+   tsdown build, strict shared tsconfig, oxlint/oxfmt, knip, changesets, CI. The
+   core `unthrown` package is split into focused modules, fully TSDoc'd, and
+   covered by a 108-test suite (100% line/function coverage). (Publishing the
+   names to npm remains a manual step.)
+2. ✅ **`packages/core/src/tagged.ts`** — Done. `TaggedError(tag)` factory
+   (extends `Error`, `_tag`, no-arg constructor when payload is empty via the
    `keyof A extends never ? void : A` trick) and `matchTags(result, handlers)`:
    a zero-dependency exhaustive fold whose handler object is
    `{ Ok, Defect } & { [K in E["_tag"]]: (e: Extract<E, {_tag: K}>) => R }`.
