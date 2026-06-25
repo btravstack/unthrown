@@ -15,6 +15,13 @@ coverage/
 # TypeDoc generated API docs
 packages/*/docs/
 
+# VitePress
+docs/.vitepress/cache/
+docs/.vitepress/dist/
+# Per-package API reference copied in from TypeDoc output at build time
+# (the hand-written docs/api/index.md overview is kept)
+docs/api/*/
+
 # Logs
 *.log
 

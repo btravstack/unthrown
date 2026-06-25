@@ -1,0 +1,23 @@
+{
+  "name": "@unthrown/docs",
+  "private": true,
+  "description": "Documentation website for unthrown",
+  "license": "MIT",
+  "author": "Benoit TRAVERS <benoit.travers.fr@gmail.com>",
+  "type": "module",
+  "scripts": {
+    "build": "tsx scripts/copy-docs.ts && vitepress build .",
+    "dev": "tsx scripts/copy-docs.ts && vitepress dev .",
+    "preview": "vitepress preview ."
+  },
+  "dependencies": {
+    "@unthrown/pattern": "workspace:*",
+    "@unthrown/vitest": "workspace:*",
+    "unthrown": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "vitepress": "catalog:"
+  }
+}

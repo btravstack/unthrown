@@ -7,6 +7,7 @@ strictPeerDependencies: true
 packages:
   - packages/*
   - tools/*
+  - docs
 
 catalog:
   "@changesets/cli": 2.31.0
@@ -20,11 +21,18 @@ catalog:
   oxlint: 1.69.0
   ts-pattern: 5.9.0
   tsdown: 0.22.2
+  tsx: 4.22.4
   turbo: 2.9.18
   typedoc: 0.28.19
   typedoc-plugin-markdown: 4.12.0
   typescript: 6.0.3
+  vitepress: 1.6.4
   vitest: 4.1.8
+
+peerDependencyRules:
+  ignoreMissing:
+    # Optional analytics peer of VitePress's bundled Algolia DocSearch.
+    - search-insights
 
 allowBuilds:
   esbuild: true

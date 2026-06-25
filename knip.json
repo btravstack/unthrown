@@ -4,6 +4,10 @@
   "workspaces": {
     "packages/*": {
       "project": ["src/**/*.ts"]
+    },
+    "docs": {
+      "entry": ["scripts/*.ts"],
+      "project": ["scripts/**/*.ts"]
     }
   },
   "ignoreDependencies": ["typedoc-plugin-markdown", "@unthrown/typedoc"]

@@ -25,6 +25,10 @@
     "build:docs": {
       "dependsOn": ["^build"],
       "outputs": ["docs/**"]
+    },
+    "@unthrown/docs#build": {
+      "dependsOn": ["^build", "^build:docs"],
+      "outputs": [".vitepress/dist/**"]
     }
   }
 }

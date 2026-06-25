@@ -1,6 +1,11 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "ignorePatterns": ["pnpm-lock.yaml"],
+  "ignorePatterns": [
+    "pnpm-lock.yaml",
+    "**/docs/api/**",
+    "docs/.vitepress/cache/**",
+    "docs/.vitepress/dist/**"
+  ],
   "organizeImports": {
     "sortImports": true,
     "separateGroups": true
