@@ -62,7 +62,7 @@ not flung up the stack. Only a true defect ever throws (at `unwrap`).
   thrown value is captured as `Err` (via `qualify`) or `Defect`. `await`-ing an
   `AsyncResult` always yields a `Result` and never throws.
 
-## Public surface (already implemented in packages/core/src/result.ts)
+## Public surface (implemented in packages/core/src/, split into focused modules)
 
 `Result<T, E>` and `AsyncResult<T, E>` share one method surface. `AsyncResult`
 is an awaitable wrapper (method parity with `Result`) typed as
