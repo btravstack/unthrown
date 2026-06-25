@@ -249,18 +249,24 @@ util packages depend on the scope existing and names get sniped.
 
 ## 7. Implementation status
 
-- `packages/core/src/result.ts` — **written and verified.**
+- **`packages/core` — written, split into focused modules, and fully tested.**
   - Compiles clean under `strict` + `exactOptionalPropertyTypes` +
     `noUncheckedIndexedAccess` on TypeScript 6.
-  - 13 runtime smoke checks pass, covering: throw-in-`map` → defect; a defect
-    flows through `mapErr`/`recover`; `unwrapOr` rethrows on a defect; `unwrap`
-    rethrows cause vs wraps `Err`; `recover` clears the error channel;
-    `fromThrowable` triage (err vs defect); `all` (first err wins / defect
-    dominates); `fromPromise` never rejects; throw-in-async-`map` → defect; async
-    `flatMap` chaining.
+  - Source layout (see §2.8): `types.ts` (public types), `defect.ts` (the
+    `Defect` marker plumbing), `core.ts` (the `Res`/`AsyncRes` engine +
+    `UnwrapError`), `constructors.ts` (`ok`/`err` + guards), `interop.ts`
+    (`from*`/`qualify`/`all`), `facade.ts` (the `Result` companion object), and
+    `index.ts` (curated re-exports). `core.ts` is the only module the rest depend
+    on and is never re-exported, keeping `Res._state` hidden.
+  - **Vitest suite: 98 tests across 7 `*.spec.ts` files**, 100% line/function
+    coverage (branches 90% — the remainder is the deliberately-unreachable
+    defensive `then` rejection path). `invariants.spec.ts` guards each
+    load-bearing invariant from §4 / CLAUDE.md 1:1; the other specs cover the
+    full surface (sync `Result`, `AsyncResult`, constructors/guards, interop,
+    `all`, facade). Coverage thresholds in `vitest.config.ts` lock this in.
   - Internal representation: a single `Res` class over a `State` discriminated
     union; `AsyncRes` wraps a `Promise<Res>` constructed never to reject.
-    `Res._state` is public-at-runtime but absent from the `Result` interface;
+    `Res._state` is public-at-runtime but absent from the `Result` type;
     `value`/`error`/`cause` getters back only the narrowed guard views. Pass-
     through branches use `as unknown as Result<…>` casts, confined to provably-
     non-`ok` states.

@@ -7,6 +7,14 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**"],
+      // Lock in the full-coverage suite. Branches sit below 100 only because of
+      // the deliberately-unreachable defensive `then` rejection path.
+      thresholds: {
+        statements: 95,
+        branches: 90,
+        functions: 100,
+        lines: 100,
+      },
     },
   },
 });
