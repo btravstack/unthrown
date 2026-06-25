@@ -8,10 +8,6 @@ packages:
   - packages/*
   - tools/*
 
-peerDependencyRules:
-  ignoreMissing:
-    - typescript
-
 catalog:
   "@changesets/cli": 2.31.0
   "@commitlint/cli": 21.0.2

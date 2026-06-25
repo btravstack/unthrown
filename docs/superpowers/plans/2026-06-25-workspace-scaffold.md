@@ -30,6 +30,7 @@
 Establishes the workspace so `pnpm install` resolves. No package code yet.
 
 **Files:**
+
 - Create: `package.json`
 - Create: `pnpm-workspace.yaml`
 - Create: `turbo.json`
@@ -43,6 +44,7 @@ Establishes the workspace so `pnpm install` resolves. No package code yet.
 - Create: `tools/typedoc/base.json`
 
 **Interfaces:**
+
 - Produces: workspace catalog (all `catalog:` references resolve), private packages `@unthrown/tsconfig` (exports `./base.json`) and `@unthrown/typedoc` (exports `./base.json`), and root scripts `build`/`lint`/`format`/`typecheck`/`test`/`knip`/`changeset`/`version`/`release`/`dev`/`prepare`.
 
 - [ ] **Step 1: Create `package.json`**
@@ -236,9 +238,7 @@ commit-msg:
   "license": "MIT",
   "author": "Benoit TRAVERS <benoit.travers.fr@gmail.com>",
   "type": "module",
-  "files": [
-    "base.json"
-  ],
+  "files": ["base.json"],
   "exports": {
     "./base.json": "./base.json"
   }
@@ -295,9 +295,7 @@ commit-msg:
   "license": "MIT",
   "author": "Benoit TRAVERS <benoit.travers.fr@gmail.com>",
   "type": "module",
-  "files": [
-    "base.json"
-  ],
+  "files": ["base.json"],
   "exports": {
     "./base.json": "./base.json"
   }
@@ -357,6 +355,7 @@ git commit -m "chore: scaffold pnpm/turbo workspace and shared config"
 Wires `packages/core`, adapts `result.ts` to the lint rules, curates the public surface, and proves typecheck/test/build all run green.
 
 **Files:**
+
 - Create: `packages/core/package.json`
 - Create: `packages/core/tsconfig.json`
 - Create: `packages/core/tsdown.config.ts`
@@ -367,6 +366,7 @@ Wires `packages/core`, adapts `result.ts` to the lint rules, curates the public 
 - Test: `packages/core/src/result.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `@unthrown/tsconfig/base.json`, `@unthrown/typedoc/base.json` (Task 1).
 - Produces: package `unthrown` whose public entry `src/index.ts` re-exports values `ok`, `err`, `defect`, `panic`, `isOk`, `isErr`, `isPanic`, `fromNullable`, `fromThrowable`, `fromPromise`, `fromSafePromise`, `all`, `UnwrapError`; and types `Result`, `AsyncResult`, `Defect`, `OkView`, `ErrView`, `PanicView`, `OkOf`, `ErrOf`. Built dist at `dist/index.{mjs,cjs,d.mts,d.cts}`.
 
@@ -399,10 +399,7 @@ Wires `packages/core`, adapts `result.ts` to the lint rules, curates the public 
     "url": "https://github.com/btravers/unthrown.git",
     "directory": "packages/core"
   },
-  "files": [
-    "dist",
-    "docs"
-  ],
+  "files": ["dist", "docs"],
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -675,6 +672,7 @@ git commit -m "feat(core): wire unthrown package, build, and smoke test"
 Buildable placeholders that claim the `@unthrown/*` scope names and establish the peer-dependency wiring (`ts-pattern`, `vitest`) without pulling them into core.
 
 **Files:**
+
 - Create: `packages/pattern/package.json`
 - Create: `packages/pattern/tsconfig.json`
 - Create: `packages/pattern/tsdown.config.ts`
@@ -687,6 +685,7 @@ Buildable placeholders that claim the `@unthrown/*` scope names and establish th
 - Create: `packages/vitest/src/index.ts`
 
 **Interfaces:**
+
 - Consumes: `unthrown` (workspace), `@unthrown/tsconfig`, `@unthrown/typedoc` (Tasks 1–2).
 - Produces: published packages `@unthrown/pattern` (peer `ts-pattern`) and `@unthrown/vitest` (peer `vitest`), each exporting a single internal placeholder const so the dist builds. No public API yet.
 
@@ -716,10 +715,7 @@ Buildable placeholders that claim the `@unthrown/*` scope names and establish th
     "url": "https://github.com/btravers/unthrown.git",
     "directory": "packages/pattern"
   },
-  "files": [
-    "dist",
-    "docs"
-  ],
+  "files": ["dist", "docs"],
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -845,10 +841,7 @@ export const __placeholder = { match, ok } as const;
     "url": "https://github.com/btravers/unthrown.git",
     "directory": "packages/vitest"
   },
-  "files": [
-    "dist",
-    "docs"
-  ],
+  "files": ["dist", "docs"],
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -989,11 +982,13 @@ git commit -m "feat: add @unthrown/pattern and @unthrown/vitest placeholders"
 Adds dead-code/dependency checking and the release configuration, completing the local quality gate set (`format`, `lint`, `typecheck`, `test`, `build`, `knip`).
 
 **Files:**
+
 - Create: `knip.json`
 - Create: `.changeset/config.json`
 - Create: `.changeset/README.md`
 
 **Interfaces:**
+
 - Consumes: the workspace and all three packages (Tasks 1–3).
 - Produces: a passing `pnpm knip`, and a changesets setup whose `fixed` group versions the three publishable packages together.
 
@@ -1008,11 +1003,7 @@ Adds dead-code/dependency checking and the release configuration, completing the
       "project": ["src/**/*.ts"]
     }
   },
-  "ignoreDependencies": [
-    "typedoc-plugin-markdown",
-    "@unthrown/typedoc",
-    "@unthrown/tsconfig"
-  ]
+  "ignoreDependencies": ["typedoc-plugin-markdown", "@unthrown/typedoc", "@unthrown/tsconfig"]
 }
 ```
 
@@ -1025,13 +1016,7 @@ Adds dead-code/dependency checking and the release configuration, completing the
   "$schema": "https://unpkg.com/@changesets/config@3.0.3/schema.json",
   "changelog": "@changesets/cli/changelog",
   "commit": false,
-  "fixed": [
-    [
-      "unthrown",
-      "@unthrown/pattern",
-      "@unthrown/vitest"
-    ]
-  ],
+  "fixed": [["unthrown", "@unthrown/pattern", "@unthrown/vitest"]],
   "linked": [],
   "access": "public",
   "baseBranch": "main",
@@ -1081,11 +1066,13 @@ git commit -m "chore: add knip and changesets configuration"
 Adds the GitHub Actions composite setup action and the CI + release pipelines, consistent with the sibling projects (minus the integration-test job).
 
 **Files:**
+
 - Create: `.github/actions/setup/action.yml`
 - Create: `.github/workflows/ci.yml`
 - Create: `.github/workflows/release.yml`
 
 **Interfaces:**
+
 - Consumes: root scripts `format`/`lint`/`typecheck`/`knip`/`test`/`build` and the changesets `version`/`release` scripts (Tasks 1–4).
 - Produces: CI on push/PR to `main` (format, lint, typecheck, knip, test+coverage, build, security-audit, bundle-size) and a changesets-driven release workflow using npm Trusted Publishing.
 
@@ -1373,6 +1360,7 @@ These remain for the maintainer to do by hand (per spec §8):
 ## Self-Review
 
 **Spec coverage:**
+
 - §2 toolchain → Tasks 1–5 (pnpm/turbo/tsdown/oxlint/oxfmt/knip/lefthook/commitlint/changesets/vitest/typedoc/CI). ✓
 - §3 layout → Tasks 1–5 create every listed file (`.npmrc` correctly omitted per the spec edit). ✓
 - §4 package wiring → Tasks 2–3 (exports map, peerDeps, `workspace:*`, zero-dep core). ✓

@@ -6,5 +6,5 @@
       "project": ["src/**/*.ts"]
     }
   },
-  "ignoreDependencies": ["typedoc-plugin-markdown", "@unthrown/typedoc", "@unthrown/tsconfig"]
+  "ignoreDependencies": ["typedoc-plugin-markdown", "@unthrown/typedoc"]
 }
