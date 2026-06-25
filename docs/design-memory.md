@@ -279,7 +279,8 @@ util packages depend on the scope existing and names get sniped.
    knip, changesets, CI). Publishing the names to npm remains a manual step.
 2. ✅ **`packages/core/src/tagged.ts`** — done. `TaggedError` factory +
    `matchTags`, fully tested and TSDoc'd.
-3. **`packages/vitest`** — the matchers above.
+3. ✅ **`packages/vitest`** — done. The matchers above (`expect.extend` +
+   `Matchers` augmentation), thenable-aware, fully tested.
 4. **`packages/pattern`** — the thin ts-pattern layer.
 
 Throughout: Vitest, one concept = one name, core stays dependency-free, and every

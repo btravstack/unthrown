@@ -47,6 +47,7 @@
     "build": "tsdown src/index.ts --format cjs,esm --dts --clean",
     "build:docs": "typedoc",
     "dev": "tsdown src/index.ts --format cjs,esm --dts --watch",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -56,6 +57,7 @@
     "@types/node": "catalog:",
     "@unthrown/tsconfig": "workspace:*",
     "@unthrown/typedoc": "workspace:*",
+    "@vitest/coverage-v8": "catalog:",
     "tsdown": "catalog:",
     "typedoc": "catalog:",
     "typedoc-plugin-markdown": "catalog:",

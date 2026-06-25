@@ -116,10 +116,11 @@ Never pull `ts-pattern` or `vitest` into core.
    `keyof A extends never ? void : A` trick) and `matchTags(result, handlers)`:
    a zero-dependency exhaustive fold whose handler object is
    `{ Ok, Defect } & { [K in E["_tag"]]: (e: Extract<E, {_tag: K}>) => R }`.
-3. **`packages/vitest`** — custom matchers: `toBeOk`, `toBeOkWith`, `toBeErr`,
-   `toBeErrTagged`, `toBeDefect`. Augment the `Matchers` interface (Vitest 3.2+).
-   Async matchers must detect a thenable `AsyncResult` and await internally; the
-   test then reads `await expect(asyncResult).toBeOk()`.
+3. ✅ **`packages/vitest`** — Done. Custom matchers `toBeOk`, `toBeOkWith`,
+   `toBeErr`, `toBeErrTagged`, `toBeDefect`, registered via `expect.extend` and
+   augmenting Vitest's `Matchers` interface. They detect a thenable `AsyncResult`
+   and await internally, so a test reads `await expect(asyncResult).toBeOk()`
+   (the required `await` is documented loudly — a forgotten one passes silently).
 4. **`packages/pattern`** — thin `ts-pattern` integration: a `P.tag(tag)` sugar
    and an adapter exposing the ok/err/defect channels. Keep it small — the power
    is ts-pattern's, `matchTags` covers the everyday exhaustive case.
