@@ -1,11 +1,11 @@
-// unthrown — the runtime engine. Three states (Ok | Err | Defect) live in a
-// single `Res` class over a `State` discriminated union; `AsyncRes` wraps a
-// `Promise<Res>` constructed never to reject.
+// unthrown — the runtime engine.
 //
-// `Res._state` is public-at-runtime so module-mates (AsyncRes, aggregation) can
-// branch on it, but it is ABSENT from the `Result` type — so user code never
-// sees it. This module must never be re-exported from `index.ts`; that is what
-// keeps the representation (and the third state) hidden. See CLAUDE.md →
+// `Result` is the PUBLIC discriminated union (tag/value/error/cause + methods).
+// `Res` is its sole internal implementation: one class over a `State` union,
+// exposing the public discriminant via getters. `Res` is never exported from
+// `index.ts`; the three cast-builders below (`okRes`/`errRes`/`defectRes`) are
+// the only place a `Res` instance is bridged to the `Result` type. `AsyncRes`
+// wraps a `Promise<Result>` constructed never to reject. See CLAUDE.md →
 // "Internal design".
 
 import type { AsyncResult, Result } from "./types.js";
@@ -40,19 +40,23 @@ type State<T, E> =
   | { readonly tag: "err"; readonly error: E }
   | { readonly tag: "defect"; readonly cause: unknown };
 
+const PUBLIC_TAG = { ok: "Ok", err: "Err", defect: "Defect" } as const;
+
 /**
  * The sole runtime implementation of {@link Result}. Never re-exported from
- * `index.ts`, which is what keeps `_state` (and the third runtime state) hidden
- * from the public type.
+ * `index.ts`. Bridged to the `Result` type only via `okRes`/`errRes`/`defectRes`.
  *
  * @internal
  */
-export class Res<T, E> implements Result<T, E> {
-  // public-at-runtime, but absent from the Result<T,E> interface, so user code
-  // never sees it; AsyncResult (same module) reads it for branching.
+class Res<T, E> {
   readonly _state: State<T, E>;
 
-  // exposed only on the narrowed views via the standalone guards
+  // The public discriminant. `value`/`error`/`cause` are only reachable on the
+  // matching variant of the `Result` union, so reading the wrong one is a type
+  // error, not a runtime surprise.
+  get tag(): "Ok" | "Err" | "Defect" {
+    return PUBLIC_TAG[this._state.tag];
+  }
   get value(): T {
     return (this._state as { value: T }).value;
   }
@@ -70,9 +74,9 @@ export class Res<T, E> implements Result<T, E> {
   map<U>(f: (value: T) => U): Result<U, E> {
     if (this._state.tag !== "ok") return this as unknown as Result<U, E>;
     try {
-      return new Res<U, E>({ tag: "ok", value: f(this._state.value) });
+      return okRes(f(this._state.value));
     } catch (cause) {
-      return defectRes<U, E>(cause);
+      return defectRes(cause);
     }
   }
 
@@ -81,31 +85,31 @@ export class Res<T, E> implements Result<T, E> {
     try {
       return f(this._state.value) as Result<U, E | E2>;
     } catch (cause) {
-      return defectRes<U, E | E2>(cause);
+      return defectRes(cause);
     }
   }
 
   tap(f: (value: T) => void): Result<T, E> {
-    if (this._state.tag !== "ok") return this;
+    if (this._state.tag !== "ok") return this as unknown as Result<T, E>;
     try {
       f(this._state.value);
-      return this;
+      return this as unknown as Result<T, E>;
     } catch (cause) {
-      return defectRes<T, E>(cause);
+      return defectRes(cause);
     }
   }
 
   as<U>(value: U): Result<U, E> {
     if (this._state.tag !== "ok") return this as unknown as Result<U, E>;
-    return new Res<U, E>({ tag: "ok", value });
+    return okRes(value);
   }
 
   mapErr<E2>(f: (error: E) => E2): Result<T, E2> {
     if (this._state.tag !== "err") return this as unknown as Result<T, E2>;
     try {
-      return new Res<T, E2>({ tag: "err", error: f(this._state.error) });
+      return errRes(f(this._state.error));
     } catch (cause) {
-      return defectRes<T, E2>(cause);
+      return defectRes(cause);
     }
   }
 
@@ -114,26 +118,26 @@ export class Res<T, E> implements Result<T, E> {
     try {
       return f(this._state.error) as Result<T | U, E2>;
     } catch (cause) {
-      return defectRes<T | U, E2>(cause);
+      return defectRes(cause);
     }
   }
 
   recover<U>(f: (error: E) => U): Result<T | U, never> {
     if (this._state.tag !== "err") return this as unknown as Result<T | U, never>;
     try {
-      return new Res<T | U, never>({ tag: "ok", value: f(this._state.error) });
+      return okRes(f(this._state.error));
     } catch (cause) {
-      return defectRes<T | U, never>(cause);
+      return defectRes(cause);
     }
   }
 
   tapErr(f: (error: E) => void): Result<T, E> {
-    if (this._state.tag !== "err") return this;
+    if (this._state.tag !== "err") return this as unknown as Result<T, E>;
     try {
       f(this._state.error);
-      return this;
+      return this as unknown as Result<T, E>;
     } catch (cause) {
-      return defectRes<T, E>(cause);
+      return defectRes(cause);
     }
   }
 
@@ -142,17 +146,17 @@ export class Res<T, E> implements Result<T, E> {
     try {
       return f(this._state.cause) as Result<T | U, E | E2>;
     } catch (cause) {
-      return defectRes<T | U, E | E2>(cause);
+      return defectRes(cause);
     }
   }
 
   tapDefect(f: (cause: unknown) => void): Result<T, E> {
-    if (this._state.tag !== "defect") return this;
+    if (this._state.tag !== "defect") return this as unknown as Result<T, E>;
     try {
       f(this._state.cause);
-      return this;
+      return this as unknown as Result<T, E>;
     } catch (cause) {
-      return defectRes<T, E>(cause);
+      return defectRes(cause);
     }
   }
 
@@ -224,27 +228,46 @@ export class Res<T, E> implements Result<T, E> {
   }
 
   toAsync(): AsyncResult<T, E> {
-    return new AsyncRes<T, E>(Promise.resolve(this));
+    return new AsyncRes<T, E>(Promise.resolve(this as unknown as Result<T, E>));
   }
 }
 
 /**
- * Construct a `Result` already in the `defect` state.
+ * Construct an `Ok` result.
+ *
+ * @internal
+ */
+export function okRes<T, E>(value: T): Result<T, E> {
+  return new Res<T, E>({ tag: "ok", value }) as unknown as Result<T, E>;
+}
+
+/**
+ * Construct an `Err` result.
+ *
+ * @internal
+ */
+export function errRes<T, E>(error: E): Result<T, E> {
+  return new Res<T, E>({ tag: "err", error }) as unknown as Result<T, E>;
+}
+
+/**
+ * Construct a `Defect` result.
  *
  * @internal
  */
 export function defectRes<T, E>(cause: unknown): Result<T, E> {
-  return new Res<T, E>({ tag: "defect", cause });
+  return new Res<T, E>({ tag: "defect", cause }) as unknown as Result<T, E>;
 }
 
 /**
  * The sole runtime implementation of {@link AsyncResult}: wraps a
- * `Promise<Res>` constructed never to reject. Never re-exported from `index.ts`.
+ * `Promise<Result>` constructed never to reject. Operates on the public `Result`
+ * union (via `tag`), never on `Res` internals. Never re-exported from `index.ts`.
  *
  * @internal
  */
 export class AsyncRes<T, E> implements AsyncResult<T, E> {
-  constructor(private readonly promise: Promise<Res<T, E>>) {}
+  constructor(private readonly promise: Promise<Result<T, E>>) {}
 
   // oxlint-disable-next-line no-thenable -- AsyncResult is an intentional (success-only) thenable so `await` collapses it to a Result; see the Awaitable type. onrejected is still forwarded so a hypothetical internal rejection settles the await instead of hanging — though the internal promise never rejects.
   then<R1 = Result<T, E>, R2 = never>(
@@ -257,11 +280,11 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   map<U>(f: (value: T) => U): AsyncResult<U, E> {
     return new AsyncRes<U, E>(
       this.promise.then((r) => {
-        if (r._state.tag !== "ok") return r as unknown as Res<U, E>;
+        if (r.tag !== "Ok") return r as unknown as Result<U, E>;
         try {
-          return new Res<U, E>({ tag: "ok", value: f(r._state.value) });
+          return okRes(f(r.value));
         } catch (cause) {
-          return new Res<U, E>({ tag: "defect", cause });
+          return defectRes(cause);
         }
       }),
     );
@@ -270,11 +293,11 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   flatMap<U, E2>(f: (value: T) => Result<U, E2> | AsyncResult<U, E2>): AsyncResult<U, E | E2> {
     return new AsyncRes<U, E | E2>(
       this.promise.then(async (r) => {
-        if (r._state.tag !== "ok") return r as unknown as Res<U, E | E2>;
+        if (r.tag !== "Ok") return r as unknown as Result<U, E | E2>;
         try {
-          return (await f(r._state.value)) as Res<U, E | E2>;
+          return (await f(r.value)) as Result<U, E | E2>;
         } catch (cause) {
-          return new Res<U, E | E2>({ tag: "defect", cause });
+          return defectRes(cause);
         }
       }),
     );
@@ -283,12 +306,12 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   tap(f: (value: T) => void): AsyncResult<T, E> {
     return new AsyncRes<T, E>(
       this.promise.then((r) => {
-        if (r._state.tag !== "ok") return r;
+        if (r.tag !== "Ok") return r;
         try {
-          f(r._state.value);
+          f(r.value);
           return r;
         } catch (cause) {
-          return new Res<T, E>({ tag: "defect", cause });
+          return defectRes<T, E>(cause);
         }
       }),
     );
@@ -297,7 +320,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   as<U>(value: U): AsyncResult<U, E> {
     return new AsyncRes<U, E>(
       this.promise.then((r) =>
-        r._state.tag === "ok" ? new Res<U, E>({ tag: "ok", value }) : (r as unknown as Res<U, E>),
+        r.tag === "Ok" ? okRes<U, E>(value) : (r as unknown as Result<U, E>),
       ),
     );
   }
@@ -305,11 +328,11 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   mapErr<E2>(f: (error: E) => E2): AsyncResult<T, E2> {
     return new AsyncRes<T, E2>(
       this.promise.then((r) => {
-        if (r._state.tag !== "err") return r as unknown as Res<T, E2>;
+        if (r.tag !== "Err") return r as unknown as Result<T, E2>;
         try {
-          return new Res<T, E2>({ tag: "err", error: f(r._state.error) });
+          return errRes(f(r.error));
         } catch (cause) {
-          return new Res<T, E2>({ tag: "defect", cause });
+          return defectRes(cause);
         }
       }),
     );
@@ -318,11 +341,11 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   orElse<U, E2>(f: (error: E) => Result<U, E2> | AsyncResult<U, E2>): AsyncResult<T | U, E2> {
     return new AsyncRes<T | U, E2>(
       this.promise.then(async (r) => {
-        if (r._state.tag !== "err") return r as unknown as Res<T | U, E2>;
+        if (r.tag !== "Err") return r as unknown as Result<T | U, E2>;
         try {
-          return (await f(r._state.error)) as Res<T | U, E2>;
+          return (await f(r.error)) as Result<T | U, E2>;
         } catch (cause) {
-          return new Res<T | U, E2>({ tag: "defect", cause });
+          return defectRes(cause);
         }
       }),
     );
@@ -331,11 +354,11 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   recover<U>(f: (error: E) => U): AsyncResult<T | U, never> {
     return new AsyncRes<T | U, never>(
       this.promise.then((r) => {
-        if (r._state.tag !== "err") return r as unknown as Res<T | U, never>;
+        if (r.tag !== "Err") return r as unknown as Result<T | U, never>;
         try {
-          return new Res<T | U, never>({ tag: "ok", value: f(r._state.error) });
+          return okRes<T | U, never>(f(r.error));
         } catch (cause) {
-          return new Res<T | U, never>({ tag: "defect", cause });
+          return defectRes(cause);
         }
       }),
     );
@@ -344,12 +367,12 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   tapErr(f: (error: E) => void): AsyncResult<T, E> {
     return new AsyncRes<T, E>(
       this.promise.then((r) => {
-        if (r._state.tag !== "err") return r;
+        if (r.tag !== "Err") return r;
         try {
-          f(r._state.error);
+          f(r.error);
           return r;
         } catch (cause) {
-          return new Res<T, E>({ tag: "defect", cause });
+          return defectRes<T, E>(cause);
         }
       }),
     );
@@ -360,11 +383,11 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   ): AsyncResult<T | U, E | E2> {
     return new AsyncRes<T | U, E | E2>(
       this.promise.then(async (r) => {
-        if (r._state.tag !== "defect") return r as unknown as Res<T | U, E | E2>;
+        if (r.tag !== "Defect") return r as unknown as Result<T | U, E | E2>;
         try {
-          return (await f(r._state.cause)) as Res<T | U, E | E2>;
+          return (await f(r.cause)) as Result<T | U, E | E2>;
         } catch (cause) {
-          return new Res<T | U, E | E2>({ tag: "defect", cause });
+          return defectRes(cause);
         }
       }),
     );
@@ -373,12 +396,12 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   tapDefect(f: (cause: unknown) => void): AsyncResult<T, E> {
     return new AsyncRes<T, E>(
       this.promise.then((r) => {
-        if (r._state.tag !== "defect") return r;
+        if (r.tag !== "Defect") return r;
         try {
-          f(r._state.cause);
+          f(r.cause);
           return r;
         } catch (cause) {
-          return new Res<T, E>({ tag: "defect", cause });
+          return defectRes<T, E>(cause);
         }
       }),
     );
@@ -403,10 +426,9 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   }
   unwrapOrElse(f: (error: E) => T): Promise<T> {
     return this.promise.then((r) => {
-      const s = r._state;
-      if (s.tag === "ok") return s.value;
-      if (s.tag === "defect") throw s.cause;
-      return f(s.error);
+      if (r.tag === "Ok") return r.value;
+      if (r.tag === "Defect") throw r.cause;
+      return f(r.error);
     });
   }
   getOrNull(): Promise<T | null> {

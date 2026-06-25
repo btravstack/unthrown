@@ -1,59 +1,64 @@
-// @unthrown/pattern — a thin `ts-pattern` integration for `Result`.
+// @unthrown/pattern — native `ts-pattern` interop for `Result`.
 //
-// `ts-pattern` already matches tagged unions natively, so this package is
-// deliberately small: `toMatchable` exposes a Result's otherwise-hidden
-// ok/err/defect channels as a discriminated union `ts-pattern` can match, and
-// `tag` is sugar for matching a `TaggedError` by its `_tag`. The matching power
-// is `ts-pattern`'s; `matchTags` from `unthrown` covers the everyday exhaustive
-// case.
-
-import type { Result } from "unthrown";
-
-/**
- * A discriminated view of a `Result`'s three channels, suitable for
- * `ts-pattern`'s `match`. The `_kind` discriminant is distinct from any `_tag`
- * an error value may carry, so the two never collide in nested patterns.
- *
- * @typeParam T - the success value type.
- * @typeParam E - the modeled error type.
- */
-export type ResultMatchable<T, E> =
-  | { readonly _kind: "Ok"; readonly value: T }
-  | { readonly _kind: "Err"; readonly error: E }
-  | { readonly _kind: "Defect"; readonly cause: unknown };
+// A `Result` is a discriminated union (`{ tag: "Ok" | "Err" | "Defect" }`), so
+// `ts-pattern` matches it directly — narrowing, selection, and `.exhaustive()`
+// all work out of the box. This package is just sugar: pattern constructors so
+// you can write `P.ok(...)` instead of the raw `{ tag: "Ok", value: ... }`
+// object pattern, plus `tag` for matching a `TaggedError` by its `_tag`.
+//
+//   import { match } from "ts-pattern";
+//   import * as P from "@unthrown/pattern";
+//
+//   match(result)
+//     .with(P.ok(), ({ value }) => `ok: ${value}`)
+//     .with(P.err(P.tag("NotFound")), () => "404")
+//     .with(P.err(), ({ error }) => `error: ${error}`)
+//     .with(P.defect(), ({ cause }) => `bug: ${String(cause)}`)
+//     .exhaustive();
 
 /**
- * Adapt a `Result` into a discriminated union `ts-pattern` can match on,
- * exposing the otherwise-hidden ok / err / defect channels.
+ * A `ts-pattern` pattern matching the `Ok` variant of a `Result`. With no
+ * argument it matches any `Ok`; pass a sub-pattern (e.g. a literal, `P.string`,
+ * or `P.select()`) to constrain or select the `value`.
  *
- * @typeParam T - the success value type.
- * @typeParam E - the modeled error type.
- * @param result - the result to view.
- *
- * @example
- * ```ts
- * import { match } from "ts-pattern";
- * import { toMatchable, tag } from "@unthrown/pattern";
- *
- * match(toMatchable(result))
- *   .with({ _kind: "Ok" }, ({ value }) => `ok ${value}`)
- *   .with({ _kind: "Err", error: tag("NotFound") }, () => 404)
- *   .with({ _kind: "Defect" }, ({ cause }) => `bug ${String(cause)}`)
- *   .exhaustive();
- * ```
+ * @typeParam V - the sub-pattern matched against the `Ok` value.
  */
-export function toMatchable<T, E>(result: Result<T, E>): ResultMatchable<T, E> {
-  return result.match<ResultMatchable<T, E>>({
-    ok: (value) => ({ _kind: "Ok", value }),
-    err: (error) => ({ _kind: "Err", error }),
-    defect: (cause) => ({ _kind: "Defect", cause }),
-  });
+export function ok(): { tag: "Ok" };
+export function ok<const V>(value: V): { tag: "Ok"; value: V };
+export function ok(...args: [] | [unknown]): { tag: "Ok"; value?: unknown } {
+  return args.length === 0 ? { tag: "Ok" } : { tag: "Ok", value: args[0] };
 }
 
 /**
- * `ts-pattern` sugar: a pattern matching any value whose `_tag` equals `value`
- * (e.g. a `TaggedError`). Equivalent to the object pattern `{ _tag: value }`,
- * but reads better nested inside an `Err` pattern and narrows to the matching
+ * A `ts-pattern` pattern matching the `Err` variant of a `Result`. With no
+ * argument it matches any `Err`; pass a sub-pattern (e.g. {@link tag}) to
+ * constrain or select the `error`.
+ *
+ * @typeParam V - the sub-pattern matched against the `Err` error.
+ */
+export function err(): { tag: "Err" };
+export function err<const V>(error: V): { tag: "Err"; error: V };
+export function err(...args: [] | [unknown]): { tag: "Err"; error?: unknown } {
+  return args.length === 0 ? { tag: "Err" } : { tag: "Err", error: args[0] };
+}
+
+/**
+ * A `ts-pattern` pattern matching the `Defect` variant of a `Result`. With no
+ * argument it matches any `Defect`; pass a sub-pattern to constrain or select
+ * the unknown `cause`.
+ *
+ * @typeParam V - the sub-pattern matched against the `Defect` cause.
+ */
+export function defect(): { tag: "Defect" };
+export function defect<const V>(cause: V): { tag: "Defect"; cause: V };
+export function defect(...args: [] | [unknown]): { tag: "Defect"; cause?: unknown } {
+  return args.length === 0 ? { tag: "Defect" } : { tag: "Defect", cause: args[0] };
+}
+
+/**
+ * A `ts-pattern` pattern matching any value whose `_tag` equals `value` (e.g. a
+ * `TaggedError`). Equivalent to the object pattern `{ _tag: value }`, but reads
+ * better nested inside an {@link err} pattern and narrows to the matching
  * variant — including its payload.
  *
  * @typeParam Tag - the string literal tag to match.
@@ -61,7 +66,7 @@ export function toMatchable<T, E>(result: Result<T, E>): ResultMatchable<T, E> {
  *
  * @example
  * ```ts
- * .with({ _kind: "Err", error: tag("Forbidden") }, ({ error }) => error.user)
+ * .with(P.err(P.tag("Forbidden")), ({ error }) => error.user)
  * ```
  */
 export function tag<const Tag extends string>(value: Tag): { _tag: Tag } {

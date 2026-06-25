@@ -2,5 +2,5 @@
   "extends": "@unthrown/typedoc/base.json",
   "entryPoints": ["src/index.ts"],
   "out": "docs",
-  "intentionallyNotExported": ["Result", "Props"]
+  "intentionallyNotExported": ["Result", "Props", "ResultMethods"]
 }

@@ -1,45 +1,15 @@
 // unthrown — public type surface. Pure types, no runtime.
 
 /**
- * The core type of the library: a computation that has either succeeded with a
- * value of type `T` or failed with a *modeled* error of type `E`.
- *
- * @remarks
- * A `Result` has **three** runtime states but only **two** type parameters:
- *
- * - **Ok** — a success carrying a `T`.
- * - **Err** — a modeled, anticipated failure carrying an `E`.
- * - **Defect** — an *unmodeled* failure (a thrown bug, an un-triaged rejection).
- *   A defect is deliberately **invisible to the type**: it never appears in `E`.
- *
- * The success combinators (`map`, `flatMap`, …) run only on `Ok`; the error
- * combinators (`mapErr`, `recover`, …) run only on `Err`. A `Defect` flows
- * through every method untouched **except** `match` and `recoverDefect` — those
- * are the only two that can observe it.
- *
- * Any value thrown by a callback inside a combinator is captured as a `Defect`
- * rather than escaping, so a pipeline can be folded once at the edge with
- * `match` and no surrounding `try`/`catch`.
+ * The method surface every {@link Result} variant carries. Factored out so the
+ * three variants ({@link OkView}, {@link ErrView}, {@link DefectView}) can each
+ * intersect it. Not part of the public API on its own.
  *
  * @typeParam T - the success value type.
- * @typeParam E - the modeled error type (only anticipated domain failures).
- *
- * @example
- * ```ts
- * import { ok, err, type Result } from "unthrown";
- *
- * function half(n: number): Result<number, "odd"> {
- *   return n % 2 === 0 ? ok(n / 2) : err("odd");
- * }
- *
- * const message = half(10).match({
- *   ok: (n) => `got ${n}`,
- *   err: (e) => `failed: ${e}`,
- *   defect: (cause) => `bug: ${String(cause)}`,
- * });
- * ```
+ * @typeParam E - the modeled error type.
+ * @internal
  */
-export type Result<T, E> = {
+export type ResultMethods<T, E> = {
   /**
    * Transform the success value with `f`.
    *
@@ -152,6 +122,7 @@ export type Result<T, E> = {
    * Exactly one handler runs. Together with the throw-to-defect guarantee, this
    * is typically the single place a pipeline is handled at the edge — mapping
    * `ok`/`err`/`defect` to (for example) 2xx / 4xx / 5xx with no `try`/`catch`.
+   * (For richer matching, a `Result` is also a discriminated union — see `tag`.)
    *
    * @typeParam R - the folded result type.
    * @param cases - one handler per channel.
@@ -213,6 +184,61 @@ export type Result<T, E> = {
   toAsync(): AsyncResult<T, E>;
 };
 
+/** The `Ok` variant of a {@link Result}: a success carrying a `value`. */
+export type OkView<T, E = never> = ResultMethods<T, E> & {
+  readonly tag: "Ok";
+  readonly value: T;
+};
+/** The `Err` variant of a {@link Result}: a modeled failure carrying an `error`. */
+export type ErrView<E, T = never> = ResultMethods<T, E> & {
+  readonly tag: "Err";
+  readonly error: E;
+};
+/** The `Defect` variant of a {@link Result}: an unmodeled failure carrying a `cause`. */
+export type DefectView<T = never, E = never> = ResultMethods<T, E> & {
+  readonly tag: "Defect";
+  readonly cause: unknown;
+};
+
+/**
+ * The core type of the library: a computation that has either succeeded with a
+ * value of type `T` or failed with a *modeled* error of type `E`.
+ *
+ * @remarks
+ * A `Result` is a **discriminated union** of three variants, distinguished by a
+ * `tag` of `"Ok"` | `"Err"` | `"Defect"`:
+ *
+ * - **`Ok`** — a success carrying a `value: T`.
+ * - **`Err`** — a modeled, anticipated failure carrying an `error: E`.
+ * - **`Defect`** — an *unmodeled* failure carrying an unknown `cause`. A defect
+ *   never appears in `E`; it is the library's third, out-of-band channel.
+ *
+ * Because it is a real union, you can match it natively (a `switch` on `tag`, or
+ * `ts-pattern`'s `match(...).with({ tag: "Ok" }, …).exhaustive()`), *and* it
+ * carries the full method surface ({@link ResultMethods}) for fluent chaining.
+ * Either way, the payload (`value`/`error`/`cause`) is only reachable after you
+ * narrow — so "check before you access" still holds.
+ *
+ * @typeParam T - the success value type.
+ * @typeParam E - the modeled error type (only anticipated domain failures).
+ *
+ * @example
+ * ```ts
+ * import { ok, err, type Result } from "unthrown";
+ *
+ * function half(n: number): Result<number, "odd"> {
+ *   return n % 2 === 0 ? ok(n / 2) : err("odd");
+ * }
+ *
+ * const message = half(10).match({
+ *   ok: (n) => `got ${n}`,
+ *   err: (e) => `failed: ${e}`,
+ *   defect: (cause) => `bug: ${String(cause)}`,
+ * });
+ * ```
+ */
+export type Result<T, E> = OkView<T, E> | ErrView<E, T> | DefectView<T, E>;
+
 /**
  * A success-only thenable: awaitable, but deliberately **not** a full
  * `PromiseLike`.
@@ -242,6 +268,8 @@ export type Awaitable<T> = {
  * qualified boundary and compose it: `ar.flatMap((v) => fromPromise(work(v),
  * qualify))`. The eliminators (`unwrap`, …) return promises; the binds
  * (`flatMap`, `orElse`, `recoverDefect`) additionally accept an `AsyncResult`.
+ *
+ * To pattern-match an `AsyncResult`, `await` it first: `match(await ar)`.
  *
  * @typeParam T - the success value type.
  * @typeParam E - the modeled error type.
@@ -296,34 +324,14 @@ export type AsyncResult<T, E> = Awaitable<Result<T, E>> & {
 };
 
 /**
- * An `Ok`-narrowed {@link Result} that additionally exposes its `value`. Yielded
- * by the {@link isOk} guard.
- *
- * @typeParam T - the success value type.
- */
-export type OkView<T> = Result<T, never> & { readonly value: T };
-/**
- * An `Err`-narrowed {@link Result} that additionally exposes its `error`.
- * Yielded by the {@link isErr} guard.
- *
- * @typeParam E - the modeled error type.
- */
-export type ErrView<E> = Result<never, E> & { readonly error: E };
-/**
- * A `Defect`-narrowed {@link Result} that additionally exposes its unknown
- * `cause`. Yielded by the {@link isDefect} guard.
- */
-export type DefectView = Result<never, never> & { readonly cause: unknown };
-
-/**
- * Extract the success type `T` from a `Result<T, unknown>`.
+ * Extract the success type `T` from a `Result`.
  *
  * @typeParam R - the `Result` type to inspect.
  */
-export type OkOf<R> = R extends Result<infer T, unknown> ? T : never;
+export type OkOf<R> = R extends { readonly tag: "Ok"; readonly value: infer T } ? T : never;
 /**
- * Extract the error type `E` from a `Result<unknown, E>`.
+ * Extract the error type `E` from a `Result`.
  *
  * @typeParam R - the `Result` type to inspect.
  */
-export type ErrOf<R> = R extends Result<unknown, infer E> ? E : never;
+export type ErrOf<R> = R extends { readonly tag: "Err"; readonly error: infer E } ? E : never;

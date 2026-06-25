@@ -2,7 +2,7 @@
 // through `qualify`, which triages each cause into a modeled `E` or a `Defect`;
 // there is no path that yields `unknown` in `E`.
 
-import { AsyncRes, defectRes, Res } from "./core.js";
+import { AsyncRes, defectRes, errRes, okRes } from "./core.js";
 import { type Defect, isDefectMarker } from "./defect.js";
 import { err, ok } from "./constructors.js";
 import type { AsyncResult, ErrOf, OkOf, Result } from "./types.js";
@@ -97,9 +97,9 @@ export function fromPromise<T, E>(
   qualify: (cause: unknown) => E | Defect,
 ): AsyncResult<T, E> {
   const p = typeof promise === "function" ? Promise.resolve().then(promise) : promise;
-  const settled: Promise<Res<T, E>> = p.then(
-    (value) => new Res<T, E>({ tag: "ok", value }),
-    (cause) => qualifyToResult<T, E>(cause, qualify) as Res<T, E>,
+  const settled: Promise<Result<T, E>> = p.then(
+    (value) => okRes<T, E>(value),
+    (cause) => qualifyToResult<T, E>(cause, qualify),
   );
   return new AsyncRes<T, E>(settled);
 }
@@ -120,9 +120,9 @@ export function fromSafePromise<T>(
   promise: Promise<T> | (() => Promise<T>),
 ): AsyncResult<T, never> {
   const p = typeof promise === "function" ? Promise.resolve().then(promise) : promise;
-  const settled: Promise<Res<T, never>> = p.then(
-    (value) => new Res<T, never>({ tag: "ok", value }),
-    (cause) => new Res<T, never>({ tag: "defect", cause }),
+  const settled: Promise<Result<T, never>> = p.then(
+    (value) => okRes<T, never>(value),
+    (cause) => defectRes<T, never>(cause),
   );
   return new AsyncRes<T, never>(settled);
 }
@@ -133,7 +133,7 @@ function qualifyToResult<T, E>(
 ): Result<T, E> {
   try {
     const q = qualify(cause);
-    return isDefectMarker(q) ? defectRes<T, E>(q.cause) : (err(q) as Result<T, E>);
+    return isDefectMarker(q) ? defectRes<T, E>(q.cause) : errRes<T, E>(q);
   } catch (qErr) {
     // a throw inside qualify is itself a defect
     return defectRes<T, E>(qErr);
@@ -167,10 +167,9 @@ export function all<Rs extends readonly Result<unknown, unknown>[]>(
   let firstDefect: Result<unknown, unknown> | undefined;
 
   for (const r of results) {
-    const s = (r as Res<unknown, unknown>)._state;
-    if (s.tag === "defect") firstDefect ??= r;
-    else if (s.tag === "err") firstErr ??= r;
-    else values.push(s.value);
+    if (r.tag === "Defect") firstDefect ??= r;
+    else if (r.tag === "Err") firstErr ??= r;
+    else values.push(r.value);
   }
 
   if (firstDefect)

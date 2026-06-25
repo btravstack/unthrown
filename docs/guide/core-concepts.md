@@ -13,6 +13,12 @@ A `Result<T, E>` has **three** runtime states but only **two** type parameters:
 The defect channel is the heart of the library and has [its own
 page](./the-defect-channel). This page covers the everyday surface.
 
+A `Result` is a real **discriminated union** — each variant carries a `tag` of
+`"Ok"` / `"Err"` / `"Defect"` plus its payload (`value` / `error` / `cause`) —
+so you can `switch` on it or [match it natively](./pattern-matching) with
+`ts-pattern`. It also carries the full method surface below; the payload is only
+reachable once you've narrowed to a variant.
+
 ## The method surface
 
 Every `Result` shares one method surface, grouped by the channel it touches:

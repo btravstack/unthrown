@@ -1,6 +1,6 @@
 // Result constructors and the standalone narrowing guards.
 
-import { Res } from "./core.js";
+import { errRes, okRes } from "./core.js";
 import type { DefectView, ErrView, OkView, Result } from "./types.js";
 
 /**
@@ -16,7 +16,7 @@ import type { DefectView, ErrView, OkView, Result } from "./types.js";
  * ```
  */
 export function ok<T>(value: T): Result<T, never> {
-  return new Res<T, never>({ tag: "ok", value });
+  return okRes(value);
 }
 
 /**
@@ -32,11 +32,11 @@ export function ok<T>(value: T): Result<T, never> {
  * ```
  */
 export function err<E>(error: E): Result<never, E> {
-  return new Res<never, E>({ tag: "err", error });
+  return errRes(error);
 }
 
 /**
- * Type guard: narrow a {@link Result} to an {@link OkView}, exposing `.value`.
+ * Type guard: narrow a {@link Result} to its `Ok` variant, exposing `.value`.
  *
  * @returns `true` when `r` is `Ok`.
  *
@@ -47,22 +47,22 @@ export function err<E>(error: E): Result<never, E> {
  * if (isOk(r)) r.value; // number, narrowed
  * ```
  */
-export function isOk<T, E>(r: Result<T, E>): r is OkView<T> {
-  return r.isOk();
+export function isOk<T, E>(r: Result<T, E>): r is OkView<T, E> {
+  return r.tag === "Ok";
 }
 /**
- * Type guard: narrow a {@link Result} to an {@link ErrView}, exposing `.error`.
+ * Type guard: narrow a {@link Result} to its `Err` variant, exposing `.error`.
  *
  * @returns `true` when `r` is `Err`.
  */
-export function isErr<T, E>(r: Result<T, E>): r is ErrView<E> {
-  return r.isErr();
+export function isErr<T, E>(r: Result<T, E>): r is ErrView<E, T> {
+  return r.tag === "Err";
 }
 /**
- * Type guard: narrow a {@link Result} to a {@link DefectView}, exposing `.cause`.
+ * Type guard: narrow a {@link Result} to its `Defect` variant, exposing `.cause`.
  *
  * @returns `true` when `r` is a `Defect`.
  */
-export function isDefect<T, E>(r: Result<T, E>): r is DefectView {
-  return r.isDefect();
+export function isDefect<T, E>(r: Result<T, E>): r is DefectView<T, E> {
+  return r.tag === "Defect";
 }

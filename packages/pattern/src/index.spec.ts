@@ -1,8 +1,8 @@
-import { match } from "ts-pattern";
+import { match, P as TP } from "ts-pattern";
 import { err, ok, type Result, TaggedError } from "unthrown";
 import { describe, expect, it } from "vitest";
 
-import { tag, toMatchable } from "./index.js";
+import * as P from "./index.js";
 
 class NotFound extends TaggedError("NotFound") {}
 class Forbidden extends TaggedError("Forbidden")<{ user: string }> {}
@@ -13,44 +13,49 @@ const aDefect: Result<number, never> = ok(0).map<number>(() => {
   throw boom;
 });
 
-describe("toMatchable", () => {
-  it("exposes the ok / err / defect channels as a discriminated union", () => {
-    expect(toMatchable(ok(1))).toEqual({ _kind: "Ok", value: 1 });
-    expect(toMatchable(err("e"))).toEqual({ _kind: "Err", error: "e" });
-    expect(toMatchable(aDefect)).toMatchObject({ _kind: "Defect", cause: boom });
-  });
-
-  it("lets ts-pattern match across all three channels", () => {
+describe("a Result is natively matchable", () => {
+  it("matches directly on its tag, exhaustively", () => {
     const fold = (r: Result<number, string>): string =>
-      match(toMatchable(r))
-        .with({ _kind: "Ok" }, ({ value }) => `ok:${value}`)
-        .with({ _kind: "Err" }, ({ error }) => `err:${error}`)
-        .with({ _kind: "Defect" }, () => "defect")
+      match(r)
+        .with({ tag: "Ok" }, ({ value }) => `ok:${value}`)
+        .with({ tag: "Err" }, ({ error }) => `err:${error}`)
+        .with({ tag: "Defect" }, ({ cause }) => `defect:${String(cause)}`)
         .exhaustive();
 
     expect(fold(ok(2))).toBe("ok:2");
     expect(fold(err("x"))).toBe("err:x");
-    expect(fold(aDefect)).toBe("defect");
+    expect(fold(aDefect)).toBe(`defect:${String(boom)}`);
   });
 });
 
-describe("tag", () => {
-  it("returns the { _tag } object pattern", () => {
-    expect(tag("Foo")).toEqual({ _tag: "Foo" });
+describe("pattern constructors", () => {
+  const fold = (r: Result<number, ApiError>): string =>
+    match(r)
+      .with(P.ok(), ({ value }) => `ok:${value}`)
+      // `error.user` only type-checks because P.tag narrows to Forbidden.
+      .with(P.err(P.tag("Forbidden")), ({ error }) => `forbidden:${error.user}`)
+      .with(P.err(P.tag("NotFound")), () => "not-found")
+      .with(P.defect(), () => "defect")
+      .exhaustive();
+
+  it("P.ok / P.err / P.defect narrow each channel", () => {
+    expect(fold(ok(5))).toBe("ok:5");
+    expect(fold(err(new NotFound()))).toBe("not-found");
+    expect(fold(err(new Forbidden({ user: "bob" })))).toBe("forbidden:bob");
   });
 
-  it("matches a TaggedError by _tag and narrows to the variant's payload", () => {
-    const fold = (r: Result<number, ApiError>): string =>
-      match(toMatchable(r))
-        .with({ _kind: "Ok" }, ({ value }) => `ok:${value}`)
-        // `error.user` below only typechecks because `tag` narrows to Forbidden.
-        .with({ _kind: "Err", error: tag("Forbidden") }, ({ error }) => `forbidden:${error.user}`)
-        .with({ _kind: "Err", error: tag("NotFound") }, () => "not-found")
-        .with({ _kind: "Defect" }, () => "defect")
-        .exhaustive();
+  it("P.ok(pattern) constrains and selects the value", () => {
+    const out = match(ok<number>(42) as Result<number, string>)
+      .with(P.ok(TP.select()), (v) => v + 1)
+      .otherwise(() => 0);
+    expect(out).toBe(43);
+  });
 
-    expect(fold(err(new Forbidden({ user: "bob" })))).toBe("forbidden:bob");
-    expect(fold(err(new NotFound()))).toBe("not-found");
-    expect(fold(ok(5))).toBe("ok:5");
+  it("constructors return plain ts-pattern object patterns", () => {
+    expect(P.ok()).toEqual({ tag: "Ok" });
+    expect(P.err()).toEqual({ tag: "Err" });
+    expect(P.defect()).toEqual({ tag: "Defect" });
+    expect(P.ok(1)).toEqual({ tag: "Ok", value: 1 });
+    expect(P.tag("X")).toEqual({ _tag: "X" });
   });
 });

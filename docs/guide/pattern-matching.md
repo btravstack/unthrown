@@ -1,11 +1,36 @@
 # Pattern Matching
 
-For the everyday exhaustive case, [`matchTags`](./tagged-errors) is all you need.
-When you want richer matching — guards, nested patterns, wildcards, `P.union` —
-`@unthrown/pattern` is a thin bridge to
-[ts-pattern](https://github.com/gvergnaud/ts-pattern).
+A `Result` is a **discriminated union** — `{ tag: "Ok"; value } | { tag: "Err";
+error } | { tag: "Defect"; cause }` — so you can pattern-match it **natively**,
+no adapter required.
 
-## Installation
+For the everyday exhaustive fold over a tagged _error_ union,
+[`matchTags`](./tagged-errors) is the simplest tool. When you want
+[ts-pattern](https://github.com/gvergnaud/ts-pattern)'s full power — guards,
+nested patterns, wildcards, selection — match the `Result` directly.
+
+## Matching a Result directly
+
+Because `tag` is a real discriminant, ts-pattern matches a `Result` out of the
+box, and `.exhaustive()` works:
+
+```ts
+import { match } from "ts-pattern";
+
+const status = match(result)
+  .with({ tag: "Ok" }, ({ value }) => 200)
+  .with({ tag: "Err" }, ({ error }) => 400)
+  .with({ tag: "Defect" }, ({ cause }) => 500)
+  .exhaustive(); // ✅ omit a variant and it won't compile
+```
+
+The payload (`value` / `error` / `cause`) is reachable only inside the matching
+arm — exactly like the type guards.
+
+## `@unthrown/pattern` — pattern sugar
+
+`@unthrown/pattern` adds small constructors so you don't write the raw object
+patterns, plus `tag` for matching a [`TaggedError`](./tagged-errors).
 
 ::: code-group
 
@@ -19,50 +44,45 @@ npm install @unthrown/pattern ts-pattern
 
 :::
 
-`ts-pattern` is a peer dependency. The integration is deliberately small — the
-matching power is ts-pattern's.
-
-## `toMatchable` — expose the channels
-
-A `Result` hides its internal state, so you can't pattern-match it directly.
-`toMatchable` adapts a `Result` into a discriminated union that ts-pattern can
-match, exposing the ok / err / defect channels under a `_kind` discriminant:
-
 ```ts
 import { match } from "ts-pattern";
-import { toMatchable, tag } from "@unthrown/pattern";
+import * as P from "@unthrown/pattern";
 
-const status = match(toMatchable(result))
-  .with({ _kind: "Ok" }, ({ value }) => 200)
-  .with({ _kind: "Err" }, ({ error }) => 400)
-  .with({ _kind: "Defect" }, ({ cause }) => 500)
+const status = match(result)
+  .with(P.ok(), ({ value }) => 200)
+  .with(P.err(P.tag("NotFound")), () => 404)
+  .with(P.err(P.tag("Forbidden")), ({ error }) => {
+    audit(error.user); // narrowed to Forbidden — payload available
+    return 403;
+  })
+  .with(P.defect(), ({ cause }) => 500)
   .exhaustive();
 ```
 
-The `_kind` discriminant is distinct from any `_tag` on an error value, so the
-two never collide in nested patterns.
+- `P.ok(sub?)` / `P.err(sub?)` / `P.defect(sub?)` — match a channel; pass a
+  sub-pattern (a literal, `P.string`, `P.select()`, …) to constrain or select
+  the payload.
+- `P.tag(t)` — sugar for `{ _tag: t }`; nested in `P.err(...)` it narrows to the
+  matching tagged-error variant, payload and all.
 
-## `tag` — match a tagged error
+`ts-pattern` is a peer dependency.
 
-`tag(t)` is sugar for the `{ _tag: t }` pattern. Nested inside an `Err` pattern,
-it narrows to the matching [`TaggedError`](./tagged-errors) variant — including
-its payload:
+## Matching an AsyncResult
+
+`ts-pattern`'s `match` is synchronous, so `await` an `AsyncResult` first — the
+result is a plain, matchable `Result`:
 
 ```ts
-match(toMatchable(result))
-  .with({ _kind: "Ok" }, ({ value }) => `ok: ${value}`)
-  .with({ _kind: "Err", error: tag("NotFound") }, () => "404")
-  .with({ _kind: "Err", error: tag("Forbidden") }, ({ error }) => `403 ${error.user}`)
-  .with({ _kind: "Defect" }, () => "500")
+const status = match(await asyncResult)
+  .with(P.ok(), () => 200)
+  .with(P.err(), () => 400)
+  .with(P.defect(), () => 500)
   .exhaustive();
 ```
-
-In the `Forbidden` branch, `error` is narrowed to the full `Forbidden` variant,
-so `error.user` type-checks.
 
 ## Which should I use?
 
-- **`matchTags`** (core) — the everyday exhaustive fold over a tagged error
-  union. Zero dependencies, no `.exhaustive()` to forget.
-- **`@unthrown/pattern` + ts-pattern** — when you need guards, nested matching on
-  payloads, wildcards, or to match on the success value's shape.
+- **`matchTags`** (core, zero-dep) — the everyday exhaustive fold over a tagged
+  error union. No `.exhaustive()` to forget.
+- **`ts-pattern`** (+ `@unthrown/pattern` sugar) — when you need guards, nested
+  matching on payloads, wildcards, or to match on the success value's shape.

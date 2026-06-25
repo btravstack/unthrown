@@ -18,9 +18,11 @@ was planned).
 ## Thesis (do not drift from these)
 
 1. **`Result<T, E>` where `E` is only the _anticipated_ domain failures.** A
-   defect (an unmodeled failure) is a third runtime state — a `Defect` — that is
-   **invisible to the type**. If a failure mode appears in `E`, it is by
-   definition modeled and is no longer a defect.
+   defect (an unmodeled failure) is the third variant of the `Result` union
+   (`{ tag: "Defect" }`), but it **never appears in `E`**. If a failure mode
+   appears in `E`, it is by definition modeled and is no longer a defect. The
+   defect is matchable like any variant, but you never thread it through your
+   domain error type.
 2. **No `Option` type.** Absence is expressed with the type system we already
    trust: `T | undefined`, `T | null`, or `Result<T, NotFound>`. Interop with
    nullable third-party APIs goes through `fromNullable`. Do not add `Option`.
@@ -61,14 +63,19 @@ was planned).
 
 ## Public surface (implemented in packages/core/src/, split into focused modules)
 
-`Result<T, E>` and `AsyncResult<T, E>` share one method surface. `AsyncResult`
-is an awaitable wrapper (method parity with `Result`) typed as
-`Awaitable<Result<T, E>>` — a **success-only thenable**, not a full
-`PromiseLike` (its internal promise never rejects, so there is no rejection
-channel to model). Its **combinator callbacks are synchronous** (no raw
-`Promise` — see Thesis #3); async work re-enters via `fromPromise` /
-`fromSafePromise` and composes with `flatMap`. `await` collapses an
-`AsyncResult` to a `Result`.
+`Result<T, E>` is a **discriminated union** — `{ tag: "Ok"; value } | { tag:
+"Err"; error } | { tag: "Defect"; cause }`, each intersected with the shared
+method surface — so it matches **natively** (a `switch` on `tag`, or
+`ts-pattern`'s `match(r).with({ tag: "Ok" }, …).exhaustive()`) **and** chains
+fluently. The payload is reachable only after narrowing, so "check before you
+access" still holds.
+
+`AsyncResult<T, E>` shares that method surface as an awaitable wrapper typed
+`Awaitable<Result<T, E>>` — a **success-only thenable**, not a full `PromiseLike`
+(its internal promise never rejects, so there is no rejection channel to model).
+Its **combinator callbacks are synchronous** (no raw `Promise` — see Thesis #3);
+async work re-enters via `fromPromise` / `fromSafePromise` and composes with
+`flatMap`. `await` collapses an `AsyncResult` to a `Result` (then match it).
 
 - success: `map`, `flatMap`, `tap`, `as`
 - error: `mapErr`, `orElse`, `recover`, `tapErr`
@@ -93,16 +100,20 @@ addition; revisit only if sequential code demands it), accumulation/`Validation`
 and aliases (`andThen`, etc. — one name per concept). Keep the surface small
 enough that the library can be "done".
 
-## Internal design (don't break the encapsulation)
+## Internal design (don't break these)
 
-- **`Result` / `AsyncResult` are types; `Res` / `AsyncRes` are the classes that
-  implement them.** The classes live in `core.ts` and are **never re-exported
-  from `index.ts`**. `Res._state` (the `ok | err | defect` discriminated union)
-  is public-at-runtime so module-mates (`AsyncRes`, `all`) can branch on it, but
-  it is **absent from the `Result` type** — which is what keeps the third state
-  invisible and forces users through guards. A single public class can't hide its
-  own field; the type/class split is load-bearing. Do not export `Res`/`AsyncRes`
-  or move `_state` onto the public type.
+- **`Result` / `AsyncResult` are the public types; `Res` / `AsyncRes` are the
+  internal classes that implement them** (in `core.ts`, **never re-exported from
+  `index.ts`**). `Result` is a discriminated union exposing `tag` / `value` /
+  `error` / `cause`; `Res` is the single class behind all three variants, with
+  `Res._state` (lowercase `ok|err|defect`) kept **module-private** and the public
+  `tag` (capitalised) surfaced via a getter. The three cast-builders
+  `okRes`/`errRes`/`defectRes` are the **only** place a `Res` is bridged to the
+  `Result` type (`as unknown as Result`) — don't scatter that cast or export
+  `Res`. "Check before you access" is enforced by the union: `result.value` only
+  type-checks on the `Ok` variant. `AsyncRes` operates purely on the public
+  `Result` union (it wraps a `Promise<Result>` and branches on `r.tag`), never on
+  `Res` internals.
 - **Builders are free functions** (`ok`, `err`, …) because they tree-shake — and
   there is a `bundle-size` CI gate that protects this. The `Result` companion
   object is additive sugar (value + type share the name via a re-alias in
