@@ -39,6 +39,29 @@ describe("toBeErr / toBeErrTagged", () => {
     expect(r).not.toBeErrTagged("Other");
     expect(err("plain")).not.toBeErrTagged("MyError");
   });
+
+  it("toBeErrTagged matches the payload exactly when given a plain object", () => {
+    const r: Result<number, MyError> = err(new MyError({ code: 42 }));
+    expect(r).toBeErrTagged("MyError", { code: 42 });
+    expect(r).not.toBeErrTagged("MyError", { code: 99 });
+    // exact: an extra/missing field fails
+    expect(r).not.toBeErrTagged("MyError", { code: 42, extra: true });
+  });
+
+  it("toBeErrTagged matches the payload partially with an asymmetric matcher", () => {
+    class Multi extends TaggedError("Multi")<{ id: number; msg: string }> {}
+    const r: Result<number, Multi> = err(new Multi({ id: 1, msg: "boom" }));
+    expect(r).toBeErrTagged("Multi", expect.objectContaining({ id: 1 }));
+    expect(r).toBeErrTagged("Multi", { id: 1, msg: "boom" });
+    expect(r).not.toBeErrTagged("Multi", expect.objectContaining({ id: 2 }));
+    // wrong tag → fails even when the payload sub-pattern would match
+    expect(r).not.toBeErrTagged("Other", expect.objectContaining({ id: 1 }));
+  });
+
+  it("toBeErrTagged with a payload still requires the right tag", () => {
+    const r: Result<number, MyError> = err(new MyError({ code: 42 }));
+    expect(r).not.toBeErrTagged("Other", { code: 42 });
+  });
 });
 
 describe("toBeDefect", () => {

@@ -37,6 +37,19 @@ function render(result: SomeResult, stringify: Stringify): string {
   return stringify(result);
 }
 
+// The "payload" of a TaggedError: its own enumerable properties minus the
+// `_tag` discriminant and the `name` (both set by TaggedError itself, not by
+// you). This is the data you passed to the constructor, so `toBeErrTagged`'s
+// optional second argument matches it: a plain object asserts it exactly, and an
+// asymmetric matcher (e.g. `expect.objectContaining(...)`) asserts it partially.
+function payloadOf(error: object): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(error)) {
+    if (key !== "_tag" && key !== "name") out[key] = (error as Record<string, unknown>)[key];
+  }
+  return out;
+}
+
 // Resolve `received` — awaiting it when it is an AsyncResult — then run `check`.
 // This is what lets one matcher serve both `expect(result)` and
 // `await expect(asyncResult)`. A non-Result fails with a clear message.
@@ -98,16 +111,28 @@ function toBeErr(this: MatcherState, received: unknown): MatcherResult {
   });
 }
 
-function toBeErrTagged(this: MatcherState, received: unknown, tag: string): MatcherResult {
+function toBeErrTagged(
+  this: MatcherState,
+  received: unknown,
+  tag: string,
+  expected?: unknown,
+): MatcherResult {
   const { stringify } = this.utils;
+  const { equals } = this;
+  const hasExpected = expected !== undefined;
+  const label = hasExpected
+    ? `Err tagged ${stringify(tag)} matching ${stringify(expected)}`
+    : `Err tagged ${stringify(tag)}`;
   return settle(received, stringify, (result) => {
-    const pass = isErr(result) && (result.error as { _tag?: unknown })?._tag === tag;
+    const error = isErr(result) ? result.error : undefined;
+    const tagPass = (error as { _tag?: unknown } | undefined)?._tag === tag;
+    const pass = tagPass && (!hasExpected || equals(payloadOf(error as object), expected));
     return {
       pass,
       message: () =>
         pass
-          ? `expected result not to be Err tagged ${stringify(tag)}`
-          : `expected result to be Err tagged ${stringify(tag)}, but got ${render(result, stringify)}`,
+          ? `expected result not to be ${label}`
+          : `expected result to be ${label}, but got ${render(result, stringify)}`,
     };
   });
 }
@@ -140,7 +165,13 @@ export type UnthrownMatchers<R = unknown> = {
   toBeOk: () => R;
   toBeOkWith: (value: unknown) => R;
   toBeErr: () => R;
-  toBeErrTagged: (tag: string) => R;
+  /**
+   * Assert an `Err` whose error has `_tag === tag`. Optionally pass `expected`
+   * to also match the error's payload (its own props minus `_tag`/`name`): a
+   * plain object matches exactly, an asymmetric matcher (e.g.
+   * `expect.objectContaining(...)`) matches partially.
+   */
+  toBeErrTagged: (tag: string, expected?: unknown) => R;
   toBeDefect: () => R;
 };
 

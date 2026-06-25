@@ -48,13 +48,38 @@ test("matchers", () => {
 });
 ```
 
-| Matcher              | Passes when                                          |
-| -------------------- | ---------------------------------------------------- |
-| `toBeOk()`           | the result is `Ok`                                   |
-| `toBeOkWith(value)`  | the result is `Ok` and the value deep-equals `value` |
-| `toBeErr()`          | the result is `Err`                                  |
-| `toBeErrTagged(tag)` | the result is `Err` whose error has `_tag === tag`   |
-| `toBeDefect()`       | the result is a `Defect`                             |
+`toBeErrTagged` takes an optional second argument to also assert the tagged
+error's payload — its own fields, minus the `_tag` and `name` that `TaggedError`
+sets. A plain object matches it **exactly**; an asymmetric matcher matches it
+**partially**:
+
+```ts
+import { err, TaggedError } from "unthrown";
+import { expect } from "vitest";
+
+class NotFound extends TaggedError("NotFound")<{ id: number; msg: string }> {}
+
+// exact — every payload field must match
+expect(err(new NotFound({ id: 1, msg: "nope" }))).toBeErrTagged("NotFound", {
+  id: 1,
+  msg: "nope",
+});
+
+// partial — only the listed fields are checked
+expect(err(new NotFound({ id: 1, msg: "nope" }))).toBeErrTagged(
+  "NotFound",
+  expect.objectContaining({ id: 1 }),
+);
+```
+
+| Matcher                        | Passes when                                                                                       |
+| ------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `toBeOk()`                     | the result is `Ok`                                                                                |
+| `toBeOkWith(value)`            | the result is `Ok` and the value deep-equals `value`                                              |
+| `toBeErr()`                    | the result is `Err`                                                                               |
+| `toBeErrTagged(tag)`           | the result is `Err` whose error has `_tag === tag`                                                |
+| `toBeErrTagged(tag, expected)` | …and its payload matches `expected` (exact for a plain object, partial for an asymmetric matcher) |
+| `toBeDefect()`                 | the result is a `Defect`                                                                          |
 
 ## Async results — `await` is required
 

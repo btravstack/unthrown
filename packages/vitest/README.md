@@ -22,11 +22,19 @@ expect(ok(1)).toBeOkWith(1);
 expect(err(new NotFound())).toBeErrTagged("NotFound");
 expect(aDefect).toBeDefect();
 
+// toBeErrTagged also takes an optional payload: a plain object matches exactly,
+// an asymmetric matcher matches partially.
+expect(err(new NotFound({ id: 1 }))).toBeErrTagged("NotFound", { id: 1 });
+expect(err(new NotFound({ id: 1, msg: "x" }))).toBeErrTagged(
+  "NotFound",
+  expect.objectContaining({ id: 1 }),
+);
+
 // AsyncResult — `await` is required
 await expect(fromPromise(load(), qualify)).toBeOk();
 ```
 
-Matchers: `toBeOk`, `toBeOkWith`, `toBeErr`, `toBeErrTagged`, `toBeDefect`.
+Matchers: `toBeOk`, `toBeOkWith`, `toBeErr`, `toBeErrTagged(tag, expected?)`, `toBeDefect`.
 
 > [!WARNING]
 > For an `AsyncResult` the matcher is asynchronous — you **must** `await` the
