@@ -6,21 +6,12 @@ export {
   fromPromise,
   fromSafePromise,
   fromThrowable,
+  isDefect,
   isErr,
   isOk,
-  isPanic,
   ok,
-  panic,
+  Result,
   UnwrapError,
 } from "./result.js";
 
-export type {
-  AsyncResult,
-  Defect,
-  ErrOf,
-  ErrView,
-  OkOf,
-  OkView,
-  PanicView,
-  Result,
-} from "./result.js";
+export type { AsyncResult, Defect, DefectView, ErrOf, ErrView, OkOf, OkView } from "./result.js";
