@@ -158,15 +158,19 @@ Never pull `ts-pattern` or `vitest` into core.
    a zero-dependency exhaustive fold whose handler object is
    `{ Ok, Defect } & { [K in E["_tag"]]: (e: Extract<E, {_tag: K}>) => R }`.
 3. ✅ **`packages/vitest`** — Done. Custom matchers `toBeOk`, `toBeOkWith`,
-   `toBeErr`, `toBeErrTagged`, `toBeDefect`, registered via `expect.extend` and
-   augmenting Vitest's `Matchers` interface. They detect a thenable `AsyncResult`
-   and await internally, so a test reads `await expect(asyncResult).toBeOk()`
-   (the required `await` is documented loudly — a forgotten one passes silently).
-4. ✅ **`packages/pattern`** — Done. Thin `ts-pattern` integration: `tag(t)`
-   sugar (the `{ _tag: t }` pattern, narrowing to the variant + payload) and
-   `toMatchable(result)` exposing the ok/err/defect channels as a `_kind`
-   discriminated union. Kept small — the power is ts-pattern's; `matchTags`
-   covers the everyday exhaustive case.
+   `toBeErr`, `toBeErrTagged` (optional second arg also matches the tagged
+   error's payload — exact for a plain object, partial for an asymmetric matcher
+   like `expect.objectContaining`), `toBeDefect`, registered via `expect.extend`
+   and augmenting Vitest's `Matchers` interface. They detect a thenable
+   `AsyncResult` and await internally, so a test reads
+   `await expect(asyncResult).toBeOk()` (the required `await` is documented loudly
+   — a forgotten one passes silently).
+4. ✅ **`packages/pattern`** — Done. Because `Result` is a discriminated union
+   (Thesis #1 / Public surface), `ts-pattern` matches it natively — this package
+   is thin sugar: pattern constructors `P.ok`/`P.err`/`P.defect` (returning the
+   `{ tag: … }` object patterns) plus `tag(t)` (the `{ _tag: t }` pattern,
+   narrowing to the variant + payload). Kept small — the power is ts-pattern's;
+   `matchTags` covers the everyday exhaustive case.
 
 Also shipped: a root `README` + `LICENSE`, per-package READMEs, and the VitePress
 docs site (guide + generated API reference). **Remaining work is manual** and

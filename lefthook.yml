@@ -2,12 +2,23 @@ pre-commit:
   parallel: true
   commands:
     format:
-      glob: "**/*.{ts,tsx,js,jsx,json,yaml,yml,md}"
-      exclude: "pnpm-lock.yaml"
+      # `*.x` (not `**/*.x`): lefthook's `*` spans `/`, so this matches files at
+      # ANY depth including the repo root. `**/*.x` requires a leading directory,
+      # so root files (`CLAUDE.md`, `README.md`, root `*.json`) silently never
+      # matched and were never formatted on commit.
+      glob: "*.{ts,tsx,js,jsx,json,yaml,yml,md}"
+      # Mirror oxfmt's `ignorePatterns` (generated docs/api + vitepress output):
+      # handing oxfmt ONLY ignored files makes it exit non-zero, which would fail
+      # a commit touching only those. Excluding them here skips the step instead.
+      exclude:
+        - "pnpm-lock.yaml"
+        - "docs/api/*"
+        - "docs/.vitepress/cache/*"
+        - "docs/.vitepress/dist/*"
       run: pnpm oxfmt {staged_files}
       stage_fixed: true
     lint:
-      glob: "**/*.{ts,tsx,js,jsx}"
+      glob: "*.{ts,tsx,js,jsx}"
       run: pnpm oxlint {staged_files}
 
 commit-msg:
