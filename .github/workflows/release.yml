@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+    branches:
+      - main
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # PAT so the git remote is configured with PAT credentials; the bare
+          # GITHUB_TOKEN push checkout normally sets up is treated as a bot
+          # event and would not fire `pull_request` workflows on the resulting
+          # branch — defeating the point of a PAT release.
+          token: ${{ secrets.RELEASE_PAT }}
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Build
+        run: pnpm build
+
+      - name: Create Release Pull Request or Publish to npm
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          # Use `pnpm run …` so we invoke the package.json scripts. Bare
+          # `pnpm version` collides with pnpm's built-in `version` command and
+          # silently prints `process.versions` instead of running the changeset
+          # version script.
+          version: pnpm run version
+          publish: pnpm run release
+          commit: "chore: release packages"
+          title: "chore: release packages"
+        env:
+          # PAT rather than GITHUB_TOKEN: events triggered by GITHUB_TOKEN do
+          # not start new workflow runs (anti-recursion safeguard), so the
+          # "Version Packages" PR would otherwise skip CI. Required repo secret:
+          # RELEASE_PAT (classic PAT with `repo`, or fine-grained with
+          # Contents + Pull requests read/write on this repo).
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
+          # NPM_TOKEN intentionally absent — npm Trusted Publishing uses the
+          # OIDC token minted via `id-token: write`. Each package must have a
+          # Trusted Publisher configured on npmjs.com pointing at this repo +
+          # workflow file (.github/workflows/release.yml).
