@@ -9,6 +9,25 @@ import { defect } from "./defect.js";
 import { all, fromNullable, fromPromise, fromSafePromise, fromThrowable } from "./interop.js";
 import type { Result as ResultType } from "./types.js";
 
+/**
+ * Companion object grouping the standalone entry points under a single,
+ * discoverable namespace: {@link Result.ok}, {@link Result.err},
+ * {@link Result.defect}, {@link Result.fromNullable}, {@link Result.fromThrowable},
+ * {@link Result.fromPromise}, {@link Result.fromSafePromise}, {@link Result.all},
+ * {@link Result.isOk}, {@link Result.isErr}, {@link Result.isDefect}.
+ *
+ * @remarks
+ * Purely additive sugar — each member **is** the corresponding free function.
+ * The free functions remain the primary, tree-shakeable API; importing only
+ * `{ ok }` never pulls this object in. The value `Result` and the type
+ * {@link Result} share one name (the companion-object pattern).
+ *
+ * @example
+ * ```ts
+ * import { Result } from "unthrown";
+ * Result.ok(1).flatMap((n) => Result.ok(n + 1)).unwrap(); // 2
+ * ```
+ */
 export const Result = {
   ok,
   err,

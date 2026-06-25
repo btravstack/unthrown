@@ -9,8 +9,22 @@
 
 import type { AsyncResult, Result } from "./types.js";
 
-/** Thrown by `unwrap()` / `unwrapErr()` when the assertion is wrong on an Err. */
+/**
+ * Thrown by a {@link Result}'s `unwrap` / `unwrapErr` when the assertion is
+ * wrong on a *modeled* result — `unwrap()` on an `Err`, or `unwrapErr()` on an
+ * `Ok`.
+ *
+ * @remarks
+ * A `Defect` is never wrapped in an `UnwrapError`: its original cause is
+ * re-thrown (with its original stack) instead.
+ *
+ * @typeParam E - the type of the {@link UnwrapError.error} it carries.
+ */
 export class UnwrapError<E = unknown> extends Error {
+  /**
+   * The offending value: the `Err` error for `unwrap()`, or the `Ok` value for
+   * `unwrapErr()`.
+   */
   readonly error: E;
   constructor(error: E) {
     super("unthrown: called unwrap on a non-matching Result");
@@ -25,6 +39,13 @@ type State<T, E> =
   | { readonly tag: "err"; readonly error: E }
   | { readonly tag: "defect"; readonly cause: unknown };
 
+/**
+ * The sole runtime implementation of {@link Result}. Never re-exported from
+ * `index.ts`, which is what keeps `_state` (and the third runtime state) hidden
+ * from the public type.
+ *
+ * @internal
+ */
 export class Res<T, E> implements Result<T, E> {
   // public-at-runtime, but absent from the Result<T,E> interface, so user code
   // never sees it; AsyncResult (same module) reads it for branching.
@@ -206,10 +227,21 @@ export class Res<T, E> implements Result<T, E> {
   }
 }
 
+/**
+ * Construct a `Result` already in the `defect` state.
+ *
+ * @internal
+ */
 export function defectRes<T, E>(cause: unknown): Result<T, E> {
   return new Res<T, E>({ tag: "defect", cause });
 }
 
+/**
+ * The sole runtime implementation of {@link AsyncResult}: wraps a
+ * `Promise<Res>` constructed never to reject. Never re-exported from `index.ts`.
+ *
+ * @internal
+ */
 export class AsyncRes<T, E> implements AsyncResult<T, E> {
   constructor(private readonly promise: Promise<Res<T, E>>) {}
 
