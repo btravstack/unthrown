@@ -12,5 +12,5 @@ This reference is generated from the source with
   `matchTags`).
 - [**@unthrown/vitest**](./vitest/) — custom Vitest matchers (`toBeOk`,
   `toBeOkWith`, `toBeErr`, `toBeErrTagged`, `toBeDefect`).
-- [**@unthrown/pattern**](./pattern/) — the thin `ts-pattern` integration
-  (`toMatchable`, `tag`).
+- [**@unthrown/pattern**](./pattern/) — thin `ts-pattern` sugar for the
+  natively-matchable `Result` (`P.ok`/`P.err`/`P.defect`, `tag`).

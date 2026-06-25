@@ -75,11 +75,11 @@ defect, so the edge of your program needs a single `match` and no `try`/`catch`.
 
 ## Packages
 
-| Package                                   | Description                                                                                |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------ |
-| [`unthrown`](./packages/core)             | The core `Result` / `AsyncResult`, interop, `TaggedError`, `matchTags`. Zero runtime deps. |
-| [`@unthrown/vitest`](./packages/vitest)   | Vitest matchers: `toBeOk`, `toBeOkWith`, `toBeErr`, `toBeErrTagged`, `toBeDefect`.         |
-| [`@unthrown/pattern`](./packages/pattern) | Thin `ts-pattern` integration: `toMatchable`, `tag`.                                       |
+| Package                                   | Description                                                                                    |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| [`unthrown`](./packages/core)             | The core `Result` / `AsyncResult`, interop, `TaggedError`, `matchTags`. Zero runtime deps.     |
+| [`@unthrown/vitest`](./packages/vitest)   | Vitest matchers: `toBeOk`, `toBeOkWith`, `toBeErr`, `toBeErrTagged`, `toBeDefect`.             |
+| [`@unthrown/pattern`](./packages/pattern) | Thin `ts-pattern` sugar for the natively-matchable `Result`: `P.ok`/`P.err`/`P.defect`, `tag`. |
 
 ## Contributing
 
