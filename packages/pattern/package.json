@@ -1,0 +1,70 @@
+{
+  "name": "@unthrown/pattern",
+  "version": "0.0.0",
+  "description": "ts-pattern integration for unthrown",
+  "keywords": [
+    "errors-as-values",
+    "pattern-matching",
+    "result",
+    "ts-pattern",
+    "typescript",
+    "unthrown"
+  ],
+  "homepage": "https://github.com/btravers/unthrown#readme",
+  "bugs": {
+    "url": "https://github.com/btravers/unthrown/issues"
+  },
+  "license": "MIT",
+  "author": "Benoit TRAVERS <benoit.travers.fr@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/btravers/unthrown.git",
+    "directory": "packages/pattern"
+  },
+  "files": [
+    "dist",
+    "docs"
+  ],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown src/index.ts --format cjs,esm --dts --clean",
+    "build:docs": "typedoc",
+    "dev": "tsdown src/index.ts --format cjs,esm --dts --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "unthrown": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@unthrown/tsconfig": "workspace:*",
+    "@unthrown/typedoc": "workspace:*",
+    "ts-pattern": "catalog:",
+    "tsdown": "catalog:",
+    "typedoc": "catalog:",
+    "typedoc-plugin-markdown": "catalog:",
+    "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "ts-pattern": "^5"
+  },
+  "engines": {
+    "node": ">=22.19"
+  }
+}

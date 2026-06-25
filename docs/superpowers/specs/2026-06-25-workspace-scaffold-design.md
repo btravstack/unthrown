@@ -23,22 +23,22 @@ suite (that is the next roadmap task) or publishing to npm (a manual step).
 
 ## 2. Toolchain (matching the sibling projects)
 
-| Concern | Choice |
-|---|---|
-| Package manager | pnpm `11.7.0`, workspaces + **catalog** |
-| Task runner | **turbo** (`turbo.json`) |
-| Build | **tsdown** — dual CJS + ESM + `.d.ts` |
-| Typecheck | `tsc --noEmit` per package, shared base config |
-| Lint | **oxlint** (`.oxlintrc.json`) |
-| Format | **oxfmt** (`.oxfmtrc.json`) |
-| Dead-code/deps | **knip** (`knip.json`) |
-| Git hooks | **lefthook** (`lefthook.yml`) |
-| Commit lint | **commitlint** conventional (`commitlint.config.js`) |
-| Versioning/release | **changesets** (`.changeset/config.json`) |
-| Tests | **vitest** per package, v8 coverage, `*.spec.ts` |
-| API docs config | **typedoc** shared config (site deferred — see §7) |
-| CI | GitHub Actions, composite setup action |
-| Node | `.node-version` `24.16.0`; `engines.node >=22.19` |
+| Concern            | Choice                                               |
+| ------------------ | ---------------------------------------------------- |
+| Package manager    | pnpm `11.7.0`, workspaces + **catalog**              |
+| Task runner        | **turbo** (`turbo.json`)                             |
+| Build              | **tsdown** — dual CJS + ESM + `.d.ts`                |
+| Typecheck          | `tsc --noEmit` per package, shared base config       |
+| Lint               | **oxlint** (`.oxlintrc.json`)                        |
+| Format             | **oxfmt** (`.oxfmtrc.json`)                          |
+| Dead-code/deps     | **knip** (`knip.json`)                               |
+| Git hooks          | **lefthook** (`lefthook.yml`)                        |
+| Commit lint        | **commitlint** conventional (`commitlint.config.js`) |
+| Versioning/release | **changesets** (`.changeset/config.json`)            |
+| Tests              | **vitest** per package, v8 coverage, `*.spec.ts`     |
+| API docs config    | **typedoc** shared config (site deferred — see §7)   |
+| CI                 | GitHub Actions, composite setup action               |
+| Node               | `.node-version` `24.16.0`; `engines.node >=22.19`    |
 
 ## 3. Repository layout
 
@@ -133,9 +133,9 @@ Per-package `package.json` mirrors the sibling-project shape: `type: module`,
   `noImplicitReturns`, `isolatedModules`, `skipLibCheck`. Published as private
   `@unthrown/tsconfig`.
 - Each package `tsconfig.json`: `{ extends, compilerOptions: { outDir: "./dist",
-  rootDir: "./src" }, include: ["src/**/*"] }`.
+rootDir: "./src" }, include: ["src/**/*"] }`.
 - **tsdown** builds the actual dist (`tsdown src/index.ts --format cjs,esm --dts
-  --clean`); `tsc --noEmit` is typecheck-only. A `tsdown.config.ts` per package
+--clean`); `tsc --noEmit` is typecheck-only. A `tsdown.config.ts` per package
   (minimal; core needs no `external` since it has no runtime deps).
 - Under `NodeNext`, relative imports in source use explicit `.js` extensions
   (e.g. `export * from "./result.js"`).

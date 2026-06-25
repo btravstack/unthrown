@@ -1,0 +1,10 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreExportsUsedInFile": true,
+  "workspaces": {
+    "packages/*": {
+      "project": ["src/**/*.ts"]
+    }
+  },
+  "ignoreDependencies": ["typedoc-plugin-markdown", "@unthrown/typedoc"]
+}

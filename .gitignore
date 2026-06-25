@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build output
+**/dist/
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+*.lcov
+
+# Turbo
+.turbo/
+
+# TypeDoc generated API docs
+packages/*/docs/
+
+# Logs
+*.log
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Editors
+.vscode/
+.idea/
+
+# macOS
+.DS_Store

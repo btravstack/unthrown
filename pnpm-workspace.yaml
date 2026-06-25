@@ -1,0 +1,31 @@
+autoInstallPeers: false
+dedupePeerDependents: true
+engineStrict: true
+saveExact: true
+strictPeerDependencies: true
+
+packages:
+  - packages/*
+  - tools/*
+
+catalog:
+  "@changesets/cli": 2.31.0
+  "@commitlint/cli": 21.0.2
+  "@commitlint/config-conventional": 21.0.2
+  "@types/node": 24.13.2
+  "@vitest/coverage-v8": 4.1.8
+  knip: 6.16.1
+  lefthook: 2.1.9
+  oxfmt: 0.54.0
+  oxlint: 1.69.0
+  ts-pattern: 5.9.0
+  tsdown: 0.22.2
+  turbo: 2.9.18
+  typedoc: 0.28.19
+  typedoc-plugin-markdown: 4.12.0
+  typescript: 6.0.3
+  vitest: 4.1.8
+
+allowBuilds:
+  esbuild: true
+  lefthook: true
