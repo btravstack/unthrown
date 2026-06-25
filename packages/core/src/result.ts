@@ -86,7 +86,18 @@ export type Result<T, E> = {
   toAsync(): AsyncResult<T, E>;
 };
 
-export type AsyncResult<T, E> = PromiseLike<Result<T, E>> & {
+/**
+ * A success-only thenable: awaitable, but deliberately NOT a full `PromiseLike`.
+ * An `AsyncResult`'s internal promise never rejects, so `await`-ing one always
+ * yields a `Result` and never throws — there is no rejection channel to model,
+ * and none is advertised. (At runtime it is still a thenable, which is the only
+ * way `await` can collapse it to a `Result`.)
+ */
+export type Awaitable<T> = {
+  then<R = T>(onfulfilled?: ((value: T) => R | PromiseLike<R>) | null): PromiseLike<R>;
+};
+
+export type AsyncResult<T, E> = Awaitable<Result<T, E>> & {
   map<U>(f: (value: T) => U | Promise<U>): AsyncResult<U, E>;
   flatMap<U, E2>(
     f: (value: T) => Result<U, E2> | AsyncResult<U, E2> | Promise<Result<U, E2>>,
@@ -352,7 +363,7 @@ export function isDefect<T, E>(r: Result<T, E>): r is DefectView {
 class AsyncRes<T, E> implements AsyncResult<T, E> {
   constructor(private readonly promise: Promise<Res<T, E>>) {}
 
-  // oxlint-disable-next-line no-thenable -- AsyncResult is intentionally a thenable; this is the designed public contract
+  // oxlint-disable-next-line no-thenable -- AsyncResult is an intentional (success-only) thenable so `await` collapses it to a Result; see the Awaitable type. onrejected is still forwarded so a hypothetical internal rejection settles the await instead of hanging — though the internal promise never rejects.
   then<R1 = Result<T, E>, R2 = never>(
     onfulfilled?: ((value: Result<T, E>) => R1 | PromiseLike<R1>) | null,
     onrejected?: ((reason: unknown) => R2 | PromiseLike<R2>) | null,

@@ -14,4 +14,13 @@ export {
   UnwrapError,
 } from "./result.js";
 
-export type { AsyncResult, Defect, DefectView, ErrOf, ErrView, OkOf, OkView } from "./result.js";
+export type {
+  AsyncResult,
+  Awaitable,
+  Defect,
+  DefectView,
+  ErrOf,
+  ErrView,
+  OkOf,
+  OkView,
+} from "./result.js";
