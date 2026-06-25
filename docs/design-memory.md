@@ -275,10 +275,10 @@ util packages depend on the scope existing and names get sniped.
 
 ## 8. Roadmap (suggested order)
 
-1. **Scaffold the workspace** — `package.json` `exports`, build (tsup or tsc),
-   shared strict `tsconfig`, and publish `unthrown` + `@unthrown` scope
-   placeholders to claim the names (do this by hand, first).
-2. **`packages/core/src/tagged.ts`** — `TaggedError` factory + `matchTags`.
+1. ✅ **Scaffold the workspace** — done (pnpm + turbo + tsdown, oxlint/oxfmt,
+   knip, changesets, CI). Publishing the names to npm remains a manual step.
+2. ✅ **`packages/core/src/tagged.ts`** — done. `TaggedError` factory +
+   `matchTags`, fully tested and TSDoc'd.
 3. **`packages/vitest`** — the matchers above.
 4. **`packages/pattern`** — the thin ts-pattern layer.
 
