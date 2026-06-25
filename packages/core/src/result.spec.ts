@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isDefect, ok, Result } from "./index.js";
+import { fromSafePromise, isDefect, ok, Result } from "./index.js";
 
 describe("unthrown core smoke", () => {
   it("maps an Ok value through the success channel", () => {
@@ -35,5 +35,17 @@ describe("Result facade", () => {
       throw new Error("boom");
     });
     expect(Result.isDefect(d)).toBe(true);
+  });
+});
+
+describe("AsyncResult is awaitable", () => {
+  it("collapses to a Result when awaited (a success-only thenable)", async () => {
+    const result = await fromSafePromise(Promise.resolve(7));
+    expect(result.unwrap()).toBe(7);
+  });
+
+  it("await still yields a Result after async combinators", async () => {
+    const result = await fromSafePromise(Promise.resolve(1)).map((n) => n + 1);
+    expect(result.unwrap()).toBe(2);
   });
 });

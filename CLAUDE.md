@@ -61,8 +61,11 @@ not flung up the stack. Only a true defect ever throws (at `unwrap`).
 ## Public surface (already implemented in packages/core/src/result.ts)
 
 `Result<T, E>` and `AsyncResult<T, E>` share one method surface. `AsyncResult`
-is a thenable wrapper (method parity with `Result`); its callbacks may be async,
-and `await` collapses it to a `Result`.
+is an awaitable wrapper (method parity with `Result`) typed as
+`Awaitable<Result<T, E>>` — a **success-only thenable**, not a full
+`PromiseLike` (its internal promise never rejects, so there is no rejection
+channel to model). Its callbacks may be async, and `await` collapses it to a
+`Result`.
 
 - success: `map`, `flatMap`, `tap`, `as`
 - error: `mapErr`, `orElse`, `recover`, `tapErr`

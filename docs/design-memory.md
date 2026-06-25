@@ -67,6 +67,16 @@ style) vs plain `Promise<Result<T,E>>` vs Effect's single unified type.
 **Chose the AsyncResult wrapper** for chaining ergonomics, accepting the doubled
 method surface / test matrix as the cost.
 
+It is typed `Awaitable<Result<T,E>>` — a **success-only thenable**, not a full
+`PromiseLike`. Because the internal promise never rejects (§4.5), there is no
+rejection channel to advertise: `Awaitable` exposes only `then(onfulfilled)`, so
+`await` yields a `Result` and can never throw. At runtime it stays a thenable
+(the only way `await` collapses it), and its `then` still forwards `onrejected`
+so a hypothetical internal rejection settles the await rather than hanging. The
+narrowing also means an `AsyncResult` is not structurally a `PromiseLike`, which
+nudges callers away from treating it as a raw promise (e.g. dropping it into
+`Promise.all`).
+
 ### 2.5 `TaggedError` convention (chosen)
 
 Errors follow a `TaggedError` convention like Effect's `Data.TaggedError`: a class
@@ -127,9 +137,10 @@ bridge into statics, and still needs a separate `AsyncResult` class.
 
 ## 3. Method surface
 
-`Result<T, E>` and `AsyncResult<T, E>` share one surface. `AsyncResult` is a
-thenable wrapper with method parity; callbacks may be async; `await` collapses it
-to a `Result`.
+`Result<T, E>` and `AsyncResult<T, E>` share one surface. `AsyncResult` is an
+awaitable wrapper with method parity, typed `Awaitable<Result<T,E>>` (a
+success-only thenable, not a full `PromiseLike` — see 2.4); callbacks may be
+async; `await` collapses it to a `Result`.
 
 - success: `map`, `flatMap`, `tap`, `as`
 - error: `mapErr`, `orElse`, `recover`, `tapErr`
