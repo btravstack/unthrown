@@ -103,17 +103,21 @@ enough that the library can be "done".
 ## Internal design (don't break these)
 
 - **`Result` / `AsyncResult` are the public types; `Res` / `AsyncRes` are the
-  internal classes that implement them** (in `core.ts`, **never re-exported from
-  `index.ts`**). `Result` is a discriminated union exposing `tag` / `value` /
-  `error` / `cause`; `Res` is the single class behind all three variants, with
-  `Res._state` (lowercase `ok|err|defect`) kept **module-private** and the public
-  `tag` (capitalised) surfaced via a getter. The three cast-builders
-  `okRes`/`errRes`/`defectRes` are the **only** place a `Res` is bridged to the
-  `Result` type (`as unknown as Result`) — don't scatter that cast or export
-  `Res`. "Check before you access" is enforced by the union: `result.value` only
+  internal classes** (in `core.ts`, **never re-exported from `index.ts`**).
+  `Result` is a discriminated union (`{ tag; value/error/cause } & methods`) where
+  each variant is `Res` (a method holder, like boxed's `__Result`) intersected
+  with its `tag`/payload. `Res` is **never `new`'d**: the builders
+  `okRes`/`errRes`/`defectRes` create instances with `Object.create(Res.prototype)`
+  and return them as the variant type (`OkView`/`ErrView`/`DefectView`) — so a
+  builder yields a value that already _is_ a union member, with **no construction
+  cast**. `Res` methods type `this` as `Result<T, E>` and narrow on `tag`. The
+  only remaining casts are the inherent type-changing pass-throughs (`map` reusing
+  an `Err` as a differently-typed `Result`) — the same `as unknown as` boxed uses,
+  sound because the passed-through variant carries no value of the changed type.
+- "Check before you access" is enforced by the union: `result.value` only
   type-checks on the `Ok` variant. `AsyncRes` operates purely on the public
-  `Result` union (it wraps a `Promise<Result>` and branches on `r.tag`), never on
-  `Res` internals.
+  `Result` union (wraps a `Promise<Result>`, branches on `r.tag`), never on `Res`
+  internals.
 - **Builders are free functions** (`ok`, `err`, …) because they tree-shake — and
   there is a `bundle-size` CI gate that protects this. The `Result` companion
   object is additive sugar (value + type share the name via a re-alias in

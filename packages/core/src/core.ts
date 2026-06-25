@@ -1,14 +1,19 @@
 // unthrown — the runtime engine.
 //
 // `Result` is the PUBLIC discriminated union (tag/value/error/cause + methods).
-// `Res` is its sole internal implementation: one class over a `State` union,
-// exposing the public discriminant via getters. `Res` is never exported from
-// `index.ts`; the three cast-builders below (`okRes`/`errRes`/`defectRes`) are
-// the only place a `Res` instance is bridged to the `Result` type. `AsyncRes`
-// wraps a `Promise<Result>` constructed never to reject. See CLAUDE.md →
-// "Internal design".
+// `Res` is a method holder only: its prototype carries the implementations, and
+// instances are built by `okRes`/`errRes`/`defectRes` with `Object.create` +
+// the variant type — so a builder returns a value that already *is* a union
+// member (no `as unknown as`). `Res` is never exported from `index.ts`.
+// `AsyncRes` wraps a `Promise<Result>` constructed never to reject and operates
+// purely on the public union (via `r.tag`). See CLAUDE.md → "Internal design".
+//
+// The only casts left are the inherent type-changing pass-throughs (e.g. `map`
+// reusing an `Err` as a differently-typed `Result`) — the same `as unknown as`
+// boxed uses, sound because the passed-through variant carries no value of the
+// changed type.
 
-import type { AsyncResult, Result } from "./types.js";
+import type { AsyncResult, DefectView, ErrView, OkView, Result } from "./types.js";
 
 /**
  * Thrown by a {@link Result}'s `unwrap` / `unwrapErr` when the assertion is
@@ -35,210 +40,190 @@ export class UnwrapError<E = unknown> extends Error {
   }
 }
 
-type State<T, E> =
-  | { readonly tag: "ok"; readonly value: T }
-  | { readonly tag: "err"; readonly error: E }
-  | { readonly tag: "defect"; readonly cause: unknown };
-
-const PUBLIC_TAG = { ok: "Ok", err: "Err", defect: "Defect" } as const;
-
 /**
- * The sole runtime implementation of {@link Result}. Never re-exported from
- * `index.ts`. Bridged to the `Result` type only via `okRes`/`errRes`/`defectRes`.
+ * Method holder for {@link Result}. Never instantiated with `new` and never
+ * exported; the builders below attach its prototype to plain objects. Every
+ * method types `this` as the public `Result` union, so it narrows on `tag`.
  *
  * @internal
  */
 class Res<T, E> {
-  readonly _state: State<T, E>;
-
-  // The public discriminant. `value`/`error`/`cause` are only reachable on the
-  // matching variant of the `Result` union, so reading the wrong one is a type
-  // error, not a runtime surprise.
-  get tag(): "Ok" | "Err" | "Defect" {
-    return PUBLIC_TAG[this._state.tag];
-  }
-  get value(): T {
-    return (this._state as { value: T }).value;
-  }
-  get error(): E {
-    return (this._state as { error: E }).error;
-  }
-  get cause(): unknown {
-    return (this._state as { cause: unknown }).cause;
-  }
-
-  constructor(state: State<T, E>) {
-    this._state = state;
-  }
-
-  map<U>(f: (value: T) => U): Result<U, E> {
-    if (this._state.tag !== "ok") return this as unknown as Result<U, E>;
+  map<U>(this: Result<T, E>, f: (value: T) => U): Result<U, E> {
+    if (this.tag !== "Ok") return this as unknown as Result<U, E>;
     try {
-      return okRes(f(this._state.value));
+      return okRes(f(this.value));
     } catch (cause) {
       return defectRes(cause);
     }
   }
 
-  flatMap<U, E2>(f: (value: T) => Result<U, E2>): Result<U, E | E2> {
-    if (this._state.tag !== "ok") return this as unknown as Result<U, E | E2>;
+  flatMap<U, E2>(this: Result<T, E>, f: (value: T) => Result<U, E2>): Result<U, E | E2> {
+    if (this.tag !== "Ok") return this as unknown as Result<U, E | E2>;
     try {
-      return f(this._state.value) as Result<U, E | E2>;
+      return f(this.value) as Result<U, E | E2>;
     } catch (cause) {
       return defectRes(cause);
     }
   }
 
-  tap(f: (value: T) => void): Result<T, E> {
-    if (this._state.tag !== "ok") return this as unknown as Result<T, E>;
+  tap(this: Result<T, E>, f: (value: T) => void): Result<T, E> {
+    if (this.tag !== "Ok") return this;
     try {
-      f(this._state.value);
-      return this as unknown as Result<T, E>;
+      f(this.value);
+      return this;
     } catch (cause) {
       return defectRes(cause);
     }
   }
 
-  as<U>(value: U): Result<U, E> {
-    if (this._state.tag !== "ok") return this as unknown as Result<U, E>;
+  as<U>(this: Result<T, E>, value: U): Result<U, E> {
+    if (this.tag !== "Ok") return this as unknown as Result<U, E>;
     return okRes(value);
   }
 
-  mapErr<E2>(f: (error: E) => E2): Result<T, E2> {
-    if (this._state.tag !== "err") return this as unknown as Result<T, E2>;
+  mapErr<E2>(this: Result<T, E>, f: (error: E) => E2): Result<T, E2> {
+    if (this.tag !== "Err") return this as unknown as Result<T, E2>;
     try {
-      return errRes(f(this._state.error));
+      return errRes(f(this.error));
     } catch (cause) {
       return defectRes(cause);
     }
   }
 
-  orElse<U, E2>(f: (error: E) => Result<U, E2>): Result<T | U, E2> {
-    if (this._state.tag !== "err") return this as unknown as Result<T | U, E2>;
+  orElse<U, E2>(this: Result<T, E>, f: (error: E) => Result<U, E2>): Result<T | U, E2> {
+    if (this.tag !== "Err") return this as unknown as Result<T | U, E2>;
     try {
-      return f(this._state.error) as Result<T | U, E2>;
+      return f(this.error) as Result<T | U, E2>;
     } catch (cause) {
       return defectRes(cause);
     }
   }
 
-  recover<U>(f: (error: E) => U): Result<T | U, never> {
-    if (this._state.tag !== "err") return this as unknown as Result<T | U, never>;
+  recover<U>(this: Result<T, E>, f: (error: E) => U): Result<T | U, never> {
+    if (this.tag !== "Err") return this as unknown as Result<T | U, never>;
     try {
-      return okRes(f(this._state.error));
+      return okRes(f(this.error));
     } catch (cause) {
       return defectRes(cause);
     }
   }
 
-  tapErr(f: (error: E) => void): Result<T, E> {
-    if (this._state.tag !== "err") return this as unknown as Result<T, E>;
+  tapErr(this: Result<T, E>, f: (error: E) => void): Result<T, E> {
+    if (this.tag !== "Err") return this;
     try {
-      f(this._state.error);
-      return this as unknown as Result<T, E>;
+      f(this.error);
+      return this;
     } catch (cause) {
       return defectRes(cause);
     }
   }
 
-  recoverDefect<U, E2>(f: (cause: unknown) => Result<U, E2>): Result<T | U, E | E2> {
-    if (this._state.tag !== "defect") return this as unknown as Result<T | U, E | E2>;
+  recoverDefect<U, E2>(
+    this: Result<T, E>,
+    f: (cause: unknown) => Result<U, E2>,
+  ): Result<T | U, E | E2> {
+    if (this.tag !== "Defect") return this as unknown as Result<T | U, E | E2>;
     try {
-      return f(this._state.cause) as Result<T | U, E | E2>;
+      return f(this.cause) as Result<T | U, E | E2>;
     } catch (cause) {
       return defectRes(cause);
     }
   }
 
-  tapDefect(f: (cause: unknown) => void): Result<T, E> {
-    if (this._state.tag !== "defect") return this as unknown as Result<T, E>;
+  tapDefect(this: Result<T, E>, f: (cause: unknown) => void): Result<T, E> {
+    if (this.tag !== "Defect") return this;
     try {
-      f(this._state.cause);
-      return this as unknown as Result<T, E>;
+      f(this.cause);
+      return this;
     } catch (cause) {
       return defectRes(cause);
     }
   }
 
-  match<R>(cases: { ok: (value: T) => R; err: (error: E) => R; defect: (cause: unknown) => R }): R {
-    switch (this._state.tag) {
-      case "ok":
-        return cases.ok(this._state.value);
-      case "err":
-        return cases.err(this._state.error);
-      case "defect":
-        return cases.defect(this._state.cause);
+  match<R>(
+    this: Result<T, E>,
+    cases: { ok: (value: T) => R; err: (error: E) => R; defect: (cause: unknown) => R },
+  ): R {
+    switch (this.tag) {
+      case "Ok":
+        return cases.ok(this.value);
+      case "Err":
+        return cases.err(this.error);
+      case "Defect":
+        return cases.defect(this.cause);
     }
   }
 
-  unwrap(): T {
-    switch (this._state.tag) {
-      case "ok":
-        return this._state.value;
-      case "err":
-        throw new UnwrapError(this._state.error);
-      case "defect":
-        throw this._state.cause; // rethrow original cause, original stack
+  unwrap(this: Result<T, E>): T {
+    switch (this.tag) {
+      case "Ok":
+        return this.value;
+      case "Err":
+        throw new UnwrapError(this.error);
+      case "Defect":
+        throw this.cause; // rethrow original cause, original stack
     }
   }
 
-  unwrapErr(): E {
-    switch (this._state.tag) {
-      case "err":
-        return this._state.error;
-      case "ok":
-        throw new UnwrapError(this._state.value);
-      case "defect":
-        throw this._state.cause;
+  unwrapErr(this: Result<T, E>): E {
+    switch (this.tag) {
+      case "Err":
+        return this.error;
+      case "Ok":
+        throw new UnwrapError(this.value);
+      case "Defect":
+        throw this.cause;
     }
   }
 
-  unwrapOr(fallback: T): T {
-    if (this._state.tag === "ok") return this._state.value;
-    if (this._state.tag === "defect") throw this._state.cause;
+  unwrapOr(this: Result<T, E>, fallback: T): T {
+    if (this.tag === "Ok") return this.value;
+    if (this.tag === "Defect") throw this.cause;
     return fallback;
   }
 
-  unwrapOrElse(f: (error: E) => T): T {
-    if (this._state.tag === "ok") return this._state.value;
-    if (this._state.tag === "defect") throw this._state.cause;
-    return f(this._state.error);
+  unwrapOrElse(this: Result<T, E>, f: (error: E) => T): T {
+    if (this.tag === "Ok") return this.value;
+    if (this.tag === "Defect") throw this.cause;
+    return f(this.error);
   }
 
-  getOrNull(): T | null {
-    if (this._state.tag === "ok") return this._state.value;
-    if (this._state.tag === "defect") throw this._state.cause;
+  getOrNull(this: Result<T, E>): T | null {
+    if (this.tag === "Ok") return this.value;
+    if (this.tag === "Defect") throw this.cause;
     return null;
   }
 
-  getOrUndefined(): T | undefined {
-    if (this._state.tag === "ok") return this._state.value;
-    if (this._state.tag === "defect") throw this._state.cause;
+  getOrUndefined(this: Result<T, E>): T | undefined {
+    if (this.tag === "Ok") return this.value;
+    if (this.tag === "Defect") throw this.cause;
     return undefined;
   }
 
-  isOk(): boolean {
-    return this._state.tag === "ok";
+  isOk(this: Result<T, E>): boolean {
+    return this.tag === "Ok";
   }
-  isErr(): boolean {
-    return this._state.tag === "err";
+  isErr(this: Result<T, E>): boolean {
+    return this.tag === "Err";
   }
-  isDefect(): boolean {
-    return this._state.tag === "defect";
+  isDefect(this: Result<T, E>): boolean {
+    return this.tag === "Defect";
   }
 
-  toAsync(): AsyncResult<T, E> {
-    return new AsyncRes<T, E>(Promise.resolve(this as unknown as Result<T, E>));
+  toAsync(this: Result<T, E>): AsyncResult<T, E> {
+    return new AsyncRes<T, E>(Promise.resolve(this));
   }
 }
 
+const RESULT_PROTO = Res.prototype;
+
 /**
- * Construct an `Ok` result.
+ * Construct an `Ok` result — a plain object on the {@link Res} prototype.
  *
  * @internal
  */
 export function okRes<T, E>(value: T): Result<T, E> {
-  return new Res<T, E>({ tag: "ok", value }) as unknown as Result<T, E>;
+  return Object.assign(Object.create(RESULT_PROTO), { tag: "Ok" as const, value }) as OkView<T, E>;
 }
 
 /**
@@ -247,7 +232,10 @@ export function okRes<T, E>(value: T): Result<T, E> {
  * @internal
  */
 export function errRes<T, E>(error: E): Result<T, E> {
-  return new Res<T, E>({ tag: "err", error }) as unknown as Result<T, E>;
+  return Object.assign(Object.create(RESULT_PROTO), { tag: "Err" as const, error }) as ErrView<
+    E,
+    T
+  >;
 }
 
 /**
@@ -256,7 +244,10 @@ export function errRes<T, E>(error: E): Result<T, E> {
  * @internal
  */
 export function defectRes<T, E>(cause: unknown): Result<T, E> {
-  return new Res<T, E>({ tag: "defect", cause }) as unknown as Result<T, E>;
+  return Object.assign(Object.create(RESULT_PROTO), {
+    tag: "Defect" as const,
+    cause,
+  }) as DefectView<T, E>;
 }
 
 /**
