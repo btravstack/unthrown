@@ -50,7 +50,8 @@ export function fromNullable<T, E>(
  *
  * @typeParam A - the wrapped function's argument tuple.
  * @typeParam T - the wrapped function's return type.
- * @typeParam R - `qualify`'s return type (`E | Defect`); `E` is `Exclude<R, Defect>`.
+ * @typeParam R - `qualify`'s return type; the modeled error `E` is
+ * `Exclude<R, Defect>` (its `Defect` arm, if any, is subtracted).
  * @param fn - the throwing function to wrap.
  * @param qualify - triages a thrown cause into `E` or a `Defect`.
  * @returns a function with the same arguments returning `Result<T, E>`.
@@ -93,7 +94,8 @@ export function fromThrowable<A extends unknown[], T, R>(
  * rejection is a defect, prefer {@link fromSafePromise}.
  *
  * @typeParam T - the resolved value type.
- * @typeParam R - `qualify`'s return type (`E | Defect`); `E` is `Exclude<R, Defect>`.
+ * @typeParam R - `qualify`'s return type; the modeled error `E` is
+ * `Exclude<R, Defect>` (its `Defect` arm, if any, is subtracted).
  * @param promise - the promise, or a thunk returning one.
  * @param qualify - triages a rejection cause into `E` or a `Defect`.
  *

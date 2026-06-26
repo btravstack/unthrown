@@ -178,7 +178,9 @@ function resultToEffect<T, E>(result: Result<T, E>): Effect.Effect<T, E> {
 // unthrown; replaying it through the throwable boundary lands it in the `Defect`
 // state — the sanctioned (boundary-only) way to mint a defect `Result`.
 function dieToResult<T, E>(cause: unknown): Result<T, E> {
-  return fromThrowable((): never => {
+  // The thunk always throws, so its `T` return is honest; `qualify` is `defect`,
+  // so the modeled error is `never` — widened to `E` here (there is no `Err`).
+  return fromThrowable((): T => {
     throw cause;
   }, defect)() as Result<T, E>;
 }
