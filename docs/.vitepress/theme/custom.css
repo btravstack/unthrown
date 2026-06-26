@@ -6,4 +6,4 @@
  * Pinned to an immutable commit SHA for reproducible builds — to pull in
  * upstream token changes, bump the SHA below. Do not fork colors here.
  */
-@import "https://cdn.jsdelivr.net/gh/btravstack/btravstack.github.io@7ad56793ed403bd626ac85476752f9b7cf7c6983/theme/vitepress.css";
+@import "https://cdn.jsdelivr.net/gh/btravstack/btravstack.github.io@v1.0.0/theme/vitepress.css";
