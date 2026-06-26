@@ -23,8 +23,12 @@ describe("all", () => {
     expect(r.unwrap()).toEqual([1, "two", true]);
   });
 
-  it("returns Ok([]) for an empty tuple", () => {
-    expect(all([]).unwrap()).toEqual([]);
+  it("returns Ok([]) for an empty tuple, typed as the empty tuple (not never[])", () => {
+    const r = all([]);
+    // Compiles only if the empty input keeps tuple typing `Result<[], never>`
+    // rather than collapsing to `Result<never[], never>`.
+    const empty: Result<[], never> = r;
+    expect(empty.unwrap()).toEqual([]);
   });
 
   it("short-circuits on the first Err", () => {

@@ -142,19 +142,25 @@ function qualifyToResult<T, E>(
 
 /**
  * The success channel of {@link all} / {@link allAsync}: a **positional tuple**
- * for a fixed-length input, or a homogeneous **array** for a dynamic one.
+ * for a fixed-length input (including the empty tuple), or a homogeneous
+ * **array** for a dynamic one.
+ *
+ * @remarks
+ * The split keys off the input's `length`: a fixed tuple has a literal length
+ * (`number extends Rs["length"]` is false → keep the positional `Ts`), while a
+ * general array has `length: number` (→ collapse to `Ts[number][]`). Checking
+ * length rather than `Rs extends [unknown, ...unknown[]]` keeps `all([])` typed
+ * as `Result<[], …>` instead of `Result<never[], …>`.
  *
  * @typeParam Rs - the tuple/array of input `Result` types.
  * @typeParam Ts - per-element extracted success types (`OkOf` for `all`,
  * `AsyncOkOf` for `allAsync`).
  * @internal
  */
-type AllOk<Rs extends readonly unknown[], Ts extends readonly unknown[]> = Rs extends readonly [
-  unknown,
-  ...unknown[],
-]
-  ? Ts
-  : Ts[number][];
+type AllOk<
+  Rs extends readonly unknown[],
+  Ts extends readonly unknown[],
+> = number extends Rs["length"] ? Ts[number][] : Ts;
 
 /**
  * Collect {@link Result}s into a single `Result` of all their success values.
