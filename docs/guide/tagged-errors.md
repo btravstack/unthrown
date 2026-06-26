@@ -24,6 +24,23 @@ The class extends `Error` (so `instanceof Error` holds and stacks work), the
 `_tag` is authoritative (a payload can't overwrite it), and a `message` field in
 the payload is forwarded to `Error`.
 
+### Namespacing the tag without renaming the error
+
+`_tag` is the discriminant `matchTags` dispatches on; `Error.name` is the
+human-facing label in stack traces and logs. By default they're the same, but a
+second `options.name` argument decouples them — so you can namespace a tag for
+collision-safety without that prefix leaking into the display name:
+
+```ts
+class RetryableError extends TaggedError("@my-lib/RetryableError", {
+  name: "RetryableError",
+})<{ message: string }> {}
+
+const e = new RetryableError({ message: "boom" });
+e._tag; // "@my-lib/RetryableError" — namespaced discriminant
+e.name; // "RetryableError"          — clean stack-trace label
+```
+
 A tagged union of these makes a precise error type:
 
 ```ts

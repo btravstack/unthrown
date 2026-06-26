@@ -63,17 +63,22 @@ zero-cost alias (a separate export — `import { ok }` never pulls it in).
 ## Guards that narrow
 
 `isOk` / `isErr` / `isDefect` are type guards. After a successful guard, the
-relevant field becomes accessible:
+relevant field becomes accessible. They come in two styles that narrow
+identically — standalone functions and methods (the methods are `this is …`
+predicates):
 
 ```ts
 import { isOk, isErr } from "unthrown";
 
 const r: Result<number, string> = ok(7);
 
+// standalone function
 if (isOk(r)) {
   r.value; // number
 }
-if (isErr(r)) {
+
+// method — narrows too
+if (r.isErr()) {
   r.error; // string
 }
 ```
@@ -94,15 +99,27 @@ ok(1).match({ ok, err, defect }); // fold all three channels
 `Err` but **rethrow a `Defect`** — a defect is a bug, not an absent value. See
 [The Defect Channel](./the-defect-channel).
 
-## Aggregating: `all`
+## Aggregating: `all` / `allAsync`
 
-`all` collects a tuple of `Result`s into a `Result` of the tuple of values. The
-first `Err` short-circuits; any `Defect` dominates (even over an earlier `Err`):
+`all` collects `Result`s into a `Result` of all their values. The first `Err`
+short-circuits; any `Defect` dominates (even over an earlier `Err`). A fixed
+tuple keeps its positional types; a dynamic `Result<T, E>[]` collapses to
+`Result<T[], E>` with no cast:
 
 ```ts
-import { all, ok } from "unthrown";
+import { all, ok, type Result } from "unthrown";
 
-all([ok(1), ok("two"), ok(true)]).unwrap(); // [1, "two", true]
+all([ok(1), ok("two"), ok(true)]).unwrap(); // [1, "two", true] (typed [number, string, boolean])
+all([ok(1), ok(2)] as Result<number, never>[]).unwrap(); // number[]
+```
+
+`allAsync` is the asynchronous counterpart — same folding rules, inputs resolved
+concurrently (order preserved), and (like every `AsyncResult`) it never rejects:
+
+```ts
+import { allAsync, fromSafePromise } from "unthrown";
+
+const [a, b] = (await allAsync([fromSafePromise(loadA()), fromSafePromise(loadB())])).unwrap();
 ```
 
 → Continue to [The Defect Channel](./the-defect-channel).

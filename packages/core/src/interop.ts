@@ -5,7 +5,7 @@
 import { AsyncRes, defectRes, errRes, okRes } from "./core.js";
 import { type Defect, isDefectMarker } from "./defect.js";
 import { err, ok } from "./constructors.js";
-import type { AsyncResult, ErrOf, OkOf, Result } from "./types.js";
+import type { AsyncErrOf, AsyncOkOf, AsyncResult, ErrOf, OkOf, Result } from "./types.js";
 
 /**
  * Bridge a nullable value into a {@link Result}: absence becomes a **modeled**
@@ -141,27 +141,45 @@ function qualifyToResult<T, E>(
 }
 
 /**
- * Collect a tuple of {@link Result}s into a single `Result` of the tuple of
- * success values.
+ * The success channel of {@link all} / {@link allAsync}: a **positional tuple**
+ * for a fixed-length input, or a homogeneous **array** for a dynamic one.
+ *
+ * @typeParam Rs - the tuple/array of input `Result` types.
+ * @typeParam Ts - per-element extracted success types (`OkOf` for `all`,
+ * `AsyncOkOf` for `allAsync`).
+ * @internal
+ */
+type AllOk<Rs extends readonly unknown[], Ts extends readonly unknown[]> = Rs extends readonly [
+  unknown,
+  ...unknown[],
+]
+  ? Ts
+  : Ts[number][];
+
+/**
+ * Collect {@link Result}s into a single `Result` of all their success values.
  *
  * @remarks
  * Short-circuits on the **first** `Err` (later entries are not inspected for
  * their error); any `Defect` present **dominates**, winning even over an earlier
- * `Err`. Positional types are preserved, so `all([ok(1), ok("a")])` is
- * `Result<[number, string], …>`.
+ * `Err`. A **fixed tuple** keeps its positional types — `all([ok(1), ok("a")])`
+ * is `Result<[number, string], …>` — while a **dynamic array** `Result<T, E>[]`
+ * collapses to `Result<T[], E>` with no cast.
  *
- * @typeParam Rs - the tuple of input `Result` types.
+ * @typeParam Rs - the tuple/array of input `Result` types.
  * @param results - the results to combine.
  *
  * @example
  * ```ts
  * import { all, ok } from "unthrown";
- * all([ok(1), ok("a"), ok(true)]).unwrap(); // [1, "a", true]
+ * all([ok(1), ok("a"), ok(true)]).unwrap(); // [1, "a", true] (typed [number, string, boolean])
+ * all([ok(1), ok(2)] as Result<number, never>[]).unwrap(); // number[]
  * ```
  */
 export function all<Rs extends readonly Result<unknown, unknown>[]>(
   results: readonly [...Rs],
-): Result<{ [K in keyof Rs]: OkOf<Rs[K]> }, ErrOf<Rs[number]>> {
+): Result<AllOk<Rs, { [K in keyof Rs]: OkOf<Rs[K]> }>, ErrOf<Rs[number]>> {
+  type Out = Result<AllOk<Rs, { [K in keyof Rs]: OkOf<Rs[K]> }>, ErrOf<Rs[number]>>;
   const values: unknown[] = [];
   let firstErr: Result<unknown, unknown> | undefined;
   let firstDefect: Result<unknown, unknown> | undefined;
@@ -172,8 +190,41 @@ export function all<Rs extends readonly Result<unknown, unknown>[]>(
     else values.push(r.value);
   }
 
-  if (firstDefect)
-    return firstDefect as Result<{ [K in keyof Rs]: OkOf<Rs[K]> }, ErrOf<Rs[number]>>;
-  if (firstErr) return firstErr as Result<{ [K in keyof Rs]: OkOf<Rs[K]> }, ErrOf<Rs[number]>>;
-  return ok(values as { [K in keyof Rs]: OkOf<Rs[K]> });
+  if (firstDefect) return firstDefect as Out;
+  if (firstErr) return firstErr as Out;
+  return ok(values) as Out;
+}
+
+/**
+ * The asynchronous counterpart of {@link all}: combine {@link AsyncResult}s into
+ * one `AsyncResult` of all their success values.
+ *
+ * @remarks
+ * The inputs are resolved **concurrently** (their order is preserved); the
+ * resolved `Result`s are then folded with the same rules as {@link all} —
+ * first `Err` short-circuits, any `Defect` dominates. As ever, the returned
+ * `AsyncResult`'s internal promise never rejects. A **fixed tuple** keeps its
+ * positional types; a **dynamic array** `AsyncResult<T, E>[]` collapses to
+ * `AsyncResult<T[], E>`.
+ *
+ * @typeParam Rs - the tuple/array of input `AsyncResult` types.
+ * @param results - the async results to combine.
+ *
+ * @example
+ * ```ts
+ * import { allAsync, fromSafePromise } from "unthrown";
+ * const both = await allAsync([fromSafePromise(a()), fromSafePromise(b())]);
+ * ```
+ */
+export function allAsync<Rs extends readonly AsyncResult<unknown, unknown>[]>(
+  results: readonly [...Rs],
+): AsyncResult<AllOk<Rs, { [K in keyof Rs]: AsyncOkOf<Rs[K]> }>, AsyncErrOf<Rs[number]>> {
+  type Out = AsyncResult<AllOk<Rs, { [K in keyof Rs]: AsyncOkOf<Rs[K]> }>, AsyncErrOf<Rs[number]>>;
+  // Each AsyncResult is a (never-rejecting) thenable, so Promise.all adopts them
+  // and resolves to the ordered Results; `all` then folds them. The internal
+  // promise still never rejects.
+  const settled = Promise.all(results).then((resolved) =>
+    all(resolved as readonly Result<unknown, unknown>[]),
+  );
+  return new AsyncRes(settled) as unknown as Out;
 }

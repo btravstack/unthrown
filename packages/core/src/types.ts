@@ -174,12 +174,12 @@ export type ResultMethods<T, E> = {
    */
   getOrUndefined(): T | undefined;
 
-  /** Whether this result is `Ok`. */
-  isOk(): boolean;
-  /** Whether this result is `Err`. */
-  isErr(): boolean;
-  /** Whether this result is a `Defect`. */
-  isDefect(): boolean;
+  /** Whether this result is `Ok` — narrows `this` to its {@link OkView} on `true`. */
+  isOk(): this is OkView<T, E>;
+  /** Whether this result is `Err` — narrows `this` to its {@link ErrView} on `true`. */
+  isErr(): this is ErrView<E, T>;
+  /** Whether this result is a `Defect` — narrows `this` to its {@link DefectView} on `true`. */
+  isDefect(): this is DefectView<T, E>;
 
   /** Lift this synchronous `Result` into an {@link AsyncResult}. */
   toAsync(): AsyncResult<T, E>;
@@ -336,3 +336,15 @@ export type OkOf<R> = R extends { readonly tag: "Ok"; readonly value: infer T } 
  * @typeParam R - the `Result` type to inspect.
  */
 export type ErrOf<R> = R extends { readonly tag: "Err"; readonly error: infer E } ? E : never;
+/**
+ * Extract the success type `T` from an {@link AsyncResult}.
+ *
+ * @typeParam R - the `AsyncResult` type to inspect.
+ */
+export type AsyncOkOf<R> = R extends AsyncResult<infer T, unknown> ? T : never;
+/**
+ * Extract the error type `E` from an {@link AsyncResult}.
+ *
+ * @typeParam R - the `AsyncResult` type to inspect.
+ */
+export type AsyncErrOf<R> = R extends AsyncResult<unknown, infer E> ? E : never;

@@ -69,6 +69,36 @@ describe("standalone guards narrow and expose the relevant field", () => {
   });
 });
 
+describe("method guards narrow (parity with the standalone guards)", () => {
+  it("r.isOk() narrows to OkView and exposes value", () => {
+    const r: Result<number, string> = ok(7);
+    if (r.isOk()) {
+      // Only compiles because `.isOk()` is a `this is OkView` predicate.
+      expect(r.value).toBe(7);
+    } else {
+      expect.fail("expected Ok");
+    }
+  });
+
+  it("r.isErr() narrows to ErrView and exposes error", () => {
+    const r: Result<number, string> = err("bad");
+    if (r.isErr()) {
+      expect(r.error).toBe("bad");
+    } else {
+      expect.fail("expected Err");
+    }
+  });
+
+  it("r.isDefect() narrows to DefectView and exposes cause", () => {
+    const r: Result<number, string> = defectOf(boom);
+    if (r.isDefect()) {
+      expect(r.cause).toBe(boom);
+    } else {
+      expect.fail("expected Defect");
+    }
+  });
+});
+
 describe("UnwrapError", () => {
   it("carries the offending error and is an Error instance", () => {
     const e = new UnwrapError("payload");
