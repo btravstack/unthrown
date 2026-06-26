@@ -39,8 +39,26 @@ export type TaggedErrorConstructor<Tag extends string> = {
  * field in the payload is forwarded to `Error`. The `_tag` always reflects
  * `tag` and cannot be overridden by the payload.
  *
+ * `_tag` is the discriminant used by {@link matchTags}; `Error.name` is the
+ * human-facing label in stack traces and logs. By default they coincide, but
+ * they can be **decoupled** with `options.name` — so a tag can be namespaced for
+ * collision-safety (`"@my-lib/RetryableError"`) without that slash-prefixed
+ * string leaking into `Error.name`:
+ *
+ * ```ts
+ * class RetryableError extends TaggedError("@my-lib/RetryableError", {
+ *   name: "RetryableError",
+ * })<{ message: string }> {}
+ *
+ * const e = new RetryableError({ message: "boom" });
+ * e._tag; // "@my-lib/RetryableError" — namespaced discriminant
+ * e.name; // "RetryableError"          — clean display name
+ * ```
+ *
  * @typeParam Tag - the string literal discriminant.
- * @param tag - the discriminant value, also used as the error `name`.
+ * @param tag - the discriminant value; also the default error `name`.
+ * @param options - optional overrides. `options.name` sets `Error.name`
+ * independently of `tag` (defaults to `tag`).
  *
  * @example
  * ```ts
@@ -51,7 +69,11 @@ export type TaggedErrorConstructor<Tag extends string> = {
  * new HttpError({ status: 500 }).status; // 500
  * ```
  */
-export function TaggedError<Tag extends string>(tag: Tag): TaggedErrorConstructor<Tag> {
+export function TaggedError<Tag extends string>(
+  tag: Tag,
+  options?: { readonly name?: string },
+): TaggedErrorConstructor<Tag> {
+  const displayName = options?.name ?? tag;
   class TaggedErrorBase extends Error {
     readonly _tag!: Tag;
 
@@ -59,9 +81,9 @@ export function TaggedError<Tag extends string>(tag: Tag): TaggedErrorConstructo
       super(typeof props?.["message"] === "string" ? (props["message"] as string) : undefined);
       if (props) Object.assign(this, props);
       // The tag is authoritative — assign it after the payload so it can't be
-      // clobbered, and set `name` for readable stack traces.
+      // clobbered. `name` is the display label, independent of the discriminant.
       (this as { _tag: Tag })._tag = tag;
-      this.name = tag;
+      this.name = displayName;
       Object.setPrototypeOf(this, new.target.prototype);
     }
   }

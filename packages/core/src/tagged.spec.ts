@@ -48,6 +48,31 @@ describe("TaggedError", () => {
     const errors: ApiError[] = [new NotFound(), new Forbidden({ user: "a" })];
     expect(errors.map((e) => e._tag)).toEqual(["NotFound", "Forbidden"]);
   });
+
+  it("defaults Error.name to the tag", () => {
+    class Plain extends TaggedError("Plain") {}
+    expect(new Plain().name).toBe("Plain");
+  });
+
+  it("decouples Error.name from a namespaced _tag via options.name", () => {
+    class Retryable extends TaggedError("@my-lib/Retryable", { name: "Retryable" })<{
+      message: string;
+    }> {}
+    const e = new Retryable({ message: "boom" });
+    expect(e._tag).toBe("@my-lib/Retryable"); // namespaced discriminant
+    expect(e.name).toBe("Retryable"); // clean display name
+    expect(e.message).toBe("boom");
+  });
+
+  it("still dispatches on the namespaced _tag in matchTags", () => {
+    class Retryable extends TaggedError("@my-lib/Retryable", { name: "Retryable" }) {}
+    const out = matchTags(err(new Retryable()) as Result<number, Retryable>, {
+      Ok: (n) => `ok:${n}`,
+      Defect: () => "defect",
+      "@my-lib/Retryable": (e) => `retry:${e.name}`,
+    });
+    expect(out).toBe("retry:Retryable");
+  });
 });
 
 describe("matchTags", () => {

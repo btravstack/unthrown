@@ -6,7 +6,14 @@
 
 import { err, isDefect, isErr, isOk, ok } from "./constructors.js";
 import { defect } from "./defect.js";
-import { all, fromNullable, fromPromise, fromSafePromise, fromThrowable } from "./interop.js";
+import {
+  all,
+  allAsync,
+  fromNullable,
+  fromPromise,
+  fromSafePromise,
+  fromThrowable,
+} from "./interop.js";
 import type { Result as ResultType } from "./types.js";
 
 /**
@@ -14,7 +21,8 @@ import type { Result as ResultType } from "./types.js";
  * discoverable namespace: {@link Result.ok}, {@link Result.err},
  * {@link Result.defect}, {@link Result.fromNullable}, {@link Result.fromThrowable},
  * {@link Result.fromPromise}, {@link Result.fromSafePromise}, {@link Result.all},
- * {@link Result.isOk}, {@link Result.isErr}, {@link Result.isDefect}.
+ * {@link Result.allAsync}, {@link Result.isOk}, {@link Result.isErr},
+ * {@link Result.isDefect}.
  *
  * @remarks
  * Purely additive sugar — each member **is** the corresponding free function.
@@ -37,6 +45,7 @@ export const Result = {
   fromPromise,
   fromSafePromise,
   all,
+  allAsync,
   isOk,
   isErr,
   isDefect,

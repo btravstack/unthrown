@@ -82,18 +82,27 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
 - defect: `recoverDefect`, `tapDefect`
 - eliminate: `match`, `unwrap`, `unwrapErr`, `unwrapOr`, `unwrapOrElse`,
   `getOrNull`, `getOrUndefined`
-- guards: methods `isOk`/`isErr`/`isDefect` (boolean) + standalone
-  `isOk`/`isErr`/`isDefect` (narrow to `OkView`/`ErrView`/`DefectView`)
+- guards: methods `isOk`/`isErr`/`isDefect` **and** standalone
+  `isOk`/`isErr`/`isDefect` both narrow (to `OkView`/`ErrView`/`DefectView`) — the
+  methods are `this is …` type predicates, so `if (r.isErr()) r.error` compiles.
+  One narrowing concept, two call styles.
 - constructors: `ok`, `err`, `defect`
 - interop: `fromNullable`, `fromThrowable`, `fromPromise`, `fromSafePromise`
-- aggregate: `all` (first `Err` wins; any `Defect` dominates)
+- aggregate: `all` / `allAsync` (first `Err` wins; any `Defect` dominates). Both
+  are **tuple-or-array**: a fixed tuple keeps positional types, a dynamic
+  `Result<T, E>[]` / `AsyncResult<T, E>[]` collapses to `Result<T[], E>` /
+  `AsyncResult<T[], E>` with no cast. `allAsync` resolves its inputs concurrently
+  (order preserved) and never rejects.
 - facade: a `Result` companion object aliases the standalone entry points
-  (`Result.ok`/`err`/`defect`/`from*`/`all`/`is*`) for discoverability; the free
-  functions remain the primary, tree-shakeable API. One concept, two import
-  styles — not a second concept.
-- tagged errors: `TaggedError(tag)` (the error-class factory) and
-  `matchTags(result, handlers)` (an exhaustive `{ Ok, Defect } & per-tag` fold);
-  see the `TaggedError` convention in Thesis #4.
+  (`Result.ok`/`err`/`defect`/`from*`/`all`/`allAsync`/`is*`) for discoverability;
+  the free functions remain the primary, tree-shakeable API. One concept, two
+  import styles — not a second concept.
+- tagged errors: `TaggedError(tag, options?)` (the error-class factory; optional
+  `options.name` sets `Error.name` independently of the `_tag` discriminant, so a
+  tag can be namespaced for collision-safety without leaking into the display
+  name) and `matchTags(result, handlers)` (an exhaustive `{ Ok, Defect } &
+per-tag` fold; has an async overload resolving to `Promise<R>`); see the
+  `TaggedError` convention in Thesis #4.
 
 Deliberately **excluded** for now: `gen`/do-notation (heaviest possible
 addition; revisit only if sequential code demands it), accumulation/`Validation`,

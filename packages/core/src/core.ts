@@ -200,13 +200,13 @@ class Res<T, E> {
     return undefined;
   }
 
-  isOk(this: Result<T, E>): boolean {
+  isOk(this: Result<T, E>): this is OkView<T, E> {
     return this.tag === "Ok";
   }
-  isErr(this: Result<T, E>): boolean {
+  isErr(this: Result<T, E>): this is ErrView<E, T> {
     return this.tag === "Err";
   }
-  isDefect(this: Result<T, E>): boolean {
+  isDefect(this: Result<T, E>): this is DefectView<T, E> {
     return this.tag === "Defect";
   }
 
