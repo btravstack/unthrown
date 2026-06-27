@@ -99,7 +99,7 @@ class Res<T, E> {
       if (r.tag !== "Ok") return passThrough(r);
       // The merged scope can't be spelled at the type level (a computed key
       // widens to an index signature), so the constructed Ok is cast to `Bound`.
-      return okRes({ ...(this.value as object), [name]: r.value }) as unknown as Result<
+      return okRes({ ...scopeOf(this.value), [name]: r.value }) as unknown as Result<
         Bound<T, K, U>,
         E | E2
       >;
@@ -115,7 +115,7 @@ class Res<T, E> {
   ): Result<Bound<T, K, U>, E> {
     if (this.tag !== "Ok") return passThrough(this);
     try {
-      return okRes({ ...(this.value as object), [name]: f(this.value) }) as unknown as Result<
+      return okRes({ ...scopeOf(this.value), [name]: f(this.value) }) as unknown as Result<
         Bound<T, K, U>,
         E
       >;
@@ -322,6 +322,31 @@ function passThrough<T, E>(self: Result<unknown, unknown>): Result<T, E> {
 }
 
 /**
+ * Validate that a `bind`/`let` scope is a real (non-null) object before merging a
+ * key into it.
+ *
+ * @remarks
+ * Do-notation accumulates an **object** scope: a chain starts at `Do()` (an
+ * empty object) and every `bind`/`let` returns an object, so in typed code the
+ * scope is always an object. The method lives on the general `Result` surface,
+ * though, so a primitive `Ok` (e.g. `Ok(5).bind(...)`, or a chain whose value was
+ * `map`-ped away from its scope) could reach it. Rather than let `{ ...5 }`
+ * silently collapse to `{}` and drop the prior scope, we throw here — the
+ * surrounding `try` turns it into a {@link Defect}, surfacing the misuse as the
+ * bug it is (a defect is a bug, not an absent value). A `this: object` constraint
+ * was rejected: TypeScript does not hard-enforce a constraint inferred solely
+ * from `this`, and it breaks `AsyncRes implements AsyncResult`.
+ *
+ * @internal
+ */
+function scopeOf(value: unknown): object {
+  if (typeof value !== "object" || value === null) {
+    throw new TypeError("bind/let requires an object scope — start a do-chain with Do()");
+  }
+  return value;
+}
+
+/**
  * The sole runtime implementation of {@link AsyncResult}: wraps a
  * `Promise<Result>` constructed never to reject. Operates on the public `Result`
  * union (via `tag`), never on `Res` internals. Never re-exported from `index.ts`.
@@ -406,7 +431,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
         try {
           const inner = await f(r.value);
           if (inner.tag !== "Ok") return passThrough(inner);
-          return okRes({ ...(r.value as object), [name]: inner.value }) as unknown as Result<
+          return okRes({ ...scopeOf(r.value), [name]: inner.value }) as unknown as Result<
             Bound<T, K, U>,
             E | E2
           >;
@@ -422,7 +447,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
       this.promise.then((r) => {
         if (r.tag !== "Ok") return passThrough(r);
         try {
-          return okRes({ ...(r.value as object), [name]: f(r.value) }) as unknown as Result<
+          return okRes({ ...scopeOf(r.value), [name]: f(r.value) }) as unknown as Result<
             Bound<T, K, U>,
             E
           >;

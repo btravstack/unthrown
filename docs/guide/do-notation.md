@@ -39,6 +39,8 @@ the normal surface, so you can mix in `map`, `flatMap`, `match`, and the rest
 freely, and a thrown callback still becomes a `Defect`:
 
 ```ts
+import { Do, Ok } from "unthrown";
+
 Do()
   .bind("n", () => Ok(2))
   .let("doubled", ({ n }) => n * 2)

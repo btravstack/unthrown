@@ -39,7 +39,7 @@ features:
 ## At a glance
 
 ```ts
-import { Ok, Err, fromPromise, type Result } from "unthrown";
+import { Ok, Err, Defect, fromPromise, type Result } from "unthrown";
 
 class NotFound extends TaggedError("NotFound") {}
 

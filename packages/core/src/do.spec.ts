@@ -62,6 +62,21 @@ describe("Do / bind / let", () => {
         .isDefect(),
     ).toBe(true);
   });
+
+  it("turns bind/let on a non-object scope into a Defect (misuse, not a silent drop)", () => {
+    // `bind`/`let` live on the general surface; calling them on a primitive `Ok`
+    // would otherwise spread `{ ...5 }` into `{}` and silently drop the value.
+    expect(
+      Ok(5)
+        .bind("a", () => Ok(1))
+        .isDefect(),
+    ).toBe(true);
+    expect(
+      Ok(5)
+        .let("a", () => 1)
+        .isDefect(),
+    ).toBe(true);
+  });
 });
 
 describe("Do / bind / let — async", () => {
@@ -95,6 +110,18 @@ describe("Do / bind / let — async", () => {
       .let("a", () => {
         throw boom;
       });
+    expect(fromLet.isDefect()).toBe(true);
+  });
+
+  it("turns an async bind/let on a non-object scope into a Defect", async () => {
+    const fromBind = await Ok(5)
+      .toAsync()
+      .bind("a", () => Ok(1));
+    expect(fromBind.isDefect()).toBe(true);
+
+    const fromLet = await Ok(5)
+      .toAsync()
+      .let("a", () => 1);
     expect(fromLet.isDefect()).toBe(true);
   });
 });
