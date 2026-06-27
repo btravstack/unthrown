@@ -19,6 +19,7 @@ describe("Invariant 1: throw inside any combinator becomes a Defect", () => {
     expect(ok(1).map(t).isDefect()).toBe(true);
     expect(ok(1).flatMap(t).isDefect()).toBe(true);
     expect(ok(1).tap(t).isDefect()).toBe(true);
+    expect(ok(1).flatTap(t).isDefect()).toBe(true);
     expect(err("e").mapErr(t).isDefect()).toBe(true);
     expect(err("e").orElse(t).isDefect()).toBe(true);
     expect(err("e").recover(t).isDefect()).toBe(true);
@@ -35,6 +36,7 @@ describe("Invariant 2: a Defect flows through every method except match() and re
       defectOf(boom).map(f),
       defectOf(boom).flatMap(f),
       defectOf(boom).tap(f),
+      defectOf(boom).flatTap(f),
       defectOf(boom).as(1),
       defectOf(boom).mapErr(f),
       defectOf(boom).orElse(f),

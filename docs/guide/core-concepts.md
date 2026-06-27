@@ -23,7 +23,7 @@ reachable once you've narrowed to a variant.
 
 Every `Result` shares one method surface, grouped by the channel it touches:
 
-- **success** (runs on `Ok`): `map`, `flatMap`, `tap`, `as`
+- **success** (runs on `Ok`): `map`, `flatMap`, `tap`, `flatTap`, `as`
 - **error** (runs on `Err`): `mapErr`, `orElse`, `recover`, `tapErr`
 - **defect** (the only door to a `Defect`): `recoverDefect`, `tapDefect`
 - **eliminate**: `match`, `unwrap`, `unwrapErr`, `unwrapOr`, `unwrapOrElse`,
@@ -36,6 +36,19 @@ through untouched:
 ok(2).map((n) => n + 1); // Ok(3)
 err("e").map((n) => n + 1); // Err("e") — callback skipped
 ok(2).mapErr((e) => `${e}!`); // Ok(2) — callback skipped
+```
+
+`tap` and `flatTap` both run a side effect and keep the original value — the
+difference is whether the effect can fail. `tap` takes a `void` callback;
+`flatTap` takes a **`Result`-returning** one, discards its success value, and
+threads its error (a validation or write whose _outcome_ matters but whose
+_value_ you don't need):
+
+```ts
+ok(user)
+  .flatTap((u) => writeAudit(u)) // returns Result<void, WriteError>
+  .map((u) => u.name);
+// → still the original user on success; short-circuits to WriteError on failure
 ```
 
 ## Constructors and the `Result` facade

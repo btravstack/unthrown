@@ -76,6 +76,17 @@ class Res<T, E> {
     }
   }
 
+  flatTap<E2>(this: Result<T, E>, f: (value: T) => Result<unknown, E2>): Result<T, E | E2> {
+    if (this.tag !== "Ok") return this as unknown as Result<T, E | E2>;
+    try {
+      const r = f(this.value);
+      // Keep the original value on success; an Err/Defect from `f` short-circuits.
+      return (r.tag === "Ok" ? this : r) as unknown as Result<T, E | E2>;
+    } catch (cause) {
+      return defectRes(cause);
+    }
+  }
+
   as<U>(this: Result<T, E>, value: U): Result<U, E> {
     if (this.tag !== "Ok") return this as unknown as Result<U, E>;
     return okRes(value);
@@ -303,6 +314,23 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
           return r;
         } catch (cause) {
           return defectRes<T, E>(cause);
+        }
+      }),
+    );
+  }
+
+  flatTap<E2>(
+    f: (value: T) => Result<unknown, E2> | AsyncResult<unknown, E2>,
+  ): AsyncResult<T, E | E2> {
+    return new AsyncRes<T, E | E2>(
+      this.promise.then(async (r) => {
+        if (r.tag !== "Ok") return r as unknown as Result<T, E | E2>;
+        try {
+          const inner = (await f(r.value)) as Result<unknown, E2>;
+          // Keep the original value on success; an Err/Defect from `f` wins.
+          return (inner.tag === "Ok" ? r : inner) as unknown as Result<T, E | E2>;
+        } catch (cause) {
+          return defectRes(cause);
         }
       }),
     );

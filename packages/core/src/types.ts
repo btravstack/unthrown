@@ -41,6 +41,23 @@ export type ResultMethods<T, E> = {
    */
   tap(f: (value: T) => void): Result<T, E>;
   /**
+   * Run a **failable** side effect on the success value, keeping the original
+   * value but threading the effect's error.
+   *
+   * @remarks
+   * This is to {@link ResultMethods.tap | tap} what
+   * {@link ResultMethods.flatMap | flatMap} is to {@link ResultMethods.map | map}:
+   * `f` returns a `Result`, but its **success value is discarded** — on success
+   * the original value flows through (`Result<T, E | E2>`), while an `Err` (or
+   * `Defect`) from `f` short-circuits. Runs only on `Ok`; `Err` and `Defect` pass
+   * through. If `f` throws, the throw becomes a `Defect`. Use it for a validation
+   * or write whose _result_ matters but whose _value_ you don't need.
+   *
+   * @typeParam E2 - the error type the effect may introduce.
+   * @param f - the failable side effect; its `Ok` value is ignored.
+   */
+  flatTap<E2>(f: (value: T) => Result<unknown, E2>): Result<T, E | E2>;
+  /**
    * Replace the success value with a constant `value`.
    *
    * Runs only on `Ok`; `Err` and `Defect` pass through.
@@ -285,6 +302,14 @@ export type AsyncResult<T, E> = Awaitable<Result<T, E>> & {
   flatMap<U, E2>(f: (value: T) => Result<U, E2> | AsyncResult<U, E2>): AsyncResult<U, E | E2>;
   /** Asynchronous `tap`. `f` is synchronous; a throw becomes a `Defect`. */
   tap(f: (value: T) => void): AsyncResult<T, E>;
+  /**
+   * Asynchronous `flatTap` — a failable tap that keeps the original value. `f`
+   * may return a `Result` **or** an `AsyncResult`; its `Ok` value is discarded,
+   * an `Err`/`Defect` short-circuits, and a throw becomes a `Defect`.
+   */
+  flatTap<E2>(
+    f: (value: T) => Result<unknown, E2> | AsyncResult<unknown, E2>,
+  ): AsyncResult<T, E | E2>;
   /** Asynchronous `as`. */
   as<U>(value: U): AsyncResult<U, E>;
 

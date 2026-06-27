@@ -46,8 +46,9 @@ was planned).
 ## Load-bearing runtime invariants (tests must guard these)
 
 - **Throw → defect.** Any value thrown by a callback inside a combinator
-  (`map`, `flatMap`, `mapErr`, `orElse`, `recover`, `tap*`, `recoverDefect`) is
-  caught and converted to a `Defect`. Nothing escapes a pipeline as a raw throw.
+  (`map`, `flatMap`, `flatTap`, `mapErr`, `orElse`, `recover`, `tap*`,
+  `recoverDefect`) is caught and converted to a `Defect`. Nothing escapes a
+  pipeline as a raw throw.
   This is what lets an HTTP adapter do a single `match({ ok, err, defect })`
   with **no surrounding `try/catch`**.
 - **A `Defect` flows through every method untouched EXCEPT `match()` and
@@ -82,7 +83,9 @@ Its **combinator callbacks are synchronous** (no raw `Promise` — see Thesis #3
 async work re-enters via `fromPromise` / `fromSafePromise` and composes with
 `flatMap`. `await` collapses an `AsyncResult` to a `Result` (then match it).
 
-- success: `map`, `flatMap`, `tap`, `as`
+- success: `map`, `flatMap`, `tap`, `flatTap` (a failable `tap` — runs a
+  `Result`-returning effect, keeps the original value, threads the effect's
+  error), `as`
 - error: `mapErr`, `orElse`, `recover`, `tapErr`
 - defect: `recoverDefect`, `tapDefect`
 - eliminate: `match`, `unwrap`, `unwrapErr`, `unwrapOr`, `unwrapOrElse`,
