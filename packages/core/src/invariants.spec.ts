@@ -3,7 +3,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { err, fromSafePromise, ok, type Result, UnwrapError } from "./index.js";
+import { Do, err, fromSafePromise, ok, type Result, UnwrapError } from "./index.js";
 
 const boom = new Error("boom");
 const defectOf = (cause: unknown): Result<number, never> =>
@@ -20,6 +20,8 @@ describe("Invariant 1: throw inside any combinator becomes a Defect", () => {
     expect(ok(1).flatMap(t).isDefect()).toBe(true);
     expect(ok(1).tap(t).isDefect()).toBe(true);
     expect(ok(1).flatTap(t).isDefect()).toBe(true);
+    expect(Do().bind("a", t).isDefect()).toBe(true);
+    expect(Do().let("a", t).isDefect()).toBe(true);
     expect(err("e").mapErr(t).isDefect()).toBe(true);
     expect(err("e").orElse(t).isDefect()).toBe(true);
     expect(err("e").recover(t).isDefect()).toBe(true);
@@ -37,6 +39,8 @@ describe("Invariant 2: a Defect flows through every method except match() and re
       defectOf(boom).flatMap(f),
       defectOf(boom).tap(f),
       defectOf(boom).flatTap(f),
+      defectOf(boom).bind("a", f),
+      defectOf(boom).let("a", f),
       defectOf(boom).as(1),
       defectOf(boom).mapErr(f),
       defectOf(boom).orElse(f),

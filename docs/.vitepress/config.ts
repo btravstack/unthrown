@@ -48,6 +48,7 @@ export default defineConfig({
             { text: "The Defect Channel", link: "/guide/the-defect-channel" },
             { text: "Boundaries & Qualification", link: "/guide/boundaries" },
             { text: "Async Results", link: "/guide/async-results" },
+            { text: "Do Notation", link: "/guide/do-notation" },
             { text: "Choosing a Combinator", link: "/guide/choosing-a-combinator" },
             { text: "Recipes", link: "/guide/recipes" },
           ],

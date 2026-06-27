@@ -1,6 +1,7 @@
 export { err, isDefect, isErr, isOk, ok } from "./constructors.js";
 export { UnwrapError } from "./core.js";
 export { defect } from "./defect.js";
+export { Do } from "./do.js";
 export { Result } from "./facade.js";
 export {
   all,

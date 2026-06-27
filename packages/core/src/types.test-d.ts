@@ -15,6 +15,7 @@ import {
   type AsyncOkOf,
   type AsyncResult,
   defect,
+  Do,
   type ErrOf,
   err,
   fromPromise,
@@ -116,6 +117,37 @@ const mapped = r1.map((n) => `${n}`);
 type _mapped = Expect<Equal<typeof mapped, Result<string, "e1">>>;
 const errMapped = r1.mapErr(() => 0 as const);
 type _errMapped = Expect<Equal<typeof errMapped, Result<number, 0>>>;
+
+// --- do-notation: bind/let accumulate a named scope, errors union ------------
+
+// the accumulated scope is readonly (it mustn't be mutated mid-chain)
+const doChain = Do()
+  .bind("a", () => ok(1))
+  .bind("b", ({ a }) => (a > 0 ? ok("x") : err<"e1">("e1")))
+  .let("c", ({ a, b }) => a + b.length);
+type _doChain = Expect<
+  Equal<
+    typeof doChain,
+    Result<{ readonly a: number; readonly b: string; readonly c: number }, "e1">
+  >
+>;
+
+// the bound scope is typed in each step's callback (compiles → keys are present)
+const doScoped = Do()
+  .bind("user", () => ok({ name: "ada" }))
+  .let("upper", ({ user }) => user.name.toUpperCase());
+type _doScoped = Expect<
+  Equal<typeof doScoped, Result<{ readonly user: { name: string }; readonly upper: string }, never>>
+>;
+
+// async do-notation accumulates the same way
+const doAsync = Do()
+  .toAsync()
+  .bind("a", () => ok(1))
+  .let("b", ({ a }) => a + 1);
+type _doAsync = Expect<
+  Equal<typeof doAsync, AsyncResult<{ readonly a: number; readonly b: number }, never>>
+>;
 
 // --- guards narrow (methods AND standalone) ----------------------------------
 
