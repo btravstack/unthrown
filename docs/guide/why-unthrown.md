@@ -53,14 +53,19 @@ Two more deliberate choices follow from this:
 
 ## Compared to the alternatives
 
-- **neverthrow / boxed** — model errors as values, but have no proper channel
-  for _unexpected_ errors, and don't force qualification when a value crosses an
-  async boundary. `boxed` also ships an `Option` type — a second way to express
-  absence that `unthrown` deliberately omits.
-- **effect** — extremely powerful, but heavy: it conflates error handling with
-  context, runtime, dependency injection, and more. `unthrown` does one thing.
+- **neverthrow / boxed / byethrow** — model errors as values, but have no proper
+  channel for _unexpected_ errors, and a throw inside a `.map` callback either
+  escapes as a real exception or gets folded into `E`. `boxed` also ships an
+  `Option` type — a second way to express absence that `unthrown` deliberately
+  omits.
+- **effect** — extremely powerful, and it _does_ have a defect channel, but it is
+  heavy: it conflates error handling with context, runtime, dependency injection,
+  and more. `unthrown` does one thing.
 
 `unthrown` borrows Effect's best idea — a defect (`die`) channel distinct from
 modeled errors — and ships just that, in a library small enough to be _done_.
+
+For a feature-by-feature table across all of these, see
+[Comparison](./comparison).
 
 → Continue to [Getting Started](./getting-started).
