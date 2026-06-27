@@ -19,6 +19,7 @@ import {
   err,
   fromPromise,
   fromThrowable,
+  isDefect,
   isErr,
   isOk,
   matchTags,
@@ -134,6 +135,9 @@ if (isOk(g)) {
 }
 if (isErr(g)) {
   type _se = Expect<Equal<typeof g.error, string>>;
+}
+if (isDefect(g)) {
+  type _sc = Expect<Equal<typeof g.cause, unknown>>;
 }
 
 // the payload is unreachable before narrowing

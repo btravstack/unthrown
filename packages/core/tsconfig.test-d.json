@@ -4,6 +4,6 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*.test-d.ts"],
   "exclude": ["node_modules", "dist"]
 }

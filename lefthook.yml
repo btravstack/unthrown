@@ -19,6 +19,12 @@ pre-commit:
       stage_fixed: true
     lint:
       glob: "*.{ts,tsx,js,jsx}"
+      # Mirror oxlint's `ignorePatterns` (type-only test files): handing oxlint
+      # ONLY ignored files makes it exit non-zero ("No files found to lint"),
+      # which would fail a commit touching only those. Exclude them here so the
+      # step is skipped instead.
+      exclude:
+        - "*.test-d.ts"
       run: pnpm oxlint {staged_files}
 
 commit-msg:
