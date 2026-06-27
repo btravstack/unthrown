@@ -1,6 +1,14 @@
 // unthrown — public type surface. Pure types, no runtime.
 
 /**
+ * Flatten an intersection into a single object literal so accumulated `bind` /
+ * `let` scopes display cleanly (`{ a; b }` rather than `{ a } & { b }`).
+ *
+ * @internal
+ */
+export type Prettify<T> = { [K in keyof T]: T[K] } & {};
+
+/**
  * The method surface every {@link Result} variant carries. Factored out so the
  * three variants ({@link OkView}, {@link ErrView}, {@link DefectView}) can each
  * intersect it. Not part of the public API on its own.
@@ -57,6 +65,45 @@ export type ResultMethods<T, E> = {
    * @param f - the failable side effect; its `Ok` value is ignored.
    */
   flatTap<E2>(f: (value: T) => Result<unknown, E2>): Result<T, E | E2>;
+  /**
+   * Do-notation: run `f` for a `Result` and **bind its value** under `name` in
+   * an accumulating object scope.
+   *
+   * @remarks
+   * Begin a chain with {@link Do} (an empty object scope) and grow it step by
+   * step. `f` receives the scope accumulated so far and returns a `Result`; on
+   * `Ok` the value is added as `{ ...scope, [name]: value }`, on `Err`/`Defect`
+   * the chain short-circuits. Errors union (`E | E2`). A throw becomes a
+   * `Defect`. (`let` is the pure-value counterpart.)
+   *
+   * @typeParam K - the key the bound value is stored under.
+   * @typeParam U - the bound value type.
+   * @typeParam E2 - the error type `f` may introduce.
+   * @param name - the scope key.
+   * @param f - produces a `Result` from the accumulated scope.
+   */
+  bind<K extends string, U, E2>(
+    name: K,
+    f: (scope: T) => Result<U, E2>,
+  ): Result<Prettify<T & { readonly [P in K]: U }>, E | E2>;
+  /**
+   * Do-notation: run `f` for a **plain value** and bind it under `name` in the
+   * accumulating object scope. The pure-value counterpart of {@link ResultMethods.bind | bind}.
+   *
+   * @remarks
+   * `f` receives the scope and returns a value (not a `Result`); it is added as
+   * `{ ...scope, [name]: value }`. Runs only on `Ok`; `Err`/`Defect` pass
+   * through. A throw becomes a `Defect`.
+   *
+   * @typeParam K - the key the value is stored under.
+   * @typeParam U - the value type.
+   * @param name - the scope key.
+   * @param f - computes a value from the accumulated scope.
+   */
+  let<K extends string, U>(
+    name: K,
+    f: (scope: T) => U,
+  ): Result<Prettify<T & { readonly [P in K]: U }>, E>;
   /**
    * Replace the success value with a constant `value`.
    *
@@ -311,6 +358,19 @@ export type AsyncResult<T, E> = Awaitable<Result<T, E>> & {
   flatTap<E2>(
     f: (value: T) => Result<unknown, E2> | AsyncResult<unknown, E2>,
   ): AsyncResult<T, E | E2>;
+  /**
+   * Asynchronous `bind` (do-notation). `f` may return a `Result` **or** an
+   * `AsyncResult`; its value is bound under `name` in the accumulating scope.
+   */
+  bind<K extends string, U, E2>(
+    name: K,
+    f: (scope: T) => Result<U, E2> | AsyncResult<U, E2>,
+  ): AsyncResult<Prettify<T & { readonly [P in K]: U }>, E | E2>;
+  /** Asynchronous `let` (do-notation). `f` returns a plain value, bound under `name`. */
+  let<K extends string, U>(
+    name: K,
+    f: (scope: T) => U,
+  ): AsyncResult<Prettify<T & { readonly [P in K]: U }>, E>;
   /** Asynchronous `as`. */
   as<U>(value: U): AsyncResult<U, E>;
 

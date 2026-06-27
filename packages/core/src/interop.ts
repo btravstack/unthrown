@@ -249,7 +249,7 @@ function foldRecord(results: ResultRecord): Result<unknown, unknown> {
 export function all<Rs extends readonly Result<unknown, unknown>[]>(
   results: readonly [...Rs],
 ): Result<AllOk<Rs, { [K in keyof Rs]: OkOf<Rs[K]> }>, ErrOf<Rs[number]>> {
-  return foldArray(results) as Result<
+  return foldArray(results) as unknown as Result<
     AllOk<Rs, { [K in keyof Rs]: OkOf<Rs[K]> }>,
     ErrOf<Rs[number]>
   >;
@@ -274,7 +274,10 @@ export function all<Rs extends readonly Result<unknown, unknown>[]>(
 export function allFromDict<R extends ResultRecord>(
   results: R,
 ): Result<{ [K in keyof R]: OkOf<R[K]> }, ErrOf<R[keyof R]>> {
-  return foldRecord(results) as Result<{ [K in keyof R]: OkOf<R[K]> }, ErrOf<R[keyof R]>>;
+  return foldRecord(results) as unknown as Result<
+    { [K in keyof R]: OkOf<R[K]> },
+    ErrOf<R[keyof R]>
+  >;
 }
 
 /**
@@ -301,7 +304,7 @@ export function allAsync<Rs extends readonly AsyncResult<unknown, unknown>[]>(
   const settled = Promise.all(results).then((resolved) =>
     foldArray(resolved as readonly Result<unknown, unknown>[]),
   );
-  return new AsyncRes(settled) as AsyncResult<
+  return new AsyncRes(settled) as unknown as AsyncResult<
     AllOk<Rs, { [K in keyof Rs]: AsyncOkOf<Rs[K]> }>,
     AsyncErrOf<Rs[number]>
   >;
@@ -333,7 +336,7 @@ export function allFromDictAsync<R extends AsyncResultRecord>(
     });
     return foldRecord(byKey);
   });
-  return new AsyncRes(settled) as AsyncResult<
+  return new AsyncRes(settled) as unknown as AsyncResult<
     { [K in keyof R]: AsyncOkOf<R[K]> },
     AsyncErrOf<R[keyof R]>
   >;

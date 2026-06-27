@@ -6,6 +6,7 @@
 
 import { err, isDefect, isErr, isOk, ok } from "./constructors.js";
 import { defect } from "./defect.js";
+import { Do } from "./do.js";
 import {
   all,
   allAsync,
@@ -43,6 +44,7 @@ export const Result = {
   ok,
   err,
   defect,
+  Do,
   fromNullable,
   fromThrowable,
   fromPromise,

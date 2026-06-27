@@ -12,6 +12,7 @@ channel** and turns a thrown callback into a `Defect`.
 | run a dependent, `Result`-returning step       | `flatMap`          | Ok      |
 | run a side effect, keep the value              | `tap`              | Ok      |
 | run a **failable** side effect, keep the value | `flatTap`          | Ok      |
+| sequence dependent steps into a named scope    | `Do`/`bind`/`let`  | Ok      |
 | replace the value with a constant              | `as`               | Ok      |
 | transform the error                            | `mapErr`           | Err     |
 | try a fallback that returns a `Result`         | `orElse`           | Err     |

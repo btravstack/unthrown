@@ -46,9 +46,9 @@ was planned).
 ## Load-bearing runtime invariants (tests must guard these)
 
 - **Throw → defect.** Any value thrown by a callback inside a combinator
-  (`map`, `flatMap`, `flatTap`, `mapErr`, `orElse`, `recover`, `tap*`,
-  `recoverDefect`) is caught and converted to a `Defect`. Nothing escapes a
-  pipeline as a raw throw.
+  (`map`, `flatMap`, `flatTap`, `bind`, `let`, `mapErr`, `orElse`, `recover`,
+  `tap*`, `recoverDefect`) is caught and converted to a `Defect`. Nothing
+  escapes a pipeline as a raw throw.
   This is what lets an HTTP adapter do a single `match({ ok, err, defect })`
   with **no surrounding `try/catch`**.
 - **A `Defect` flows through every method untouched EXCEPT `match()` and
@@ -86,6 +86,13 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
 - success: `map`, `flatMap`, `tap`, `flatTap` (a failable `tap` — runs a
   `Result`-returning effect, keeps the original value, threads the effect's
   error), `as`
+- do-notation: `Do()` (entry — `ok({})`, an empty object scope; capitalised
+  because `do` is reserved) plus the methods `bind(name, f)` (sequence a
+  `Result`-returning step, binding its value under `name` in an accumulating
+  **readonly** object scope; errors union `E | E2`) and `let(name, f)` (bind a
+  pure value). On `AsyncResult`, `bind`'s `f` may return a `Result` or an
+  `AsyncResult`. A throw in either becomes a `Defect`; `Err`/`Defect`
+  short-circuits/passes through. To go async, lift with `toAsync()`.
 - error: `mapErr`, `orElse`, `recover`, `tapErr`
 - defect: `recoverDefect`, `tapDefect`
 - eliminate: `match`, `unwrap`, `unwrapErr`, `unwrapOr`, `unwrapOrElse`,
@@ -108,7 +115,7 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   reject. The record fold writes keys via `Object.defineProperty`, so a
   caller-supplied `"__proto__"` key can't pollute the prototype.
 - facade: a `Result` companion object aliases the standalone entry points
-  (`Result.ok`/`err`/`defect`/`from*`/`all`/`allAsync`/`allFromDict`/`allFromDictAsync`/`is*`)
+  (`Result.ok`/`err`/`defect`/`Do`/`from*`/`all`/`allAsync`/`allFromDict`/`allFromDictAsync`/`is*`)
   for discoverability;
   the free functions remain the primary, tree-shakeable API. One concept, two
   import styles — not a second concept.
@@ -119,10 +126,11 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
 per-tag` fold; has an async overload resolving to `Promise<R>`); see the
   `TaggedError` convention in Thesis #4.
 
-Deliberately **excluded** for now: `gen`/do-notation (heaviest possible
-addition; revisit only if sequential code demands it), accumulation/`Validation`,
-and aliases (`andThen`, etc. — one name per concept). Keep the surface small
-enough that the library can be "done".
+Deliberately **excluded** for now: **generator** do-notation (`gen`/`yield*`
+"safeTry" style — the fluent `Do`/`bind`/`let` above covers sequential code
+without the generator machinery), accumulation/`Validation`, and aliases
+(`andThen`, etc. — one name per concept). Keep the surface small enough that the
+library can be "done".
 
 ## Internal design (don't break these)
 

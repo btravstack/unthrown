@@ -24,6 +24,8 @@ reachable once you've narrowed to a variant.
 Every `Result` shares one method surface, grouped by the channel it touches:
 
 - **success** (runs on `Ok`): `map`, `flatMap`, `tap`, `flatTap`, `as`
+- **do-notation** (runs on `Ok`): `bind`, `let` — accumulate a named scope; see
+  [Do Notation](./do-notation)
 - **error** (runs on `Err`): `mapErr`, `orElse`, `recover`, `tapErr`
 - **defect** (the only door to a `Defect`): `recoverDefect`, `tapDefect`
 - **eliminate**: `match`, `unwrap`, `unwrapErr`, `unwrapOr`, `unwrapOrElse`,
