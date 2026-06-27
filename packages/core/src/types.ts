@@ -9,6 +9,16 @@
 export type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
 /**
+ * The scope produced by a `bind` / `let` step: `T` with `K` added (as a readonly
+ * property of type `U`). `Omit<T, K>` first drops any existing `K`, so re-binding
+ * a name **overwrites** it — matching the runtime spread — rather than producing
+ * an unsound `T[K] & U` intersection.
+ *
+ * @internal
+ */
+export type Bound<T, K extends string, U> = Prettify<Omit<T, K> & { readonly [P in K]: U }>;
+
+/**
  * The method surface every {@link Result} variant carries. Factored out so the
  * three variants ({@link OkView}, {@link ErrView}, {@link DefectView}) can each
  * intersect it. Not part of the public API on its own.
@@ -85,7 +95,7 @@ export type ResultMethods<T, E> = {
   bind<K extends string, U, E2>(
     name: K,
     f: (scope: T) => Result<U, E2>,
-  ): Result<Prettify<T & { readonly [P in K]: U }>, E | E2>;
+  ): Result<Bound<T, K, U>, E | E2>;
   /**
    * Do-notation: run `f` for a **plain value** and bind it under `name` in the
    * accumulating object scope. The pure-value counterpart of {@link ResultMethods.bind | bind}.
@@ -100,10 +110,7 @@ export type ResultMethods<T, E> = {
    * @param name - the scope key.
    * @param f - computes a value from the accumulated scope.
    */
-  let<K extends string, U>(
-    name: K,
-    f: (scope: T) => U,
-  ): Result<Prettify<T & { readonly [P in K]: U }>, E>;
+  let<K extends string, U>(name: K, f: (scope: T) => U): Result<Bound<T, K, U>, E>;
   /**
    * Replace the success value with a constant `value`.
    *
@@ -365,12 +372,9 @@ export type AsyncResult<T, E> = Awaitable<Result<T, E>> & {
   bind<K extends string, U, E2>(
     name: K,
     f: (scope: T) => Result<U, E2> | AsyncResult<U, E2>,
-  ): AsyncResult<Prettify<T & { readonly [P in K]: U }>, E | E2>;
+  ): AsyncResult<Bound<T, K, U>, E | E2>;
   /** Asynchronous `let` (do-notation). `f` returns a plain value, bound under `name`. */
-  let<K extends string, U>(
-    name: K,
-    f: (scope: T) => U,
-  ): AsyncResult<Prettify<T & { readonly [P in K]: U }>, E>;
+  let<K extends string, U>(name: K, f: (scope: T) => U): AsyncResult<Bound<T, K, U>, E>;
   /** Asynchronous `as`. */
   as<U>(value: U): AsyncResult<U, E>;
 
