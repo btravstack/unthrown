@@ -37,5 +37,14 @@ ruleTester.run("no-ambiguous-error-type", noAmbiguousErrorType, {
       code: `import type { AsyncResult } from "unthrown";\ntype T = AsyncResult<number, unknown>;`,
       errors: [{ messageId: "noAmbiguousErrorType" }],
     },
+    // An ambiguous member taints a union.
+    {
+      code: `import type { Result } from "unthrown";\ntype T = Result<number, MyError | unknown>;`,
+      errors: [{ messageId: "noAmbiguousErrorType" }],
+    },
+    {
+      code: `import type { Result } from "unthrown";\ntype T = Result<number, Error | MyError>;`,
+      errors: [{ messageId: "noAmbiguousErrorType" }],
+    },
   ],
 });

@@ -25,17 +25,7 @@ alone.
 
 ## Usage
 
-oxlint JS plugins are configured in `.oxlintrc.json`. Enable the bundled
-`recommended` preset:
-
-```js
-// oxlint.config.js
-import unthrown from "@unthrown/oxlint";
-
-export default [unthrown.recommended];
-```
-
-Or wire the rules by hand:
+Register the plugin and enable its rules in your `.oxlintrc.json`:
 
 ```json
 {
@@ -45,6 +35,15 @@ Or wire the rules by hand:
     "unthrown/prefer-async-result": "error"
   }
 }
+```
+
+The package's default export also exposes a `recommended` preset (an oxlint
+config that registers the plugin and turns both rules on) for setups that build
+their config programmatically:
+
+```ts
+import unthrown from "@unthrown/oxlint";
+// unthrown.recommended → { jsPlugins: [...], rules: { "unthrown/...": "error" } }
 ```
 
 `oxlint` is a peer dependency. JS plugins require a recent oxlint (≥ 1.69).

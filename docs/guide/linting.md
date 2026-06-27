@@ -47,16 +47,7 @@ only fire on unthrown's types — a `Result` from another library is ignored.
 
 ## Setup
 
-Enable the bundled `recommended` preset:
-
-```js
-// oxlint.config.js
-import unthrown from "@unthrown/oxlint";
-
-export default [unthrown.recommended];
-```
-
-Or wire the rules by hand in `.oxlintrc.json`:
+Register the plugin and turn its rules on in your `.oxlintrc.json`:
 
 ```json
 {
@@ -67,5 +58,10 @@ Or wire the rules by hand in `.oxlintrc.json`:
   }
 }
 ```
+
+The default export also exposes a `recommended` preset — an oxlint config that
+registers the plugin and enables both rules — for setups that build their config
+programmatically (`import unthrown from "@unthrown/oxlint"` →
+`unthrown.recommended`).
 
 `oxlint` is a peer dependency; JS plugins require oxlint ≥ 1.69.

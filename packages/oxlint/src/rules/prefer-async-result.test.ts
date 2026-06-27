@@ -15,10 +15,18 @@ ruleTester.run("prefer-async-result", preferAsyncResult, {
     },
   ],
   invalid: [
+    // `AsyncResult` is imported → safe to autofix.
+    {
+      code: `import type { Result, AsyncResult } from "unthrown";\ntype T = Promise<Result<number, MyError>>;`,
+      errors: [{ messageId: "preferAsyncResult" }],
+      output: `import type { Result, AsyncResult } from "unthrown";\ntype T = AsyncResult<number, MyError>;`,
+    },
+    // `AsyncResult` is NOT imported → still reported, but no autofix (it would
+    // rewrite to an undefined name). `output: null` asserts the fix is withheld.
     {
       code: `import type { Result } from "unthrown";\ntype T = Promise<Result<number, MyError>>;`,
       errors: [{ messageId: "preferAsyncResult" }],
-      output: `import type { Result } from "unthrown";\ntype T = AsyncResult<number, MyError>;`,
+      output: null,
     },
   ],
 });

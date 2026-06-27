@@ -54,17 +54,7 @@ export const noAmbiguousErrorType = defineRule({
         if (importSource !== MODULE) return;
 
         const errorNode: ESTree.TSType = node.typeArguments.params[1];
-        if (errorNode.type === "TSTypeLiteral") {
-          // Only the *empty* object literal `{}` is ambiguous; `{ code: number }` is fine.
-          if (errorNode.members.length > 0) return;
-        } else if (errorNode.type === "TSTypeReference") {
-          // Only the bare `Error` class is too generic; a `MyError` is fine.
-          if (errorNode.typeName.type !== "Identifier" || errorNode.typeName.name !== "Error") {
-            return;
-          }
-        } else if (!AMBIGUOUS_KEYWORDS.has(errorNode.type)) {
-          return;
-        }
+        if (!isAmbiguousType(errorNode)) return;
 
         context.report({
           node: errorNode,
@@ -78,3 +68,21 @@ export const noAmbiguousErrorType = defineRule({
     };
   },
 });
+
+/**
+ * Whether an error-position type is non-specific. Recurses into unions and
+ * intersections, so `MyError | unknown` and `Error | MyError` are flagged too —
+ * one ambiguous member taints the whole type.
+ */
+function isAmbiguousType(node: ESTree.TSType): boolean {
+  if (node.type === "TSUnionType" || node.type === "TSIntersectionType") {
+    return node.types.some(isAmbiguousType);
+  }
+  // The *empty* object literal `{}` is ambiguous; `{ code: number }` is fine.
+  if (node.type === "TSTypeLiteral") return node.members.length === 0;
+  // The bare `Error` class is too generic; a `MyError` is fine.
+  if (node.type === "TSTypeReference") {
+    return node.typeName.type === "Identifier" && node.typeName.name === "Error";
+  }
+  return AMBIGUOUS_KEYWORDS.has(node.type);
+}
