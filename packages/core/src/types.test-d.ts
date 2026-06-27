@@ -149,6 +149,12 @@ type _doAsync = Expect<
   Equal<typeof doAsync, AsyncResult<{ readonly a: number; readonly b: number }, never>>
 >;
 
+// re-binding a key OVERWRITES it (not an unsound `number & string` intersection)
+const doRebind = Do()
+  .bind("a", () => ok(1))
+  .bind("a", () => ok("x"));
+type _doRebind = Expect<Equal<typeof doRebind, Result<{ readonly a: string }, never>>>;
+
 // --- guards narrow (methods AND standalone) ----------------------------------
 
 declare const g: Result<number, string>;

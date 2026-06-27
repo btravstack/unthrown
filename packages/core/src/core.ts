@@ -13,7 +13,7 @@
 // boxed uses, sound because the passed-through variant carries no value of the
 // changed type.
 
-import type { AsyncResult, DefectView, ErrView, OkView, Prettify, Result } from "./types.js";
+import type { AsyncResult, Bound, DefectView, ErrView, OkView, Result } from "./types.js";
 
 /**
  * Thrown by a {@link Result}'s `unwrap` / `unwrapErr` when the assertion is
@@ -91,13 +91,16 @@ class Res<T, E> {
     this: Result<T, E>,
     name: K,
     f: (scope: T) => Result<U, E2>,
-  ): Result<Prettify<T & { readonly [P in K]: U }>, E | E2> {
-    type Out = Result<Prettify<T & { readonly [P in K]: U }>, E | E2>;
+  ): Result<Bound<T, K, U>, E | E2> {
+    type Out = Result<Bound<T, K, U>, E | E2>;
     if (this.tag !== "Ok") return this as unknown as Out;
     try {
       const r = f(this.value);
       if (r.tag !== "Ok") return r as unknown as Out;
-      return okRes({ ...(this.value as object), [name]: r.value }) as unknown as Out;
+      return okRes({
+        ...(this.value as object),
+        [name]: r.value,
+      }) as unknown as Out;
     } catch (cause) {
       return defectRes(cause);
     }
@@ -107,11 +110,14 @@ class Res<T, E> {
     this: Result<T, E>,
     name: K,
     f: (scope: T) => U,
-  ): Result<Prettify<T & { readonly [P in K]: U }>, E> {
-    type Out = Result<Prettify<T & { readonly [P in K]: U }>, E>;
+  ): Result<Bound<T, K, U>, E> {
+    type Out = Result<Bound<T, K, U>, E>;
     if (this.tag !== "Ok") return this as unknown as Out;
     try {
-      return okRes({ ...(this.value as object), [name]: f(this.value) }) as unknown as Out;
+      return okRes({
+        ...(this.value as object),
+        [name]: f(this.value),
+      }) as unknown as Out;
     } catch (cause) {
       return defectRes(cause);
     }
@@ -183,7 +189,11 @@ class Res<T, E> {
 
   match<R>(
     this: Result<T, E>,
-    cases: { ok: (value: T) => R; err: (error: E) => R; defect: (cause: unknown) => R },
+    cases: {
+      ok: (value: T) => R;
+      err: (error: E) => R;
+      defect: (cause: unknown) => R;
+    },
   ): R {
     switch (this.tag) {
       case "Ok":
@@ -244,9 +254,11 @@ class Res<T, E> {
   isOk(this: Result<T, E>): this is OkView<T, E> {
     return this.tag === "Ok";
   }
+
   isErr(this: Result<T, E>): this is ErrView<E, T> {
     return this.tag === "Err";
   }
+
   isDefect(this: Result<T, E>): this is DefectView<T, E> {
     return this.tag === "Defect";
   }
@@ -264,7 +276,10 @@ const RESULT_PROTO = Res.prototype;
  * @internal
  */
 export function okRes<T, E>(value: T): Result<T, E> {
-  return Object.assign(Object.create(RESULT_PROTO), { tag: "Ok" as const, value }) as OkView<T, E>;
+  return Object.assign(Object.create(RESULT_PROTO), {
+    tag: "Ok" as const,
+    value,
+  }) as OkView<T, E>;
 }
 
 /**
@@ -273,10 +288,10 @@ export function okRes<T, E>(value: T): Result<T, E> {
  * @internal
  */
 export function errRes<T, E>(error: E): Result<T, E> {
-  return Object.assign(Object.create(RESULT_PROTO), { tag: "Err" as const, error }) as ErrView<
-    E,
-    T
-  >;
+  return Object.assign(Object.create(RESULT_PROTO), {
+    tag: "Err" as const,
+    error,
+  }) as ErrView<E, T>;
 }
 
 /**
@@ -369,18 +384,18 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   bind<K extends string, U, E2>(
     name: K,
     f: (scope: T) => Result<U, E2> | AsyncResult<U, E2>,
-  ): AsyncResult<Prettify<T & { readonly [P in K]: U }>, E | E2> {
-    type Merged = Prettify<T & { readonly [P in K]: U }>;
+  ): AsyncResult<Bound<T, K, U>, E | E2> {
+    type Merged = Bound<T, K, U>;
     return new AsyncRes<Merged, E | E2>(
       this.promise.then(async (r) => {
         if (r.tag !== "Ok") return r as unknown as Result<Merged, E | E2>;
         try {
           const inner = (await f(r.value)) as Result<U, E2>;
           if (inner.tag !== "Ok") return inner as unknown as Result<Merged, E | E2>;
-          return okRes({ ...(r.value as object), [name]: inner.value }) as unknown as Result<
-            Merged,
-            E | E2
-          >;
+          return okRes({
+            ...(r.value as object),
+            [name]: inner.value,
+          }) as unknown as Result<Merged, E | E2>;
         } catch (cause) {
           return defectRes(cause);
         }
@@ -388,19 +403,16 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  let<K extends string, U>(
-    name: K,
-    f: (scope: T) => U,
-  ): AsyncResult<Prettify<T & { readonly [P in K]: U }>, E> {
-    type Merged = Prettify<T & { readonly [P in K]: U }>;
+  let<K extends string, U>(name: K, f: (scope: T) => U): AsyncResult<Bound<T, K, U>, E> {
+    type Merged = Bound<T, K, U>;
     return new AsyncRes<Merged, E>(
       this.promise.then((r) => {
         if (r.tag !== "Ok") return r as unknown as Result<Merged, E>;
         try {
-          return okRes({ ...(r.value as object), [name]: f(r.value) }) as unknown as Result<
-            Merged,
-            E
-          >;
+          return okRes({
+            ...(r.value as object),
+            [name]: f(r.value),
+          }) as unknown as Result<Merged, E>;
         } catch (cause) {
           return defectRes(cause);
         }
