@@ -25,7 +25,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # PAT so the git remote is configured with PAT credentials; the bare
           # GITHUB_TOKEN push checkout normally sets up is treated as a bot
