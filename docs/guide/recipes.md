@@ -21,13 +21,22 @@ Because every boundary is qualified and every in-pipeline throw becomes a defect
 the edge of a request handler needs **no `try`/`catch`** — just one `match`
 mapping each channel to a status code.
 
+`fetch` only _rejects_ on a network error — a 404/403 resolves normally — so the
+modeled statuses are mapped in a `flatMap` (a `throw` there, like an unexpected
+status or malformed JSON, becomes a `Defect`):
+
 ```ts
-import { fromPromise, defect } from "unthrown";
+import { fromPromise, err, defect } from "unthrown";
 
 const loadProfile = (id: string) =>
-  fromPromise(fetch(`/api/users/${id}`), (cause) =>
-    cause instanceof Response && cause.status === 404 ? new NotFound({ id }) : defect(cause),
-  ).flatMap((res) => fromPromise(res.json() as Promise<Profile>, defect));
+  // A network error (a rejected fetch) is unexpected → defect.
+  fromPromise(fetch(`/api/users/${id}`), defect).flatMap((res) => {
+    if (res.status === 404) return err(new NotFound({ id }));
+    if (res.status === 403) return err(new Forbidden());
+    if (!res.ok) throw new Error(`unexpected status ${res.status}`); // → Defect
+    return fromPromise(res.json() as Promise<Profile>, defect); // malformed JSON → Defect
+  });
+// AsyncResult<Profile, NotFound | Forbidden>
 
 async function handler(id: string): Promise<HttpResponse> {
   return (await loadProfile(id)).match({
@@ -41,8 +50,9 @@ async function handler(id: string): Promise<HttpResponse> {
 }
 ```
 
-A thrown `TypeError` from a bad `.json()` shape lands in `defect` → 500. A
-modeled `NotFound` lands in `err` → 404. The type told you which is which.
+A network failure or malformed response lands in `defect` → 500. The modeled
+`NotFound` / `Forbidden` land in `err` → 404 / 403. The type told you which is
+which.
 
 ## 2. Wrap a throwing parser
 
@@ -76,17 +86,21 @@ fromCache("u_1").map((p) => p.name); // Result<string, NotFound>
 
 ## 4. Combine independent fetches
 
-`all` collects several `Result`s, short-circuiting on the first `Err` (and any
-`Defect` dominates):
+`loadProfile` and friends are `AsyncResult`s, so `allAsync` combines them —
+resolving concurrently, short-circuiting on the first `Err` (and any `Defect`
+dominates):
 
 ```ts
-import { all } from "unthrown";
+import { allAsync } from "unthrown";
 
-const page = all([loadProfile(id), loadPosts(id), loadFollowers(id)]);
-// Result<[Profile, Post[], User[]], ProfileError>
+const page = allAsync([loadProfile(id), loadPosts(id), loadFollowers(id)]);
+// AsyncResult<[Profile, Post[], User[]], ProfileError>
 
 page.map(([profile, posts, followers]) => renderPage(profile, posts, followers));
 ```
+
+(For synchronous `Result`s, use `all`; to key the results by name instead of
+position, `allFromDict` / `allFromDictAsync`.)
 
 ## 5. Fold a tagged-error union exhaustively
 
