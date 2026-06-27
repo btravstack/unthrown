@@ -253,6 +253,15 @@ changesets `release.yml` (plus enabling GitHub Pages for `deploy-docs.yml`).
 - Tests: Vitest. Every load-bearing invariant above gets an explicit test
   (`invariants.spec.ts` guards them 1:1); core holds 100% line/function coverage,
   enforced by thresholds in its `vitest.config.ts`.
+- **Type-level tests:** `packages/core/src/types.test-d.ts` asserts the
+  type-level behaviour the runtime can't (the conditional `all`/`allFromDict`
+  shapes, `Exclude<R, Defect>` boundary inference, `flatTap`/`recover` channel
+  widening, the `this is …` guard narrowing, `matchTags` exhaustiveness) with a
+  `Expect<Equal<…>>` helper plus `@ts-expect-error` for must-not-compile cases.
+  They are checked by `tsc` via `tsconfig.test-d.json` (which relaxes
+  `noUnusedLocals`), folded into the package's `typecheck` script — so a typing
+  regression fails the gate. The file is excluded from the build, coverage,
+  oxlint, and knip (it has no runtime).
 - Public API carries full **TSDoc**; `pnpm --filter <pkg> build:docs` must stay
   typedoc-warning-free.
 - One concept = one name. Resist convenience aliases.

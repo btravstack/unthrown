@@ -50,7 +50,8 @@
     "build:docs": "typedoc",
     "dev": "tsdown src/index.ts --format cjs,esm --dts --watch",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "test:types": "tsc --noEmit -p tsconfig.test-d.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test-d.json"
   },
   "devDependencies": {
     "@types/node": "catalog:",
