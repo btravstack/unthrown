@@ -1,6 +1,6 @@
 {
   "name": "@unthrown/pattern",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "ts-pattern integration for unthrown",
   "keywords": [
     "errors-as-values",

@@ -1,5 +1,13 @@
 # @unthrown/vitest
 
+## 0.3.0
+
+### Patch Changes
+
+- Updated dependencies [db16017]
+- Updated dependencies [bc8cd57]
+  - unthrown@0.3.0
+
 ## 0.2.0
 
 ### Patch Changes
