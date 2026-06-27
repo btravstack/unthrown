@@ -102,16 +102,22 @@ ok(1).match({ ok, err, defect }); // fold all three channels
 ## Aggregating: `all` / `allAsync`
 
 `all` collects `Result`s into a `Result` of all their values. The first `Err`
-short-circuits; any `Defect` dominates (even over an earlier `Err`). A fixed
-tuple keeps its positional types; a dynamic `Result<T, E>[]` collapses to
-`Result<T[], E>` with no cast:
+short-circuits; any `Defect` dominates (even over an earlier `Err`). The output
+mirrors the input shape — a fixed tuple keeps its positional types, a dynamic
+`Result<T, E>[]` collapses to `Result<T[], E>`, and a **record** becomes a record
+of values (handy for named parallel work, no tupling):
 
 ```ts
 import { all, ok, type Result } from "unthrown";
 
 all([ok(1), ok("two"), ok(true)]).unwrap(); // [1, "two", true] (typed [number, string, boolean])
 all([ok(1), ok(2)] as Result<number, never>[]).unwrap(); // number[]
+all({ id: ok(1), name: ok("ada") }).unwrap(); // { id: 1, name: "ada" }
 ```
+
+This short-circuits on the first `Err` — it is **not** error accumulation. If you
+need every failure collected, that is a separate (deliberately unshipped)
+concern.
 
 `allAsync` is the asynchronous counterpart — same folding rules, inputs resolved
 concurrently (order preserved), and (like every `AsyncResult`) it never rejects:

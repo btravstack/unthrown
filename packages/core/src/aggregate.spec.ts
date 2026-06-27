@@ -57,6 +57,24 @@ describe("all", () => {
     const e = combine([ok(1), err("bad")] as Result<number, string>[]);
     expect(e.unwrapErr()).toBe("bad");
   });
+
+  it("collects a record of Ok values into a record, keyed by name", () => {
+    const r = all({ id: ok(1), name: ok("ada"), admin: ok(true) });
+    // Typed `Result<{ id: number; name: string; admin: boolean }, never>`.
+    const value: { id: number; name: string; admin: boolean } = r.unwrap();
+    expect(value).toEqual({ id: 1, name: "ada", admin: true });
+  });
+
+  it("short-circuits a record on the first Err and lets a Defect dominate", () => {
+    expect(all({ a: ok(1), b: err("bad") }).unwrapErr()).toBe("bad");
+    const d = all({ a: ok(1), b: err("e"), c: defectOf(boom) });
+    expect(d.isDefect()).toBe(true);
+    expect(d.recoverDefect((c) => ok(c === boom)).unwrap()).toBe(true);
+  });
+
+  it("returns Ok({}) for an empty record", () => {
+    expect(all({}).unwrap()).toEqual({});
+  });
 });
 
 describe("allAsync", () => {
@@ -102,5 +120,22 @@ describe("allAsync", () => {
       fromSafePromise(Promise.resolve(2)),
     ]);
     expect(r.unwrap()).toEqual([1, 2]);
+  });
+
+  it("collects a record of AsyncResults into a record, keyed by name", async () => {
+    const r = await allAsync({
+      id: fromSafePromise(Promise.resolve(1)),
+      name: fromSafePromise(Promise.resolve("ada")),
+    });
+    const value: { id: number; name: string } = r.unwrap();
+    expect(value).toEqual({ id: 1, name: "ada" });
+  });
+
+  it("short-circuits a record on the first Err", async () => {
+    const r = await allAsync({
+      a: fromSafePromise(Promise.resolve(1)),
+      b: fromPromise(Promise.reject("bad"), (c) => c as string),
+    });
+    expect(r.unwrapErr()).toBe("bad");
   });
 });

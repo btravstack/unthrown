@@ -94,10 +94,14 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
 - constructors: `ok`, `err`, `defect`
 - interop: `fromNullable`, `fromThrowable`, `fromPromise`, `fromSafePromise`
 - aggregate: `all` / `allAsync` (first `Err` wins; any `Defect` dominates). Both
-  are **tuple-or-array**: a fixed tuple keeps positional types, a dynamic
-  `Result<T, E>[]` / `AsyncResult<T, E>[]` collapses to `Result<T[], E>` /
-  `AsyncResult<T[], E>` with no cast. `allAsync` resolves its inputs concurrently
-  (order preserved) and never rejects.
+  are **tuple-, array-, or record-shaped**, and the output mirrors the input: a
+  fixed tuple keeps positional types, a dynamic `Result<T, E>[]` /
+  `AsyncResult<T, E>[]` collapses to `Result<T[], E>` / `AsyncResult<T[], E>`, and
+  a record `{ a: Result<A, E>, b: Result<B, E> }` becomes `Result<{ a: A; b: B },
+E>` (named parallel work, no tupling). All forms still short-circuit on the
+  first `Err`; `allAsync` resolves its inputs concurrently (order preserved) and
+  never rejects. Note this is **not** error accumulation (still first-`Err`-wins)
+  — accumulation stays deliberately excluded.
 - facade: a `Result` companion object aliases the standalone entry points
   (`Result.ok`/`err`/`defect`/`from*`/`all`/`allAsync`/`is*`) for discoverability;
   the free functions remain the primary, tree-shakeable API. One concept, two
