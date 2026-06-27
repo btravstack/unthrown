@@ -18,6 +18,9 @@ catalogs:
     '@commitlint/config-conventional':
       specifier: 21.0.2
       version: 21.0.2
+    '@standard-schema/spec':
+      specifier: 1.0.0
+      version: 1.0.0
     '@types/node':
       specifier: 24.13.2
       version: 24.13.2
@@ -113,6 +116,9 @@ importers:
       '@unthrown/pattern':
         specifier: workspace:*
         version: link:../packages/pattern
+      '@unthrown/standard-schema':
+        specifier: workspace:*
+        version: link:../packages/standard-schema
       '@unthrown/vitest':
         specifier: workspace:*
         version: link:../packages/vitest
@@ -292,6 +298,43 @@ importers:
       ts-pattern:
         specifier: 'catalog:'
         version: 5.9.0
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.2(oxc-resolver@11.21.3)(tsx@4.22.4)(typescript@6.0.3)
+      typedoc:
+        specifier: 'catalog:'
+        version: 0.28.19(typescript@6.0.3)
+      typedoc-plugin-markdown:
+        specifier: 'catalog:'
+        version: 4.12.0(typedoc@0.28.19(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.8(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0)
+
+  packages/standard-schema:
+    dependencies:
+      '@standard-schema/spec':
+        specifier: 'catalog:'
+        version: 1.0.0
+      unthrown:
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.2
+      '@unthrown/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@unthrown/typedoc':
+        specifier: workspace:*
+        version: link:../../tools/typedoc
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.1.8(vitest@4.1.8)
       tsdown:
         specifier: 'catalog:'
         version: 0.22.2(oxc-resolver@11.21.3)(tsx@4.22.4)(typescript@6.0.3)
@@ -1785,6 +1828,9 @@ packages:
   '@simple-libs/stream-utils@1.2.0':
     resolution: {integrity: sha512-KxXvfapcixpz6rVEB6HPjOUZT22yN6v0vI0urQSk1L8MlEWPDFCZkhw2xmkyoTGYeFw7tWTZd7e3lVzRZRN/EA==}
     engines: {node: '>=18'}
+
+  '@standard-schema/spec@1.0.0':
+    resolution: {integrity: sha512-m2bOd0f2RT9k8QJx1JN85cZYyH1RqFBdlwtkSlf4tBDYLCiiZnv1fIIwacK6cqwXavOydf0NPToMQgpKq+dVlA==}
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -4470,6 +4516,8 @@ snapshots:
       '@simple-libs/stream-utils': 1.2.0
 
   '@simple-libs/stream-utils@1.2.0': {}
+
+  '@standard-schema/spec@1.0.0': {}
 
   '@standard-schema/spec@1.1.0': {}
 

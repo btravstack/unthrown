@@ -1,0 +1,73 @@
+{
+  "name": "@unthrown/standard-schema",
+  "version": "0.1.0",
+  "description": "Standard Schema (Zod, Valibot, ArkType, …) interop for unthrown",
+  "keywords": [
+    "arktype",
+    "errors-as-values",
+    "result",
+    "standard-schema",
+    "typescript",
+    "unthrown",
+    "valibot",
+    "validation",
+    "zod"
+  ],
+  "homepage": "https://github.com/btravstack/unthrown#readme",
+  "bugs": {
+    "url": "https://github.com/btravstack/unthrown/issues"
+  },
+  "license": "MIT",
+  "author": "Benoit TRAVERS <benoit.travers.fr@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/btravstack/unthrown.git",
+    "directory": "packages/standard-schema"
+  },
+  "files": [
+    "dist",
+    "docs"
+  ],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown src/index.ts --format cjs,esm --dts --clean",
+    "build:docs": "typedoc",
+    "dev": "tsdown src/index.ts --format cjs,esm --dts --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@standard-schema/spec": "catalog:",
+    "unthrown": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@unthrown/tsconfig": "workspace:*",
+    "@unthrown/typedoc": "workspace:*",
+    "@vitest/coverage-v8": "catalog:",
+    "tsdown": "catalog:",
+    "typedoc": "catalog:",
+    "typedoc-plugin-markdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.19"
+  }
+}
