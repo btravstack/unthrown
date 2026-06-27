@@ -36,6 +36,11 @@ describe("fromSchema (sync)", () => {
   it("throws a TypeError when the schema validates asynchronously", () => {
     expect(() => fromSchema(stringSchema({ async: true }))("hi")).toThrow(TypeError);
   });
+
+  it("turns a throwing validator into a Defect (it never escapes)", () => {
+    const r = fromSchema(stringSchema({ throws: true }))("hi");
+    expect(r.isDefect()).toBe(true);
+  });
 });
 
 describe("fromSchemaAsync", () => {
