@@ -14,7 +14,7 @@
 //   parseUser(input); // Result<{ id: string }, readonly StandardSchemaV1.Issue[]>
 
 import type { StandardSchemaV1 } from "@standard-schema/spec";
-import { err, fromSafePromise, ok } from "unthrown";
+import { defect, err, fromSafePromise, fromThrowable, ok } from "unthrown";
 import type { AsyncResult, Result } from "unthrown";
 
 /** The error channel both entry points produce: a schema's validation issues. */
@@ -29,9 +29,12 @@ export type SchemaIssues = readonly StandardSchemaV1.Issue[];
  * because a failed validation is an *anticipated* outcome, not a defect. Works
  * with any Standard Schema implementation (Zod, Valibot, ArkType, …).
  *
- * If the schema validates **asynchronously** (its `validate` returns a
- * `Promise`), a synchronous `Result` cannot represent the pending work, so this
- * throws a `TypeError` — use {@link fromSchemaAsync} instead.
+ * A validator that **throws** (rather than returning issues) becomes a `Defect`
+ * — the same boundary behaviour as `fromThrowable`, so an unexpected crash never
+ * escapes as a raw exception. If the schema validates **asynchronously**
+ * (its `validate` returns a `Promise`), a synchronous `Result` cannot represent
+ * the pending work, so this throws a `TypeError` — a deliberate usage error; use
+ * {@link fromSchemaAsync} instead.
  *
  * @typeParam S - the schema type.
  * @param schema - a Standard Schema validator.
@@ -48,14 +51,25 @@ export type SchemaIssues = readonly StandardSchemaV1.Issue[];
 export function fromSchema<S extends StandardSchemaV1>(
   schema: S,
 ): (input: unknown) => Result<StandardSchemaV1.InferOutput<S>, SchemaIssues> {
+  type Output = StandardSchemaV1.InferOutput<S>;
+  // Run `validate` at a boundary so a *throwing* validator lands in the Defect
+  // channel instead of escaping; `qualify` only ever mints a defect, so E = never.
+  const validate = fromThrowable(
+    (input: unknown) => schema["~standard"].validate(input),
+    (cause) => defect(cause),
+  );
   return (input) => {
-    const result = schema["~standard"].validate(input);
-    if (result instanceof Promise) {
+    const settled = validate(input);
+    // An async schema can't be represented synchronously — fail loud and early.
+    if (settled.isOk() && settled.value instanceof Promise) {
       throw new TypeError(
         "@unthrown/standard-schema: this schema validates asynchronously — use fromSchemaAsync instead.",
       );
     }
-    return result.issues ? err(result.issues) : ok(result.value);
+    return settled.flatMap((result) => {
+      const sync = result as StandardSchemaV1.Result<Output>;
+      return sync.issues ? err(sync.issues) : ok(sync.value);
+    });
   };
 }
 
