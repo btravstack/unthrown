@@ -9,6 +9,8 @@ import { defect } from "./defect.js";
 import {
   all,
   allAsync,
+  allFromDict,
+  allFromDictAsync,
   fromNullable,
   fromPromise,
   fromSafePromise,
@@ -21,7 +23,8 @@ import type { Result as ResultType } from "./types.js";
  * discoverable namespace: {@link Result.ok}, {@link Result.err},
  * {@link Result.defect}, {@link Result.fromNullable}, {@link Result.fromThrowable},
  * {@link Result.fromPromise}, {@link Result.fromSafePromise}, {@link Result.all},
- * {@link Result.allAsync}, {@link Result.isOk}, {@link Result.isErr},
+ * {@link Result.allAsync}, {@link Result.allFromDict},
+ * {@link Result.allFromDictAsync}, {@link Result.isOk}, {@link Result.isErr},
  * {@link Result.isDefect}.
  *
  * @remarks
@@ -46,6 +49,8 @@ export const Result = {
   fromSafePromise,
   all,
   allAsync,
+  allFromDict,
+  allFromDictAsync,
   isOk,
   isErr,
   isDefect,

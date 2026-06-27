@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   all,
   allAsync,
+  allFromDict,
+  allFromDictAsync,
   type AsyncResult,
   err,
   fromPromise,
@@ -57,23 +59,32 @@ describe("all", () => {
     const e = combine([ok(1), err("bad")] as Result<number, string>[]);
     expect(e.unwrapErr()).toBe("bad");
   });
+});
 
+describe("allFromDict", () => {
   it("collects a record of Ok values into a record, keyed by name", () => {
-    const r = all({ id: ok(1), name: ok("ada"), admin: ok(true) });
+    const r = allFromDict({ id: ok(1), name: ok("ada"), admin: ok(true) });
     // Typed `Result<{ id: number; name: string; admin: boolean }, never>`.
     const value: { id: number; name: string; admin: boolean } = r.unwrap();
     expect(value).toEqual({ id: 1, name: "ada", admin: true });
   });
 
   it("short-circuits a record on the first Err and lets a Defect dominate", () => {
-    expect(all({ a: ok(1), b: err("bad") }).unwrapErr()).toBe("bad");
-    const d = all({ a: ok(1), b: err("e"), c: defectOf(boom) });
+    expect(allFromDict({ a: ok(1), b: err("bad") }).unwrapErr()).toBe("bad");
+    const d = allFromDict({ a: ok(1), b: err("e"), c: defectOf(boom) });
     expect(d.isDefect()).toBe(true);
     expect(d.recoverDefect((c) => ok(c === boom)).unwrap()).toBe(true);
   });
 
   it("returns Ok({}) for an empty record", () => {
-    expect(all({}).unwrap()).toEqual({});
+    expect(allFromDict({}).unwrap()).toEqual({});
+  });
+
+  it("does not let a `__proto__` key pollute the prototype", () => {
+    const r = allFromDict({ ["__proto__"]: ok({ polluted: true }), safe: ok(1) });
+    expect(r.isOk()).toBe(true);
+    // The dangerous key lands as a normal own property, not on Object.prototype.
+    expect(({} as Record<string, unknown>)["polluted"]).toBeUndefined();
   });
 });
 
@@ -121,9 +132,11 @@ describe("allAsync", () => {
     ]);
     expect(r.unwrap()).toEqual([1, 2]);
   });
+});
 
+describe("allFromDictAsync", () => {
   it("collects a record of AsyncResults into a record, keyed by name", async () => {
-    const r = await allAsync({
+    const r = await allFromDictAsync({
       id: fromSafePromise(Promise.resolve(1)),
       name: fromSafePromise(Promise.resolve("ada")),
     });
@@ -132,10 +145,22 @@ describe("allAsync", () => {
   });
 
   it("short-circuits a record on the first Err", async () => {
-    const r = await allAsync({
+    const r = await allFromDictAsync({
       a: fromSafePromise(Promise.resolve(1)),
       b: fromPromise(Promise.reject("bad"), (c) => c as string),
     });
     expect(r.unwrapErr()).toBe("bad");
+  });
+
+  it("lets any Defect dominate over an earlier Err", async () => {
+    const r = await allFromDictAsync({
+      a: fromPromise(Promise.reject("e"), (c) => c as string),
+      b: fromSafePromise(Promise.reject(boom)),
+    });
+    expect(r.isDefect()).toBe(true);
+  });
+
+  it("returns Ok({}) for an empty record", async () => {
+    expect((await allFromDictAsync({})).unwrap()).toEqual({});
   });
 });

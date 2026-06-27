@@ -93,17 +93,20 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   One narrowing concept, two call styles.
 - constructors: `ok`, `err`, `defect`
 - interop: `fromNullable`, `fromThrowable`, `fromPromise`, `fromSafePromise`
-- aggregate: `all` / `allAsync` (first `Err` wins; any `Defect` dominates). Both
-  are **tuple-, array-, or record-shaped**, and the output mirrors the input: a
-  fixed tuple keeps positional types, a dynamic `Result<T, E>[]` /
-  `AsyncResult<T, E>[]` collapses to `Result<T[], E>` / `AsyncResult<T[], E>`, and
-  a record `{ a: Result<A, E>, b: Result<B, E> }` becomes `Result<{ a: A; b: B },
-E>` (named parallel work, no tupling). All forms still short-circuit on the
-  first `Err`; `allAsync` resolves its inputs concurrently (order preserved) and
-  never rejects. Note this is **not** error accumulation (still first-`Err`-wins)
-  — accumulation stays deliberately excluded.
+- aggregate: `all` / `allAsync` take a **tuple/array** (a fixed tuple keeps
+  positional types; a dynamic `Result<T, E>[]` / `AsyncResult<T, E>[]` collapses
+  to `Result<T[], E>` / `AsyncResult<T[], E>`), while `allFromDict` /
+  `allFromDictAsync` take a **record** keyed by name (`{ a: Result<A, E> }` →
+  `Result<{ a: A }, E>`) — named parallel work without tupling. Array and record
+  are **separate functions**, not one overload (positional vs named is a distinct
+  concept). All four short-circuit on the first `Err`, let any `Defect` dominate,
+  and are **not** error accumulation (which stays deliberately excluded);
+  `allAsync` / `allFromDictAsync` resolve concurrently (order preserved) and never
+  reject. The record fold writes keys via `Object.defineProperty`, so a
+  caller-supplied `"__proto__"` key can't pollute the prototype.
 - facade: a `Result` companion object aliases the standalone entry points
-  (`Result.ok`/`err`/`defect`/`from*`/`all`/`allAsync`/`is*`) for discoverability;
+  (`Result.ok`/`err`/`defect`/`from*`/`all`/`allAsync`/`allFromDict`/`allFromDictAsync`/`is*`)
+  for discoverability;
   the free functions remain the primary, tree-shakeable API. One concept, two
   import styles — not a second concept.
 - tagged errors: `TaggedError(tag, options?)` (the error-class factory; optional

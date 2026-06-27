@@ -179,123 +179,162 @@ type AllOk<
   Ts extends readonly unknown[],
 > = number extends Rs["length"] ? Ts[number][] : Ts;
 
-/** A record of `Result`s, the input to the object form of {@link all}. */
+/** A record of `Result`s — the input to {@link allFromDict}. */
 type ResultRecord = Record<string, Result<unknown, unknown>>;
-/** A record of `AsyncResult`s, the input to the object form of {@link allAsync}. */
+/** A record of `AsyncResult`s — the input to {@link allFromDictAsync}. */
 type AsyncResultRecord = Record<string, AsyncResult<unknown, unknown>>;
 
 /**
- * Fold an array **or** a record of already-settled `Result`s with the
- * `all`/`allAsync` rules: first `Err` wins, any `Defect` dominates. Returns an
- * `Ok` of the same shape (array → array, record → record) on full success.
+ * Fold an array of settled `Result`s: first `Err` wins, any `Defect` dominates,
+ * else `Ok` of the values array.
  *
  * @internal
  */
-function foldAll(
-  results: readonly Result<unknown, unknown>[] | ResultRecord,
-): Result<unknown, unknown> {
+function foldArray(results: readonly Result<unknown, unknown>[]): Result<unknown, unknown> {
   let firstErr: Result<unknown, unknown> | undefined;
   let firstDefect: Result<unknown, unknown> | undefined;
-
-  if (Array.isArray(results)) {
-    const values: unknown[] = [];
-    for (const r of results) {
-      if (r.tag === "Defect") firstDefect ??= r;
-      else if (r.tag === "Err") firstErr ??= r;
-      else values.push(r.value);
-    }
-    return firstDefect ?? firstErr ?? ok(values);
-  }
-
-  const values: Record<string, unknown> = {};
-  for (const [key, r] of Object.entries(results)) {
+  const values: unknown[] = [];
+  for (const r of results) {
     if (r.tag === "Defect") firstDefect ??= r;
     else if (r.tag === "Err") firstErr ??= r;
-    else values[key] = r.value;
+    else values.push(r.value);
   }
   return firstDefect ?? firstErr ?? ok(values);
 }
 
 /**
- * Collect {@link Result}s into a single `Result` of all their success values —
- * from a tuple, an array, or a **record**.
+ * Fold a record of settled `Result`s with the same rules, else `Ok` of the
+ * record of values. Keys are written with `Object.defineProperty` so a
+ * caller-supplied `"__proto__"` key cannot pollute the prototype.
+ *
+ * @internal
+ */
+function foldRecord(results: ResultRecord): Result<unknown, unknown> {
+  let firstErr: Result<unknown, unknown> | undefined;
+  let firstDefect: Result<unknown, unknown> | undefined;
+  const values: Record<string, unknown> = {};
+  for (const [key, r] of Object.entries(results)) {
+    if (r.tag === "Defect") firstDefect ??= r;
+    else if (r.tag === "Err") firstErr ??= r;
+    else
+      Object.defineProperty(values, key, {
+        value: r.value,
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+  }
+  return firstDefect ?? firstErr ?? ok(values);
+}
+
+/**
+ * Collect a tuple/array of {@link Result}s into a single `Result` of all their
+ * success values.
  *
  * @remarks
  * Short-circuits on the **first** `Err` (later entries are not inspected for
  * their error); any `Defect` present **dominates**, winning even over an earlier
- * `Err`. The output mirrors the input shape:
- *
- * - a **fixed tuple** keeps its positional types — `all([ok(1), ok("a")])` is
- *   `Result<[number, string], …>`;
- * - a **dynamic array** `Result<T, E>[]` collapses to `Result<T[], E>`;
- * - a **record** `{ a: Result<A, E>, b: Result<B, E> }` becomes
- *   `Result<{ a: A; b: B }, E>` — handy for named parallel work, no tupling.
+ * `Err`. A **fixed tuple** keeps its positional types — `all([ok(1), ok("a")])`
+ * is `Result<[number, string], …>` — while a **dynamic array** `Result<T, E>[]`
+ * collapses to `Result<T[], E>` with no cast. For a **record** keyed by name,
+ * use {@link allFromDict}.
  *
  * @example
  * ```ts
  * import { all, ok } from "unthrown";
  * all([ok(1), ok("a"), ok(true)]).unwrap(); // [1, "a", true] (typed [number, string, boolean])
  * all([ok(1), ok(2)] as Result<number, never>[]).unwrap(); // number[]
- * all({ id: ok(1), name: ok("ada") }).unwrap(); // { id: 1, name: "ada" }
  * ```
  */
 export function all<Rs extends readonly Result<unknown, unknown>[]>(
   results: readonly [...Rs],
-): Result<AllOk<Rs, { [K in keyof Rs]: OkOf<Rs[K]> }>, ErrOf<Rs[number]>>;
-export function all<R extends ResultRecord>(
-  results: R,
-): Result<{ [K in keyof R]: OkOf<R[K]> }, ErrOf<R[keyof R]>>;
-export function all(
-  results: readonly Result<unknown, unknown>[] | ResultRecord,
-): Result<unknown, unknown> {
-  return foldAll(results);
+): Result<AllOk<Rs, { [K in keyof Rs]: OkOf<Rs[K]> }>, ErrOf<Rs[number]>> {
+  return foldArray(results) as Result<
+    AllOk<Rs, { [K in keyof Rs]: OkOf<Rs[K]> }>,
+    ErrOf<Rs[number]>
+  >;
 }
 
 /**
- * The asynchronous counterpart of {@link all}: combine {@link AsyncResult}s into
- * one `AsyncResult` of all their success values — from a tuple, an array, or a
- * **record**.
+ * Collect a **record** of {@link Result}s into a single `Result` of a record of
+ * their success values — `allFromDict({ a: Result<A, E>, b: Result<B, E> })` is
+ * `Result<{ a: A; b: B }, E>`. The named counterpart of {@link all}, for
+ * parallel work you'd rather not tuple.
+ *
+ * @remarks
+ * Same folding rules as {@link all}: first `Err` short-circuits, any `Defect`
+ * dominates. This is **not** error accumulation.
+ *
+ * @example
+ * ```ts
+ * import { allFromDict, ok } from "unthrown";
+ * allFromDict({ id: ok(1), name: ok("ada") }).unwrap(); // { id: 1, name: "ada" }
+ * ```
+ */
+export function allFromDict<R extends ResultRecord>(
+  results: R,
+): Result<{ [K in keyof R]: OkOf<R[K]> }, ErrOf<R[keyof R]>> {
+  return foldRecord(results) as Result<{ [K in keyof R]: OkOf<R[K]> }, ErrOf<R[keyof R]>>;
+}
+
+/**
+ * The asynchronous counterpart of {@link all}: combine a tuple/array of
+ * {@link AsyncResult}s into one `AsyncResult` of all their success values.
  *
  * @remarks
  * The inputs are resolved **concurrently** (order preserved); the resolved
  * `Result`s are then folded with the same rules as {@link all} — first `Err`
  * short-circuits, any `Defect` dominates. As ever, the returned `AsyncResult`'s
- * internal promise never rejects. The output mirrors the input shape: a fixed
- * tuple keeps positional types, a dynamic array `AsyncResult<T, E>[]` collapses
- * to `AsyncResult<T[], E>`, and a record `{ a, b }` becomes
- * `AsyncResult<{ a; b }, E>`.
+ * internal promise never rejects. For a **record**, use {@link allFromDictAsync}.
  *
  * @example
  * ```ts
  * import { allAsync, fromSafePromise } from "unthrown";
- * await allAsync([fromSafePromise(a()), fromSafePromise(b())]); // tuple
- * await allAsync({ a: fromSafePromise(a()), b: fromSafePromise(b()) }); // record
+ * await allAsync([fromSafePromise(a()), fromSafePromise(b())]);
  * ```
  */
 export function allAsync<Rs extends readonly AsyncResult<unknown, unknown>[]>(
   results: readonly [...Rs],
-): AsyncResult<AllOk<Rs, { [K in keyof Rs]: AsyncOkOf<Rs[K]> }>, AsyncErrOf<Rs[number]>>;
-export function allAsync<R extends AsyncResultRecord>(
-  results: R,
-): AsyncResult<{ [K in keyof R]: AsyncOkOf<R[K]> }, AsyncErrOf<R[keyof R]>>;
-export function allAsync(
-  results: readonly AsyncResult<unknown, unknown>[] | AsyncResultRecord,
-): AsyncResult<unknown, unknown> {
+): AsyncResult<AllOk<Rs, { [K in keyof Rs]: AsyncOkOf<Rs[K]> }>, AsyncErrOf<Rs[number]>> {
   // Each AsyncResult is a (never-rejecting) thenable, so Promise.all adopts them;
-  // `foldAll` then applies the all() rules. The internal promise never rejects.
-  if (Array.isArray(results)) {
-    const settled = Promise.all(results).then((resolved) =>
-      foldAll(resolved as readonly Result<unknown, unknown>[]),
-    );
-    return new AsyncRes(settled);
-  }
+  // `foldArray` then applies the all() rules. The internal promise never rejects.
+  const settled = Promise.all(results).then((resolved) =>
+    foldArray(resolved as readonly Result<unknown, unknown>[]),
+  );
+  return new AsyncRes(settled) as AsyncResult<
+    AllOk<Rs, { [K in keyof Rs]: AsyncOkOf<Rs[K]> }>,
+    AsyncErrOf<Rs[number]>
+  >;
+}
+
+/**
+ * The asynchronous counterpart of {@link allFromDict}: combine a record of
+ * {@link AsyncResult}s into one `AsyncResult` of a record of their values.
+ *
+ * @remarks
+ * Resolved concurrently (order preserved), folded with the {@link all} rules,
+ * and the internal promise never rejects.
+ *
+ * @example
+ * ```ts
+ * import { allFromDictAsync, fromSafePromise } from "unthrown";
+ * await allFromDictAsync({ a: fromSafePromise(a()), b: fromSafePromise(b()) });
+ * ```
+ */
+export function allFromDictAsync<R extends AsyncResultRecord>(
+  results: R,
+): AsyncResult<{ [K in keyof R]: AsyncOkOf<R[K]> }, AsyncErrOf<R[keyof R]>> {
   const entries = Object.entries(results);
   const settled = Promise.all(entries.map(([, ar]) => ar)).then((resolved) => {
-    const byKey: ResultRecord = {};
+    // Null-proto accumulator: pairing resolved values back to keys can't pollute.
+    const byKey: ResultRecord = Object.create(null) as ResultRecord;
     entries.forEach(([key], i) => {
       byKey[key] = resolved[i] as Result<unknown, unknown>;
     });
-    return foldAll(byKey);
+    return foldRecord(byKey);
   });
-  return new AsyncRes(settled);
+  return new AsyncRes(settled) as AsyncResult<
+    { [K in keyof R]: AsyncOkOf<R[K]> },
+    AsyncErrOf<R[keyof R]>
+  >;
 }

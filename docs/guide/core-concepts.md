@@ -99,28 +99,36 @@ ok(1).match({ ok, err, defect }); // fold all three channels
 `Err` but **rethrow a `Defect`** — a defect is a bug, not an absent value. See
 [The Defect Channel](./the-defect-channel).
 
-## Aggregating: `all` / `allAsync`
+## Aggregating: `all` / `allFromDict`
 
-`all` collects `Result`s into a `Result` of all their values. The first `Err`
-short-circuits; any `Defect` dominates (even over an earlier `Err`). The output
-mirrors the input shape — a fixed tuple keeps its positional types, a dynamic
-`Result<T, E>[]` collapses to `Result<T[], E>`, and a **record** becomes a record
-of values (handy for named parallel work, no tupling):
+`all` collects a **tuple/array** of `Result`s into a `Result` of all their
+values. The first `Err` short-circuits; any `Defect` dominates (even over an
+earlier `Err`). A fixed tuple keeps its positional types; a dynamic
+`Result<T, E>[]` collapses to `Result<T[], E>`:
 
 ```ts
 import { all, ok, type Result } from "unthrown";
 
 all([ok(1), ok("two"), ok(true)]).unwrap(); // [1, "two", true] (typed [number, string, boolean])
 all([ok(1), ok(2)] as Result<number, never>[]).unwrap(); // number[]
-all({ id: ok(1), name: ok("ada") }).unwrap(); // { id: 1, name: "ada" }
 ```
 
-This short-circuits on the first `Err` — it is **not** error accumulation. If you
-need every failure collected, that is a separate (deliberately unshipped)
+For **named** parallel work, `allFromDict` takes a record instead — same rules,
+no tupling:
+
+```ts
+import { allFromDict, ok } from "unthrown";
+
+allFromDict({ id: ok(1), name: ok("ada") }).unwrap(); // { id: 1, name: "ada" }
+```
+
+Both short-circuit on the first `Err` — this is **not** error accumulation. If
+you need every failure collected, that is a separate (deliberately unshipped)
 concern.
 
-`allAsync` is the asynchronous counterpart — same folding rules, inputs resolved
-concurrently (order preserved), and (like every `AsyncResult`) it never rejects:
+`allAsync` and `allFromDictAsync` are the asynchronous counterparts — same
+folding rules, inputs resolved concurrently (order preserved), and (like every
+`AsyncResult`) they never reject:
 
 ```ts
 import { allAsync, fromSafePromise } from "unthrown";

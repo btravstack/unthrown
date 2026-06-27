@@ -5,6 +5,8 @@ export { Result } from "./facade.js";
 export {
   all,
   allAsync,
+  allFromDict,
+  allFromDictAsync,
   fromNullable,
   fromPromise,
   fromSafePromise,
