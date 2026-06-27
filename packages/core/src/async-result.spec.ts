@@ -66,6 +66,7 @@ describe("AsyncResult: a throw in any combinator becomes a Defect", () => {
     expect((await asyncOk(1).map(t)).isDefect()).toBe(true);
     expect((await asyncOk(1).flatMap(t)).isDefect()).toBe(true);
     expect((await asyncOk(1).tap(t)).isDefect()).toBe(true);
+    expect((await asyncOk(1).flatTap(t)).isDefect()).toBe(true);
     expect((await asyncErr("e").mapErr(t)).isDefect()).toBe(true);
     expect((await asyncErr("e").orElse(t)).isDefect()).toBe(true);
     expect((await asyncErr("e").recover(t)).isDefect()).toBe(true);
@@ -100,6 +101,20 @@ describe("AsyncResult success channel", () => {
     const seen: number[] = [];
     const r = await asyncOk(5).tap((n) => seen.push(n));
     expect(seen).toEqual([5]);
+    expect(r.unwrap()).toBe(5);
+  });
+
+  it("flatTap keeps the original value when the effect succeeds", async () => {
+    const r = await asyncOk(5).flatTap((n) => ok(n * 100));
+    expect(r.unwrap()).toBe(5); // original, not 500
+  });
+
+  it("flatTap short-circuits to the effect's Err", async () => {
+    expect((await asyncOk(5).flatTap(() => err("denied"))).unwrapErr()).toBe("denied");
+  });
+
+  it("flatTap composes an async effect via a qualified boundary, keeping the value", async () => {
+    const r = await asyncOk(5).flatTap(() => fromSafePromise(Promise.resolve("logged")));
     expect(r.unwrap()).toBe(5);
   });
 

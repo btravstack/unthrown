@@ -106,6 +106,45 @@ describe("Result.tap", () => {
   });
 });
 
+describe("Result.flatTap", () => {
+  it("runs the failable effect on Ok and keeps the original value on success", () => {
+    const seen: number[] = [];
+    const r = ok(5).flatTap((n) => {
+      seen.push(n);
+      return ok("ignored");
+    });
+    expect(seen).toEqual([5]);
+    expect(r.unwrap()).toBe(5); // original value preserved, not "ignored"
+  });
+
+  it("short-circuits to the effect's Err", () => {
+    const r = ok(5).flatTap(() => err("denied"));
+    expect(r.unwrapErr()).toBe("denied");
+  });
+
+  it("propagates a Defect from the effect", () => {
+    const r = ok(5).flatTap(() => defectOf(boom));
+    expect(r.isDefect()).toBe(true);
+  });
+
+  it("does not run on Err or Defect", () => {
+    const f = vi.fn(() => ok(1));
+    expect(err("e").flatTap(f).isErr()).toBe(true);
+    expect(defectOf(boom).flatTap(f).isDefect()).toBe(true);
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("converts a throw into a Defect", () => {
+    expect(
+      ok(1)
+        .flatTap(() => {
+          throw boom;
+        })
+        .isDefect(),
+    ).toBe(true);
+  });
+});
+
 describe("Result.as", () => {
   it("replaces the Ok value", () => {
     expect(ok(1).as("x").unwrap()).toBe("x");
