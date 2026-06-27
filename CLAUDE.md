@@ -166,6 +166,10 @@ enough that the library can be "done".
 - `packages/neverthrow` → `@unthrown/neverthrow` (peerDep `neverthrow`)
 - `packages/boxed` → `@unthrown/boxed` (peerDep `@bloodyowl/boxed` — Boxed's
   maintained scope; `@swan-io/boxed` is the deprecated former name)
+- `packages/standard-schema` → `@unthrown/standard-schema` (dep on the
+  types-only `@standard-schema/spec`; bridges Zod/Valibot/ArkType validators to
+  `Result` via `fromSchema` / `fromSchemaAsync`, with the validation issues as
+  the modeled `E`)
 - `tools/tsconfig`, `tools/typedoc` → private shared config (`@unthrown/tsconfig`,
   `@unthrown/typedoc`)
 - `docs` → `@unthrown/docs`, the VitePress site (guide + TypeDoc-generated API

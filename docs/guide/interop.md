@@ -4,11 +4,12 @@ unthrown ships thin bridges to the three most common neighbours in the
 errors-as-values space. Each is a separate, peer-dependency package with a small
 `to*` / `from*` surface — nothing to learn beyond "which direction am I going."
 
-| Package                                    | Peer dependency    | Bridges                    |
-| ------------------------------------------ | ------------------ | -------------------------- |
-| [`@unthrown/effect`](/api/effect/)         | `effect`           | `Exit`, `Either`, `Effect` |
-| [`@unthrown/neverthrow`](/api/neverthrow/) | `neverthrow`       | `Result`, `ResultAsync`    |
-| [`@unthrown/boxed`](/api/boxed/)           | `@bloodyowl/boxed` | `Result`, `Future<Result>` |
+| Package                                              | Peer dependency    | Bridges                    |
+| ---------------------------------------------------- | ------------------ | -------------------------- |
+| [`@unthrown/effect`](/api/effect/)                   | `effect`           | `Exit`, `Either`, `Effect` |
+| [`@unthrown/neverthrow`](/api/neverthrow/)           | `neverthrow`       | `Result`, `ResultAsync`    |
+| [`@unthrown/boxed`](/api/boxed/)                     | `@bloodyowl/boxed` | `Result`, `Future<Result>` |
+| [`@unthrown/standard-schema`](/api/standard-schema/) | _(types only)_     | any Standard Schema        |
 
 ## The one rule: does the neighbour have a defect channel?
 
@@ -66,3 +67,31 @@ Future<Result>`.
 
 On the way in, an _unexpected_ rejection inside the neighbour's async type
 becomes a `Defect` — never a silently-swallowed error.
+
+## Standard Schema — validators as `Result`s
+
+[`@unthrown/standard-schema`](/api/standard-schema/) is the odd one out: there's
+no `to*` direction (you don't turn a `Result` back into a schema). It bridges
+**any** [Standard Schema](https://standardschema.dev) validator — Zod, Valibot,
+ArkType — into a validator that returns a `Result`. The schema's validation
+**issues become the modeled error `E`**, because a failed validation is an
+anticipated outcome, not a defect.
+
+```ts
+import { fromSchema, fromSchemaAsync } from "@unthrown/standard-schema";
+import { z } from "zod";
+
+const parseUser = fromSchema(z.object({ id: z.string() }));
+
+parseUser({ id: "u_1" }).unwrap(); // { id: "u_1" }
+parseUser({ id: 1 }).unwrapErr(); // readonly StandardSchemaV1.Issue[]
+```
+
+- `fromSchema(schema)` → `(input) => Result<Output, Issues>` for a synchronous
+  schema (it throws a `TypeError` if the schema is async — use the next one).
+- `fromSchemaAsync(schema)` → `(input) => AsyncResult<Output, Issues>`, accepting
+  sync **or** async schemas. A validator that _throws_ (rather than returning
+  issues) becomes a `Defect`; the `AsyncResult` never rejects.
+
+The only dependency is the tiny, types-only `@standard-schema/spec` — your
+validator library provides the runtime.

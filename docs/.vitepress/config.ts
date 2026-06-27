@@ -74,6 +74,7 @@ export default defineConfig({
             { text: "@unthrown/effect", link: "/api/effect/" },
             { text: "@unthrown/neverthrow", link: "/api/neverthrow/" },
             { text: "@unthrown/boxed", link: "/api/boxed/" },
+            { text: "@unthrown/standard-schema", link: "/api/standard-schema/" },
           ],
         },
       ],
