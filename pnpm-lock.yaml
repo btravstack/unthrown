@@ -129,6 +129,9 @@ importers:
         specifier: workspace:*
         version: link:../packages/core
     devDependencies:
+      '@btravstack/theme':
+        specifier: ^1.2.0
+        version: 1.2.0(vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@24.13.2)(lightningcss@1.32.0)(postcss@8.5.15)(typescript@6.0.3))
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.2
@@ -564,6 +567,11 @@ packages:
     peerDependenciesMeta:
       typescript:
         optional: true
+
+  '@btravstack/theme@1.2.0':
+    resolution: {integrity: sha512-T6zN2V8xPY3ohlbjILbP01AMO1xbGl39HuPeVoY2qlJYTRVBRW3RBvuXJVeQAuRdLFcl0xTgFjzHsl9B8RLlkA==}
+    peerDependencies:
+      vitepress: ^1.6.0
 
   '@changesets/apply-release-plan@7.1.1':
     resolution: {integrity: sha512-9qPCm/rLx/xoOFXIHGB229+4GOL76S4MC+7tyOuTsR6+1jYlfFDQORdvwR5hDA6y4FL2BPt3qpbcQIS+dW85LA==}
@@ -3556,6 +3564,10 @@ snapshots:
   '@bloodyowl/boxed@3.4.0(typescript@6.0.3)':
     optionalDependencies:
       typescript: 6.0.3
+
+  '@btravstack/theme@1.2.0(vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@24.13.2)(lightningcss@1.32.0)(postcss@8.5.15)(typescript@6.0.3))':
+    dependencies:
+      vitepress: 1.6.4(@algolia/client-search@5.55.1)(@types/node@24.13.2)(lightningcss@1.32.0)(postcss@8.5.15)(typescript@6.0.3)
 
   '@changesets/apply-release-plan@7.1.1':
     dependencies:

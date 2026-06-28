@@ -1,5 +1,3 @@
-import DefaultTheme from "vitepress/theme";
+import Theme from "@btravstack/theme";
 
-import "./custom.css";
-
-export default DefaultTheme;
+export default Theme;
