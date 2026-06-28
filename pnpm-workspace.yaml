@@ -51,3 +51,6 @@ auditConfig:
     # never run in CI or production (the docs site ships as static HTML), and it is
     # in no published package's runtime dependencies.
     - GHSA-fx2h-pf6j-xcff
+
+minimumReleaseAgeExclude:
+  - "@btravstack/theme"
