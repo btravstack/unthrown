@@ -20,6 +20,10 @@ updates:
       # Only allow @types/node patch/minor updates (block major version bumps)
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+    # Mirror pnpm's minimumReleaseAge: wait before proposing freshly published versions.
+    # Dependabot does not read pnpm-workspace.yaml, so this must be configured here.
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 10
 
   # GitHub Actions
@@ -28,4 +32,6 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 5
