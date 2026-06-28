@@ -44,6 +44,13 @@ allowBuilds:
   esbuild: true
   lefthook: true
 
+# Supply-chain maturity delay: don't adopt a freshly published version until it
+# has been on the registry for 7 days (10080 minutes). Strict mode also validates
+# the committed lockfile against this cutoff, so a same-day-published transitive
+# dep fails the check instead of slipping in silently.
+minimumReleaseAge: 10080
+minimumReleaseAgeStrict: true
+
 auditConfig:
   ignoreGhsas:
     # vite `server.fs.deny` bypass on Windows alternate paths. Reaches us only
