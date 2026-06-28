@@ -104,6 +104,14 @@ export default defineConfig({
     },
   },
 
+  vite: {
+    // @btravstack/theme's entry imports `vitepress/theme` (which pulls in `.css`)
+    // and its own `style.css`. VitePress externalizes node_modules deps in the SSR
+    // build, so Node's ESM loader would hit those `.css` files and throw
+    // ERR_UNKNOWN_FILE_EXTENSION. Bundling the theme through Vite handles the CSS.
+    ssr: { noExternal: ["@btravstack/theme"] },
+  },
+
   head: [
     ["link", { rel: "icon", type: "image/svg+xml", href: "/unthrown/logo.svg" }],
     ["meta", { name: "author", content: "Benoit TRAVERS" }],

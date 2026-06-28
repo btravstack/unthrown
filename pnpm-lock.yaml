@@ -9,6 +9,9 @@ catalogs:
     '@bloodyowl/boxed':
       specifier: 3.4.0
       version: 3.4.0
+    '@btravstack/theme':
+      specifier: 1.2.0
+      version: 1.2.0
     '@changesets/cli':
       specifier: 2.31.0
       version: 2.31.0
@@ -130,7 +133,7 @@ importers:
         version: link:../packages/core
     devDependencies:
       '@btravstack/theme':
-        specifier: ^1.2.0
+        specifier: 'catalog:'
         version: 1.2.0(vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@24.13.2)(lightningcss@1.32.0)(postcss@8.5.15)(typescript@6.0.3))
       '@types/node':
         specifier: 'catalog:'

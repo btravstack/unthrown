@@ -20,7 +20,7 @@
     "unthrown": "workspace:*"
   },
   "devDependencies": {
-    "@btravstack/theme": "^1.2.0",
+    "@btravstack/theme": "catalog:",
     "@types/node": "catalog:",
     "tsx": "catalog:",
     "vitepress": "catalog:"

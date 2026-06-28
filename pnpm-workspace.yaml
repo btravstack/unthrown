@@ -13,6 +13,7 @@ catalog:
   "@changesets/cli": 2.31.0
   "@commitlint/cli": 21.0.2
   "@bloodyowl/boxed": 3.4.0
+  "@btravstack/theme": 1.2.0
   "@standard-schema/spec": 1.1.0
   "@commitlint/config-conventional": 21.0.2
   "@oxlint/plugins": 1.69.0
