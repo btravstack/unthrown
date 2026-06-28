@@ -10,8 +10,8 @@ catalogs:
       specifier: 3.4.0
       version: 3.4.0
     '@btravstack/theme':
-      specifier: 1.2.0
-      version: 1.2.0
+      specifier: 1.2.1
+      version: 1.2.1
     '@changesets/cli':
       specifier: 2.31.0
       version: 2.31.0
@@ -134,7 +134,7 @@ importers:
     devDependencies:
       '@btravstack/theme':
         specifier: 'catalog:'
-        version: 1.2.0(vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@24.13.2)(lightningcss@1.32.0)(postcss@8.5.15)(typescript@6.0.3))
+        version: 1.2.1(vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@24.13.2)(lightningcss@1.32.0)(postcss@8.5.15)(typescript@6.0.3))
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.2
@@ -571,8 +571,8 @@ packages:
       typescript:
         optional: true
 
-  '@btravstack/theme@1.2.0':
-    resolution: {integrity: sha512-T6zN2V8xPY3ohlbjILbP01AMO1xbGl39HuPeVoY2qlJYTRVBRW3RBvuXJVeQAuRdLFcl0xTgFjzHsl9B8RLlkA==}
+  '@btravstack/theme@1.2.1':
+    resolution: {integrity: sha512-v9FGRapJxIOpiniwVNFcn3ht18VIowf4K0bPwl9z5V1nfRW7YpqFYe3/JGGimNh6/Ukof0qtHmeuqYB8Hfpagg==}
     peerDependencies:
       vitepress: ^1.6.0
 
@@ -3568,7 +3568,7 @@ snapshots:
     optionalDependencies:
       typescript: 6.0.3
 
-  '@btravstack/theme@1.2.0(vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@24.13.2)(lightningcss@1.32.0)(postcss@8.5.15)(typescript@6.0.3))':
+  '@btravstack/theme@1.2.1(vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@24.13.2)(lightningcss@1.32.0)(postcss@8.5.15)(typescript@6.0.3))':
     dependencies:
       vitepress: 1.6.4(@algolia/client-search@5.55.1)(@types/node@24.13.2)(lightningcss@1.32.0)(postcss@8.5.15)(typescript@6.0.3)
 
