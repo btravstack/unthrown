@@ -5,6 +5,7 @@
 // companion-object pattern. See CLAUDE.md → "Internal design".
 
 import { Err, isDefect, isErr, isOk, Ok } from "./constructors.js";
+import { isResult } from "./core.js";
 import { Defect } from "./defect.js";
 import { Do } from "./do.js";
 import {
@@ -26,7 +27,7 @@ import type { Result as ResultType } from "./types.js";
  * {@link Result.fromPromise}, {@link Result.fromSafePromise}, {@link Result.all},
  * {@link Result.allAsync}, {@link Result.allFromDict},
  * {@link Result.allFromDictAsync}, {@link Result.isOk}, {@link Result.isErr},
- * {@link Result.isDefect}.
+ * {@link Result.isDefect}, {@link Result.isResult}.
  *
  * @remarks
  * Purely additive sugar — each member **is** the corresponding free function.
@@ -56,6 +57,7 @@ export const Result = {
   isOk,
   isErr,
   isDefect,
+  isResult,
 } as const;
 
 // Re-alias the Result type into this module so a single `export { Result }`

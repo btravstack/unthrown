@@ -18,6 +18,7 @@ channel** and turns a thrown callback into a `Defect`.
 | try a fallback that returns a `Result`         | `orElse`           | Err     |
 | turn an error into a success value             | `recover`          | Err     |
 | run a side effect on the error                 | `tapErr`           | Err     |
+| run a **failable** side effect on the error    | `flatTapErr`       | Err     |
 | recover from a defect (rare)                   | `recoverDefect`    | Defect  |
 | observe a defect, e.g. log it                  | `tapDefect`        | Defect  |
 | handle all three channels at the edge          | `match`            | all     |
@@ -37,6 +38,12 @@ don't need).
 **`flatMap` vs `flatTap`** — both take a `Result`-returning callback. `flatMap`
 **replaces** the value with the callback's; `flatTap` **discards** the callback's
 value and keeps the original.
+
+**`tapErr` vs `flatTapErr`** — the error-channel mirror of `tap` vs `flatTap`.
+Both run only on `Err` and keep the original error on success. `tapErr` takes a
+`void` callback that can't fail; `flatTapErr` takes a `Result`-returning one and
+threads its error (a failable effect _during_ error handling — e.g. writing the
+error to an audit log that may itself fail).
 
 **`orElse` vs `recover`** — both run on `Err`. `recover` produces a plain success
 value (emptying the error channel to `never`); `orElse` produces another

@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { Defect, Err, isDefect, isErr, isOk, Ok, type Result, UnwrapError } from "./index.js";
+import {
+  Defect,
+  Err,
+  isDefect,
+  isErr,
+  isOk,
+  isResult,
+  Ok,
+  type Result,
+  UnwrapError,
+} from "./index.js";
 
 const boom = new Error("boom");
 const defectOf = (cause: unknown): Result<number, never> =>
@@ -66,6 +76,27 @@ describe("standalone guards narrow and expose the relevant field", () => {
     expect([isOk(o), isErr(o), isDefect(o)]).toEqual([true, false, false]);
     expect([isOk(e), isErr(e), isDefect(e)]).toEqual([false, true, false]);
     expect([isOk(d), isErr(d), isDefect(d)]).toEqual([false, false, true]);
+  });
+});
+
+describe("isResult narrows an unknown value to a Result", () => {
+  it("is true for every Result variant", () => {
+    expect(isResult(Ok(1))).toBe(true);
+    expect(isResult(Err("e"))).toBe(true);
+    expect(isResult(defectOf(boom))).toBe(true);
+  });
+
+  it("is false for look-alikes, primitives, and unrelated objects", () => {
+    expect(isResult({ tag: "Ok", value: 1 })).toBe(false); // structural look-alike
+    expect(isResult(null)).toBe(false);
+    expect(isResult(undefined)).toBe(false);
+    expect(isResult(42)).toBe(false);
+    expect(isResult("Ok")).toBe(false);
+    expect(isResult({})).toBe(false);
+  });
+
+  it("is false for an AsyncResult (not a Result)", () => {
+    expect(isResult(Ok(1).toAsync())).toBe(false);
   });
 });
 

@@ -71,6 +71,7 @@ describe("AsyncResult: a throw in any combinator becomes a Defect", () => {
     expect((await asyncErr("e").orElse(t)).isDefect()).toBe(true);
     expect((await asyncErr("e").recover(t)).isDefect()).toBe(true);
     expect((await asyncErr("e").tapErr(t)).isDefect()).toBe(true);
+    expect((await asyncErr("e").flatTapErr(t)).isDefect()).toBe(true);
     expect((await asyncDefect().recoverDefect(t)).isDefect()).toBe(true);
     expect((await asyncDefect().tapDefect(t)).isDefect()).toBe(true);
   });
@@ -157,6 +158,29 @@ describe("AsyncResult error channel", () => {
     const r = await asyncErr("e").tapErr((s) => seen.push(s));
     expect(seen).toEqual(["e"]);
     expect(r.unwrapErr()).toBe("e");
+  });
+
+  it("flatTapErr keeps the original error when the effect succeeds", async () => {
+    const r = await asyncErr("e").flatTapErr(() => Ok("ignored"));
+    expect(r.unwrapErr()).toBe("e");
+  });
+
+  it("flatTapErr threads the effect's Err", async () => {
+    expect((await asyncErr("e").flatTapErr(() => Err("log_failed"))).unwrapErr()).toBe(
+      "log_failed",
+    );
+  });
+
+  it("flatTapErr composes an async effect via a qualified boundary, keeping the error", async () => {
+    const r = await asyncErr("e").flatTapErr(() => fromSafePromise(Promise.resolve("logged")));
+    expect(r.unwrapErr()).toBe("e");
+  });
+
+  it("flatTapErr does not run the effect on Ok or Defect", async () => {
+    const f = vi.fn(() => Ok(1));
+    expect((await asyncOk(1).flatTapErr(f)).unwrap()).toBe(1);
+    expect((await asyncDefect().flatTapErr(f)).isDefect()).toBe(true);
+    expect(f).not.toHaveBeenCalled();
   });
 });
 

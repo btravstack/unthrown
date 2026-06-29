@@ -23,6 +23,7 @@ import {
   isDefect,
   isErr,
   isOk,
+  isResult,
   matchTags,
   Ok,
   type OkOf,
@@ -108,6 +109,10 @@ type _flatMapped = Expect<Equal<typeof flatMapped, Result<never, "e1" | "e2">>>;
 const flatTapped = r1.flatTap(() => Err<"e2">("e2"));
 type _flatTapped = Expect<Equal<typeof flatTapped, Result<number, "e1" | "e2">>>;
 
+// flatTapErr KEEPS the value type and widens the error channel (error-side mirror)
+const flatTapErred = r1.flatTapErr(() => Err<"e2">("e2"));
+type _flatTapErred = Expect<Equal<typeof flatTapErred, Result<number, "e1" | "e2">>>;
+
 // recover empties the error channel (to `never`)
 const recovered = r1.recover(() => 0);
 type _recovered = Expect<Equal<typeof recovered, Result<number, never>>>;
@@ -176,6 +181,12 @@ if (isErr(g)) {
 }
 if (isDefect(g)) {
   type _sc = Expect<Equal<typeof g.cause, unknown>>;
+}
+
+// isResult narrows `unknown` to a Result
+declare const u: unknown;
+if (isResult(u)) {
+  type _isResult = Expect<Equal<typeof u, Result<unknown, unknown>>>;
 }
 
 // the payload is unreachable before narrowing

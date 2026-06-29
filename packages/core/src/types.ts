@@ -165,6 +165,23 @@ export type ResultMethods<T, E> = {
    * @param f - the side effect (its return value is ignored).
    */
   tapErr(f: (error: E) => void): Result<T, E>;
+  /**
+   * Run a **failable** side effect on the error, keeping the original error but
+   * threading the effect's own error.
+   *
+   * @remarks
+   * The error-channel mirror of {@link ResultMethods.flatTap | flatTap}: `f`
+   * returns a `Result`, but its **success value is discarded** — on the effect's
+   * `Ok` the original `Err` flows through unchanged, while an `Err` (or `Defect`)
+   * from `f` short-circuits and threads its error (`Result<T, E | E2>`). Runs only
+   * on `Err`; `Ok` and `Defect` pass through. If `f` throws, the throw becomes a
+   * `Defect`. Use it for a failable effect _during_ error handling (e.g. writing
+   * the error to an audit log that may itself fail).
+   *
+   * @typeParam E2 - the error type the effect may introduce.
+   * @param f - the failable side effect; its `Ok` value is ignored.
+   */
+  flatTapErr<E2>(f: (error: E) => Result<unknown, E2>): Result<T, E | E2>;
 
   /**
    * Recover from a `Defect` — the **only** combinator that can touch one.
@@ -388,6 +405,15 @@ export type AsyncResult<T, E> = Awaitable<Result<T, E>> & {
   recover<U>(f: (error: E) => U): AsyncResult<T | U, never>;
   /** Asynchronous `tapErr`. `f` is synchronous; a throw becomes a `Defect`. */
   tapErr(f: (error: E) => void): AsyncResult<T, E>;
+  /**
+   * Asynchronous `flatTapErr` — a failable tap on the error that keeps the
+   * original error. `f` may return a `Result` **or** an `AsyncResult`; its `Ok`
+   * value is discarded, an `Err`/`Defect` from `f` threads through, and a throw
+   * becomes a `Defect`.
+   */
+  flatTapErr<E2>(
+    f: (error: E) => Result<unknown, E2> | AsyncResult<unknown, E2>,
+  ): AsyncResult<T, E | E2>;
 
   /** Asynchronous `recoverDefect`. `f` may return a `Result` or an `AsyncResult`. */
   recoverDefect<U, E2>(

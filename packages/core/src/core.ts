@@ -166,6 +166,17 @@ class Res<T, E> {
     }
   }
 
+  flatTapErr<E2>(this: Result<T, E>, f: (error: E) => Result<unknown, E2>): Result<T, E | E2> {
+    if (this.tag !== "Err") return this;
+    try {
+      const r = f(this.error);
+      // Keep the original error on the effect's success; an Err/Defect threads through.
+      return r.tag === "Ok" ? this : passThrough(r);
+    } catch (cause) {
+      return defectRes(cause);
+    }
+  }
+
   recoverDefect<U, E2>(
     this: Result<T, E>,
     f: (cause: unknown) => Result<U, E2>,
@@ -305,6 +316,22 @@ export function defectRes<T, E>(cause: unknown): Result<T, E> {
     tag: "Defect" as const,
     cause,
   }) as DefectView<T, E>;
+}
+
+/**
+ * Type guard: is `x` a {@link Result} (any of `Ok` / `Err` / `Defect`)?
+ *
+ * @remarks
+ * Unlike {@link isOk} / {@link isErr} / {@link isDefect}, which narrow a value
+ * already known to be a `Result`, this narrows from `unknown` — useful at an
+ * untyped boundary. It checks the value carries the `Result` prototype, so a
+ * look-alike plain object (`{ tag: "Ok" }`) is **not** matched. An `AsyncResult`
+ * is not a `Result` and returns `false`.
+ *
+ * @returns `true` when `x` is a `Result` produced by this library.
+ */
+export function isResult(x: unknown): x is Result<unknown, unknown> {
+  return x instanceof Res;
 }
 
 /**
@@ -512,6 +539,23 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
           return r;
         } catch (cause) {
           return defectRes<T, E>(cause);
+        }
+      }),
+    );
+  }
+
+  flatTapErr<E2>(
+    f: (error: E) => Result<unknown, E2> | AsyncResult<unknown, E2>,
+  ): AsyncResult<T, E | E2> {
+    return new AsyncRes<T, E | E2>(
+      this.promise.then(async (r) => {
+        if (r.tag !== "Err") return passThrough(r);
+        try {
+          const inner = await f(r.error);
+          // Keep the original error on success; an Err/Defect from `f` wins.
+          return inner.tag === "Ok" ? passThrough(r) : passThrough(inner);
+        } catch (cause) {
+          return defectRes(cause);
         }
       }),
     );

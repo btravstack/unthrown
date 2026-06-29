@@ -47,7 +47,7 @@ was planned).
 
 - **Throw → defect.** Any value thrown by a callback inside a combinator
   (`map`, `flatMap`, `flatTap`, `bind`, `let`, `mapErr`, `orElse`, `recover`,
-  `tap*`, `recoverDefect`) is caught and converted to a `Defect`. Nothing
+  `tap*`, `flatTapErr`, `recoverDefect`) is caught and converted to a `Defect`. Nothing
   escapes a pipeline as a raw throw.
   This is what lets an HTTP adapter do a single `match({ ok, err, defect })`
   with **no surrounding `try/catch`**.
@@ -93,14 +93,18 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   pure value). On `AsyncResult`, `bind`'s `f` may return a `Result` or an
   `AsyncResult`. A throw in either becomes a `Defect`; `Err`/`Defect`
   short-circuits/passes through. To go async, lift with `toAsync()`.
-- error: `mapErr`, `orElse`, `recover`, `tapErr`
+- error: `mapErr`, `orElse`, `recover`, `tapErr`, `flatTapErr` (the error-channel
+  mirror of `flatTap` — runs a `Result`-returning effect on the error, keeps the
+  original error, threads the effect's error)
 - defect: `recoverDefect`, `tapDefect`
 - eliminate: `match`, `unwrap`, `unwrapErr`, `unwrapOr`, `unwrapOrElse`,
   `getOrNull`, `getOrUndefined`
 - guards: methods `isOk`/`isErr`/`isDefect` **and** standalone
   `isOk`/`isErr`/`isDefect` both narrow (to `OkView`/`ErrView`/`DefectView`) — the
   methods are `this is …` type predicates, so `if (r.isErr()) r.error` compiles.
-  One narrowing concept, two call styles.
+  One narrowing concept, two call styles. Plus the standalone `isResult(x)` —
+  narrows an `unknown` to `Result<unknown, unknown>` (a prototype check, so a
+  plain `{ tag: "Ok" }` look-alike is not matched), for untyped boundaries.
 - constructors: `Ok`, `Err`, `Defect`
 - interop: `fromNullable`, `fromThrowable`, `fromPromise`, `fromSafePromise`
 - aggregate: `all` / `allAsync` take a **tuple/array** (a fixed tuple keeps

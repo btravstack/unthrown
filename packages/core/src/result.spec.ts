@@ -277,6 +277,45 @@ describe("Result.tapErr", () => {
   });
 });
 
+describe("Result.flatTapErr", () => {
+  it("runs the failable effect on Err and keeps the original error on success", () => {
+    const seen: string[] = [];
+    const r = Err("e").flatTapErr((s) => {
+      seen.push(s);
+      return Ok("ignored");
+    });
+    expect(seen).toEqual(["e"]);
+    expect(r.unwrapErr()).toBe("e"); // original error preserved
+  });
+
+  it("threads the effect's Err", () => {
+    const r = Err("e").flatTapErr(() => Err("log_failed"));
+    expect(r.unwrapErr()).toBe("log_failed");
+  });
+
+  it("propagates a Defect from the effect", () => {
+    const r = Err("e").flatTapErr(() => defectOf(boom));
+    expect(r.isDefect()).toBe(true);
+  });
+
+  it("does not run on Ok or Defect", () => {
+    const f = vi.fn(() => Ok(1));
+    expect(Ok(1).flatTapErr(f).unwrap()).toBe(1);
+    expect(defectOf(boom).flatTapErr(f).isDefect()).toBe(true);
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("converts a throw into a Defect", () => {
+    expect(
+      Err("e")
+        .flatTapErr(() => {
+          throw boom;
+        })
+        .isDefect(),
+    ).toBe(true);
+  });
+});
+
 describe("Result.recoverDefect (the only door to a Defect)", () => {
   it("replaces a Defect with an Ok", () => {
     expect(
