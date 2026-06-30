@@ -65,7 +65,7 @@ If you prefer a namespace, two companion objects alias the same entry points —
 **grouped by what they return**, so each static lives in exactly one place:
 
 ```ts
-import { Result, AsyncResult } from "unthrown";
+import { Result, AsyncResult, Defect } from "unthrown";
 
 // Result.* — everything that yields a Result (sync)
 Result.Ok(1);
@@ -77,10 +77,13 @@ await AsyncResult.fromPromise(fetchUser(id), (c) => Defect(c));
 await AsyncResult.all([AsyncResult.fromSafePromise(loadA()), AsyncResult.fromSafePromise(loadB())]);
 ```
 
-The free functions remain the primary, tree-shakeable API; the companions are a
-zero-cost, opt-in alias (a separate export — `import { Ok }` never pulls one in).
-Inside `AsyncResult` the aggregates drop the `Async` suffix (`AsyncResult.all`
-**is** the free function `allAsync`) — the namespace already says async.
+The free functions remain the primary, tree-shakeable API; the companions are an
+opt-in alias (a separate export — `import { Ok }` never pulls one in). Importing a
+companion _value_ trades that tree-shaking for the namespace, since it references
+every entry point; the library is small, so the cost is minor — but if you care
+about it, prefer the free functions. Inside `AsyncResult` the aggregates drop the
+`Async` suffix (`AsyncResult.all` **is** the free function `allAsync`) — the
+namespace already says async.
 
 ## Guards that narrow
 

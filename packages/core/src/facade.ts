@@ -81,7 +81,7 @@ export type Result<T, E> = ResultType<T, E>;
  *
  * @example
  * ```ts
- * import { AsyncResult } from "unthrown";
+ * import { AsyncResult, Defect } from "unthrown";
  * const user = await AsyncResult.fromPromise(fetchUser(id), (c) => Defect(c));
  * ```
  */
