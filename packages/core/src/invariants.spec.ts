@@ -79,6 +79,8 @@ describe("Invariant 3: unwrap() is asymmetric", () => {
     } catch (e) {
       expect(e).toBeInstanceOf(UnwrapError);
       expect((e as UnwrapError<string>).error).toBe("modeled");
+      // the offending value is also surfaced as the standard Error.cause
+      expect((e as UnwrapError<string>).cause).toBe("modeled");
     }
   });
 

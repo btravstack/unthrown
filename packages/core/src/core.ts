@@ -22,6 +22,11 @@ import type { AsyncResult, Bound, DefectView, ErrView, OkView, Result } from "./
  * `Ok`.
  *
  * @remarks
+ * The offending value is exposed two ways: the typed {@link UnwrapError.error}
+ * property for programmatic access, and the standard `Error.cause` for the
+ * runtime and devtools to chain — when `E` is an `Error` (e.g. a `TaggedError`)
+ * its original stack is printed under "caused by".
+ *
  * A `Defect` is never wrapped in an `UnwrapError`: its original cause is
  * re-thrown (with its original stack) instead.
  *
@@ -34,7 +39,7 @@ export class UnwrapError<E = unknown> extends Error {
    */
   readonly error: E;
   constructor(error: E) {
-    super("unthrown: called unwrap on a non-matching Result");
+    super("unthrown: called unwrap on a non-matching Result", { cause: error });
     this.name = "UnwrapError";
     this.error = error;
     Object.setPrototypeOf(this, new.target.prototype);

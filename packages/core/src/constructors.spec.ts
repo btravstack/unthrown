@@ -137,5 +137,13 @@ describe("UnwrapError", () => {
     expect(e).toBeInstanceOf(UnwrapError);
     expect(e.name).toBe("UnwrapError");
     expect(e.error).toBe("payload");
+    expect(e.cause).toBe("payload");
+  });
+
+  it("chains an Error payload through the standard cause", () => {
+    const boom = new Error("boom");
+    const e = new UnwrapError(boom);
+    expect(e.cause).toBe(boom);
+    expect((e.cause as Error).stack).toBe(boom.stack);
   });
 });

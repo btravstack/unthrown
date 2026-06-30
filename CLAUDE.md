@@ -55,7 +55,9 @@ was planned).
   `recoverDefect()`.** Therefore `unwrapOr`, `unwrapOrElse`, `getOrNull`,
   `getOrUndefined` still **throw** on a `Defect` — they recover the modeled `Err`,
   never an unmodeled defect (a defect is a bug, not an absent value).
-- **`unwrap()` is asymmetric.** On `Err` it throws a `UnwrapError` carrying `E`.
+- **`unwrap()` is asymmetric.** On `Err` it throws a `UnwrapError` carrying `E`
+  (on both the typed `.error` property and the standard `Error.cause`, so an
+  `Error`-typed `E` chains its original stack under "caused by").
   On a `Defect` it **rethrows the original `cause`** (it _panics_) with its
   original stack, so an unhandled defect hits the global handler looking like the
   real failure.
