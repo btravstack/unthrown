@@ -1,5 +1,13 @@
 # @unthrown/neverthrow
 
+## 3.0.0
+
+### Patch Changes
+
+- Updated dependencies [2cffaed]
+- Updated dependencies [88bb366]
+  - unthrown@3.0.0
+
 ## 2.0.0
 
 ### Patch Changes

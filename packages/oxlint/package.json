@@ -1,6 +1,6 @@
 {
   "name": "@unthrown/oxlint",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "oxlint plugin enforcing unthrown's conventions",
   "keywords": [
     "errors-as-values",
