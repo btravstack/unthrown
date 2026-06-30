@@ -29,6 +29,8 @@ export default defineConfig({
         text: "Changelog",
         link: "https://github.com/btravstack/unthrown/releases",
       },
+      // Back to the btravstack hub (links the docs up to the landing page).
+      { text: "btravstack", link: "https://btravstack.github.io/" },
     ],
 
     sidebar: {
