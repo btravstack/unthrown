@@ -118,11 +118,20 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   `allAsync` / `allFromDictAsync` resolve concurrently (order preserved) and never
   reject. The record fold writes keys via `Object.defineProperty`, so a
   caller-supplied `"__proto__"` key can't pollute the prototype.
-- facade: a `Result` companion object aliases the standalone entry points
-  (`Result.Ok`/`Err`/`Defect`/`Do`/`from*`/`all`/`allAsync`/`allFromDict`/`allFromDictAsync`/`is*`)
-  for discoverability;
-  the free functions remain the primary, tree-shakeable API. One concept, two
-  import styles — not a second concept.
+- facade: two companion objects alias the standalone entry points, **grouped by
+  what they return** so a static lives in exactly one namespace. `Result.*` holds
+  the `Result`-producing ones
+  (`Result.Ok`/`Err`/`Defect`/`Do`/`fromNullable`/`fromThrowable`/`all`/`allFromDict`/`is*`);
+  `AsyncResult.*` holds the `AsyncResult`-producing ones
+  (`AsyncResult.fromPromise`/`fromSafePromise`/`all`/`allFromDict` — the
+  aggregates drop the `Async` suffix the free functions carry, since the
+  namespace already says async). Both are value+type companions (the value and
+  the `Result<T,E>` / `AsyncResult<T,E>` type share one name). The free functions
+  remain the primary, tree-shakeable API; the companions are opt-in sugar (only
+  code importing a companion value forgoes tree-shaking). One concept, two import
+  styles — not a second concept. (Each companion re-aliases its type in
+  `facade.ts`, so the `types.ts` `Result`/`AsyncResult` declarations both sit in
+  `typedoc.json`'s `intentionallyNotExported`.)
 - tagged errors: `TaggedError(tag, options?)` (the error-class factory; optional
   `options.name` sets `Error.name` independently of the `_tag` discriminant, so a
   tag can be namespaced for collision-safety without leaking into the display

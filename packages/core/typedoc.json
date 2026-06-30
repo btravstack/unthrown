@@ -4,6 +4,7 @@
   "out": "docs",
   "intentionallyNotExported": [
     "Result",
+    "AsyncResult",
     "Props",
     "ResultMethods",
     "AllOk",

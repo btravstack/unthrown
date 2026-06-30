@@ -53,7 +53,7 @@ Ok(user)
 // → still the original user on success; short-circuits to WriteError on failure
 ```
 
-## Constructors and the `Result` facade
+## Constructors and the `Result` / `AsyncResult` facades
 
 The constructors and helpers are tree-shakeable free functions:
 
@@ -61,19 +61,26 @@ The constructors and helpers are tree-shakeable free functions:
 import { Ok, Err, fromNullable, all } from "unthrown";
 ```
 
-If you prefer a namespace, a `Result` companion object aliases the same entry
-points — handy for discoverability:
+If you prefer a namespace, two companion objects alias the same entry points —
+**grouped by what they return**, so each static lives in exactly one place:
 
 ```ts
-import { Result } from "unthrown";
+import { Result, AsyncResult } from "unthrown";
 
+// Result.* — everything that yields a Result (sync)
 Result.Ok(1);
 Result.fromNullable(map.get(key), () => "absent");
 Result.all([Result.Ok(1), Result.Ok(2)]);
+
+// AsyncResult.* — everything that yields an AsyncResult
+await AsyncResult.fromPromise(fetchUser(id), (c) => Defect(c));
+await AsyncResult.all([AsyncResult.fromSafePromise(loadA()), AsyncResult.fromSafePromise(loadB())]);
 ```
 
-The free functions remain the primary, tree-shakeable API; `Result.*` is a
-zero-cost alias (a separate export — `import { Ok }` never pulls it in).
+The free functions remain the primary, tree-shakeable API; the companions are a
+zero-cost, opt-in alias (a separate export — `import { Ok }` never pulls one in).
+Inside `AsyncResult` the aggregates drop the `Async` suffix (`AsyncResult.all`
+**is** the free function `allAsync`) — the namespace already says async.
 
 ## Guards that narrow
 

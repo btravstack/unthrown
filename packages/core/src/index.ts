@@ -2,7 +2,7 @@ export { Err, isDefect, isErr, isOk, Ok } from "./constructors.js";
 export { isResult, UnwrapError } from "./core.js";
 export { Defect } from "./defect.js";
 export { Do } from "./do.js";
-export { Result } from "./facade.js";
+export { AsyncResult, Result } from "./facade.js";
 export {
   all,
   allAsync,
@@ -19,7 +19,6 @@ export type { TaggedErrorConstructor, TaggedErrorInstance, TagHandlers } from ".
 export type {
   AsyncErrOf,
   AsyncOkOf,
-  AsyncResult,
   Awaitable,
   DefectView,
   ErrOf,
