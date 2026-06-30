@@ -39,7 +39,7 @@ features:
 ## At a glance
 
 ```ts
-import { Ok, Err, Defect, fromPromise, type Result } from "unthrown";
+import { Ok, Err, fromPromise, type Result } from "unthrown";
 
 class NotFound extends TaggedError("NotFound") {}
 
@@ -49,8 +49,8 @@ function findUser(id: string): Result<User, NotFound> {
 }
 
 // Cross an async boundary — every rejection MUST be triaged.
-const profile = fromPromise(fetch(`/u/${id}`), (cause) =>
-  cause instanceof Response ? new NotFound() : Defect(cause),
+const profile = fromPromise(fetch(`/u/${id}`), (cause, defect) =>
+  cause instanceof Response ? new NotFound() : defect(cause),
 );
 
 // Handle every channel once, at the edge — no surrounding try/catch.

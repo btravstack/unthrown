@@ -27,8 +27,11 @@ was planned).
    trust: `T | undefined`, `T | null`, or `Result<T, NotFound>`. Interop with
    nullable third-party APIs goes through `fromNullable`. Do not add `Option`.
 3. **Qualification is enforced at every boundary.** `fromPromise` / `fromThrowable`
-   take a mandatory `qualify: (cause: unknown) => E | Defect`. There is no path
-   that produces `unknown` in `E`. The boundary forces a triage decision. The
+   take a mandatory `qualify: (cause: unknown, defect) => E | Defect`, where
+   `defect` is a helper the boundary **injects** as the second argument (domain
+   code never imports it — the qualify-time marker is not a public value). There
+   is no path that produces `unknown` in `E`. The boundary forces a triage
+   decision. The
    modeled error type is inferred as **`Exclude<R, Defect>`** (where `R` is
    `qualify`'s return type): the `Defect` arm is _subtracted_ from `E`, never
    inferred into it — a defect-only `qualify` yields `E = never`, not
@@ -107,7 +110,9 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   One narrowing concept, two call styles. Plus the standalone `isResult(x)` —
   narrows an `unknown` to `Result<unknown, unknown>` (a prototype check, so a
   plain `{ tag: "Ok" }` look-alike is not matched), for untyped boundaries.
-- constructors: `Ok`, `Err`, `Defect`
+- constructors: `Ok`, `Err` (there is **no** `Defect` constructor — a defect-state
+  `Result` arises only at boundaries; the qualify-time `defect` marker helper is
+  injected, not exported)
 - interop: `fromNullable`, `fromThrowable`, `fromPromise`, `fromSafePromise`
 - aggregate: `all` / `allAsync` take a **tuple/array** (a fixed tuple keeps
   positional types; a dynamic `Result<T, E>[]` / `AsyncResult<T, E>[]` collapses
@@ -123,7 +128,7 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
 - facade: two companion objects alias the standalone entry points, **grouped by
   what they return** so a static lives in exactly one namespace. `Result.*` holds
   the `Result`-producing ones
-  (`Result.Ok`/`Err`/`Defect`/`Do`/`fromNullable`/`fromThrowable`/`all`/`allFromDict`/`is*`);
+  (`Result.Ok`/`Err`/`Do`/`fromNullable`/`fromThrowable`/`all`/`allFromDict`/`is*`);
   `AsyncResult.*` holds the `AsyncResult`-producing ones
   (`AsyncResult.fromPromise`/`fromSafePromise`/`all`/`allFromDict` — the
   aggregates drop the `Async` suffix the free functions carry, since the

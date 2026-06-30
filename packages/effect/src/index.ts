@@ -17,7 +17,7 @@
 // silent path that drops it.
 
 import { Cause, Effect, Either, Exit, Option } from "effect";
-import { Defect, Err, fromSafePromise, fromThrowable, Ok } from "unthrown";
+import { Err, fromSafePromise, fromThrowable, Ok } from "unthrown";
 import type { AsyncResult, Result } from "unthrown";
 
 /**
@@ -178,11 +178,15 @@ function resultToEffect<T, E>(result: Result<T, E>): Effect.Effect<T, E> {
 // unthrown; replaying it through the throwable boundary lands it in the `Defect`
 // state — the sanctioned (boundary-only) way to mint a Defect `Result`.
 function dieToResult<T, E>(cause: unknown): Result<T, E> {
-  // The thunk always throws, so its `T` return is honest; `qualify` is `Defect`,
-  // so the modeled error is `never` — widened to `E` here (there is no `Err`).
-  return fromThrowable((): T => {
-    throw cause;
-  }, Defect)() as Result<T, E>;
+  // The thunk always throws, so its `T` return is honest; `qualify` marks every
+  // cause a Defect, so the modeled error is `never` — widened to `E` here (there
+  // is no `Err`).
+  return fromThrowable(
+    (): T => {
+      throw cause;
+    },
+    (c, defect) => defect(c),
+  )() as Result<T, E>;
 }
 
 function settle<T, E>(asyncResult: AsyncResult<T, E>): Promise<Result<T, E>> {

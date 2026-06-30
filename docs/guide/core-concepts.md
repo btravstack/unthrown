@@ -65,7 +65,7 @@ If you prefer a namespace, two companion objects alias the same entry points —
 **grouped by what they return**, so each static lives in exactly one place:
 
 ```ts
-import { Result, AsyncResult, Defect } from "unthrown";
+import { Result, AsyncResult } from "unthrown";
 
 // Result.* — everything that yields a Result (sync)
 Result.Ok(1);
@@ -73,7 +73,7 @@ Result.fromNullable(map.get(key), () => "absent");
 Result.all([Result.Ok(1), Result.Ok(2)]);
 
 // AsyncResult.* — everything that yields an AsyncResult
-await AsyncResult.fromPromise(fetchUser(id), (c) => Defect(c));
+await AsyncResult.fromPromise(fetchUser(id), (c, defect) => defect(c));
 await AsyncResult.all([AsyncResult.fromSafePromise(loadA()), AsyncResult.fromSafePromise(loadB())]);
 ```
 

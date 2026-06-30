@@ -11,10 +11,10 @@ pnpm add unthrown
 ```
 
 ```ts
-import { Ok, Err, fromPromise, Defect, type Result } from "unthrown";
+import { Ok, Err, fromPromise, type Result } from "unthrown";
 
-const user = fromPromise(fetchUser(id), (cause) =>
-  cause instanceof NotFoundError ? new NotFound() : Defect(cause),
+const user = fromPromise(fetchUser(id), (cause, defect) =>
+  cause instanceof NotFoundError ? new NotFound() : defect(cause),
 );
 
 const status = await user.match({

@@ -3,7 +3,7 @@
 // there is no path that yields `unknown` in `E`.
 
 import { AsyncRes, defectRes, errRes, okRes } from "./core.js";
-import { type Defect, isDefectMarker } from "./defect.js";
+import { type Defect, defect, isDefectMarker } from "./defect.js";
 import { Err, Ok } from "./constructors.js";
 import type { AsyncErrOf, AsyncOkOf, AsyncResult, ErrOf, OkOf, Result } from "./types.js";
 
@@ -39,12 +39,13 @@ export function fromNullable<T, E>(
  *
  * @remarks
  * `qualify` **must** triage every thrown cause into a modeled error `E` or a
- * {@link Defect} (via {@link Defect}) — there is no path that leaves `unknown`
- * in `E`. A throw inside `qualify` itself is treated as a `Defect`.
+ * `Defect` (via the injected `defect` helper, its second argument) — there is no
+ * path that leaves `unknown` in `E`. A throw inside `qualify` itself is treated
+ * as a `Defect`.
  *
  * The modeled error type is `Exclude<R, Defect>` — the `Defect` arm of
  * `qualify`'s return is **subtracted** from `E`, never inferred into it. So a
- * `qualify` that returns *only* `Defect(cause)` yields `E = never` (a Defect is
+ * `qualify` that returns *only* `defect(cause)` yields `E = never` (a Defect is
  * out-of-band and must not pollute the error channel); reach for
  * {@link fromSafePromise} when every failure is a Defect.
  *
@@ -53,22 +54,23 @@ export function fromNullable<T, E>(
  * @typeParam R - `qualify`'s return type; the modeled error `E` is
  * `Exclude<R, Defect>` (its `Defect` arm, if any, is subtracted).
  * @param fn - the throwing function to wrap.
- * @param qualify - triages a thrown cause into `E` or a `Defect`.
+ * @param qualify - triages a thrown `cause` into a modeled `E`, or marks it
+ * unmodeled by returning `defect(cause)` (the helper passed as its second arg).
  * @returns a function with the same arguments returning `Result<T, E>`.
  *
  * @example
  * ```ts
- * import { fromThrowable, Defect } from "unthrown";
- * const parse = fromThrowable(JSON.parse, (cause) => Defect(cause));
+ * import { fromThrowable } from "unthrown";
+ * const parse = fromThrowable(JSON.parse, (cause, defect) => defect(cause));
  * parse("{}").unwrap();
  * ```
  */
 export function fromThrowable<A extends unknown[], T, R>(
   fn: (...args: A) => T,
-  qualify: (cause: unknown) => R,
+  qualify: (cause: unknown, defect: (cause: unknown) => Defect) => R,
 ): (...args: A) => Result<T, Exclude<R, Defect>> {
   type E = Exclude<R, Defect>;
-  const triage = qualify as (cause: unknown) => E | Defect;
+  const triage = qualify as (cause: unknown, defect: (cause: unknown) => Defect) => E | Defect;
   return (...args: A): Result<T, E> => {
     try {
       return Ok(fn(...args)) as Result<T, E>;
@@ -84,35 +86,36 @@ export function fromThrowable<A extends unknown[], T, R>(
  *
  * @remarks
  * `qualify` **must** map each rejection cause into a modeled error `E` or a
- * {@link Defect}. The returned `AsyncResult`'s internal promise never rejects;
- * `await`-ing it always yields a `Result`. A throw inside `qualify` is itself a
- * `Defect`.
+ * `Defect` (via the injected `defect` helper, its second argument). The returned
+ * `AsyncResult`'s internal promise never rejects; `await`-ing it always yields a
+ * `Result`. A throw inside `qualify` is itself a `Defect`.
  *
  * The modeled error type is `Exclude<R, Defect>` — the `Defect` arm of
  * `qualify`'s return is **subtracted** from `E`, never inferred into it. So a
- * `qualify` that returns *only* `Defect(cause)` yields `E = never`; when every
+ * `qualify` that returns *only* `defect(cause)` yields `E = never`; when every
  * rejection is a Defect, prefer {@link fromSafePromise}.
  *
  * @typeParam T - the resolved value type.
  * @typeParam R - `qualify`'s return type; the modeled error `E` is
  * `Exclude<R, Defect>` (its `Defect` arm, if any, is subtracted).
  * @param promise - the promise, or a thunk returning one.
- * @param qualify - triages a rejection cause into `E` or a `Defect`.
+ * @param qualify - triages a rejection `cause` into a modeled `E`, or marks it
+ * unmodeled by returning `defect(cause)` (the helper passed as its second arg).
  *
  * @example
  * ```ts
- * import { fromPromise, Defect } from "unthrown";
- * const user = await fromPromise(fetchUser(id), (cause) =>
- *   cause instanceof NotFoundError ? ("not_found" as const) : Defect(cause),
+ * import { fromPromise } from "unthrown";
+ * const user = await fromPromise(fetchUser(id), (cause, defect) =>
+ *   cause instanceof NotFoundError ? ("not_found" as const) : defect(cause),
  * );
  * ```
  */
 export function fromPromise<T, R>(
   promise: Promise<T> | (() => Promise<T>),
-  qualify: (cause: unknown) => R,
+  qualify: (cause: unknown, defect: (cause: unknown) => Defect) => R,
 ): AsyncResult<T, Exclude<R, Defect>> {
   type E = Exclude<R, Defect>;
-  const triage = qualify as (cause: unknown) => E | Defect;
+  const triage = qualify as (cause: unknown, defect: (cause: unknown) => Defect) => E | Defect;
   const p = typeof promise === "function" ? Promise.resolve().then(promise) : promise;
   const settled: Promise<Result<T, E>> = p.then(
     (value) => okRes<T, E>(value),
@@ -146,10 +149,10 @@ export function fromSafePromise<T>(
 
 function qualifyToResult<T, E>(
   cause: unknown,
-  qualify: (cause: unknown) => E | Defect,
+  qualify: (cause: unknown, defect: (cause: unknown) => Defect) => E | Defect,
 ): Result<T, E> {
   try {
-    const q = qualify(cause);
+    const q = qualify(cause, defect);
     return isDefectMarker(q) ? defectRes<T, E>(q.cause) : errRes<T, E>(q);
   } catch (qErr) {
     // a throw inside qualify is itself a Defect

@@ -14,7 +14,6 @@ import {
   type AsyncErrOf,
   type AsyncOkOf,
   type AsyncResult,
-  Defect,
   Do,
   type ErrOf,
   Err,
@@ -79,19 +78,19 @@ type _dictAsync = Expect<Equal<typeof dictAsync, AsyncResult<{ id: number; name:
 // --- boundaries: `Defect` is subtracted from the error channel ---------------
 
 // a Defect-only qualify yields `E = never`
-const defectOnly = fromPromise(Promise.resolve(1), (c) => Defect(c));
+const defectOnly = fromPromise(Promise.resolve(1), (c, defect) => defect(c));
 type _defectOnly = Expect<Equal<typeof defectOnly, AsyncResult<number, never>>>;
 
 // a mixed qualify keeps only the modeled arm
-const mixedQualify = fromPromise(Promise.resolve(1), (c) =>
-  c === 1 ? ("nf" as const) : Defect(c),
+const mixedQualify = fromPromise(Promise.resolve(1), (c, defect) =>
+  c === 1 ? ("nf" as const) : defect(c),
 );
 type _mixedQualify = Expect<Equal<typeof mixedQualify, AsyncResult<number, "nf">>>;
 
 // the same subtraction on `fromThrowable`
 const throwable = fromThrowable(
   (s: string) => s.length,
-  (c) => Defect(c),
+  (c, defect) => defect(c),
 );
 type _throwable = Expect<Equal<ReturnType<typeof throwable>, Result<number, never>>>;
 

@@ -14,7 +14,7 @@
 //   parseUser(input); // Result<{ id: string }, readonly StandardSchemaV1.Issue[]>
 
 import type { StandardSchemaV1 } from "@standard-schema/spec";
-import { Defect, Err, fromSafePromise, fromThrowable, Ok } from "unthrown";
+import { Err, fromSafePromise, fromThrowable, Ok } from "unthrown";
 import type { AsyncResult, Result } from "unthrown";
 
 /** The error channel both entry points produce: a schema's validation issues. */
@@ -56,7 +56,7 @@ export function fromSchema<S extends StandardSchemaV1>(
   // channel instead of escaping; `qualify` only ever mints a Defect, so E = never.
   const validate = fromThrowable(
     (input: unknown) => schema["~standard"].validate(input),
-    (cause) => Defect(cause),
+    (cause, defect) => defect(cause),
   );
   return (input) => {
     const settled = validate(input);

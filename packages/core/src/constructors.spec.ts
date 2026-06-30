@@ -1,16 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  Defect,
-  Err,
-  isDefect,
-  isErr,
-  isOk,
-  isResult,
-  Ok,
-  type Result,
-  UnwrapError,
-} from "./index.js";
+import { Err, isDefect, isErr, isOk, isResult, Ok, type Result, UnwrapError } from "./index.js";
 
 const boom = new Error("boom");
 const defectOf = (cause: unknown): Result<number, never> =>
@@ -33,14 +23,6 @@ describe("constructors", () => {
     expect(r.isOk()).toBe(false);
     expect(r.isDefect()).toBe(false);
     expect(r.unwrapErr()).toBe("nope");
-  });
-
-  it("Defect wraps a cause as a qualify-time marker (not a Result)", () => {
-    const marker = Defect(boom);
-    // The marker is opaque; it carries the cause for the boundary to triage.
-    expect(marker).toMatchObject({ cause: boom });
-    // It is NOT a Result — it has no Result methods.
-    expect((marker as unknown as { isOk?: unknown }).isOk).toBeUndefined();
   });
 });
 

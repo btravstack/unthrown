@@ -3,14 +3,18 @@
 const DEFECT: unique symbol = Symbol("unthrown/Defect");
 
 /**
- * The marker a `qualify` function returns to triage a cause as **unexpected**.
+ * The opaque marker a `qualify` function returns to triage a cause as
+ * **unexpected**.
  *
  * @remarks
  * `qualify` (passed to {@link fromPromise} / {@link fromThrowable}) returns
- * `E | Defect`: either a modeled domain error, or a `Defect` produced by
- * {@link Defect} to say "this failure is not modeled". A `Defect` is opaque —
- * it carries the original cause for the boundary to convert into the third
- * runtime state of a `Result`.
+ * `E | Defect`: either a modeled domain error, or a `Defect` produced by the
+ * injected `defect` helper to say "this failure is not modeled". A `Defect` is
+ * opaque — it carries the original cause for the boundary to convert into the
+ * third runtime state of a `Result`. It is **not** a public value; the only way
+ * to mint one is the `defect` helper the boundary passes to `qualify`.
+ *
+ * @internal
  */
 export type Defect = {
   readonly [DEFECT]: true;
@@ -18,22 +22,17 @@ export type Defect = {
 };
 
 /**
- * Wrap a cause as a {@link Defect} — the value you return from a `qualify`
- * function when a failure is **not** a modeled domain error.
+ * Wrap a cause as a `Defect` marker — the value returned from a `qualify`
+ * function when a failure is **not** a modeled domain error. The boundary
+ * (`fromPromise` / `fromThrowable`) passes this in as `qualify`'s second
+ * argument, so domain code never imports it.
  *
  * @param cause - the original thrown/rejected value.
  * @returns an opaque Defect marker carrying `cause`.
  *
- * @example
- * ```ts
- * import { fromPromise, Defect } from "unthrown";
- *
- * const user = fromPromise(fetchUser(id), (cause) =>
- *   cause instanceof NotFoundError ? cause : Defect(cause),
- * );
- * ```
+ * @internal
  */
-export function Defect(cause: unknown): Defect {
+export function defect(cause: unknown): Defect {
   return { [DEFECT]: true, cause };
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { type AsyncResult, Defect, Err, fromPromise, fromSafePromise, Ok } from "./index.js";
+import { type AsyncResult, Err, fromPromise, fromSafePromise, Ok } from "./index.js";
 
 const boom = new Error("boom");
 const asyncOk = <T>(v: T): AsyncResult<T, never> => Ok(v).toAsync();
@@ -33,7 +33,7 @@ describe("AsyncResult is awaitable and never rejects", () => {
     const asErr = await fromPromise(Promise.reject("modeled"), (c) => c as string);
     expect(asErr.unwrapErr()).toBe("modeled");
 
-    const asDefect = await fromPromise(Promise.reject(boom), (c) => Defect(c));
+    const asDefect = await fromPromise(Promise.reject(boom), (c, defect) => defect(c));
     expect(asDefect.isDefect()).toBe(true);
   });
 

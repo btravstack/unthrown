@@ -364,7 +364,7 @@ function passThrough<T, E>(self: Result<unknown, unknown>): Result<T, E> {
  * though, so a primitive `Ok` (e.g. `Ok(5).bind(...)`, or a chain whose value was
  * `map`-ped away from its scope) could reach it. Rather than let `{ ...5 }`
  * silently collapse to `{}` and drop the prior scope, we throw here — the
- * surrounding `try` turns it into a {@link Defect}, surfacing the misuse as the
+ * surrounding `try` turns it into a `Defect`, surfacing the misuse as the
  * bug it is (a defect is a bug, not an absent value). A `this: object` constraint
  * was rejected: TypeScript does not hard-enforce a constraint inferred solely
  * from `this`, and it breaks `AsyncRes implements AsyncResult`.

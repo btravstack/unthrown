@@ -58,12 +58,12 @@ To sequence asynchronous steps, lift the chain with `toAsync()`. From there a
 [Boundaries](./boundaries)):
 
 ```ts
-import { Do, fromPromise, Defect } from "unthrown";
+import { Do, fromPromise } from "unthrown";
 
 const profile = await Do()
   .toAsync()
-  .bind("user", () => fromPromise(fetchUser(id), (c) => Defect(c)))
-  .bind("posts", ({ user }) => fromPromise(fetchPosts(user.id), (c) => Defect(c)))
+  .bind("user", () => fromPromise(fetchUser(id), (c, defect) => defect(c)))
+  .bind("posts", ({ user }) => fromPromise(fetchPosts(user.id), (c, defect) => defect(c)))
   .let("count", ({ posts }) => posts.length)
   .match({ ok: (s) => s, err: () => null, defect: () => null });
 ```

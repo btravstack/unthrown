@@ -23,13 +23,14 @@ type system you already trust (`T | undefined`, `T | null`) or with
 
 `fromThrowable` wraps a synchronous function that might throw. You **must** pass
 a `qualify` function that triages the thrown cause into a modeled error `E` or a
-`defect`:
+defect. `qualify`'s **second argument is a `defect` helper** the boundary injects
+— call it to mark a cause as unmodeled (you never import it):
 
 ```ts
-import { fromThrowable, Defect } from "unthrown";
+import { fromThrowable } from "unthrown";
 
-const parse = fromThrowable(JSON.parse, (cause) =>
-  cause instanceof SyntaxError ? ("invalid_json" as const) : Defect(cause),
+const parse = fromThrowable(JSON.parse, (cause, defect) =>
+  cause instanceof SyntaxError ? ("invalid_json" as const) : defect(cause),
 );
 
 parse("{ not json"); // Err("invalid_json")
@@ -44,10 +45,10 @@ A throw _inside_ `qualify` is itself treated as a defect.
 [`AsyncResult`](./async-results). Every rejection **must** be triaged:
 
 ```ts
-import { fromPromise, Defect } from "unthrown";
+import { fromPromise } from "unthrown";
 
-const user = fromPromise(fetchUser(id), (cause) =>
-  cause instanceof NotFoundError ? new NotFound() : Defect(cause),
+const user = fromPromise(fetchUser(id), (cause, defect) =>
+  cause instanceof NotFoundError ? new NotFound() : defect(cause),
 );
 ```
 
@@ -58,7 +59,7 @@ The boxed/neverthrow "original sin" is `fromPromise(p): AsyncResult<T, unknown>`
 
 The error channel is inferred as `Exclude<R, Defect>` — the `Defect` arm of
 `qualify`'s return is **subtracted**, never inferred into `E`. So a `qualify`
-that returns _only_ `Defect(cause)` gives `AsyncResult<T, never>`, not
+that returns _only_ `defect(cause)` gives `AsyncResult<T, never>`, not
 `AsyncResult<T, Defect>` — a defect stays out-of-band. (When _every_ rejection is
 a defect, reach for `fromSafePromise` below.)
 

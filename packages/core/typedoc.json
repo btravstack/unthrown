@@ -5,6 +5,7 @@
   "intentionallyNotExported": [
     "Result",
     "AsyncResult",
+    "Defect",
     "Props",
     "ResultMethods",
     "AllOk",

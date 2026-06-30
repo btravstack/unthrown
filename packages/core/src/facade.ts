@@ -6,7 +6,6 @@
 
 import { Err, isDefect, isErr, isOk, Ok } from "./constructors.js";
 import { isResult } from "./core.js";
-import { Defect } from "./defect.js";
 import { Do } from "./do.js";
 import {
   all,
@@ -23,10 +22,9 @@ import type { AsyncResult as AsyncResultType, Result as ResultType } from "./typ
 /**
  * Companion object grouping the **`Result`-producing** entry points under a
  * single, discoverable namespace: {@link Result.Ok}, {@link Result.Err},
- * {@link Result.Defect}, {@link Result.Do}, {@link Result.fromNullable},
- * {@link Result.fromThrowable}, {@link Result.all}, {@link Result.allFromDict},
- * {@link Result.isOk}, {@link Result.isErr}, {@link Result.isDefect},
- * {@link Result.isResult}.
+ * {@link Result.Do}, {@link Result.fromNullable}, {@link Result.fromThrowable},
+ * {@link Result.all}, {@link Result.allFromDict}, {@link Result.isOk},
+ * {@link Result.isErr}, {@link Result.isDefect}, {@link Result.isResult}.
  *
  * @remarks
  * Purely additive sugar — each member **is** the corresponding free function.
@@ -47,7 +45,6 @@ import type { AsyncResult as AsyncResultType, Result as ResultType } from "./typ
 export const Result = {
   Ok,
   Err,
-  Defect,
   Do,
   fromNullable,
   fromThrowable,
@@ -81,8 +78,8 @@ export type Result<T, E> = ResultType<T, E>;
  *
  * @example
  * ```ts
- * import { AsyncResult, Defect } from "unthrown";
- * const user = await AsyncResult.fromPromise(fetchUser(id), (c) => Defect(c));
+ * import { AsyncResult } from "unthrown";
+ * const user = await AsyncResult.fromPromise(fetchUser(id), (c, defect) => defect(c));
  * ```
  */
 export const AsyncResult = {

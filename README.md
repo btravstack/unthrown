@@ -50,13 +50,14 @@ pnpm add unthrown
 ## Example
 
 ```ts
-import { fromPromise, Defect, TaggedError } from "unthrown";
+import { fromPromise, TaggedError } from "unthrown";
 
 class NotFound extends TaggedError("NotFound") {}
 
 // Cross an async boundary — every rejection MUST be triaged into E or a defect.
-const user = fromPromise(fetchUser(id), (cause) =>
-  cause instanceof NotFoundError ? new NotFound() : Defect(cause),
+// `defect` is injected as qualify's second argument.
+const user = fromPromise(fetchUser(id), (cause, defect) =>
+  cause instanceof NotFoundError ? new NotFound() : defect(cause),
 );
 
 // Handle every channel once, at the edge — no surrounding try/catch.
