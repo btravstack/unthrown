@@ -1,5 +1,12 @@
 # @unthrown/standard-schema
 
+## 2.0.0
+
+### Patch Changes
+
+- Updated dependencies [c8c928e]
+  - unthrown@2.0.0
+
 ## 1.1.0
 
 ### Patch Changes
