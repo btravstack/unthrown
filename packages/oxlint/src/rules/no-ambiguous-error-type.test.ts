@@ -46,5 +46,21 @@ ruleTester.run("no-ambiguous-error-type", noAmbiguousErrorType, {
       code: `import type { Result } from "unthrown";\ntype T = Result<number, Error | MyError>;`,
       errors: [{ messageId: "noAmbiguousErrorType" }],
     },
+    // Inner scope — a function return-type annotation. Locks that the import
+    // source resolves from a nested scope (regression guard for scope analysis).
+    {
+      code: `import type { Result } from "unthrown";\nfunction f(): Result<number, unknown> { throw 0; }`,
+      errors: [{ messageId: "noAmbiguousErrorType" }],
+    },
+    // Inner scope — a type alias declared inside a function body.
+    {
+      code: `import type { Result } from "unthrown";\nfunction f() { type T = Result<number, any>; return null as unknown as T; }`,
+      errors: [{ messageId: "noAmbiguousErrorType" }],
+    },
+    // Inner scope — a nested block.
+    {
+      code: `import type { Result } from "unthrown";\n{ type T = Result<number, Error>; }`,
+      errors: [{ messageId: "noAmbiguousErrorType" }],
+    },
   ],
 });
