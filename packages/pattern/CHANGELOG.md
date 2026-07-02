@@ -1,5 +1,12 @@
 # @unthrown/pattern
 
+## 3.0.1
+
+### Patch Changes
+
+- Updated dependencies [9812449]
+  - unthrown@3.0.1
+
 ## 3.0.0
 
 ### Patch Changes

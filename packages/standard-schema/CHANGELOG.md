@@ -1,5 +1,12 @@
 # @unthrown/standard-schema
 
+## 3.0.1
+
+### Patch Changes
+
+- Updated dependencies [9812449]
+  - unthrown@3.0.1
+
 ## 3.0.0
 
 ### Patch Changes
@@ -38,6 +45,7 @@
 
 - d5f4256: **BREAKING:** capitalize the value constructors so they match the
   discriminated-union tags (`"Ok"`/`"Err"`/`"Defect"`) and the capitalized `Do`:
+
   - `ok` → `Ok`, `err` → `Err`, `defect` → `Defect`
   - facade: `Result.ok`/`err`/`defect` → `Result.Ok`/`Err`/`Defect`
   - `@unthrown/pattern`: `P.ok`/`err`/`defect` → `P.Ok`/`Err`/`Defect`

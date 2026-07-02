@@ -1,5 +1,16 @@
 # unthrown
 
+## 3.0.1
+
+### Patch Changes
+
+- 9812449: Mark shipped packages as `"sideEffects": false` so bundlers can prune between
+  modules (all except `@unthrown/vitest`, whose `expect.extend` registration is a
+  genuine import-time effect). Also: `AsyncResult.unwrapOrElse` now delegates to the
+  sync eliminator (guarding the "unwrapOr\* throws on a Defect" invariant), `all`
+  short-circuits once a Defect is found, and `tapDefect`'s throw-to-Defect behaviour
+  is documented.
+
 ## 3.0.0
 
 ### Major Changes
@@ -47,6 +58,7 @@
 - c8c928e: **BREAKING:** add an `AsyncResult` companion object and split the static entry
   points across the two facades **by what they return**, so each static lives in
   exactly one namespace.
+
   - New `AsyncResult.*` companion (value + type sharing one name, like `Result`):
     `AsyncResult.fromPromise`, `AsyncResult.fromSafePromise`, `AsyncResult.all`,
     `AsyncResult.allFromDict`. The aggregates **drop the `Async` suffix** the free
@@ -85,6 +97,7 @@
 
 - d5f4256: **BREAKING:** capitalize the value constructors so they match the
   discriminated-union tags (`"Ok"`/`"Err"`/`"Defect"`) and the capitalized `Do`:
+
   - `ok` → `Ok`, `err` → `Err`, `defect` → `Defect`
   - facade: `Result.ok`/`err`/`defect` → `Result.Ok`/`Err`/`Defect`
   - `@unthrown/pattern`: `P.ok`/`err`/`defect` → `P.Ok`/`Err`/`Defect`
