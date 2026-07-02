@@ -133,7 +133,7 @@ export type TagHandlers<T, E extends { _tag: string }, R> = {
  *
  * @example
  * ```ts
- * import { Ok, Err, matchTags, TaggedError } from "unthrown";
+ * import { Ok, Err, matchTags, TaggedError, type Result } from "unthrown";
  *
  * class NotFound extends TaggedError("NotFound") {}
  * class Forbidden extends TaggedError("Forbidden")<{ user: string }> {}
