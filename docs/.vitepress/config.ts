@@ -27,9 +27,11 @@ export default defineConfig({
     }
 
     const normalizedPath = pageData.relativePath.replace(/^\/+/, "");
+    // cleanUrls is true, so the public URL has no `.html` extension: strip
+    // `index.md` to the directory and any other `.md` to the bare route.
     const canonicalUrl = `https://btravstack.github.io/unthrown/${normalizedPath}`
       .replace(/index\.md$/, "")
-      .replace(/\.md$/, ".html");
+      .replace(/\.md$/, "");
 
     pageData.frontmatter ??= {};
     pageData.frontmatter.head ??= [];
