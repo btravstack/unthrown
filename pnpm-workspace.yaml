@@ -20,7 +20,7 @@ catalog:
   "@types/node": 24.13.2
   "@vitest/coverage-v8": 4.1.8
   effect: 3.21.4
-  knip: 6.16.1
+  knip: 6.20.0
   lefthook: 2.1.9
   neverthrow: 8.2.0
   oxfmt: 0.54.0
