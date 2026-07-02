@@ -198,8 +198,10 @@ function foldArray(results: readonly Result<unknown, unknown>[]): Result<unknown
   let firstDefect: Result<unknown, unknown> | undefined;
   const values: unknown[] = [];
   for (const r of results) {
-    if (r.tag === "Defect") firstDefect ??= r;
-    else if (r.tag === "Err") firstErr ??= r;
+    if (r.tag === "Defect") {
+      firstDefect ??= r;
+      break; // any Defect dominates — nothing later can change the outcome
+    } else if (r.tag === "Err") firstErr ??= r;
     else values.push(r.value);
   }
   return firstDefect ?? firstErr ?? Ok(values);
@@ -335,7 +337,7 @@ export function allFromDictAsync<R extends AsyncResultRecord>(
     // Null-proto accumulator: pairing resolved values back to keys can't pollute.
     const byKey: ResultRecord = Object.create(null) as ResultRecord;
     entries.forEach(([key], i) => {
-      byKey[key] = resolved[i] as Result<unknown, unknown>;
+      byKey[key] = resolved[i]!;
     });
     return foldRecord(byKey);
   });

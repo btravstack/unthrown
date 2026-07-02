@@ -613,11 +613,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     return this.promise.then((r) => r.unwrapOr(fallback));
   }
   unwrapOrElse(f: (error: E) => T): Promise<T> {
-    return this.promise.then((r) => {
-      if (r.tag === "Ok") return r.value;
-      if (r.tag === "Defect") throw r.cause;
-      return f(r.error);
-    });
+    return this.promise.then((r) => r.unwrapOrElse(f));
   }
   getOrNull(): Promise<T | null> {
     return this.promise.then((r) => r.getOrNull());
