@@ -276,7 +276,13 @@ export type ResultMethods<T, E> = {
 };
 
 /**
- * The `Ok` variant of a {@link Result}: a success carrying a `value`.
+ * The `Ok` variant of a {@link Result}: a success carrying a `value`. This is
+ * what a successful `isOk` guard narrows to, making `.value` reachable.
+ *
+ * @example
+ * ```ts
+ * if (r.isOk()) r.value; // r: OkView<T, E> here — .value is a T
+ * ```
  *
  * @category Types
  */
@@ -286,6 +292,12 @@ export type OkView<T, E = never> = ResultMethods<T, E> & {
 };
 /**
  * The `Err` variant of a {@link Result}: a modeled failure carrying an `error`.
+ * What a successful `isErr` guard narrows to, exposing `.error`.
+ *
+ * @example
+ * ```ts
+ * if (r.isErr()) r.error; // r: ErrView<E, T> here — .error is an E
+ * ```
  *
  * @category Types
  */
@@ -294,7 +306,13 @@ export type ErrView<E, T = never> = ResultMethods<T, E> & {
   readonly error: E;
 };
 /**
- * The `Defect` variant of a {@link Result}: an unmodeled failure carrying a `cause`.
+ * The `Defect` variant of a {@link Result}: an unmodeled failure carrying a
+ * `cause`. What a successful `isDefect` guard narrows to, exposing `.cause`.
+ *
+ * @example
+ * ```ts
+ * if (r.isDefect()) r.cause; // r: DefectView<T, E> here — .cause is `unknown`
+ * ```
  *
  * @category Types
  */
@@ -457,33 +475,59 @@ export type AsyncResult<T, E> = Awaitable<Result<T, E>> & {
 };
 
 /**
- * Extract the success type `T` from a `Result`.
+ * Extract the success type `T` from a `Result` type — derive one type from
+ * another instead of restating it (e.g. the payload a function returns).
  *
  * @typeParam R - the `Result` type to inspect.
+ *
+ * @example
+ * ```ts
+ * type R = Result<User, NotFound>;
+ * type U = OkOf<R>; // User
+ * type E = ErrOf<R>; // NotFound
+ * ```
  *
  * @category Types
  */
 export type OkOf<R> = R extends { readonly tag: "Ok"; readonly value: infer T } ? T : never;
 /**
- * Extract the error type `E` from a `Result`.
+ * Extract the error type `E` from a `Result` type — the counterpart of
+ * {@link OkOf}.
  *
  * @typeParam R - the `Result` type to inspect.
+ *
+ * @example
+ * ```ts
+ * type E = ErrOf<Result<User, NotFound>>; // NotFound
+ * ```
  *
  * @category Types
  */
 export type ErrOf<R> = R extends { readonly tag: "Err"; readonly error: infer E } ? E : never;
 /**
- * Extract the success type `T` from an {@link AsyncResult}.
+ * Extract the success type `T` from an {@link AsyncResult} type — the async
+ * counterpart of {@link OkOf}.
  *
  * @typeParam R - the `AsyncResult` type to inspect.
+ *
+ * @example
+ * ```ts
+ * type T = AsyncOkOf<AsyncResult<User, NotFound>>; // User
+ * ```
  *
  * @category Types
  */
 export type AsyncOkOf<R> = R extends AsyncResult<infer T, unknown> ? T : never;
 /**
- * Extract the error type `E` from an {@link AsyncResult}.
+ * Extract the error type `E` from an {@link AsyncResult} type — the async
+ * counterpart of {@link ErrOf}.
  *
  * @typeParam R - the `AsyncResult` type to inspect.
+ *
+ * @example
+ * ```ts
+ * type E = AsyncErrOf<AsyncResult<User, NotFound>>; // NotFound
+ * ```
  *
  * @category Types
  */

@@ -58,6 +58,13 @@ export const Result = {
   isResult,
 } as const;
 
+/**
+ * `Result<T, E>` — the core discriminated union. Shares its name with the
+ * {@link Result | companion object} above (the value and type are one name); this
+ * is the type half.
+ *
+ * @category Facade
+ */
 // Re-alias the Result type into this module so a single `export { Result }`
 // (from index.ts) carries BOTH the companion object above and the type — value
 // and type sharing one name, declaration-merged in one place.
@@ -94,6 +101,13 @@ export const AsyncResult = {
   allFromDict: allFromDictAsync,
 } as const;
 
+/**
+ * `AsyncResult<T, E>` — the async counterpart of {@link Result}. Shares its name
+ * with the {@link AsyncResult | companion object} above (value and type are one
+ * name); this is the type half.
+ *
+ * @category Facade
+ */
 // Re-alias the AsyncResult type into this module (same companion-object pattern
 // as Result above) so one `export { AsyncResult }` carries value + type.
 export type AsyncResult<T, E> = AsyncResultType<T, E>;
