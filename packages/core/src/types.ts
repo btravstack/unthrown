@@ -292,7 +292,7 @@ export type OkView<T, E = never> = ResultMethods<T, E> & {
 };
 /**
  * The `Err` variant of a {@link Result}: a modeled failure carrying an `error`.
- * What a successful `isErr` guard narrows to, exposing `.error`.
+ * This is what a successful `isErr` guard narrows to, exposing `.error`.
  *
  * @example
  * ```ts
@@ -307,7 +307,8 @@ export type ErrView<E, T = never> = ResultMethods<T, E> & {
 };
 /**
  * The `Defect` variant of a {@link Result}: an unmodeled failure carrying a
- * `cause`. What a successful `isDefect` guard narrows to, exposing `.cause`.
+ * `cause`. This is what a successful `isDefect` guard narrows to, exposing
+ * `.cause`.
  *
  * @example
  * ```ts
