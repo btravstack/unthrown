@@ -19,6 +19,36 @@ export default defineConfig({
     hostname: "https://btravstack.github.io/unthrown/",
   },
 
+  // Per-page canonical URL + Open Graph / Twitter title & description, so every
+  // page shares a correct preview and avoids duplicate-content ambiguity.
+  transformPageData(pageData) {
+    if (!pageData.relativePath.endsWith(".md")) {
+      return;
+    }
+
+    const normalizedPath = pageData.relativePath.replace(/^\/+/, "");
+    const canonicalUrl = `https://btravstack.github.io/unthrown/${normalizedPath}`
+      .replace(/index\.md$/, "")
+      .replace(/\.md$/, ".html");
+
+    pageData.frontmatter ??= {};
+    pageData.frontmatter.head ??= [];
+
+    pageData.frontmatter.head.push(["link", { rel: "canonical", href: canonicalUrl }]);
+
+    const pageTitle = pageData.title || pageData.frontmatter.title || "unthrown";
+    const pageDescription =
+      pageData.description || pageData.frontmatter.description || SITE_DESCRIPTION;
+
+    pageData.frontmatter.head.push(
+      ["meta", { property: "og:url", content: canonicalUrl }],
+      ["meta", { property: "og:title", content: pageTitle }],
+      ["meta", { property: "og:description", content: pageDescription }],
+      ["meta", { name: "twitter:title", content: pageTitle }],
+      ["meta", { name: "twitter:description", content: pageDescription }],
+    );
+  },
+
   themeConfig: {
     logo: { light: "/logo-light.svg", dark: "/logo-dark.svg" },
 
@@ -118,6 +148,14 @@ export default defineConfig({
     ["link", { rel: "icon", type: "image/svg+xml", href: "/unthrown/logo.svg" }],
     ["meta", { name: "author", content: "Benoit TRAVERS" }],
     ["meta", { name: "robots", content: "index, follow" }],
+    ["meta", { name: "application-name", content: "unthrown" }],
+    [
+      "meta",
+      {
+        name: "google-site-verification",
+        content: "u6ZPW5bWbP9G1yF5Sv7B4fSOJm5rLbZWeH858tmisTc",
+      },
+    ],
     [
       "meta",
       {
@@ -126,12 +164,92 @@ export default defineConfig({
           "typescript, result, error handling, errors as values, neverthrow, effect, railway oriented programming, tagged error, defect, panic, type-safe",
       },
     ],
+    // Open Graph — og:title/description/url are added per page in transformPageData
     ["meta", { property: "og:type", content: "website" }],
     ["meta", { property: "og:site_name", content: "unthrown" }],
-    ["meta", { property: "og:title", content: "unthrown" }],
-    ["meta", { property: "og:description", content: SITE_DESCRIPTION }],
-    ["meta", { property: "og:image", content: "https://btravstack.github.io/unthrown/logo.svg" }],
-    ["meta", { name: "twitter:card", content: "summary" }],
-    ["meta", { name: "twitter:image", content: "https://btravstack.github.io/unthrown/logo.svg" }],
+    ["meta", { property: "og:locale", content: "en_US" }],
+    [
+      "meta",
+      { property: "og:image", content: "https://btravstack.github.io/unthrown/og-unthrown.png" },
+    ],
+    ["meta", { property: "og:image:type", content: "image/png" }],
+    ["meta", { property: "og:image:width", content: "1200" }],
+    ["meta", { property: "og:image:height", content: "630" }],
+    [
+      "meta",
+      {
+        property: "og:image:alt",
+        content: "unthrown — explicit errors as values, for TypeScript",
+      },
+    ],
+    // Twitter Card
+    ["meta", { name: "twitter:card", content: "summary_large_image" }],
+    [
+      "meta",
+      { name: "twitter:image", content: "https://btravstack.github.io/unthrown/og-unthrown.png" },
+    ],
+    [
+      "meta",
+      {
+        name: "twitter:image:alt",
+        content: "unthrown — explicit errors as values, for TypeScript",
+      },
+    ],
+    // JSON-LD structured data for better SEO
+    [
+      "script",
+      { type: "application/ld+json" },
+      JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        name: "unthrown",
+        description: SITE_DESCRIPTION,
+        applicationCategory: "DeveloperApplication",
+        operatingSystem: "Cross-platform",
+        offers: {
+          "@type": "Offer",
+          price: "0",
+          priceCurrency: "USD",
+        },
+        url: "https://btravstack.github.io/unthrown/",
+        author: {
+          "@type": "Person",
+          name: "Benoit TRAVERS",
+        },
+        programmingLanguage: {
+          "@type": "ComputerLanguage",
+          name: "TypeScript",
+          url: "https://www.typescriptlang.org/",
+        },
+        keywords: "TypeScript, error handling, errors as values, Result, type-safe",
+      }),
+    ],
+    // WebSite JSON-LD for proper site name display in Google search
+    [
+      "script",
+      { type: "application/ld+json" },
+      JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        name: "unthrown",
+        url: "https://btravstack.github.io/unthrown/",
+      }),
+    ],
+    // Organization JSON-LD for logo display in Google search
+    [
+      "script",
+      { type: "application/ld+json" },
+      JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        name: "unthrown",
+        url: "https://btravstack.github.io/unthrown/",
+        logo: {
+          "@type": "ImageObject",
+          url: "https://btravstack.github.io/unthrown/logo.svg",
+        },
+        sameAs: ["https://github.com/btravstack/unthrown"],
+      }),
+    ],
   ],
 });
