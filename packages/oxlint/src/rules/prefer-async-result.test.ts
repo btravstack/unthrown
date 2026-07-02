@@ -28,5 +28,18 @@ ruleTester.run("prefer-async-result", preferAsyncResult, {
       errors: [{ messageId: "preferAsyncResult" }],
       output: null,
     },
+    // Inner scope — a function return-type annotation, with AsyncResult imported
+    // so the autofix applies. Locks import-source resolution from a nested scope.
+    {
+      code: `import type { Result, AsyncResult } from "unthrown";\nfunction f(): Promise<Result<number, MyError>> { throw 0; }`,
+      errors: [{ messageId: "preferAsyncResult" }],
+      output: `import type { Result, AsyncResult } from "unthrown";\nfunction f(): AsyncResult<number, MyError> { throw 0; }`,
+    },
+    // Inner scope — a type alias inside a function body.
+    {
+      code: `import type { Result } from "unthrown";\nfunction f() { type T = Promise<Result<number, MyError>>; return null as unknown as T; }`,
+      errors: [{ messageId: "preferAsyncResult" }],
+      output: null,
+    },
   ],
 });
