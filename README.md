@@ -1,24 +1,25 @@
-<p align="center">
-  <img src="docs/public/logo.svg" alt="unthrown" width="128" height="128" />
-</p>
+<div align="center">
 
-<h1 align="center">unthrown</h1>
+<img src="docs/public/logo.svg" alt="unthrown" width="128" height="128" />
 
-> Explicit errors as values for TypeScript — with a separate defect channel for
-> the unexpected, and qualification enforced at every boundary.
+# unthrown
+
+**Explicit errors as values for [TypeScript](https://www.typescriptlang.org/), with a separate defect channel for the unexpected**
 
 [![CI](https://github.com/btravstack/unthrown/actions/workflows/ci.yml/badge.svg)](https://github.com/btravstack/unthrown/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/unthrown.svg)](https://www.npmjs.com/package/unthrown)
-[![license](https://img.shields.io/npm/l/unthrown.svg)](./LICENSE)
+[![npm version](https://img.shields.io/npm/v/unthrown.svg?logo=npm)](https://www.npmjs.com/package/unthrown)
+[![npm downloads](https://img.shields.io/npm/dm/unthrown.svg)](https://www.npmjs.com/package/unthrown)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+[**Documentation**](https://btravstack.github.io/unthrown/) · [**Get Started**](https://btravstack.github.io/unthrown/guide/getting-started) · [**Why unthrown?**](https://btravstack.github.io/unthrown/guide/why-unthrown)
+
+</div>
 
 Ordinary errors are _unthrown_ — returned as values, not flung up the stack.
 Only a true defect ever throws, and only at `unwrap`.
 
-📖 **[Documentation](https://btravstack.github.io/unthrown/)** ·
-[Why unthrown?](https://btravstack.github.io/unthrown/guide/why-unthrown) ·
-[Getting Started](https://btravstack.github.io/unthrown/guide/getting-started)
-
-## Why?
+## Why unthrown?
 
 Most errors-as-values libraries model _anticipated_ failures in `Result<T, E>`
 but have no channel for the _unexpected_ — a thrown `TypeError`, an un-triaged
@@ -29,14 +30,14 @@ starts to look like a domain error.
 the type**. `E` lists only your anticipated errors; anything unexpected becomes a
 defect that short-circuits to the edge, where you log it and return a 500.
 
-- **Errors as values.** `map` / `flatMap` / `match` over a `Result<T, E>`.
-- **A separate defect channel.** Unmodeled failures can't masquerade as domain
-  errors, and can only be observed by `match` or `recoverDefect`.
-- **Qualification at every boundary.** `fromPromise` / `fromThrowable` force you
-  to triage each failure into a modeled error or a defect — no path yields
+- 🎯 **Errors as values** — `map` / `flatMap` / `match` over a `Result<T, E>`.
+- 🛡️ **A separate defect channel** — unmodeled failures can't masquerade as
+  domain errors, and can only be observed by `match` or `recoverDefect`.
+- 🛂 **Qualification at every boundary** — `fromPromise` / `fromThrowable` force
+  you to triage each failure into a modeled error or a defect; no path yields
   `unknown` in `E`.
-- **Small and done-able.** Zero runtime dependencies, ESM-first, dual CJS/ESM,
-  fully typed.
+- 🪶 **Small and done-able** — zero runtime dependencies, ESM-first, dual
+  CJS/ESM, fully typed.
 
 See [Why unthrown?](https://btravstack.github.io/unthrown/guide/why-unthrown) for
 the comparison with `neverthrow`, `boxed`, and `effect`.
@@ -47,7 +48,7 @@ the comparison with `neverthrow`, `boxed`, and `effect`.
 pnpm add unthrown
 ```
 
-## Example
+## Quick Example
 
 ```ts
 import { fromPromise, TaggedError } from "unthrown";
