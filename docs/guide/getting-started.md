@@ -56,8 +56,9 @@ can chain without checking at every step:
 ```ts
 parseAge("42")
   .map((n) => n + 1) // => Ok(43)   — map: callback returns a plain value
-  .flatMap((n) => (n >= 18 ? Ok(n) : Err("negative"))) // => Ok(43) — flatMap: callback returns a Result
+  .flatMap((n) => (n >= 18 ? Ok(n) : Err("underage"))) // => Ok(43) — flatMap: callback returns a Result
   .unwrap(); // => 43
+// the error type widens to AgeError | "underage" — flatMap unions the channels
 ```
 
 ```ts
@@ -77,14 +78,15 @@ You handle all three runtime channels — `ok`, `err`, and the `defect` channel 
 the _unexpected_ (covered next):
 
 ```ts
-const message = parseAge(input).match({
+const message = parseAge("-3").match({
   ok: (age) => `age is ${age}`,
   err: (e) => (e === "negative" ? "must be positive" : "not a number"),
   defect: (cause) => {
-    logger.error(cause); // a bug slipped through — log it, don't leak it
+    console.error(cause); // a bug slipped through — log it, don't leak it
     return "something went wrong";
   },
 });
+// => "must be positive"
 ```
 
 Because a thrown bug inside any combinator becomes a `defect` (never an `Err`),
