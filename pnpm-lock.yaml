@@ -18,6 +18,9 @@ catalogs:
     '@commitlint/cli':
       specifier: 21.1.0
       version: 21.1.0
+    '@commitlint/config-conventional':
+      specifier: 21.1.0
+      version: 21.1.0
     '@oxlint/plugins':
       specifier: 1.71.0
       version: 1.71.0
@@ -87,7 +90,7 @@ importers:
         specifier: 'catalog:'
         version: 21.1.0(@types/node@24.13.2)(conventional-commits-parser@6.4.0)(typescript@6.0.3)
       '@commitlint/config-conventional':
-        specifier: 21.1.0
+        specifier: 'catalog:'
         version: 21.1.0
       knip:
         specifier: 'catalog:'
