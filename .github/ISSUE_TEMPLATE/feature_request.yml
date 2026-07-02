@@ -1,0 +1,40 @@
+name: Feature request
+description: Suggest a change or addition to unthrown
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        `unthrown` is deliberately small — "one concept = one name", and the surface
+        is meant to stay small enough that the library can be "done". Additions that
+        sharpen the existing design are more likely to land than ones that grow it.
+        Please read the design rationale in `CLAUDE.md` first.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem are you trying to solve? What can't you express today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What API or behaviour would you like? Include type signatures if relevant.
+      render: ts
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Existing combinators or patterns you tried, and why they fall short.
+    validations:
+      required: false
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: I've read `CLAUDE.md` and this doesn't duplicate an existing concept or a deliberately-excluded one (generator do-notation, error accumulation, aliases, an `Option` type).
+          required: true

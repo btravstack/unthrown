@@ -176,7 +176,11 @@ library can be "done".
   `Result` union (wraps a `Promise<Result>`, branches on `r.tag`), never on `Res`
   internals.
 - **Builders are free functions** (`Ok`, `Err`, …) because they tree-shake — and
-  there is a `bundle-size` CI gate that protects this. The `Result` companion
+  every shipped package sets `"sideEffects": false` so bundlers can prune between
+  modules (the sole exception is `@unthrown/vitest`, whose top-level
+  `expect.extend` registration is a genuine import-time effect). A `bundle-size`
+  CI job reports the per-package `dist` sizes to the run summary — it is
+  informational (no threshold), not a hard gate. The `Result` companion
   object is additive sugar (value + type share the name via a re-alias in
   `facade.ts`); it must stay a separate export so `import { Ok }` never pulls it
   in.
