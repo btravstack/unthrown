@@ -1,5 +1,12 @@
 # @unthrown/neverthrow
 
+## 3.0.1
+
+### Patch Changes
+
+- Updated dependencies [9812449]
+  - unthrown@3.0.1
+
 ## 3.0.0
 
 ### Patch Changes
@@ -44,6 +51,7 @@
 
 - 959bc68: Add three interop packages bridging `Result`/`AsyncResult` with neighbouring
   errors-as-values libraries:
+
   - **`@unthrown/effect`** — `toExit`/`fromExit` (a bijection, since Effect's
     `Cause` has a defect channel), `toEither`/`fromEither`, and
     `toEffect`/`fromEffect` (including `AsyncResult ↔ Effect`).
