@@ -1,0 +1,58 @@
+name: Bug report
+description: Report incorrect behaviour in unthrown or an @unthrown/* package
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a report. Please search existing issues first.
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      description: Which package is affected?
+      options:
+        - unthrown (core)
+        - "@unthrown/pattern"
+        - "@unthrown/vitest"
+        - "@unthrown/effect"
+        - "@unthrown/neverthrow"
+        - "@unthrown/boxed"
+        - "@unthrown/standard-schema"
+        - "@unthrown/oxlint"
+        - not sure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Which version of the package are you using?
+      placeholder: e.g. 3.0.0
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, including what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: A minimal code snippet or link that reproduces the issue.
+      render: ts
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: TypeScript version, Node version, bundler/runtime if relevant.
+      placeholder: |
+        - TypeScript: 5.x
+        - Node: 22.x
+    validations:
+      required: false

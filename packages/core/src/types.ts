@@ -199,7 +199,7 @@ export type ResultMethods<T, E> = {
   recoverDefect<U, E2>(f: (cause: unknown) => Result<U, E2>): Result<T | U, E | E2>;
   /**
    * Run a side effect on a present `Defect`'s cause (e.g. logging) and pass the
-   * `Defect` through unchanged.
+   * `Defect` through unchanged. If `f` throws, the throw becomes a new `Defect`.
    *
    * @param f - the side effect over the unknown cause.
    */
