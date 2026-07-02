@@ -154,13 +154,6 @@ export default defineConfig({
     [
       "meta",
       {
-        name: "google-site-verification",
-        content: "u6ZPW5bWbP9G1yF5Sv7B4fSOJm5rLbZWeH858tmisTc",
-      },
-    ],
-    [
-      "meta",
-      {
         name: "keywords",
         content:
           "typescript, result, error handling, errors as values, neverthrow, effect, railway oriented programming, tagged error, defect, panic, type-safe",
