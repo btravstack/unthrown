@@ -24,7 +24,7 @@ catalog:
   lefthook: 2.1.9
   neverthrow: 8.2.0
   oxfmt: 0.56.0
-  oxlint: 1.69.0
+  oxlint: 1.71.0
   ts-pattern: 5.9.0
   tsdown: 0.22.3
   tsx: 4.22.4
