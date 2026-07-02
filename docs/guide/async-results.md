@@ -10,7 +10,7 @@ You get one from a qualified boundary ([`fromPromise`](./boundaries),
 import { fromSafePromise } from "unthrown";
 
 const result = await fromSafePromise(Promise.resolve(1)).map((n) => n + 1);
-result.unwrap(); // 2
+result.unwrap(); // => 2
 ```
 
 ## Awaitable, not a Promise

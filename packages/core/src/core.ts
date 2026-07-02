@@ -31,6 +31,8 @@ import type { AsyncResult, Bound, DefectView, ErrView, OkView, Result } from "./
  * re-thrown (with its original stack) instead.
  *
  * @typeParam E - the type of the {@link UnwrapError.error} it carries.
+ *
+ * @category Errors
  */
 export class UnwrapError<E = unknown> extends Error {
   /**
@@ -334,6 +336,20 @@ export function defectRes<T, E>(cause: unknown): Result<T, E> {
  * is not a `Result` and returns `false`.
  *
  * @returns `true` when `x` is a `Result` produced by this library.
+ *
+ * @example
+ * ```ts
+ * import { isResult, Ok } from "unthrown";
+ *
+ * isResult(Ok(1)); // => true
+ * isResult({ tag: "Ok" }); // => false (look-alike, wrong prototype)
+ * isResult(Ok(1).toAsync()); // => false (an AsyncResult is not a Result)
+ *
+ * const x: unknown = Ok(1);
+ * if (isResult(x)) x.match({ ok: () => 1, err: () => 0, defect: () => -1 });
+ * ```
+ *
+ * @category Guards
  */
 export function isResult(x: unknown): x is Result<unknown, unknown> {
   return x instanceof Res;

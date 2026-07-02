@@ -36,10 +36,12 @@ import type { AsyncResult as AsyncResultType, Result as ResultType } from "./typ
  * (`AsyncResult.fromPromise`, `AsyncResult.all`, …), grouped by what they
  * return — a static lives in exactly one namespace.
  *
+ * @category Facade
+ *
  * @example
  * ```ts
  * import { Result } from "unthrown";
- * Result.Ok(1).flatMap((n) => Result.Ok(n + 1)).unwrap(); // 2
+ * Result.Ok(1).flatMap((n) => Result.Ok(n + 1)).unwrap(); // => 2
  * ```
  */
 export const Result = {
@@ -76,10 +78,13 @@ export type Result<T, E> = ResultType<T, E>;
  * {@link Result}, the free functions remain the primary, tree-shakeable API; the
  * value `AsyncResult` and the type {@link AsyncResult} share one name.
  *
+ * @category Facade
+ *
  * @example
  * ```ts
  * import { AsyncResult } from "unthrown";
  * const user = await AsyncResult.fromPromise(fetchUser(id), (c, defect) => defect(c));
+ * user.unwrap(); // => the fetched user (on success)
  * ```
  */
 export const AsyncResult = {

@@ -24,49 +24,70 @@ and has **zero runtime dependencies**. It targets TypeScript with `strict` mode.
 ## Your first Result
 
 A `Result<T, E>` is either an **Ok** carrying a value `T`, or an **Err** carrying
-a _modeled_ error `E`. Build them with `Ok` and `Err`:
+a _modeled_ error `E`. `E` lists only the failures you _anticipate_.
+
+Say you're parsing a user-supplied age. Two things can go wrong, and you want to
+model both instead of throwing:
 
 ```ts
 import { Ok, Err, type Result } from "unthrown";
 
-function half(n: number): Result<number, "odd"> {
-  return n % 2 === 0 ? Ok(n / 2) : Err("odd");
+type AgeError = "not_a_number" | "negative";
+
+function parseAge(input: string): Result<number, AgeError> {
+  const n = Number(input);
+  if (Number.isNaN(n)) return Err("not_a_number");
+  if (n < 0) return Err("negative");
+  return Ok(n);
 }
+
+parseAge("42"); // => Ok(42)
+parseAge("-3"); // => Err("negative")
+parseAge("x"); // => Err("not_a_number")
 ```
 
-`E` lists only the failures you _anticipate_. Here, the only modeled failure is
-the literal `"odd"`.
+Nothing is thrown — both outcomes come back as values you can inspect.
 
 ## Transform and chain
 
-The success combinators run only on `Ok`; an `Err` passes straight through:
+Success combinators run only on `Ok`; an `Err` passes straight through, so you
+can chain without checking at every step:
 
 ```ts
-half(10)
-  .map((n) => n + 1) // Ok(6)
-  .flatMap((n) => half(n)) // Ok(3)
-  .unwrap(); // 3
+parseAge("42")
+  .map((n) => n + 1) // => Ok(43)   — map: callback returns a plain value
+  .flatMap((n) => (n >= 18 ? Ok(n) : Err("negative"))) // => Ok(43) — flatMap: callback returns a Result
+  .unwrap(); // => 43
 ```
 
 ```ts
-half(7) // Err("odd")
-  .map((n) => n + 1) // still Err("odd") — callback never runs
-  .unwrapErr(); // "odd"
+parseAge("x") // => Err("not_a_number")
+  .map((n) => n + 1) // callback never runs — still Err("not_a_number")
+  .unwrapErr(); // => "not_a_number"
 ```
+
+Reach for `map` when your callback returns a plain value, `flatMap` when it
+returns another `Result`. The [Choosing a Combinator](./choosing-a-combinator)
+cheat sheet has the full picture.
 
 ## Handle every outcome
 
 At the edge of your program, fold a `Result` into a single value with `match`.
-You must handle all three runtime channels — `ok`, `err`, and `defect`:
+You handle all three runtime channels — `ok`, `err`, and the `defect` channel for
+the _unexpected_ (covered next):
 
 ```ts
-const message = half(7).match({
-  ok: (n) => `got ${n}`,
-  err: (e) => `failed: ${e}`,
-  defect: (cause) => `bug: ${String(cause)}`,
+const message = parseAge(input).match({
+  ok: (age) => `age is ${age}`,
+  err: (e) => (e === "negative" ? "must be positive" : "not a number"),
+  defect: (cause) => {
+    logger.error(cause); // a bug slipped through — log it, don't leak it
+    return "something went wrong";
+  },
 });
 ```
 
-The third channel, `defect`, is for the _unexpected_ — covered next.
+Because a thrown bug inside any combinator becomes a `defect` (never an `Err`),
+this single `match` at the edge needs no surrounding `try`/`catch`.
 
 → Continue to [Core Concepts](./core-concepts).

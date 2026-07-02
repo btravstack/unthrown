@@ -35,9 +35,9 @@ A combinator only runs its callback on its own channel — the other states flow
 through untouched:
 
 ```ts
-Ok(2).map((n) => n + 1); // Ok(3)
-Err("e").map((n) => n + 1); // Err("e") — callback skipped
-Ok(2).mapErr((e) => `${e}!`); // Ok(2) — callback skipped
+Ok(2).map((n) => n + 1); // => Ok(3)
+Err("e").map((n) => n + 1); // => Err("e") — callback skipped
+Ok(2).mapErr((e) => `${e}!`); // => Ok(2) — callback skipped
 ```
 
 `tap` and `flatTap` both run a side effect and keep the original value — the
@@ -118,10 +118,10 @@ matched.
 Once you are ready to leave the `Result` world, pick the right exit:
 
 ```ts
-Ok(1).unwrap(); // 1            — throws on Err/Defect
-Err("e").unwrapErr(); // "e"    — throws on Ok/Defect
-Err("e").unwrapOr(0); // 0      — recovers an Err; rethrows a Defect
-Err("e").getOrNull(); // null   — recovers an Err; rethrows a Defect
+Ok(1).unwrap(); // => 1         — throws on Err/Defect
+Err("e").unwrapErr(); // => "e" — throws on Ok/Defect
+Err("e").unwrapOr(0); // => 0   — recovers an Err; rethrows a Defect
+Err("e").getOrNull(); // => null — recovers an Err; rethrows a Defect
 Ok(1).match({ ok, err, defect }); // fold all three channels
 ```
 
@@ -139,8 +139,8 @@ earlier `Err`). A fixed tuple keeps its positional types; a dynamic
 ```ts
 import { all, Ok, type Result } from "unthrown";
 
-all([Ok(1), Ok("two"), Ok(true)]).unwrap(); // [1, "two", true] (typed [number, string, boolean])
-all([Ok(1), Ok(2)] as Result<number, never>[]).unwrap(); // number[]
+all([Ok(1), Ok("two"), Ok(true)]).unwrap(); // => [1, "two", true] (typed [number, string, boolean])
+all([Ok(1), Ok(2)] as Result<number, never>[]).unwrap(); // => number[]
 ```
 
 For **named** parallel work, `allFromDict` takes a record instead — same rules,
@@ -149,7 +149,7 @@ no tupling:
 ```ts
 import { allFromDict, Ok } from "unthrown";
 
-allFromDict({ id: Ok(1), name: Ok("ada") }).unwrap(); // { id: 1, name: "ada" }
+allFromDict({ id: Ok(1), name: Ok("ada") }).unwrap(); // => { id: 1, name: "ada" }
 ```
 
 Both short-circuit on the first `Err` — this is **not** error accumulation. If

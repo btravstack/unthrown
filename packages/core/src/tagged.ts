@@ -11,6 +11,8 @@ type Props = Record<string, unknown>;
  *
  * @typeParam Tag - the string literal discriminant.
  * @typeParam A - the payload object type.
+ *
+ * @category Types
  */
 export type TaggedErrorInstance<Tag extends string, A extends Props> = Error &
   Readonly<A> & { readonly _tag: Tag };
@@ -24,6 +26,8 @@ export type TaggedErrorInstance<Tag extends string, A extends Props> = Error &
  * `keyof A extends never ? void : A` trick); otherwise it takes the payload.
  *
  * @typeParam Tag - the string literal discriminant.
+ *
+ * @category Types
  */
 export type TaggedErrorConstructor<Tag extends string> = {
   new <A extends Props = {}>(args: keyof A extends never ? void : A): TaggedErrorInstance<Tag, A>;
@@ -60,13 +64,15 @@ export type TaggedErrorConstructor<Tag extends string> = {
  * @param options - optional overrides. `options.name` sets `Error.name`
  * independently of `tag` (defaults to `tag`).
  *
+ * @category Tagged errors
+ *
  * @example
  * ```ts
  * class NotFound extends TaggedError("NotFound") {}
  * class HttpError extends TaggedError("HttpError")<{ status: number }> {}
  *
- * new NotFound()._tag; // "NotFound"
- * new HttpError({ status: 500 }).status; // 500
+ * new NotFound()._tag; // => "NotFound"
+ * new HttpError({ status: 500 }).status; // => 500
  * ```
  */
 export function TaggedError<Tag extends string>(
@@ -99,6 +105,8 @@ export function TaggedError<Tag extends string>(
  * @typeParam T - the success value type.
  * @typeParam E - the tagged error union.
  * @typeParam R - the folded result type.
+ *
+ * @category Types
  */
 export type TagHandlers<T, E extends { _tag: string }, R> = {
   Ok: (value: T) => R;
@@ -121,18 +129,25 @@ export type TagHandlers<T, E extends { _tag: string }, R> = {
  * @param result - the result to fold.
  * @param handlers - one branch per channel/tag.
  *
+ * @category Tagged errors
+ *
  * @example
  * ```ts
+ * import { Ok, Err, matchTags, TaggedError } from "unthrown";
+ *
  * class NotFound extends TaggedError("NotFound") {}
  * class Forbidden extends TaggedError("Forbidden")<{ user: string }> {}
  *
- * declare const r: Result<number, NotFound | Forbidden>;
- * matchTags(r, {
- *   Ok: (n) => `got ${n}`,
- *   Defect: (cause) => `bug: ${String(cause)}`,
- *   NotFound: () => "404",
- *   Forbidden: (e) => `403 for ${e.user}`,
- * });
+ * const fold = (r: Result<number, NotFound | Forbidden>) =>
+ *   matchTags(r, {
+ *     Ok: (n) => `got ${n}`,
+ *     Defect: (cause) => `bug: ${String(cause)}`,
+ *     NotFound: () => "404",
+ *     Forbidden: (e) => `403 for ${e.user}`,
+ *   });
+ *
+ * fold(Ok(1)); // => "got 1"
+ * fold(Err(new Forbidden({ user: "ada" }))); // => "403 for ada"
  * ```
  */
 export function matchTags<T, E extends { _tag: string }, R>(

@@ -20,10 +20,16 @@ import type { AsyncErrOf, AsyncOkOf, AsyncResult, ErrOf, OkOf, Result } from "./
  * @param value - the possibly-absent value.
  * @param onAbsent - lazily produces the error for the absent case.
  *
+ * @category Interop
+ *
  * @example
  * ```ts
  * import { fromNullable } from "unthrown";
- * fromNullable(map.get(key), () => "missing").unwrap();
+ *
+ * const map = new Map([["a", 1]]);
+ * fromNullable(map.get("a"), () => "absent").unwrap(); // => 1
+ * fromNullable(map.get("z"), () => "absent"); // => Err("absent")
+ * fromNullable(0, () => "absent").unwrap(); // => 0 (falsy but present)
  * ```
  */
 export function fromNullable<T, E>(
@@ -58,11 +64,21 @@ export function fromNullable<T, E>(
  * unmodeled by returning `defect(cause)` (the helper passed as its second arg).
  * @returns a function with the same arguments returning `Result<T, E>`.
  *
+ * @category Interop
+ *
  * @example
  * ```ts
  * import { fromThrowable } from "unthrown";
- * const parse = fromThrowable(JSON.parse, (cause, defect) => defect(cause));
- * parse("{}").unwrap();
+ *
+ * // Model the parse failure as an `Err`, everything unexpected as a `Defect`.
+ * const parse = fromThrowable(
+ *   (text: string) => JSON.parse(text) as unknown,
+ *   (cause, defect) =>
+ *     cause instanceof SyntaxError ? ("invalid_json" as const) : defect(cause),
+ * );
+ *
+ * parse('{"ok":true}').unwrap(); // => { ok: true }
+ * parse("nope"); // => Err("invalid_json")
  * ```
  */
 export function fromThrowable<A extends unknown[], T, R>(
@@ -102,12 +118,19 @@ export function fromThrowable<A extends unknown[], T, R>(
  * @param qualify - triages a rejection `cause` into a modeled `E`, or marks it
  * unmodeled by returning `defect(cause)` (the helper passed as its second arg).
  *
+ * @category Interop
+ *
  * @example
  * ```ts
  * import { fromPromise } from "unthrown";
+ *
+ * // A rejection with a NotFoundError becomes a modeled `Err`; anything else a Defect.
  * const user = await fromPromise(fetchUser(id), (cause, defect) =>
  *   cause instanceof NotFoundError ? ("not_found" as const) : defect(cause),
  * );
+ *
+ * user.unwrap(); // => the fetched user (on success)
+ * // when fetchUser rejects with NotFoundError: => Err("not_found")
  * ```
  */
 export function fromPromise<T, R>(
@@ -135,6 +158,17 @@ export function fromPromise<T, R>(
  *
  * @typeParam T - the resolved value type.
  * @param promise - the promise, or a thunk returning one.
+ *
+ * @category Interop
+ *
+ * @example
+ * ```ts
+ * import { fromSafePromise } from "unthrown";
+ *
+ * (await fromSafePromise(Promise.resolve(3))).unwrap(); // => 3
+ * // a rejection becomes a Defect (never a modeled Err):
+ * await fromSafePromise(Promise.reject(new Error("boom"))); // => Defect(Error("boom"))
+ * ```
  */
 export function fromSafePromise<T>(
   promise: Promise<T> | (() => Promise<T>),
@@ -244,11 +278,14 @@ function foldRecord(results: ResultRecord): Result<unknown, unknown> {
  * collapses to `Result<T[], E>` with no cast. For a **record** keyed by name,
  * use {@link allFromDict}.
  *
+ * @category Aggregate
+ *
  * @example
  * ```ts
- * import { all, Ok } from "unthrown";
- * all([Ok(1), Ok("a"), Ok(true)]).unwrap(); // [1, "a", true] (typed [number, string, boolean])
- * all([Ok(1), Ok(2)] as Result<number, never>[]).unwrap(); // number[]
+ * import { all, Ok, Err } from "unthrown";
+ *
+ * all([Ok(1), Ok("a"), Ok(true)]).unwrap(); // => [1, "a", true] (typed [number, string, boolean])
+ * all([Ok(1), Err("e"), Ok(3)]); // => Err("e") (short-circuits on the first Err)
  * ```
  */
 export function all<Rs extends readonly Result<unknown, unknown>[]>(
@@ -270,10 +307,14 @@ export function all<Rs extends readonly Result<unknown, unknown>[]>(
  * Same folding rules as {@link all}: first `Err` short-circuits, any `Defect`
  * dominates. This is **not** error accumulation.
  *
+ * @category Aggregate
+ *
  * @example
  * ```ts
- * import { allFromDict, Ok } from "unthrown";
- * allFromDict({ id: Ok(1), name: Ok("ada") }).unwrap(); // { id: 1, name: "ada" }
+ * import { allFromDict, Ok, Err } from "unthrown";
+ *
+ * allFromDict({ id: Ok(1), name: Ok("ada") }).unwrap(); // => { id: 1, name: "ada" }
+ * allFromDict({ id: Ok(1), name: Err("missing") }); // => Err("missing")
  * ```
  */
 export function allFromDict<R extends ResultRecord>(
@@ -295,10 +336,14 @@ export function allFromDict<R extends ResultRecord>(
  * short-circuits, any `Defect` dominates. As ever, the returned `AsyncResult`'s
  * internal promise never rejects. For a **record**, use {@link allFromDictAsync}.
  *
+ * @category Aggregate
+ *
  * @example
  * ```ts
  * import { allAsync, fromSafePromise } from "unthrown";
- * await allAsync([fromSafePromise(a()), fromSafePromise(b())]);
+ *
+ * const both = allAsync([fromSafePromise(Promise.resolve(1)), fromSafePromise(Promise.resolve(2))]);
+ * (await both).unwrap(); // => [1, 2]
  * ```
  */
 export function allAsync<Rs extends readonly AsyncResult<unknown, unknown>[]>(
@@ -323,10 +368,17 @@ export function allAsync<Rs extends readonly AsyncResult<unknown, unknown>[]>(
  * Resolved concurrently (order preserved), folded with the {@link all} rules,
  * and the internal promise never rejects.
  *
+ * @category Aggregate
+ *
  * @example
  * ```ts
  * import { allFromDictAsync, fromSafePromise } from "unthrown";
- * await allFromDictAsync({ a: fromSafePromise(a()), b: fromSafePromise(b()) });
+ *
+ * const both = allFromDictAsync({
+ *   a: fromSafePromise(Promise.resolve(1)),
+ *   b: fromSafePromise(Promise.resolve("x")),
+ * });
+ * (await both).unwrap(); // => { a: 1, b: "x" }
  * ```
  */
 export function allFromDictAsync<R extends AsyncResultRecord>(
