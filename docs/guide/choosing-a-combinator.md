@@ -15,23 +15,24 @@ The `→ Result<…>` half of each signature is the tell — it shows how the co
 moves the channels: `flatMap` widens `E` to `E | E2`, `recover` empties it to
 `never`, `orElse` widens the value to `T | U`.
 
-| I want to…                                     | use                   | signature                                                    | channel |
-| ---------------------------------------------- | --------------------- | ------------------------------------------------------------ | ------- |
-| transform the success value                    | `map`                 | `(v: T) => U` → `Result<U, E>`                               | Ok      |
-| chain a `Result`-returning step                | `flatMap`             | `(v: T) => Result<U, E2>` → `Result<U, E \| E2>`             | Ok      |
-| run a side effect, keep the value              | `tap`                 | `(v: T) => void` → `Result<T, E>`                            | Ok      |
-| run a **failable** side effect, keep the value | `flatTap`             | `(v: T) => Result<unknown, E2>` → `Result<T, E \| E2>`       | Ok      |
-| sequence steps into a named scope              | `Do`/`bind`/`let`     | `bind(k, (scope) => Result<U, E2>)` → `Result<{…}, E \| E2>` | Ok      |
-| replace the value with a constant              | `as`                  | `(value: U)` → `Result<U, E>`                                | Ok      |
-| transform the error                            | `mapErr`              | `(e: E) => E2` → `Result<T, E2>`                             | Err     |
-| try a fallback that returns a `Result`         | `orElse`              | `(e: E) => Result<U, E2>` → `Result<T \| U, E2>`             | Err     |
-| turn an error into a success value             | `recover`             | `(e: E) => U` → `Result<T \| U, never>`                      | Err     |
-| run a side effect on the error                 | `tapErr`              | `(e: E) => void` → `Result<T, E>`                            | Err     |
-| run a **failable** side effect on the error    | `flatTapErr`          | `(e: E) => Result<unknown, E2>` → `Result<T, E \| E2>`       | Err     |
-| recover from a defect (rare)                   | `recoverDefect`       | `(cause) => Result<U, E2>` → `Result<T \| U, E \| E2>`       | Defect  |
-| observe a defect, e.g. log it                  | `tapDefect`           | `(cause) => void` → `Result<T, E>`                           | Defect  |
-| handle all three channels at the edge          | `match`               | `{ ok, err, defect }` → `R`                                  | all     |
-| combine many `Result`s                         | `all` / `allFromDict` | `Result<T, E>[]` → `Result<T[], E>`                          | —       |
+| I want to…                                     | use               | signature                                                    | channel |
+| ---------------------------------------------- | ----------------- | ------------------------------------------------------------ | ------- |
+| transform the success value                    | `map`             | `(v: T) => U` → `Result<U, E>`                               | Ok      |
+| chain a `Result`-returning step                | `flatMap`         | `(v: T) => Result<U, E2>` → `Result<U, E \| E2>`             | Ok      |
+| run a side effect, keep the value              | `tap`             | `(v: T) => void` → `Result<T, E>`                            | Ok      |
+| run a **failable** side effect, keep the value | `flatTap`         | `(v: T) => Result<unknown, E2>` → `Result<T, E \| E2>`       | Ok      |
+| sequence steps into a named scope              | `Do`/`bind`/`let` | `bind(k, (scope) => Result<U, E2>)` → `Result<{…}, E \| E2>` | Ok      |
+| replace the value with a constant              | `as`              | `(value: U)` → `Result<U, E>`                                | Ok      |
+| transform the error                            | `mapErr`          | `(e: E) => E2` → `Result<T, E2>`                             | Err     |
+| try a fallback that returns a `Result`         | `orElse`          | `(e: E) => Result<U, E2>` → `Result<T \| U, E2>`             | Err     |
+| turn an error into a success value             | `recover`         | `(e: E) => U` → `Result<T \| U, never>`                      | Err     |
+| run a side effect on the error                 | `tapErr`          | `(e: E) => void` → `Result<T, E>`                            | Err     |
+| run a **failable** side effect on the error    | `flatTapErr`      | `(e: E) => Result<unknown, E2>` → `Result<T, E \| E2>`       | Err     |
+| recover from a defect (rare)                   | `recoverDefect`   | `(cause) => Result<U, E2>` → `Result<T \| U, E \| E2>`       | Defect  |
+| observe a defect, e.g. log it                  | `tapDefect`       | `(cause) => void` → `Result<T, E>`                           | Defect  |
+| handle all three channels at the edge          | `match`           | `{ ok, err, defect }` → `R`                                  | all     |
+| combine an array of `Result`s                  | `all`             | `Result<T, E>[]` → `Result<T[], E>`                          | —       |
+| combine a record of `Result`s                  | `allFromDict`     | `{ [k]: Result<T, E> }` → `Result<{ [k]: T }, E>`            | —       |
 
 ## Behavior at a glance
 
@@ -69,9 +70,10 @@ exactly three ways:
 - **Callbacks stay synchronous.** A raw `Promise` may never enter a combinator —
   that would skip qualification and silently become a defect. Do async work by
   re-entering a boundary and composing it with `flatMap`.
-- **The binds accept `Result` _or_ `AsyncResult`.** `flatMap`, `orElse`, `bind`,
-  and `recoverDefect` take a callback returning either, so you can freely mix sync
-  and async steps in one chain.
+- **The `Result`-returning combinators accept `Result` _or_ `AsyncResult`.**
+  `flatMap`, `flatTap`, `orElse`, `flatTapErr`, `bind`, and `recoverDefect` take a
+  callback returning either, so you can freely mix sync and async steps in one
+  chain.
 - **Eliminators return a `Promise`.** `await result.match({ … })` /
   `await result.unwrap()` — or `await` the `AsyncResult` first to collapse it to a
   `Result`, then match synchronously.
