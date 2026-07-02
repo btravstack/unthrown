@@ -275,17 +275,29 @@ export type ResultMethods<T, E> = {
   toAsync(): AsyncResult<T, E>;
 };
 
-/** The `Ok` variant of a {@link Result}: a success carrying a `value`. */
+/**
+ * The `Ok` variant of a {@link Result}: a success carrying a `value`.
+ *
+ * @category Types
+ */
 export type OkView<T, E = never> = ResultMethods<T, E> & {
   readonly tag: "Ok";
   readonly value: T;
 };
-/** The `Err` variant of a {@link Result}: a modeled failure carrying an `error`. */
+/**
+ * The `Err` variant of a {@link Result}: a modeled failure carrying an `error`.
+ *
+ * @category Types
+ */
 export type ErrView<E, T = never> = ResultMethods<T, E> & {
   readonly tag: "Err";
   readonly error: E;
 };
-/** The `Defect` variant of a {@link Result}: an unmodeled failure carrying a `cause`. */
+/**
+ * The `Defect` variant of a {@link Result}: an unmodeled failure carrying a `cause`.
+ *
+ * @category Types
+ */
 export type DefectView<T = never, E = never> = ResultMethods<T, E> & {
   readonly tag: "Defect";
   readonly cause: unknown;
@@ -342,6 +354,8 @@ export type Result<T, E> = OkView<T, E> | ErrView<E, T> | DefectView<T, E>;
  * being treated as a raw promise (e.g. dropped into `Promise.all`).
  *
  * @typeParam T - the value `await` resolves to.
+ *
+ * @category Types
  */
 export type Awaitable<T> = {
   then<R = T>(onfulfilled?: ((value: T) => R | PromiseLike<R>) | null): PromiseLike<R>;
@@ -446,23 +460,31 @@ export type AsyncResult<T, E> = Awaitable<Result<T, E>> & {
  * Extract the success type `T` from a `Result`.
  *
  * @typeParam R - the `Result` type to inspect.
+ *
+ * @category Types
  */
 export type OkOf<R> = R extends { readonly tag: "Ok"; readonly value: infer T } ? T : never;
 /**
  * Extract the error type `E` from a `Result`.
  *
  * @typeParam R - the `Result` type to inspect.
+ *
+ * @category Types
  */
 export type ErrOf<R> = R extends { readonly tag: "Err"; readonly error: infer E } ? E : never;
 /**
  * Extract the success type `T` from an {@link AsyncResult}.
  *
  * @typeParam R - the `AsyncResult` type to inspect.
+ *
+ * @category Types
  */
 export type AsyncOkOf<R> = R extends AsyncResult<infer T, unknown> ? T : never;
 /**
  * Extract the error type `E` from an {@link AsyncResult}.
  *
  * @typeParam R - the `AsyncResult` type to inspect.
+ *
+ * @category Types
  */
 export type AsyncErrOf<R> = R extends AsyncResult<unknown, infer E> ? E : never;

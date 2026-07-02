@@ -26,6 +26,24 @@ import type { Result } from "./types.js";
  *   .map(({ user, org, label }) => render(user, org, label));
  * // Result<View, NotFound>
  * ```
+ *
+ * @example
+ * ```ts
+ * import { Do, Ok, Err } from "unthrown";
+ *
+ * // Ok path — the scope accumulates:
+ * Do()
+ *   .bind("a", () => Ok(2))
+ *   .let("b", ({ a }) => a * 10)
+ *   .map(({ a, b }) => a + b); // => Ok(22)
+ *
+ * // Err path — the first Err short-circuits the rest:
+ * Do()
+ *   .bind("a", () => Err("boom"))
+ *   .let("b", ({ a }) => a); // => Err("boom")
+ * ```
+ *
+ * @category Do-notation
  */
 export function Do(): Result<{}, never> {
   return Ok({});

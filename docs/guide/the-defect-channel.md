@@ -18,7 +18,7 @@ const r = Ok(1).map(() => {
   throw new Error("boom");
 });
 
-r.isDefect(); // true
+r.isDefect(); // => true
 ```
 
 This is what makes "no `try`/`catch` at the edge" real: a bug in a `.map`
@@ -50,7 +50,7 @@ runtime:
 ```ts
 const recovered = d.recover(() => 99);
 // type: Result<number, never>
-recovered.isDefect(); // true — `never` does NOT mean "total"
+recovered.isDefect(); // => true — `never` does NOT mean "total"
 ```
 
 A defect is a bug; you should not be able to accidentally "recover" it into a
@@ -63,6 +63,13 @@ d.unwrapOrElse(() => 0); // throws the original cause
 ```
 
 They recover a modeled `Err`, never an unmodeled defect.
+
+::: warning `unwrapOr` / `getOrNull` still throw on a defect
+It's tempting to read `unwrapOr(0)` as "always give me a value." It doesn't — it
+supplies the fallback for a modeled `Err` but **rethrows a defect** (a bug is not
+an absent value). If you must not throw, handle the defect explicitly first with
+`match` or `recoverDefect`.
+:::
 
 ## `unwrap` is asymmetric
 
