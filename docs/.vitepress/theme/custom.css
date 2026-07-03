@@ -7,19 +7,27 @@
 
 /* Home-hero background glyph — the project's motif behind the hero (an ok/err
  * railway split). Painted in --accent through a mask, so it always tracks the
- * accent token; the SVG is base64-encoded so no CSS minifier can mangle it.
- * `position: relative` gives the glyph its positioning context (kept here so
- * this file stands alone, even though the shared theme also sets it). */
+ * accent token; the SVG is base64-encoded so no CSS minifier can mangle it. */
 .VPHome {
   position: relative;
+  /* content-column width, and the gutter from the viewport edge in to it —
+     defined once so the glow and glyph stay anchored to the same column. */
+  --btv-col: 1152px;
+  --btv-gutter: max(0px, calc((100% - var(--btv-col)) / 2));
+}
+/* Anchor the shared theme's hero glow to the content column instead of the
+ * viewport edge, so it doesn't drift into a stray halo by the header on wide
+ * screens (it still bleeds ~120px past the content, as before). */
+.VPHome::before {
+  right: calc(var(--btv-gutter) - 120px);
 }
 .VPHome::after {
   content: "";
   position: absolute;
   top: 30px;
-  right: 0;
+  right: var(--btv-gutter);
   width: 560px;
-  max-width: 56vw;
+  max-width: 46vw;
   aspect-ratio: 500 / 300;
   background-color: var(--accent);
   -webkit-mask: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MDAgMzAwIiBmaWxsPSJub25lIj48cGF0aCBkPSJNMCwxMjAgSDUwMCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiLz48cGF0aCBkPSJNMCwxOTAgSDIxMCBDMjUwLDE5MCAyNTAsMjUwIDI5MCwyNTAgSDUwMCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1kYXNoYXJyYXk9IjcgNyIvPjxjaXJjbGUgY3g9IjIxMCIgY3k9IjE5MCIgcj0iNiIgZmlsbD0iI2ZmZiIvPjx0ZXh0IHg9IjQyNSIgeT0iMTA4IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiBmb250LXNpemU9IjE1IiBmaWxsPSIjZmZmIj5vazwvdGV4dD48dGV4dCB4PSI0MjUiIHk9IjIzOCIgZm9udC1mYW1pbHk9Im1vbm9zcGFjZSIgZm9udC1zaXplPSIxNSIgZmlsbD0iI2ZmZiI+ZXJyPC90ZXh0Pjwvc3ZnPg==")
