@@ -4,3 +4,34 @@
 :root {
   --accent: #46b86c;
 }
+
+/* Home-hero background glyph — the project's motif behind the hero (an ok/err
+ * railway split). Painted in --accent through a mask, so it always tracks the
+ * accent token; the SVG is base64-encoded so no CSS minifier can mangle it.
+ * `position: relative` gives the glyph its positioning context (kept here so
+ * this file stands alone, even though the shared theme also sets it). */
+.VPHome {
+  position: relative;
+}
+.VPHome::after {
+  content: "";
+  position: absolute;
+  top: 30px;
+  right: 0;
+  width: 560px;
+  max-width: 56vw;
+  aspect-ratio: 500 / 300;
+  background-color: var(--accent);
+  -webkit-mask: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MDAgMzAwIiBmaWxsPSJub25lIj48cGF0aCBkPSJNMCwxMjAgSDUwMCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiLz48cGF0aCBkPSJNMCwxOTAgSDIxMCBDMjUwLDE5MCAyNTAsMjUwIDI5MCwyNTAgSDUwMCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1kYXNoYXJyYXk9IjcgNyIvPjxjaXJjbGUgY3g9IjIxMCIgY3k9IjE5MCIgcj0iNiIgZmlsbD0iI2ZmZiIvPjx0ZXh0IHg9IjQyNSIgeT0iMTA4IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiBmb250LXNpemU9IjE1IiBmaWxsPSIjZmZmIj5vazwvdGV4dD48dGV4dCB4PSI0MjUiIHk9IjIzOCIgZm9udC1mYW1pbHk9Im1vbm9zcGFjZSIgZm9udC1zaXplPSIxNSIgZmlsbD0iI2ZmZiI+ZXJyPC90ZXh0Pjwvc3ZnPg==")
+    no-repeat top right / contain;
+  mask: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MDAgMzAwIiBmaWxsPSJub25lIj48cGF0aCBkPSJNMCwxMjAgSDUwMCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiLz48cGF0aCBkPSJNMCwxOTAgSDIxMCBDMjUwLDE5MCAyNTAsMjUwIDI5MCwyNTAgSDUwMCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1kYXNoYXJyYXk9IjcgNyIvPjxjaXJjbGUgY3g9IjIxMCIgY3k9IjE5MCIgcj0iNiIgZmlsbD0iI2ZmZiIvPjx0ZXh0IHg9IjQyNSIgeT0iMTA4IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiBmb250LXNpemU9IjE1IiBmaWxsPSIjZmZmIj5vazwvdGV4dD48dGV4dCB4PSI0MjUiIHk9IjIzOCIgZm9udC1mYW1pbHk9Im1vbm9zcGFjZSIgZm9udC1zaXplPSIxNSIgZmlsbD0iI2ZmZiI+ZXJyPC90ZXh0Pjwvc3ZnPg==")
+    no-repeat top right / contain;
+  opacity: 0.14;
+  pointer-events: none;
+  z-index: 0;
+}
+@media (max-width: 768px) {
+  .VPHome::after {
+    display: none;
+  }
+}
