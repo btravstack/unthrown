@@ -1,0 +1,5 @@
+/* unthrown accent — green.
+ * @btravstack/theme 1.4.0 derives every accent shade from this one token. */
+:root:root {
+  --accent: #46B86C;
+}
