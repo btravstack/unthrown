@@ -22,16 +22,16 @@ hero:
       link: https://github.com/btravstack/unthrown
 
 features:
-  - icon: 🎯
+  - icon: { src: /icons/target.svg }
     title: Errors as values
     details: Ordinary errors are returned in a Result<T, E>, not thrown. Only a true defect ever throws — and only at unwrap.
-  - icon: 🧯
+  - icon: { src: /icons/channels.svg }
     title: A separate defect channel
     details: Unmodeled failures become a Defect — a third runtime state invisible to the type. A bug in a .map can't masquerade as a domain error.
-  - icon: 🛂
+  - icon: { src: /icons/triage.svg }
     title: Qualification at every boundary
     details: fromPromise / fromThrowable force you to triage each failure into a modeled error or a defect. No path ever yields `unknown` in E.
-  - icon: 🪶
+  - icon: { src: /icons/check.svg }
     title: Small and done-able
     details: Zero runtime dependencies, ESM-first, dual CJS/ESM, fully typed. One concept, one name. Small enough to be "done".
 ---
