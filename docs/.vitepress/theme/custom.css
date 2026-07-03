@@ -48,9 +48,8 @@
  * too. */
 @media (max-width: 959px) {
   .VPHero .image-src {
-    width: 208px;
-    height: 208px;
-    max-width: 62vw;
+    width: min(208px, 62vw);
+    height: min(208px, 62vw);
     object-fit: contain;
   }
 }
