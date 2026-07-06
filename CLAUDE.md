@@ -139,6 +139,16 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   styles — not a second concept. (Each companion re-aliases its type in
   `facade.ts`, so the `types.ts` `Result`/`AsyncResult` declarations both sit in
   `typedoc.json`'s `intentionallyNotExported`.)
+- method surface: the fluent combinators live on **`ResultMethods<T, E>`** (and
+  its async twin **`AsyncResultMethods<T, E>`**) — the object-literal types each
+  `Result` / `AsyncResult` variant intersects. Both are **exported from
+  `index.ts`** and carry `@category Types`: a discriminated union alias can't hang
+  a method list off itself in TypeDoc, so these named types are the single
+  documented home for `map`/`flatMap`/`match`/… (the `Result` / `AsyncResult` doc
+  comments `{@link}` them). The core `typedoc.json` sets an explicit
+  `categoryOrder` (`Facade`, `Types`, `Constructors`, … then `Aggregate`,
+  `Errors`) so the core surface leads the API reference instead of the default
+  alphabetical order (which buried it under `Aggregate`).
 - tagged errors: `TaggedError(tag, options?)` (the error-class factory; optional
   `options.name` sets `Error.name` independently of the `_tag` discriminant, so a
   tag can be namespaced for collision-safety without leaking into the display

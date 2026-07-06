@@ -63,6 +63,10 @@ export const Result = {
  * {@link Result | companion object} above (the value and type are one name); this
  * is the type half.
  *
+ * @remarks
+ * The fluent combinators (`map`, `flatMap`, `match`, `unwrap`, …) every variant
+ * carries are documented on {@link ResultMethods}.
+ *
  * @category Facade
  */
 // Re-alias the Result type into this module so a single `export { Result }`
@@ -105,6 +109,10 @@ export const AsyncResult = {
  * `AsyncResult<T, E>` — the async counterpart of {@link Result}. Shares its name
  * with the {@link AsyncResult | companion object} above (value and type are one
  * name); this is the type half.
+ *
+ * @remarks
+ * The fluent combinators it carries are documented on
+ * {@link AsyncResultMethods}.
  *
  * @category Facade
  */
