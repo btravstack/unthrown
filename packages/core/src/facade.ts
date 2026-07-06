@@ -64,8 +64,10 @@ export const Result = {
  * is the type half.
  *
  * @remarks
- * The fluent combinators (`map`, `flatMap`, `match`, `unwrap`, …) every variant
- * carries are documented on {@link ResultMethods}.
+ * A `Result` is a discriminated union, so its fluent combinators (`map`,
+ * `flatMap`, `match`, `unwrap`, …) aren't listed as a standalone type here; they
+ * are documented by intent — with the same surface shared by `AsyncResult` — in
+ * the [Choosing a combinator](/guide/choosing-a-combinator) guide.
  *
  * @category Facade
  */
@@ -111,8 +113,9 @@ export const AsyncResult = {
  * name); this is the type half.
  *
  * @remarks
- * The fluent combinators it carries are documented on
- * {@link AsyncResultMethods}.
+ * `AsyncResult` shares `Result`'s fluent surface (`map`, `flatMap`, `match`, …);
+ * those combinators are documented by intent in the
+ * [Choosing a combinator](/guide/choosing-a-combinator) guide.
  *
  * @category Facade
  */
