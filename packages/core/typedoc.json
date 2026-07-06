@@ -2,12 +2,23 @@
   "extends": "@unthrown/typedoc/base.json",
   "entryPoints": ["src/index.ts"],
   "out": "docs",
+  "categoryOrder": [
+    "Facade",
+    "Types",
+    "Constructors",
+    "Interop",
+    "Do-notation",
+    "Guards",
+    "Tagged errors",
+    "Aggregate",
+    "Errors",
+    "*"
+  ],
   "intentionallyNotExported": [
     "Result",
     "AsyncResult",
     "Defect",
     "Props",
-    "ResultMethods",
     "AllOk",
     "ResultRecord",
     "AsyncResultRecord"

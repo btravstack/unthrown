@@ -51,6 +51,38 @@ Two more deliberate choices follow from this:
   what lets an HTTP handler do a single `match({ ok, err, defect })` with no
   surrounding `try`/`catch`.
 
+## Why this matters more with AI in the loop
+
+Most code today is written with an assistant in the loop, and the economics of
+that loop reward exactly what errors-as-values provides. A model converges on
+correct code fastest when a mistake is caught **at author time by the type
+checker** rather than **at run time by a crash**: a compile error is local,
+specific, and available before anything executes, whereas a thrown exception
+costs a full generate → run → observe → retry cycle just to _discover_ that
+something can fail.
+
+Thrown exceptions give a model nothing to work with. A signature
+`(id: string) => User` hides every way it can fail, so neither the model nor the
+compiler can tell that a caller forgot to handle a timeout — the failure surfaces
+later, as a stack trace, in a separate iteration. `Result<T, E>` puts every
+anticipated failure _in the type_, which turns the type checker into a
+specification the model must satisfy: a non-exhaustive `match`, an unhandled
+`PaymentDeclined`, a forgotten `Err` arm each become a compile error the moment
+they're written. That is the tightest correction signal there is — immediate,
+mechanical, and free of a run.
+
+The defect channel is what keeps that signal sharp. If unexpected failures were
+folded into `E` as `unknown` or `Error`, exhaustiveness would degrade into
+"handle the catch-all" and stop meaning anything. By holding `E` to exactly the
+modeled errors and routing the unexpected to a separate, type-invisible defect,
+`unthrown` keeps `E` a precise contract — so the type stays worth checking and
+the compiler keeps telling the model something _true_. The enforced `qualify` at
+every boundary reinforces this: it forces an explicit triage decision at each
+`fromPromise` / `fromThrowable` instead of letting `unknown` be swallowed and
+carried forward. The [`@unthrown/oxlint`](./linting) rule
+`no-ambiguous-error-type` guards the same line from the other side, failing the
+build when `unknown` / `any` / `Error` leak back into `E`.
+
 ## Compared to the alternatives
 
 - **neverthrow / boxed / byethrow** — model errors as values, but have no proper
