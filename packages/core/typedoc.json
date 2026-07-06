@@ -19,6 +19,7 @@
     "AsyncResult",
     "Defect",
     "Props",
+    "ResultMethods",
     "AllOk",
     "ResultRecord",
     "AsyncResultRecord"

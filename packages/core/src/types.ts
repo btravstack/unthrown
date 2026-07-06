@@ -19,15 +19,15 @@ export type Prettify<T> = { [K in keyof T]: T[K] } & {};
 export type Bound<T, K extends string, U> = Prettify<Omit<T, K> & { readonly [P in K]: U }>;
 
 /**
- * The fluent method surface every {@link Result} variant carries. Factored out
- * so the three variants ({@link OkView}, {@link ErrView}, {@link DefectView}) can
- * each intersect it — and so the combinators (`map`, `flatMap`, `match`, …) have
- * a single documented home, since a discriminated union can't carry a method
- * list on its own. The async counterpart is {@link AsyncResultMethods}.
+ * The method surface every {@link Result} variant carries. Factored out so the
+ * three variants ({@link OkView}, {@link ErrView}, {@link DefectView}) can each
+ * intersect it. Not part of the public API on its own — a `Result` is a
+ * discriminated union, so its combinators are documented by intent in the
+ * "Choosing a combinator" guide rather than as a standalone type here.
  *
  * @typeParam T - the success value type.
  * @typeParam E - the modeled error type.
- * @category Types
+ * @internal
  */
 export type ResultMethods<T, E> = {
   /**
@@ -401,24 +401,7 @@ export type Awaitable<T> = {
  * @typeParam T - the success value type.
  * @typeParam E - the modeled error type.
  */
-export type AsyncResult<T, E> = Awaitable<Result<T, E>> & AsyncResultMethods<T, E>;
-
-/**
- * The fluent method surface an {@link AsyncResult} carries — the async
- * counterpart of {@link ResultMethods}, factored out so the combinators have a
- * single documented home (an {@link AsyncResult} is `Awaitable<Result>`
- * intersected with these methods).
- *
- * @remarks
- * **Combinator callbacks are synchronous** (see {@link AsyncResult}). The binds
- * (`flatMap`, `flatTap`, `bind`, `orElse`, `recoverDefect`) additionally accept
- * an `AsyncResult`; the eliminators (`unwrap`, …) return promises.
- *
- * @typeParam T - the success value type.
- * @typeParam E - the modeled error type.
- * @category Types
- */
-export type AsyncResultMethods<T, E> = {
+export type AsyncResult<T, E> = Awaitable<Result<T, E>> & {
   /** Asynchronous `map`. `f` is synchronous; a throw becomes a `Defect`. */
   map<U>(f: (value: T) => U): AsyncResult<U, E>;
   /**
