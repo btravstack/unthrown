@@ -229,7 +229,7 @@ export type UnthrownMatchers<R = unknown> = {
    * `expect(result).toBeErrTagged("NotFound", { id })` asserts the tag and payload.
    */
   toBeErrTagged: (tag: string, expected?: unknown) => R;
-  toBeErrWith: (value: unknown) => R;
+  toBeErrWith: (expected: unknown) => R;
   /** `expect(result).toBeDefect()` asserts the result is a `Defect`. */
   toBeDefect: () => R;
 };
