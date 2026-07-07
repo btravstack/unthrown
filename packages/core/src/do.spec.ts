@@ -26,7 +26,8 @@ describe("Do / bind / let", () => {
     const r = Do()
       .bind("a", () => Err("denied"))
       .bind("b", later);
-    expect(r.unwrapErr()).toBe("denied");
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toBe("denied");
     expect(later).not.toHaveBeenCalled();
   });
 
@@ -34,7 +35,8 @@ describe("Do / bind / let", () => {
     const a: Result<{ x: number }, "e1"> = Do().bind("x", () => Err<"e1">("e1"));
     const b = a.bind("y", () => Err<"e2">("e2"));
     // `b` is Result<{ x; y }, "e1" | "e2"> — exercised at runtime here:
-    expect(b.unwrapErr()).toBe("e1");
+    expect(b.isErr()).toBe(true);
+    if (b.isErr()) expect(b.error).toBe("e1");
   });
 
   it("propagates a Defect and does not run later steps", () => {
@@ -114,7 +116,8 @@ describe("Do / bind / let — async", () => {
       .toAsync()
       .bind("a", () => Err("denied"))
       .bind("b", () => Ok(1));
-    expect(r.unwrapErr()).toBe("denied");
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toBe("denied");
   });
 
   it("turns a throw in an async bind or let into a Defect and never rejects", async () => {

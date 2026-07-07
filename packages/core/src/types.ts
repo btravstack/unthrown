@@ -267,7 +267,7 @@ export type ResultMethods<T, E> = {
    * re-throws the **original cause** with its original stack, so an unhandled
    * Defect surfaces at the global handler as the real failure.
    */
-  unwrap(): T;
+  unwrap(this: Result<T, never>): T;
   /**
    * Extract the modeled error.
    *
@@ -275,7 +275,7 @@ export type ResultMethods<T, E> = {
    * @throws On `Ok`, an {@link UnwrapError} carrying the value. On a `Defect`,
    * re-throws the original cause.
    */
-  unwrapErr(): E;
+  unwrapErr(this: Result<never, E>): E;
   /**
    * The success value, or `fallback` on `Err`.
    *
@@ -568,9 +568,9 @@ export type AsyncResultMethods<T, E> = {
    * Asynchronous {@link ResultMethods.unwrap | unwrap}. The returned promise
    * rejects on `Err`/`Defect`.
    */
-  unwrap(): Promise<T>;
+  unwrap(this: AsyncResult<T, never>): Promise<T>;
   /** Asynchronous {@link ResultMethods.unwrapErr | unwrapErr}. */
-  unwrapErr(): Promise<E>;
+  unwrapErr(this: AsyncResult<never, E>): Promise<E>;
   /** Asynchronous {@link ResultMethods.unwrapOr | unwrapOr}. */
   unwrapOr<U>(fallback: U): Promise<T | U>;
   /** Asynchronous {@link ResultMethods.unwrapOrElse | unwrapOrElse}. */

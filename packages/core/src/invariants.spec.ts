@@ -76,7 +76,9 @@ describe("Invariant 2: a Defect flows through every method except match() and re
 describe("Invariant 3: unwrap() is asymmetric", () => {
   it("on Err throws an UnwrapError carrying E", () => {
     try {
-      Err("modeled").unwrap();
+      // The Err branch is unreachable in typed code (unwrap needs E = never);
+      // force it via a cast to exercise the defensive runtime guard.
+      (Err("modeled") as unknown as Result<number, never>).unwrap();
       expect.unreachable();
     } catch (e) {
       expect(e).toBeInstanceOf(UnwrapError);

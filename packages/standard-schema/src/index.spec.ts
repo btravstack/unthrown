@@ -25,12 +25,15 @@ function stringSchema(opts?: {
 
 describe("fromSchema (sync)", () => {
   it("returns Ok with the parsed value on valid input", () => {
-    expect(fromSchema(stringSchema())("hi").unwrap()).toBe("hi");
+    const r = fromSchema(stringSchema())("hi");
+    expect(r.isOk()).toBe(true);
+    if (r.isOk()) expect(r.value).toBe("hi");
   });
 
   it("returns Err carrying the issues on invalid input", () => {
     const r = fromSchema(stringSchema())(42);
-    expect(r.unwrapErr()).toEqual([{ message: "expected a string" }]);
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toEqual([{ message: "expected a string" }]);
   });
 
   it("throws a TypeError when the schema validates asynchronously", () => {
@@ -66,16 +69,21 @@ describe("fromSchema (sync)", () => {
 
 describe("fromSchemaAsync", () => {
   it("returns Ok on valid input for a synchronous schema", async () => {
-    expect((await fromSchemaAsync(stringSchema())("hi")).unwrap()).toBe("hi");
+    const r = await fromSchemaAsync(stringSchema())("hi");
+    expect(r.isOk()).toBe(true);
+    if (r.isOk()) expect(r.value).toBe("hi");
   });
 
   it("returns Ok on valid input for an asynchronous schema", async () => {
-    expect((await fromSchemaAsync(stringSchema({ async: true }))("hi")).unwrap()).toBe("hi");
+    const r = await fromSchemaAsync(stringSchema({ async: true }))("hi");
+    expect(r.isOk()).toBe(true);
+    if (r.isOk()) expect(r.value).toBe("hi");
   });
 
   it("returns Err carrying the issues on invalid input", async () => {
     const r = await fromSchemaAsync(stringSchema({ async: true }))(42);
-    expect(r.unwrapErr()).toEqual([{ message: "expected a string" }]);
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toEqual([{ message: "expected a string" }]);
   });
 
   it("turns a throwing validator into a Defect (never rejects)", async () => {

@@ -21,7 +21,8 @@ describe("Result.map", () => {
     const f = vi.fn();
     const r = Err<string>("e").map(f);
     expect(f).not.toHaveBeenCalled();
-    expect(r.unwrapErr()).toBe("e");
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toBe("e");
   });
 
   it("passes a Defect through untouched without calling the callback", () => {
@@ -59,7 +60,9 @@ describe("Result.flatMap", () => {
 
   it("passes Err through and does not call the callback", () => {
     const f = vi.fn();
-    expect(Err<string>("e").flatMap(f).unwrapErr()).toBe("e");
+    const r = Err<string>("e").flatMap(f);
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toBe("e");
     expect(f).not.toHaveBeenCalled();
   });
 
@@ -119,7 +122,8 @@ describe("Result.flatTap", () => {
 
   it("short-circuits to the effect's Err", () => {
     const r = Ok(5).flatTap(() => Err("denied"));
-    expect(r.unwrapErr()).toBe("denied");
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toBe("denied");
   });
 
   it("propagates a Defect from the effect", () => {
@@ -151,7 +155,9 @@ describe("Result.as", () => {
   });
 
   it("passes Err and Defect through", () => {
-    expect(Err("e").as("x").unwrapErr()).toBe("e");
+    const r = Err("e").as("x");
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toBe("e");
     expect(defectOf(boom).as("x").isDefect()).toBe(true);
   });
 });
@@ -167,7 +173,9 @@ describe("Result.mapErr", () => {
 
   it("passes Ok through and does not call the callback", () => {
     const f = vi.fn();
-    expect(Ok(1).mapErr(f).unwrap()).toBe(1);
+    const r = Ok(1).mapErr(f);
+    expect(r.isOk()).toBe(true);
+    if (r.isOk()) expect(r.value).toBe(1);
     expect(f).not.toHaveBeenCalled();
   });
 
@@ -207,7 +215,9 @@ describe("Result.orElse", () => {
 
   it("passes Ok through and does not call the callback", () => {
     const f = vi.fn();
-    expect(Ok(1).orElse(f).unwrap()).toBe(1);
+    const r = Ok(1).orElse(f);
+    expect(r.isOk()).toBe(true);
+    if (r.isOk()) expect(r.value).toBe(1);
     expect(f).not.toHaveBeenCalled();
   });
 
@@ -326,17 +336,19 @@ describe("Result.recoverDefect (the only door to a Defect)", () => {
   });
 
   it("replaces a Defect with an Err", () => {
-    expect(
-      defectOf(boom)
-        .recoverDefect(() => Err("modeled now"))
-        .unwrapErr(),
-    ).toBe("modeled now");
+    const r = defectOf(boom).recoverDefect(() => Err("modeled now"));
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toBe("modeled now");
   });
 
   it("passes Ok and Err through and does not call the callback", () => {
     const f = vi.fn();
-    expect(Ok(1).recoverDefect(f).unwrap()).toBe(1);
-    expect(Err("e").recoverDefect(f).unwrapErr()).toBe("e");
+    const okR = Ok(1).recoverDefect(f);
+    expect(okR.isOk()).toBe(true);
+    if (okR.isOk()) expect(okR.value).toBe(1);
+    const errR = Err("e").recoverDefect(f);
+    expect(errR.isErr()).toBe(true);
+    if (errR.isErr()) expect(errR.error).toBe("e");
     expect(f).not.toHaveBeenCalled();
   });
 
@@ -432,7 +444,9 @@ describe("Result eliminators on Ok / Err", () => {
   it("unwrap returns the Ok value; throws UnwrapError on Err", () => {
     expect(Ok(1).unwrap()).toBe(1);
     try {
-      Err("e").unwrap();
+      // The Err branch is unreachable in typed code (unwrap needs E = never);
+      // force it via a cast to exercise the defensive runtime guard.
+      (Err("e") as unknown as Result<number, never>).unwrap();
       expect.unreachable();
     } catch (e) {
       expect(e).toBeInstanceOf(Error);
@@ -444,14 +458,18 @@ describe("Result eliminators on Ok / Err", () => {
   it("unwrapErr returns the Err; throws UnwrapError on Ok; rethrows the cause on a Defect", () => {
     expect(Err("e").unwrapErr()).toBe("e");
     try {
-      Ok(1).unwrapErr();
+      // The Ok branch is unreachable in typed code (unwrapErr needs T = never);
+      // force it via a cast to exercise the defensive runtime guard.
+      (Ok(1) as unknown as Result<never, number>).unwrapErr();
       expect.unreachable();
     } catch (e) {
       expect((e as { name: string }).name).toBe("UnwrapError");
       expect((e as { error: unknown }).error).toBe(1);
     }
     try {
-      defectOf(boom).unwrapErr();
+      // Also type-unreachable (unwrapErr needs T = never; defectOf's declared
+      // T is number) — cast to exercise the Defect-rethrow guard.
+      (defectOf(boom) as unknown as Result<never, never>).unwrapErr();
       expect.unreachable();
     } catch (e) {
       expect(e).toBe(boom);
