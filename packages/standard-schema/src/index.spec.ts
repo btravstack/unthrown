@@ -37,6 +37,25 @@ describe("fromSchema (sync)", () => {
     expect(() => fromSchema(stringSchema({ async: true }))("hi")).toThrow(TypeError);
   });
 
+  it("detects an async schema even when its promise is a cross-realm thenable", () => {
+    // A promise from another realm (vm/worker) — a genuine thenable that fails
+    // `instanceof Promise`. It must still be caught, not silently produce Ok().
+    const foreign: StandardSchemaV1<unknown, string> = {
+      "~standard": {
+        version: 1,
+        vendor: "test",
+        // A genuine thenable typed (falsely) as a Promise — mimics a promise
+        // from another realm, which fails `instanceof Promise`.
+        validate: () =>
+          ({
+            then: (onfulfilled: (r: StandardSchemaV1.Result<string>) => void) =>
+              onfulfilled({ value: "hi" }),
+          }) as unknown as Promise<StandardSchemaV1.Result<string>>,
+      },
+    };
+    expect(() => fromSchema(foreign)("hi")).toThrow(TypeError);
+  });
+
   it("turns a throwing validator into a Defect (it never escapes)", () => {
     const r = fromSchema(stringSchema({ throws: true }))("hi");
     expect(r.isDefect()).toBe(true);

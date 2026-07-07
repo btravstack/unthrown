@@ -20,6 +20,18 @@ import type { AsyncResult, Result } from "unthrown";
 /** The error channel both entry points produce: a schema's validation issues. */
 export type SchemaIssues = readonly StandardSchemaV1.Issue[];
 
+// A Standard Schema signals async validation by returning a thenable. Detect it
+// structurally rather than with `instanceof Promise`, which misses a promise
+// created in another realm (a `vm` context, a worker) even though it is a
+// genuine `PromiseLike`.
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    (typeof value === "object" || typeof value === "function") &&
+    value !== null &&
+    typeof (value as { then?: unknown }).then === "function"
+  );
+}
+
 /**
  * Turn a **synchronous** Standard Schema into a validator returning a
  * `Result`.
@@ -61,7 +73,7 @@ export function fromSchema<S extends StandardSchemaV1>(
   return (input) => {
     const settled = validate(input);
     // An async schema can't be represented synchronously — fail loud and early.
-    if (settled.isOk() && settled.value instanceof Promise) {
+    if (settled.isOk() && isThenable(settled.value)) {
       throw new TypeError(
         "@unthrown/standard-schema: this schema validates asynchronously — use fromSchemaAsync instead.",
       );
