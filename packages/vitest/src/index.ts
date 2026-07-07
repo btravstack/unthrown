@@ -10,7 +10,7 @@
 // IMPORTANT: for an AsyncResult the matcher is asynchronous, so you MUST `await`
 // the assertion. A forgotten `await` makes the assertion pass silently.
 
-import { isDefect, isErr, isOk, type Result } from "unthrown";
+import { isDefect, isErr, isOk, isResult, type Result } from "unthrown";
 import { expect } from "vitest";
 import type { MatcherResult, MatcherState } from "vitest";
 
@@ -26,14 +26,12 @@ function isThenable(x: unknown): x is PromiseLike<unknown> {
   );
 }
 
-function isResult(x: unknown): x is SomeResult {
-  return typeof (x as { isOk?: unknown } | null | undefined)?.isOk === "function";
-}
-
 function render(result: SomeResult, stringify: Stringify): string {
   if (isOk(result)) return `Ok(${stringify(result.value)})`;
   if (isErr(result)) return `Err(${stringify(result.error)})`;
   if (isDefect(result)) return `Defect(${stringify(result.cause)})`;
+  /* v8 ignore next -- unreachable: `settle` only calls `render` on a canonical
+     Result, which is always Ok/Err/Defect; kept for return-exhaustiveness. */
   return stringify(result);
 }
 

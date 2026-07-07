@@ -7,15 +7,15 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**"],
-      // Lock in the matcher suite (incl. every failure-message branch). Lines
-      // sit just below 100 only because of the defensive `render` fallback for a
-      // value that is Result-like but not Ok/Err/Defect — unreachable for a real
-      // Result, kept for return-exhaustiveness.
+      // Lock in the matcher suite at full statement/line/function coverage. The
+      // one uncovered branch is the defensive `typeof x === "function"` arm of
+      // `isThenable` (a value that is callable *and* thenable never reaches the
+      // matchers), so `branches` sits just below 100.
       thresholds: {
-        statements: 95,
-        branches: 90,
+        statements: 100,
+        branches: 95,
         functions: 100,
-        lines: 95,
+        lines: 100,
       },
     },
   },
