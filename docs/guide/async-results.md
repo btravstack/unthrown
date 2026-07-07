@@ -28,10 +28,13 @@ not interchangeable with a raw promise.
 > isn't known until it settles. `await` it first — the guards live on the
 > `Result` you get back.
 
-::: warning Eliminators still reject
-The async eliminators do throw when you ask them to: `await result.unwrap()`
-rejects on an `Err` or `Defect`, just like the synchronous `unwrap()`. It is the
-_internal_ promise — the one `await result` resolves — that never rejects.
+::: warning Eliminators still reject on a Defect
+The async eliminators reject when they hit a `Defect`: `await result.unwrap()`
+rethrows the defect's cause, just like the synchronous `unwrap()`. (Like its sync
+form, `unwrap()` is type-gated — it compiles only when the error channel is
+`never` — so in well-typed code an `Err` can't reach it; a `Defect` is the only
+rejection you'll see.) It is the _internal_ promise — the one `await result`
+resolves — that never rejects.
 :::
 
 ## Combinator callbacks are synchronous
