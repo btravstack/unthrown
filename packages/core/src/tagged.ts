@@ -15,7 +15,7 @@ type Props = Record<string, unknown>;
  * @category Types
  */
 export type TaggedErrorInstance<Tag extends string, A extends Props> = Error &
-  Readonly<A> & { readonly _tag: Tag };
+  Readonly<Omit<A, "name">> & { readonly _tag: Tag };
 
 /**
  * The class constructor returned by {@link TaggedError}. Generic in its payload:
@@ -41,7 +41,10 @@ export type TaggedErrorConstructor<Tag extends string> = {
  * Extend the returned class to declare a concrete error. Supply the payload with
  * an instantiation expression; omit it for a payload-less error. A `message`
  * field in the payload is forwarded to `Error`. The `_tag` always reflects
- * `tag` and cannot be overridden by the payload.
+ * `tag` and cannot be overridden by the payload. `name` is likewise reserved —
+ * it is the display label (set it with `options.name`); a payload `name` is
+ * ignored at runtime and excluded from the instance type, so it can't shadow
+ * `Error.name`.
  *
  * `_tag` is the discriminant used by {@link matchTags}; `Error.name` is the
  * human-facing label in stack traces and logs. By default they coincide, but
