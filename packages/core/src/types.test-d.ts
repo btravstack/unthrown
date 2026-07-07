@@ -17,6 +17,7 @@ import {
   Do,
   type ErrOf,
   Err,
+  type ErrView,
   fromPromise,
   fromThrowable,
   isDefect,
@@ -103,6 +104,20 @@ fromPromise(Promise.resolve(1));
 // flatMap widens the error channel
 const flatMapped = r1.flatMap(() => Err<"e2">("e2"));
 type _flatMapped = Expect<Equal<typeof flatMapped, Result<never, "e1" | "e2">>>;
+
+// A raw Promise may NEVER enter an AsyncResult combinator (Thesis #3): the
+// callback must return a Result or an AsyncResult, so its rejection can't
+// silently become a Defect. Pins that the param bound rejects a `Promise`.
+declare const ar: AsyncResult<number, "e">;
+// @ts-expect-error - a raw Promise callback return is not assignable
+ar.flatMap((n) => Promise.resolve(Ok(n)));
+
+// ErrView's parameter order is <E, T> (error first) — the reverse of OkView /
+// DefectView / Result — because `Result<T, E>` narrows to `ErrView<E, T>`.
+type _errViewErr = Expect<Equal<ErrView<"boom", number>["error"], "boom">>;
+type _errViewNarrow = Expect<
+  Equal<Extract<Result<number, "boom">, { readonly tag: "Err" }>, ErrView<"boom", number>>
+>;
 
 // flatTap KEEPS the value type and widens the error channel
 const flatTapped = r1.flatTap(() => Err<"e2">("e2"));
