@@ -44,6 +44,13 @@ describe("TaggedError", () => {
     expect(e._tag).toBe("Forbidden");
   });
 
+  it("keeps `name` reserved — a payload `name` cannot shadow the display name", () => {
+    class UserError extends TaggedError("UserError")<{ user: string }> {}
+    const e = new UserError({ user: "Alice", name: "Alice" } as { user: string });
+    expect(e.name).toBe("UserError"); // display label, not the payload's `name`
+    expect(e.user).toBe("Alice");
+  });
+
   it("distinct tags produce distinct, discriminable classes", () => {
     const errors: ApiError[] = [new NotFound(), new Forbidden({ user: "a" })];
     expect(errors.map((e) => e._tag)).toEqual(["NotFound", "Forbidden"]);
