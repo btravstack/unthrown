@@ -296,6 +296,14 @@ export type OkView<T, E = never> = ResultMethods<T, E> & {
  * The `Err` variant of a {@link Result}: a modeled failure carrying an `error`.
  * This is what a successful `isErr` guard narrows to, exposing `.error`.
  *
+ * @remarks
+ * **Note the parameter order: `ErrView<E, T>` puts the error type _first_** — the
+ * reverse of the `<T, E>` order used by {@link OkView}, {@link DefectView}, and
+ * {@link Result} — because `Result<T, E>` narrows to `ErrView<E, T>` (the error is
+ * the payload the guard makes reachable). You rarely write it by hand (a failed
+ * `isErr()` narrows to it for you); if you do, mind the flip — `ErrView<MyError,
+ * MyValue>`, not `ErrView<MyValue, MyError>`.
+ *
  * @example
  * ```ts
  * if (r.isErr()) r.error; // r: ErrView<E, T> here — .error is an E
