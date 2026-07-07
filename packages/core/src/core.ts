@@ -657,10 +657,10 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   }
 
   unwrap(): Promise<T> {
-    return this.promise.then((r) => r.unwrap());
+    return this.promise.then((r) => (r as Result<T, never>).unwrap());
   }
   unwrapErr(): Promise<E> {
-    return this.promise.then((r) => r.unwrapErr());
+    return this.promise.then((r) => (r as Result<never, E>).unwrapErr());
   }
   unwrapOr<U>(fallback: U): Promise<T | U> {
     return this.promise.then((r) => r.unwrapOr(fallback));

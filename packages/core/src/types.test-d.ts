@@ -210,6 +210,26 @@ const _noValue = g.value;
 // @ts-expect-error - `.error` only exists on the Err variant
 const _noError = g.error;
 
+// --- unwrap / unwrapErr are gated on an empty opposite channel ---------------
+
+declare const rNever: Result<number, never>;
+declare const rFallible: Result<number, "e">;
+declare const rErrOnly: Result<never, "e">;
+rNever.unwrap(); // ok: E = never
+rErrOnly.unwrapErr(); // ok: T = never
+// @ts-expect-error - unwrap requires E = never
+rFallible.unwrap();
+// @ts-expect-error - unwrapErr requires T = never
+rFallible.unwrapErr();
+
+declare const arNever: AsyncResult<number, never>;
+declare const arFallible: AsyncResult<number, "e">;
+arNever.unwrap();
+// @ts-expect-error - async unwrap requires E = never
+arFallible.unwrap();
+// @ts-expect-error - async unwrapErr requires T = never
+arFallible.unwrapErr();
+
 // --- extractor types ---------------------------------------------------------
 
 type _okOf = Expect<Equal<OkOf<Result<number, "e">>, number>>;

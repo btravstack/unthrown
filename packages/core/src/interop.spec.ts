@@ -19,10 +19,21 @@ describe("fromNullable", () => {
   });
 
   it("keeps a present value as Ok (and treats falsy non-null as present)", () => {
-    expect(fromNullable(5, () => "absent").unwrap()).toBe(5);
-    expect(fromNullable(0, () => "absent").unwrap()).toBe(0);
-    expect(fromNullable("", () => "absent").unwrap()).toBe("");
-    expect(fromNullable(false, () => "absent").unwrap()).toBe(false);
+    const r1 = fromNullable(5, () => "absent");
+    expect(r1.isOk()).toBe(true);
+    if (r1.isOk()) expect(r1.value).toBe(5);
+
+    const r2 = fromNullable(0, () => "absent");
+    expect(r2.isOk()).toBe(true);
+    if (r2.isOk()) expect(r2.value).toBe(0);
+
+    const r3 = fromNullable("", () => "absent");
+    expect(r3.isOk()).toBe(true);
+    if (r3.isOk()) expect(r3.value).toBe("");
+
+    const r4 = fromNullable(false, () => "absent");
+    expect(r4.isOk()).toBe(true);
+    if (r4.isOk()) expect(r4.value).toBe(false);
   });
 });
 
@@ -32,7 +43,9 @@ describe("fromThrowable", () => {
       (a: number, b: number) => a + b,
       () => "qualified",
     );
-    expect(add(2, 3).unwrap()).toBe(5);
+    const r = add(2, 3);
+    expect(r.isOk()).toBe(true);
+    if (r.isOk()) expect(r.value).toBe(5);
   });
 
   it("triages a thrown cause into Err when qualify returns E", () => {
@@ -40,8 +53,13 @@ describe("fromThrowable", () => {
       (s: string) => JSON.parse(s) as unknown,
       () => "invalid-json",
     );
-    expect(parse("{not json}").unwrapErr()).toBe("invalid-json");
-    expect(parse('{"a":1}').unwrap()).toEqual({ a: 1 });
+    const err = parse("{not json}");
+    expect(err.isErr()).toBe(true);
+    if (err.isErr()) expect(err.error).toBe("invalid-json");
+
+    const ok = parse('{"a":1}');
+    expect(ok.isOk()).toBe(true);
+    if (ok.isOk()) expect(ok.value).toEqual({ a: 1 });
   });
 
   it("triages a thrown cause into a Defect when qualify returns the injected defect marker", () => {
@@ -93,7 +111,8 @@ describe("fromThrowable", () => {
       (c, defect) => (c === boom ? ("known" as const) : defect(c)),
     );
     const r: Result<number, "known"> = fn();
-    expect(r.unwrap()).toBe(1);
+    expect(r.isOk()).toBe(true);
+    if (r.isOk()) expect(r.value).toBe(1);
   });
 });
 

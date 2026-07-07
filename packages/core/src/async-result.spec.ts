@@ -45,15 +45,16 @@ describe("AsyncResult is awaitable and never rejects", () => {
   });
 
   it("fromPromise: a resolved value becomes Ok (promise and thunk forms)", async () => {
-    expect((await fromPromise(Promise.resolve(5), (c) => c as string)).unwrap()).toBe(5);
-    expect(
-      (
-        await fromPromise(
-          () => Promise.resolve(6),
-          (c) => c as string,
-        )
-      ).unwrap(),
-    ).toBe(6);
+    const r1 = await fromPromise(Promise.resolve(5), (c) => c as string);
+    expect(r1.isOk()).toBe(true);
+    if (r1.isOk()) expect(r1.value).toBe(5);
+
+    const r2 = await fromPromise(
+      () => Promise.resolve(6),
+      (c) => c as string,
+    );
+    expect(r2.isOk()).toBe(true);
+    if (r2.isOk()) expect(r2.value).toBe(6);
   });
 });
 
@@ -111,7 +112,9 @@ describe("AsyncResult success channel", () => {
   });
 
   it("flatTap short-circuits to the effect's Err", async () => {
-    expect((await asyncOk(5).flatTap(() => Err("denied"))).unwrapErr()).toBe("denied");
+    const r = await asyncOk(5).flatTap(() => Err("denied"));
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toBe("denied");
   });
 
   it("flatTap composes an async effect via a qualified boundary, keeping the value", async () => {
@@ -128,7 +131,9 @@ describe("AsyncResult success channel", () => {
 
   it("as replaces the Ok value, and passes Err/Defect through", async () => {
     expect((await asyncOk(1).as("x")).unwrap()).toBe("x");
-    expect((await asyncErr("e").as("x")).unwrapErr()).toBe("e");
+    const r = await asyncErr("e").as("x");
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toBe("e");
     expect((await asyncDefect().as("x")).isDefect()).toBe(true);
   });
 });
@@ -252,7 +257,11 @@ describe("AsyncResult eliminators", () => {
 
   it("unwrap resolves the value and rejects (via UnwrapError) on Err", async () => {
     await expect(asyncOk(1).unwrap()).resolves.toBe(1);
-    await expect(asyncErr("e").unwrap()).rejects.toMatchObject({ name: "UnwrapError", error: "e" });
+    // The Err branch is unreachable in typed code (unwrap needs E = never);
+    // force it via a cast to exercise the defensive runtime guard.
+    await expect(
+      (asyncErr("e") as unknown as AsyncResult<number, never>).unwrap(),
+    ).rejects.toMatchObject({ name: "UnwrapError", error: "e" });
   });
 
   it("unwrapErr resolves the error", async () => {
@@ -273,7 +282,11 @@ describe("AsyncResult eliminators", () => {
 
   it("a Defect rejects the eliminators with the original cause", async () => {
     await expect(asyncDefect().unwrap()).rejects.toBe(boom);
-    await expect(asyncDefect().unwrapErr()).rejects.toBe(boom);
+    // Also type-unreachable (unwrapErr needs T = never; asyncDefect's declared
+    // T is number) — cast to exercise the Defect-rethrow guard.
+    await expect((asyncDefect() as unknown as AsyncResult<never, never>).unwrapErr()).rejects.toBe(
+      boom,
+    );
     await expect(asyncDefect().unwrapOr(0)).rejects.toBe(boom);
     await expect(asyncDefect().unwrapOrElse(() => 0)).rejects.toBe(boom);
     await expect(asyncDefect().getOrNull()).rejects.toBe(boom);
