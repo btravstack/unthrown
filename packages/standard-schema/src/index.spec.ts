@@ -45,9 +45,11 @@ describe("fromSchema (sync)", () => {
         version: 1,
         vendor: "test",
         // A genuine thenable typed (falsely) as a Promise — mimics a promise
-        // from another realm, which fails `instanceof Promise`.
+        // from another realm, which fails `instanceof Promise`. The `then` is the
+        // whole point of the test.
         validate: () =>
           ({
+            // oxlint-disable-next-line no-thenable
             then: (onfulfilled: (r: StandardSchemaV1.Result<string>) => void) =>
               onfulfilled({ value: "hi" }),
           }) as unknown as Promise<StandardSchemaV1.Result<string>>,

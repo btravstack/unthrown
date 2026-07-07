@@ -66,7 +66,9 @@ Every package mirrors its sync pair for the asynchronous types:
 Future<Result>`.
 
 On the way in, an _unexpected_ rejection inside the neighbour's async type
-becomes a `Defect` — never a silently-swallowed error.
+becomes a `Defect` — never a silently-swallowed error. (Boxed's `Future` has no
+failure channel and never rejects, so for `fromBoxedFuture` this is a defensive
+guarantee rather than a path you can actually hit.)
 
 ## Standard Schema — validators as `Result`s
 

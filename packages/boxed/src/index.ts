@@ -88,9 +88,12 @@ export function toBoxedFuture<T, E>(
  * Convert a Boxed `Future<Result>` into an `AsyncResult`.
  *
  * @remarks
- * The async counterpart of {@link fromBoxed}. A `Result.Error` stays an `Err`;
- * an *unexpected* rejection of the underlying promise becomes a `Defect`. The
- * returned `AsyncResult` never throws when awaited.
+ * The async counterpart of {@link fromBoxed}. A `Result.Error` inside the future
+ * stays an `Err`. Boxed's `Future` has no failure channel of its own —
+ * `Future.toPromise()` does not reject — so in practice no `Defect` arises here;
+ * the `fromSafePromise` boundary is a defensive net that would only capture one
+ * if a future somehow rejected. The returned `AsyncResult` never throws when
+ * awaited.
  *
  * @typeParam T - the success value type.
  * @typeParam E - the modeled error type.

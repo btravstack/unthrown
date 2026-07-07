@@ -53,7 +53,10 @@ pnpm add unthrown
 ```ts
 import { fromPromise, TaggedError } from "unthrown";
 
+// Our modeled domain failure:
 class NotFound extends TaggedError("NotFound") {}
+// What the upstream `fetchUser` rejects with when the user is absent:
+class NotFoundError extends Error {}
 
 // Cross an async boundary — every rejection MUST be triaged into E or a defect.
 // `defect` is injected as qualify's second argument.

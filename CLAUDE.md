@@ -281,7 +281,7 @@ channel?**
    — a forgotten one passes silently).
 4. ✅ **`packages/pattern`** — Done. Because `Result` is a discriminated union
    (Thesis #1 / Public surface), `ts-pattern` matches it natively — this package
-   is thin sugar: pattern constructors `P.ok`/`P.err`/`P.defect` (returning the
+   is thin sugar: pattern constructors `P.Ok`/`P.Err`/`P.Defect` (returning the
    `{ tag: … }` object patterns) plus `tag(t)` (the `{ _tag: t }` pattern,
    narrowing to the variant + payload). Kept small — the power is ts-pattern's;
    `matchTags` covers the everyday exhaustive case.
