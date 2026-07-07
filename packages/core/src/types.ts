@@ -284,7 +284,8 @@ export type ResultMethods<T, E> = {
 
 /**
  * The `Ok` variant of a {@link Result}: a success carrying a `value`. This is
- * what a successful `isOk` guard narrows to, making `.value` reachable.
+ * what a successful `isOk` guard narrows to, making `.value` reachable. It also
+ * carries the shared fluent surface ({@link ResultMethods}).
  *
  * @example
  * ```ts
@@ -299,7 +300,8 @@ export type OkView<T, E = never> = ResultMethods<T, E> & {
 };
 /**
  * The `Err` variant of a {@link Result}: a modeled failure carrying an `error`.
- * This is what a successful `isErr` guard narrows to, exposing `.error`.
+ * This is what a successful `isErr` guard narrows to, exposing `.error`. It also
+ * carries the shared fluent surface ({@link ResultMethods}).
  *
  * @example
  * ```ts
@@ -315,7 +317,7 @@ export type ErrView<E, T = never> = ResultMethods<T, E> & {
 /**
  * The `Defect` variant of a {@link Result}: an unmodeled failure carrying a
  * `cause`. This is what a successful `isDefect` guard narrows to, exposing
- * `.cause`.
+ * `.cause`. It also carries the shared fluent surface ({@link ResultMethods}).
  *
  * @example
  * ```ts

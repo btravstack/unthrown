@@ -64,10 +64,11 @@ export const Result = {
  * is the type half.
  *
  * @remarks
- * A `Result` is a discriminated union, so its fluent combinators (`map`,
- * `flatMap`, `match`, `unwrap`, …) aren't listed as a standalone type here; they
- * are documented by intent — with the same surface shared by `AsyncResult` — in
- * the [Choosing a combinator](/guide/choosing-a-combinator) guide.
+ * A `Result` is a discriminated union, so TypeDoc can't list its methods on this
+ * alias. Its fluent combinators (`map`, `flatMap`, `match`, `unwrap`, …) are
+ * documented one per entry on {@link ResultMethods} — the shared method surface
+ * every variant carries. For "which one do I reach for?", see the
+ * [Choosing a combinator](/guide/choosing-a-combinator) guide.
  *
  * @category Facade
  */
@@ -113,9 +114,10 @@ export const AsyncResult = {
  * name); this is the type half.
  *
  * @remarks
- * `AsyncResult` shares `Result`'s fluent surface (`map`, `flatMap`, `match`, …);
- * those combinators are documented by intent in the
- * [Choosing a combinator](/guide/choosing-a-combinator) guide.
+ * `AsyncResult` carries the async fluent surface; its combinators (`map`,
+ * `flatMap`, `match`, `unwrap`, …) are documented one per entry — with their
+ * async signatures — on {@link AsyncResultMethods}. For "which one do I reach
+ * for?", see the [Choosing a combinator](/guide/choosing-a-combinator) guide.
  *
  * @category Facade
  */
