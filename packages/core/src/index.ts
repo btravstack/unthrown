@@ -18,6 +18,7 @@ export type { TaggedErrorConstructor, TaggedErrorInstance, TagHandlers } from ".
 export type {
   AsyncErrOf,
   AsyncOkOf,
+  AsyncResultMethods,
   Awaitable,
   DefectView,
   ErrOf,

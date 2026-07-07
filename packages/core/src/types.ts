@@ -388,8 +388,138 @@ export type Awaitable<T> = {
 };
 
 /**
- * The asynchronous counterpart of {@link Result}: an awaitable wrapper with the
- * same method surface, collapsing to a `Result<T, E>` when `await`-ed.
+ * The async method surface every {@link AsyncResult} carries — the combinators
+ * (`map`, `flatMap`, `mapErr`, `match`, `unwrap`, …) with their asynchronous
+ * signatures, documented one per entry below. The async mirror of
+ * {@link ResultMethods}: each entry links its synchronous counterpart and states
+ * only the async delta.
+ *
+ * @remarks
+ * Like {@link ResultMethods}, this type exists to **document** the surface — not
+ * to be authored against; you obtain it by holding an `AsyncResult`. Its
+ * combinator callbacks are **synchronous** (a raw `Promise` may never enter — see
+ * the {@link AsyncResult} remarks); async work re-enters via {@link fromPromise}
+ * and composes with `flatMap`. Systematic differences from the sync surface: the
+ * binds return an `AsyncResult` (and additionally accept one), and the
+ * eliminators return a `Promise`.
+ *
+ * @typeParam T - the success value type.
+ * @typeParam E - the modeled error type.
+ * @category Methods
+ */
+export type AsyncResultMethods<T, E> = {
+  /**
+   * Asynchronous {@link ResultMethods.map | map}: transforms the success value
+   * with `f`. `f` is synchronous; a throw becomes a `Defect`.
+   */
+  map<U>(f: (value: T) => U): AsyncResult<U, E>;
+  /**
+   * Asynchronous {@link ResultMethods.flatMap | flatMap}. Unlike the sync form,
+   * `f` may return a `Result` **or** an `AsyncResult` (never a raw `Promise`); a
+   * throw becomes a `Defect`.
+   */
+  flatMap<U, E2>(f: (value: T) => Result<U, E2> | AsyncResult<U, E2>): AsyncResult<U, E | E2>;
+  /**
+   * Asynchronous {@link ResultMethods.tap | tap}. `f` is synchronous; a throw
+   * becomes a `Defect`.
+   */
+  tap(f: (value: T) => void): AsyncResult<T, E>;
+  /**
+   * Asynchronous {@link ResultMethods.flatTap | flatTap} — a failable tap that
+   * keeps the original value. `f` may return a `Result` **or** an `AsyncResult`;
+   * its `Ok` value is discarded, an `Err`/`Defect` short-circuits, and a throw
+   * becomes a `Defect`.
+   */
+  flatTap<E2>(
+    f: (value: T) => Result<unknown, E2> | AsyncResult<unknown, E2>,
+  ): AsyncResult<T, E | E2>;
+  /**
+   * Asynchronous {@link ResultMethods.bind | bind} (do-notation). `f` may return
+   * a `Result` **or** an `AsyncResult`; its value is bound under `name` in the
+   * accumulating scope.
+   */
+  bind<K extends string, U, E2>(
+    name: K,
+    f: (scope: T) => Result<U, E2> | AsyncResult<U, E2>,
+  ): AsyncResult<Bound<T, K, U>, E | E2>;
+  /**
+   * Asynchronous {@link ResultMethods.let | let} (do-notation). `f` returns a
+   * plain value, bound under `name`.
+   */
+  let<K extends string, U>(name: K, f: (scope: T) => U): AsyncResult<Bound<T, K, U>, E>;
+  /** Asynchronous {@link ResultMethods.as | as}: replaces the value with `value`. */
+  as<U>(value: U): AsyncResult<U, E>;
+
+  /**
+   * Asynchronous {@link ResultMethods.mapErr | mapErr}. `f` is synchronous; a
+   * throw becomes a `Defect`.
+   */
+  mapErr<E2>(f: (error: E) => E2): AsyncResult<T, E2>;
+  /**
+   * Asynchronous {@link ResultMethods.orElse | orElse}. `f` may return a `Result`
+   * or an `AsyncResult`.
+   */
+  orElse<U, E2>(f: (error: E) => Result<U, E2> | AsyncResult<U, E2>): AsyncResult<T | U, E2>;
+  /**
+   * Asynchronous {@link ResultMethods.recover | recover}. `f` is synchronous; a
+   * throw becomes a `Defect`.
+   */
+  recover<U>(f: (error: E) => U): AsyncResult<T | U, never>;
+  /**
+   * Asynchronous {@link ResultMethods.tapErr | tapErr}. `f` is synchronous; a
+   * throw becomes a `Defect`.
+   */
+  tapErr(f: (error: E) => void): AsyncResult<T, E>;
+  /**
+   * Asynchronous {@link ResultMethods.flatTapErr | flatTapErr} — the
+   * error-channel mirror of `flatTap`. `f` may return a `Result` **or** an
+   * `AsyncResult`; its `Ok` value is discarded, an `Err`/`Defect` from `f`
+   * threads through, and a throw becomes a `Defect`.
+   */
+  flatTapErr<E2>(
+    f: (error: E) => Result<unknown, E2> | AsyncResult<unknown, E2>,
+  ): AsyncResult<T, E | E2>;
+
+  /**
+   * Asynchronous {@link ResultMethods.recoverDefect | recoverDefect}. `f` may
+   * return a `Result` or an `AsyncResult`.
+   */
+  recoverDefect<U, E2>(
+    f: (cause: unknown) => Result<U, E2> | AsyncResult<U, E2>,
+  ): AsyncResult<T | U, E | E2>;
+  /** Asynchronous {@link ResultMethods.tapDefect | tapDefect}. */
+  tapDefect(f: (cause: unknown) => void): AsyncResult<T, E>;
+
+  /**
+   * Asynchronous {@link ResultMethods.match | match}. Handlers are synchronous;
+   * resolves to a `Promise<R>`.
+   */
+  match<R>(cases: {
+    ok: (value: T) => R;
+    err: (error: E) => R;
+    defect: (cause: unknown) => R;
+  }): Promise<R>;
+  /**
+   * Asynchronous {@link ResultMethods.unwrap | unwrap}. The returned promise
+   * rejects on `Err`/`Defect`.
+   */
+  unwrap(): Promise<T>;
+  /** Asynchronous {@link ResultMethods.unwrapErr | unwrapErr}. */
+  unwrapErr(): Promise<E>;
+  /** Asynchronous {@link ResultMethods.unwrapOr | unwrapOr}. */
+  unwrapOr(fallback: T): Promise<T>;
+  /** Asynchronous {@link ResultMethods.unwrapOrElse | unwrapOrElse}. */
+  unwrapOrElse(f: (error: E) => T): Promise<T>;
+  /** Asynchronous {@link ResultMethods.getOrNull | getOrNull}. */
+  getOrNull(): Promise<T | null>;
+  /** Asynchronous {@link ResultMethods.getOrUndefined | getOrUndefined}. */
+  getOrUndefined(): Promise<T | undefined>;
+};
+
+/**
+ * The asynchronous counterpart of {@link Result}: an awaitable wrapper carrying
+ * the {@link AsyncResultMethods} surface, collapsing to a `Result<T, E>` when
+ * `await`-ed.
  *
  * @remarks
  * **Combinator callbacks are synchronous.** A raw `Promise` may never enter an
@@ -399,88 +529,15 @@ export type Awaitable<T> = {
  * qualified boundary and compose it: `ar.flatMap((v) => fromPromise(work(v),
  * qualify))`. The eliminators (`unwrap`, …) return promises; the binds
  * (`flatMap`, `flatTap`, `orElse`, `recoverDefect`) additionally accept an
- * `AsyncResult`.
+ * `AsyncResult`. Its combinators are documented one per entry on
+ * {@link AsyncResultMethods}.
  *
  * To pattern-match an `AsyncResult`, `await` it first: `match(await ar)`.
  *
  * @typeParam T - the success value type.
  * @typeParam E - the modeled error type.
  */
-export type AsyncResult<T, E> = Awaitable<Result<T, E>> & {
-  /** Asynchronous `map`. `f` is synchronous; a throw becomes a `Defect`. */
-  map<U>(f: (value: T) => U): AsyncResult<U, E>;
-  /**
-   * Asynchronous `flatMap`. `f` may return a `Result` **or** an `AsyncResult`
-   * (never a raw `Promise`); a throw becomes a `Defect`.
-   */
-  flatMap<U, E2>(f: (value: T) => Result<U, E2> | AsyncResult<U, E2>): AsyncResult<U, E | E2>;
-  /** Asynchronous `tap`. `f` is synchronous; a throw becomes a `Defect`. */
-  tap(f: (value: T) => void): AsyncResult<T, E>;
-  /**
-   * Asynchronous `flatTap` — a failable tap that keeps the original value. `f`
-   * may return a `Result` **or** an `AsyncResult`; its `Ok` value is discarded,
-   * an `Err`/`Defect` short-circuits, and a throw becomes a `Defect`.
-   */
-  flatTap<E2>(
-    f: (value: T) => Result<unknown, E2> | AsyncResult<unknown, E2>,
-  ): AsyncResult<T, E | E2>;
-  /**
-   * Asynchronous `bind` (do-notation). `f` may return a `Result` **or** an
-   * `AsyncResult`; its value is bound under `name` in the accumulating scope.
-   */
-  bind<K extends string, U, E2>(
-    name: K,
-    f: (scope: T) => Result<U, E2> | AsyncResult<U, E2>,
-  ): AsyncResult<Bound<T, K, U>, E | E2>;
-  /** Asynchronous `let` (do-notation). `f` returns a plain value, bound under `name`. */
-  let<K extends string, U>(name: K, f: (scope: T) => U): AsyncResult<Bound<T, K, U>, E>;
-  /** Asynchronous `as`. */
-  as<U>(value: U): AsyncResult<U, E>;
-
-  /** Asynchronous `mapErr`. `f` is synchronous; a throw becomes a `Defect`. */
-  mapErr<E2>(f: (error: E) => E2): AsyncResult<T, E2>;
-  /** Asynchronous `orElse`. `f` may return a `Result` or an `AsyncResult`. */
-  orElse<U, E2>(f: (error: E) => Result<U, E2> | AsyncResult<U, E2>): AsyncResult<T | U, E2>;
-  /** Asynchronous `recover`. `f` is synchronous; a throw becomes a `Defect`. */
-  recover<U>(f: (error: E) => U): AsyncResult<T | U, never>;
-  /** Asynchronous `tapErr`. `f` is synchronous; a throw becomes a `Defect`. */
-  tapErr(f: (error: E) => void): AsyncResult<T, E>;
-  /**
-   * Asynchronous `flatTapErr` — a failable tap on the error that keeps the
-   * original error. `f` may return a `Result` **or** an `AsyncResult`; its `Ok`
-   * value is discarded, an `Err`/`Defect` from `f` threads through, and a throw
-   * becomes a `Defect`.
-   */
-  flatTapErr<E2>(
-    f: (error: E) => Result<unknown, E2> | AsyncResult<unknown, E2>,
-  ): AsyncResult<T, E | E2>;
-
-  /** Asynchronous `recoverDefect`. `f` may return a `Result` or an `AsyncResult`. */
-  recoverDefect<U, E2>(
-    f: (cause: unknown) => Result<U, E2> | AsyncResult<U, E2>,
-  ): AsyncResult<T | U, E | E2>;
-  /** Asynchronous `tapDefect`. */
-  tapDefect(f: (cause: unknown) => void): AsyncResult<T, E>;
-
-  /** Asynchronous `match`. Handlers are synchronous; resolves to `R`. */
-  match<R>(cases: {
-    ok: (value: T) => R;
-    err: (error: E) => R;
-    defect: (cause: unknown) => R;
-  }): Promise<R>;
-  /** Asynchronous `unwrap`. The returned promise rejects on `Err`/`Defect`. */
-  unwrap(): Promise<T>;
-  /** Asynchronous `unwrapErr`. */
-  unwrapErr(): Promise<E>;
-  /** Asynchronous `unwrapOr`. */
-  unwrapOr(fallback: T): Promise<T>;
-  /** Asynchronous `unwrapOrElse`. */
-  unwrapOrElse(f: (error: E) => T): Promise<T>;
-  /** Asynchronous `getOrNull`. */
-  getOrNull(): Promise<T | null>;
-  /** Asynchronous `getOrUndefined`. */
-  getOrUndefined(): Promise<T | undefined>;
-};
+export type AsyncResult<T, E> = Awaitable<Result<T, E>> & AsyncResultMethods<T, E>;
 
 /**
  * Extract the success type `T` from a `Result` type — derive one type from
