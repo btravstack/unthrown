@@ -109,6 +109,21 @@ function toBeErr(this: MatcherState, received: unknown): MatcherResult {
   });
 }
 
+function toBeErrWith(this: MatcherState, received: unknown, expected: unknown): MatcherResult {
+  const { stringify } = this.utils;
+  const { equals } = this;
+  return settle(received, stringify, (result) => {
+    const pass = isErr(result) && equals(result.error, expected);
+    return {
+      pass,
+      message: () =>
+        pass
+          ? `expected result not to be Err(${stringify(expected)})`
+          : `expected result to be Err(${stringify(expected)}), but got ${render(result, stringify)}`,
+    };
+  });
+}
+
 function toBeErrTagged(
   this: MatcherState,
   received: unknown,
@@ -165,9 +180,9 @@ function toBeDefect(this: MatcherState, received: unknown): MatcherResult {
   });
 }
 
-expect.extend({ toBeOk, toBeOkWith, toBeErr, toBeErrTagged, toBeDefect });
+expect.extend({ toBeDefect, toBeErr, toBeErrTagged, toBeErrWith, toBeOk, toBeOkWith });
 
-export { toBeDefect, toBeErr, toBeErrTagged, toBeOk, toBeOkWith };
+export { toBeDefect, toBeErr, toBeErrTagged, toBeErrWith, toBeOk, toBeOkWith };
 
 /**
  * The matchers `@unthrown/vitest` contributes to Vitest's `expect`. For an
@@ -214,6 +229,7 @@ export type UnthrownMatchers<R = unknown> = {
    * `expect(result).toBeErrTagged("NotFound", { id })` asserts the tag and payload.
    */
   toBeErrTagged: (tag: string, expected?: unknown) => R;
+  toBeErrWith: (value: unknown) => R;
   /** `expect(result).toBeDefect()` asserts the result is a `Defect`. */
   toBeDefect: () => R;
 };

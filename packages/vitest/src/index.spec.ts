@@ -68,6 +68,14 @@ describe("toBeErr / toBeErrTagged", () => {
     expect(r).toBeErrTagged("MyError"); // one-arg: tag-only, passes
     expect(r).not.toBeErrTagged("MyError", undefined); // explicit undefined: payload {code:1} !== undefined
   });
+
+  it("toBeErrWith compares the error value deeply", () => {
+    expect(Err("boom")).toBeErrWith("boom");
+    expect(Err({ code: 404 })).toBeErrWith({ code: 404 });
+    expect(Err("boom")).not.toBeErrWith("other");
+    expect(Ok(1)).not.toBeErrWith(1);
+    expect(Err({ code: 404, detail: "x" })).toBeErrWith(expect.objectContaining({ code: 404 }));
+  });
 });
 
 describe("toBeDefect", () => {
@@ -115,6 +123,9 @@ describe("failure messages", () => {
 
   it("reports the expected value/tag on the other matchers", () => {
     expect(() => expect(Ok(1)).toBeOkWith(2)).toThrowError(/to be Ok\(2\), but got Ok\(1\)/);
+    expect(() => expect(Err("boom")).toBeErrWith("nope")).toThrowError(
+      /to be Err\("nope"\), but got Err\("boom"\)/,
+    );
     expect(() => expect(Ok(1)).toBeErrTagged("Nope")).toThrowError(
       /to be Err tagged "Nope", but got Ok\(1\)/,
     );
@@ -134,6 +145,9 @@ describe("failure messages", () => {
     expect(() => expect(Ok(1)).not.toBeOkWith(1)).toThrowError(/not to be Ok\(1\)/);
     expect(() => expect(Err("e")).not.toBeErr()).toThrowError(
       /not to be Err, but it was Err\("e"\)/,
+    );
+    expect(() => expect(Err("boom")).not.toBeErrWith("boom")).toThrowError(
+      /not to be Err\("boom"\)/,
     );
     expect(() => expect(Err(new MyError({ code: 1 }))).not.toBeErrTagged("MyError")).toThrowError(
       /not to be Err tagged "MyError"/,
