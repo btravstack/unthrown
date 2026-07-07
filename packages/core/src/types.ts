@@ -506,15 +506,33 @@ export type AsyncResultMethods<T, E> = {
    * rejects on `Err`/`Defect`.
    */
   unwrap(): Promise<T>;
-  /** Asynchronous {@link ResultMethods.unwrapErr | unwrapErr}. */
+  /**
+   * Asynchronous {@link ResultMethods.unwrapErr | unwrapErr}. The returned
+   * promise rejects on `Ok` (an `UnwrapError`) and on a `Defect` (the original
+   * cause).
+   */
   unwrapErr(): Promise<E>;
-  /** Asynchronous {@link ResultMethods.unwrapOr | unwrapOr}. */
+  /**
+   * Asynchronous {@link ResultMethods.unwrapOr | unwrapOr}. Recovers an `Err` to
+   * `fallback`, but the returned promise still **rejects on a `Defect`** (the
+   * original cause) — a defect is a bug, not an absent value.
+   */
   unwrapOr(fallback: T): Promise<T>;
-  /** Asynchronous {@link ResultMethods.unwrapOrElse | unwrapOrElse}. */
+  /**
+   * Asynchronous {@link ResultMethods.unwrapOrElse | unwrapOrElse}. Recovers an
+   * `Err` via `f`, but the returned promise still **rejects on a `Defect`**.
+   */
   unwrapOrElse(f: (error: E) => T): Promise<T>;
-  /** Asynchronous {@link ResultMethods.getOrNull | getOrNull}. */
+  /**
+   * Asynchronous {@link ResultMethods.getOrNull | getOrNull}. Resolves `null` on
+   * an `Err`, but the returned promise still **rejects on a `Defect`**.
+   */
   getOrNull(): Promise<T | null>;
-  /** Asynchronous {@link ResultMethods.getOrUndefined | getOrUndefined}. */
+  /**
+   * Asynchronous {@link ResultMethods.getOrUndefined | getOrUndefined}. Resolves
+   * `undefined` on an `Err`, but the returned promise still **rejects on a
+   * `Defect`**.
+   */
   getOrUndefined(): Promise<T | undefined>;
 };
 

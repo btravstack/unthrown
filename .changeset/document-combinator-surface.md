@@ -1,5 +1,5 @@
 ---
-"unthrown": patch
+"unthrown": minor
 ---
 
 Document the fluent combinators on the generated API reference. The method
