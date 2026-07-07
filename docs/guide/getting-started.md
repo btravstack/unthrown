@@ -64,10 +64,10 @@ parseAge("42")
 ```
 
 ```ts
-const tooYoung = parseAge("x") // => Err("not_a_number")
+const parsed = parseAge("x") // => Err("not_a_number")
   .map((n) => n + 1); // callback never runs — still Err("not_a_number")
 
-if (tooYoung.isErr()) tooYoung.error; // => "not_a_number"
+if (parsed.isErr()) parsed.error; // => "not_a_number"
 ```
 
 Reach for `map` when your callback returns a plain value, `flatMap` when it

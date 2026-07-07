@@ -136,8 +136,9 @@ the other's fallback — a defect flows past `recover` untouched.
 Reach for an eliminator once you're done chaining:
 
 - `match` — the default at the edge; fold all three channels into one value.
-- `unwrap` / `unwrapErr` — extract, throwing on the wrong variant (and
-  _panicking_ on a defect).
+- `unwrap` / `unwrapErr` — extract; type-gated to compile only when the
+  opposite channel is `never` (`unwrap` needs `Result<T, never>`, `unwrapErr`
+  needs `Result<never, E>`), and _panicking_ (rethrowing the cause) on a defect.
 - `unwrapOr` / `unwrapOrElse` / `getOrNull` / `getOrUndefined` — recover an `Err`
   to a fallback, but **re-throw a defect** (it's a bug, not an absent value).
 
