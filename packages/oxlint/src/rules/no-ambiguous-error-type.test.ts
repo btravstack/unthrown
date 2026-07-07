@@ -15,6 +15,19 @@ ruleTester.run("no-ambiguous-error-type", noAmbiguousErrorType, {
     { code: `import type { Result } from "unthrown";\ntype T = Result<number, { code: number }>;` },
     // A `Result` from another library is none of our business.
     { code: `import type { Result } from "neverthrow";\ntype T = Result<number, unknown>;` },
+    // A user's own `type Error` is not the ambiguous global — resolve by scope,
+    // not by name. (Regression guard for the bare-`Error` false positive.)
+    {
+      code: `import type { Result } from "unthrown";\ntype Error = { code: number };\ntype T = Result<number, Error>;`,
+    },
+    // A generic parameter literally named `Error` is a concrete type variable.
+    {
+      code: `import type { Result } from "unthrown";\nfunction f<Error>(): Result<number, Error> { throw 0; }`,
+    },
+    // A generic error parameter `E` is concrete — never treat it as ambiguous.
+    {
+      code: `import type { Result } from "unthrown";\nfunction f<E>(): Result<number, E> { throw 0; }`,
+    },
   ],
   invalid: [
     {
@@ -31,6 +44,19 @@ ruleTester.run("no-ambiguous-error-type", noAmbiguousErrorType, {
     },
     {
       code: `import type { Result } from "unthrown";\ntype T = Result<number, {}>;`,
+      errors: [{ messageId: "noAmbiguousErrorType" }],
+    },
+    // The primitive / non-domain keywords are all ambiguous, not just any/unknown.
+    {
+      code: `import type { Result } from "unthrown";\ntype T = Result<number, string>;`,
+      errors: [{ messageId: "noAmbiguousErrorType" }],
+    },
+    {
+      code: `import type { Result } from "unthrown";\ntype T = Result<number, object>;`,
+      errors: [{ messageId: "noAmbiguousErrorType" }],
+    },
+    {
+      code: `import type { Result } from "unthrown";\ntype T = Result<number, null>;`,
       errors: [{ messageId: "noAmbiguousErrorType" }],
     },
     {
