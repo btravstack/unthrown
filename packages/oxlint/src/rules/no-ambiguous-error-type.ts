@@ -3,8 +3,9 @@ import { defineRule } from "@oxlint/plugins";
 import { getImportSource } from "../helpers/get-import-source.js";
 import { hasTypeArguments } from "../helpers/has-type-arguments.js";
 import { isIdentifierTypeName } from "../helpers/is-identifier-type-name.js";
+import { isLocallyBound } from "../helpers/is-locally-bound.js";
 
-import type { ESTree } from "@oxlint/plugins";
+import type { ESTree, Scope } from "@oxlint/plugins";
 
 const MODULE = "unthrown";
 const RESULT_TYPES = ["Result", "AsyncResult"] as const;
@@ -50,11 +51,11 @@ export const noAmbiguousErrorType = defineRule({
         if (!isIdentifierTypeName(node, RESULT_TYPES)) return;
         if (!hasTypeArguments(node, 2)) return;
 
-        const importSource = getImportSource(context.sourceCode.getScope(node), node.typeName);
-        if (importSource !== MODULE) return;
+        const scope = context.sourceCode.getScope(node);
+        if (getImportSource(scope, node.typeName) !== MODULE) return;
 
         const errorNode: ESTree.TSType = node.typeArguments.params[1];
-        if (!isAmbiguousType(errorNode)) return;
+        if (!isAmbiguousType(errorNode, scope)) return;
 
         context.report({
           node: errorNode,
@@ -72,17 +73,24 @@ export const noAmbiguousErrorType = defineRule({
 /**
  * Whether an error-position type is non-specific. Recurses into unions and
  * intersections, so `MyError | unknown` and `Error | MyError` are flagged too —
- * one ambiguous member taints the whole type.
+ * one ambiguous member taints the whole type. `scope` is threaded through so the
+ * bare-`Error` check can resolve the identifier: only the ambient global `Error`
+ * is flagged, never a locally-declared `type Error` or a generic `<Error>`.
  */
-function isAmbiguousType(node: ESTree.TSType): boolean {
+function isAmbiguousType(node: ESTree.TSType, scope: Scope): boolean {
   if (node.type === "TSUnionType" || node.type === "TSIntersectionType") {
-    return node.types.some(isAmbiguousType);
+    return node.types.some((member) => isAmbiguousType(member, scope));
   }
   // The *empty* object literal `{}` is ambiguous; `{ code: number }` is fine.
   if (node.type === "TSTypeLiteral") return node.members.length === 0;
-  // The bare `Error` class is too generic; a `MyError` is fine.
+  // The bare global `Error` class is too generic; a `MyError` — or a user's own
+  // `type Error` / generic `<Error>` — is fine, so resolve it through scope.
   if (node.type === "TSTypeReference") {
-    return node.typeName.type === "Identifier" && node.typeName.name === "Error";
+    return (
+      node.typeName.type === "Identifier" &&
+      node.typeName.name === "Error" &&
+      !isLocallyBound(scope, node.typeName)
+    );
   }
   return AMBIGUOUS_KEYWORDS.has(node.type);
 }
