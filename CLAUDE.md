@@ -83,12 +83,16 @@ was planned).
   (widened cast, JS caller) an unknown or reserved (`"Ok"`/`"Defect"`) `_tag`
   routes to the `Defect` handler; reserved tags in `E` are additionally a
   compile error.
-- **`unwrap()` is asymmetric.** On `Err` it throws a `UnwrapError` carrying `E`
-  (on both the typed `.error` property and the standard `Error.cause`, so an
-  `Error`-typed `E` chains its original stack under "caused by").
-  On a `Defect` it **rethrows the original `cause`** (it _panics_) with its
-  original stack, so an unhandled defect hits the global handler looking like the
-  real failure.
+- **`unwrap()` / `unwrapErr()` are type-gated.** `unwrap()` compiles only when the
+  error channel is empty (`this: Result<T, never>`); `unwrapErr()` only when the
+  success channel is empty (`this: Result<never, E>`). Eliminate the opposite
+  channel first (`match` / `recover` / `orElse`), or use the `unwrapOr` /
+  `unwrapOrElse` / `getOrNull` / `getOrUndefined` family (which recover an `Err`).
+  On a `Defect` they still **rethrow the original `cause`** (they _panic_) with its
+  original stack — so `Result<T, never>` means the modeled error channel is empty,
+  **not** that `unwrap()` cannot throw. The `UnwrapError`-on-wrong-variant branch
+  remains at runtime as a defensive guard but is **unreachable through well-typed
+  code** (only a cast or a raw-JS caller can reach it).
 - **`recover` returns `Result<T | U, never>`, and `never` means only the _error_
   channel is empty — a `Defect` can still be present at runtime.** This is the one
   place the type intentionally under-describes the runtime. Do not read `never`
@@ -127,9 +131,13 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   mirror of `flatTap` — runs a `Result`-returning effect on the error, keeps the
   original error, threads the effect's error)
 - defect: `recoverDefect`, `tapDefect`
-- eliminate: `match`, `unwrap`, `unwrapErr`, `unwrapOr` (signature
-  `unwrapOr<U>(fallback: U): T | U` — widening, not narrowed to `T`),
-  `unwrapOrElse` (same `T | U` widening), `getOrNull`, `getOrUndefined`
+- eliminate: `match`, `unwrap`/`unwrapErr` (type-gated — `unwrap` only compiles on
+  `Result<T, never>`, `unwrapErr` only on `Result<never, E>`; use `match` /
+  `recover` / `orElse` to empty the opposite channel first), `unwrapOr` (signature
+  `unwrapOr<U>(fallback: U): T | U` — widening, not narrowed to `T`), `unwrapOrElse`
+  (same `T | U` widening), `getOrNull`, `getOrUndefined` — the `unwrapOr…`/`getOr…`
+  family extracts from a still-fallible `Result` with a fallback, since
+  `unwrap`/`unwrapErr` won't compile on it
 - guards: methods `isOk`/`isErr`/`isDefect` **and** standalone
   `isOk`/`isErr`/`isDefect` both narrow (to `OkView`/`ErrView`/`DefectView`) — the
   methods are `this is …` type predicates, so `if (r.isErr()) r.error` compiles.
