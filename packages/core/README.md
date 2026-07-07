@@ -11,7 +11,10 @@ pnpm add unthrown
 ```
 
 ```ts
-import { Ok, Err, fromPromise, type Result } from "unthrown";
+import { fromPromise, TaggedError } from "unthrown";
+
+class NotFound extends TaggedError("NotFound") {} // our modeled domain failure
+class NotFoundError extends Error {} // what `fetchUser` rejects with on a 404
 
 const user = fromPromise(fetchUser(id), (cause, defect) =>
   cause instanceof NotFoundError ? new NotFound() : defect(cause),

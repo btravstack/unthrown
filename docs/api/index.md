@@ -6,7 +6,8 @@ This reference is generated from the source with
 ## Packages
 
 - [**unthrown**](./core/) — the core `Result` / `AsyncResult` types,
-  constructors (`Ok`, `Err`, `Defect`), guards, boundary interop
+  constructors (`Ok`, `Err` — a `Defect` has no constructor; it arises only at
+  boundaries), guards, boundary interop
   (`fromNullable`, `fromThrowable`, `fromPromise`, `fromSafePromise`),
   aggregation (`all`), and the tagged-error utilities (`TaggedError`,
   `matchTags`).
