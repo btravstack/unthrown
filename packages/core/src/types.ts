@@ -262,18 +262,23 @@ export type ResultMethods<T, E> = {
   /**
    * Extract the success value.
    *
+   * @remarks
+   * Compiles only when the error channel is empty (`E = never`) — eliminate
+   * modeled errors first (`match` / `recover` / `orElse`). A `Defect` still
+   * **rethrows its original cause** (a defect is a bug, not an absent value).
+   *
    * @returns the `Ok` value.
-   * @throws On `Err`, an {@link UnwrapError} carrying the error. On a `Defect`,
-   * re-throws the **original cause** with its original stack, so an unhandled
-   * Defect surfaces at the global handler as the real failure.
    */
   unwrap(this: Result<T, never>): T;
   /**
    * Extract the modeled error.
    *
+   * @remarks
+   * Compiles only when the success channel is empty (`T = never`) — eliminate
+   * the success case first. A `Defect` still **rethrows its original cause**
+   * (a defect is a bug, not an absent value).
+   *
    * @returns the `Err` value.
-   * @throws On `Ok`, an {@link UnwrapError} carrying the value. On a `Defect`,
-   * re-throws the original cause.
    */
   unwrapErr(this: Result<never, E>): E;
   /**

@@ -57,14 +57,17 @@ can chain without checking at every step:
 parseAge("42")
   .map((n) => n + 1) // => Ok(43)   — map: callback returns a plain value
   .flatMap((n) => (n >= 18 ? Ok(n) : Err("underage"))) // => Ok(43) — flatMap: callback returns a Result
-  .unwrap(); // => 43
+  .unwrapOrElse((e) => {
+    throw new Error(e); // eliminate the error channel first — unwrap() needs E = never
+  }); // => 43
 // the error type widens to AgeError | "underage" — flatMap unions the channels
 ```
 
 ```ts
-parseAge("x") // => Err("not_a_number")
-  .map((n) => n + 1) // callback never runs — still Err("not_a_number")
-  .unwrapErr(); // => "not_a_number"
+const tooYoung = parseAge("x") // => Err("not_a_number")
+  .map((n) => n + 1); // callback never runs — still Err("not_a_number")
+
+if (tooYoung.isErr()) tooYoung.error; // => "not_a_number"
 ```
 
 Reach for `map` when your callback returns a plain value, `flatMap` when it

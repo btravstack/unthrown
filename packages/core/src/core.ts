@@ -38,6 +38,11 @@ import type {
  * A `Defect` is never wrapped in an `UnwrapError`: its original cause is
  * re-thrown (with its original stack) instead.
  *
+ * `unwrap()` and `unwrapErr()` are type-gated (`this: Result<T, never>` /
+ * `Result<never, E>`), so the wrong-variant branch that throws this is
+ * unreachable through well-typed code — it remains only as a defensive guard
+ * against unsound runtime misuse (e.g. an `as` cast past the gate).
+ *
  * @typeParam E - the type of the {@link UnwrapError.error} it carries.
  *
  * @category Errors

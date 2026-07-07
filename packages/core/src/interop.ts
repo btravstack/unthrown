@@ -27,9 +27,9 @@ import type { AsyncErrOf, AsyncOkOf, AsyncResult, ErrOf, OkOf, Result } from "./
  * import { fromNullable } from "unthrown";
  *
  * const map = new Map([["a", 1]]);
- * fromNullable(map.get("a"), () => "absent").unwrap(); // => 1
+ * fromNullable(map.get("a"), () => "absent").unwrapOr(0); // => 1
  * fromNullable(map.get("z"), () => "absent"); // => Err("absent")
- * fromNullable(0, () => "absent").unwrap(); // => 0 (falsy but present)
+ * fromNullable(0, () => "absent").unwrapOr(-1); // => 0 (falsy but present)
  * ```
  */
 export function fromNullable<T, E>(
@@ -77,7 +77,7 @@ export function fromNullable<T, E>(
  *     cause instanceof SyntaxError ? ("invalid_json" as const) : defect(cause),
  * );
  *
- * parse('{"ok":true}').unwrap(); // => { ok: true }
+ * parse('{"ok":true}').unwrapOr(null); // => { ok: true }
  * parse("nope"); // => Err("invalid_json")
  * ```
  */
@@ -129,8 +129,8 @@ export function fromThrowable<A extends unknown[], T, R>(
  *   cause instanceof NotFoundError ? ("not_found" as const) : defect(cause),
  * );
  *
- * user.unwrap(); // => the fetched user (on success)
- * // when fetchUser rejects with NotFoundError: => Err("not_found")
+ * if (user.isOk()) user.value; // => the fetched user
+ * // when fetchUser rejects with NotFoundError: user is Err("not_found")
  * ```
  */
 export function fromPromise<T, R>(
