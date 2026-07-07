@@ -575,7 +575,11 @@ export type AsyncResultMethods<T, E> = {
    * rejects on a `Defect` (rethrowing its cause).
    */
   unwrap(this: AsyncResult<T, never>): Promise<T>;
-  /** Asynchronous {@link ResultMethods.unwrapErr | unwrapErr}. */
+  /**
+   * Asynchronous {@link ResultMethods.unwrapErr | unwrapErr}. Compiles only when
+   * the success channel is empty (`this: AsyncResult<never, E>`); the returned
+   * promise rejects on a `Defect` (rethrowing its cause).
+   */
   unwrapErr(this: AsyncResult<never, E>): Promise<E>;
   /** Asynchronous {@link ResultMethods.unwrapOr | unwrapOr}. */
   unwrapOr<U>(fallback: U): Promise<T | U>;
