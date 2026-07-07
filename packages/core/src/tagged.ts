@@ -23,14 +23,19 @@ export type TaggedErrorInstance<Tag extends string, A extends Props> = Error &
  *
  * @remarks
  * When the payload is empty, the constructor takes **no** arguments (the
- * `keyof A extends never ? void : A` trick); otherwise it takes the payload.
+ * `keyof A extends never ? void : A` trick); otherwise it takes the payload. A
+ * `name` key is **rejected** (`name?: never`) because it is reserved for the
+ * display label — mirroring how {@link TaggedErrorInstance} excludes it — so the
+ * reservation is enforced at the call site, not just ignored at runtime.
  *
  * @typeParam Tag - the string literal discriminant.
  *
  * @category Types
  */
 export type TaggedErrorConstructor<Tag extends string> = {
-  new <A extends Props = {}>(args: keyof A extends never ? void : A): TaggedErrorInstance<Tag, A>;
+  new <A extends Props = {}>(
+    args: keyof A extends never ? void : A & { readonly name?: never },
+  ): TaggedErrorInstance<Tag, A>;
 };
 
 /**
@@ -43,8 +48,8 @@ export type TaggedErrorConstructor<Tag extends string> = {
  * field in the payload is forwarded to `Error`. The `_tag` always reflects
  * `tag` and cannot be overridden by the payload. `name` is likewise reserved —
  * it is the display label (set it with `options.name`); a payload `name` is
- * ignored at runtime and excluded from the instance type, so it can't shadow
- * `Error.name`.
+ * rejected at compile time (and excluded from the instance type), so it can't
+ * shadow `Error.name`.
  *
  * `_tag` is the discriminant used by {@link matchTags}; `Error.name` is the
  * human-facing label in stack traces and logs. By default they coincide, but

@@ -29,6 +29,7 @@ import {
   type OkOf,
   type Result,
   TaggedError,
+  type TaggedErrorInstance,
 } from "./index.js";
 
 // --- assertion helpers -------------------------------------------------------
@@ -230,3 +231,14 @@ matchTags(tagged, { Ok: () => 1, Defect: () => 2, TagA: () => 3 });
 // `_tag` is the literal; `options.name` is independent (still a literal `_tag`)
 class Named extends TaggedError("@scope/Named", { name: "Named" }) {}
 type _namedTag = Expect<Equal<(typeof Named)["prototype"]["_tag"], "@scope/Named">>;
+
+// `name` is reserved (the display label) — rejected as a payload key at the call
+// site, and never shadowed on the instance type.
+class WithCode extends TaggedError("WithCode")<{ code: number }> {}
+new WithCode({ code: 1 });
+// @ts-expect-error - a `name` payload key is reserved, not constructable
+new WithCode({ code: 1, name: "nope" });
+// Even a forced `name` payload does not narrow `Error.name`: it stays `string`.
+type _nameNotShadowed = Expect<
+  Equal<TaggedErrorInstance<"X", { code: number; name: "lit" }>["name"], string>
+>;
