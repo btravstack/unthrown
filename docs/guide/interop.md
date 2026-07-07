@@ -89,8 +89,11 @@ import { z } from "zod";
 
 const parseUser = fromSchema(z.object({ id: z.string() }));
 
-parseUser({ id: "u_1" }).unwrap(); // { id: "u_1" }
-parseUser({ id: 1 }).unwrapErr(); // readonly StandardSchemaV1.Issue[]
+const ok = parseUser({ id: "u_1" });
+if (ok.isOk()) ok.value; // { id: "u_1" }
+
+const bad = parseUser({ id: 1 });
+if (bad.isErr()) bad.error; // readonly StandardSchemaV1.Issue[]
 ```
 
 - `fromSchema(schema)` → `(input) => Result<Output, Issues>` for a synchronous
