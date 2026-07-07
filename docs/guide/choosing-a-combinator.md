@@ -4,10 +4,13 @@ The method surface is small, but "which one do I reach for?" comes up constantly
 This page is the cheat sheet. Every combinator runs its callback **only on its own
 channel** and turns a thrown callback into a `Defect`.
 
-Everything here works the **same on `Result` and `AsyncResult`** — they share one
-method surface, so both tables below apply to each. The handful of async-only
-rules (and how to move between the two types) are in
-[Result and AsyncResult](#result-and-asyncresult) at the bottom.
+`Result` and `AsyncResult` expose the **same set of combinators** with the same
+per-channel behavior, so the tables below — read _by intent_ — apply to both.
+Their _signatures_ differ, though: an `AsyncResult` combinator returns an
+`AsyncResult` (its eliminators a `Promise`), and its binds also accept an
+`AsyncResult`. The handful of async-only rules (and how to move between the two
+types) are in [Result and AsyncResult](#result-and-asyncresult) at the bottom;
+for the exact per-type signatures see the API reference linked just below.
 
 ::: tip Full per-method reference
 These tables are the _selection_ cheat-sheet — which combinator to reach for. For
