@@ -24,4 +24,5 @@ export type {
   ErrView,
   OkOf,
   OkView,
+  ResultMethods,
 } from "./types.js";
