@@ -5,6 +5,7 @@
   "categoryOrder": [
     "Facade",
     "Types",
+    "Methods",
     "Constructors",
     "Interop",
     "Do-notation",
@@ -19,7 +20,6 @@
     "AsyncResult",
     "Defect",
     "Props",
-    "ResultMethods",
     "AllOk",
     "ResultRecord",
     "AsyncResultRecord"

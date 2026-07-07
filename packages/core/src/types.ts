@@ -19,15 +19,20 @@ export type Prettify<T> = { [K in keyof T]: T[K] } & {};
 export type Bound<T, K extends string, U> = Prettify<Omit<T, K> & { readonly [P in K]: U }>;
 
 /**
- * The method surface every {@link Result} variant carries. Factored out so the
- * three variants ({@link OkView}, {@link ErrView}, {@link DefectView}) can each
- * intersect it. Not part of the public API on its own — a `Result` is a
- * discriminated union, so its combinators are documented by intent in the
- * "Choosing a combinator" guide rather than as a standalone type here.
+ * The fluent method surface every {@link Result} variant carries — the
+ * combinators (`map`, `flatMap`, `mapErr`, `match`, `unwrap`, …), documented one
+ * per entry below. Factored out so the three variants ({@link OkView},
+ * {@link ErrView}, {@link DefectView}) can each intersect it; {@link AsyncResult}
+ * mirrors this surface with async signatures.
+ *
+ * @remarks
+ * This type exists to **document** the surface and to power narrowing — not to be
+ * authored against. You obtain it by holding a `Result` (or `AsyncResult`), never
+ * by implementing your own `Result`-like; treat it as read-only reference.
  *
  * @typeParam T - the success value type.
  * @typeParam E - the modeled error type.
- * @internal
+ * @category Methods
  */
 export type ResultMethods<T, E> = {
   /**
