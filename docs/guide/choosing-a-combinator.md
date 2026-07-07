@@ -26,24 +26,34 @@ The `→ Result<…>` half of each signature is the tell — it shows how the co
 moves the channels: `flatMap` widens `E` to `E | E2`, `recover` empties it to
 `never`, `orElse` widens the value to `T | U`.
 
-| I want to…                                     | use               | signature                                                    | channel |
-| ---------------------------------------------- | ----------------- | ------------------------------------------------------------ | ------- |
-| transform the success value                    | `map`             | `(v: T) => U` → `Result<U, E>`                               | Ok      |
-| chain a `Result`-returning step                | `flatMap`         | `(v: T) => Result<U, E2>` → `Result<U, E \| E2>`             | Ok      |
-| run a side effect, keep the value              | `tap`             | `(v: T) => void` → `Result<T, E>`                            | Ok      |
-| run a **failable** side effect, keep the value | `flatTap`         | `(v: T) => Result<unknown, E2>` → `Result<T, E \| E2>`       | Ok      |
-| sequence steps into a named scope              | `Do`/`bind`/`let` | `bind(k, (scope) => Result<U, E2>)` → `Result<{…}, E \| E2>` | Ok      |
-| replace the value with a constant              | `as`              | `(value: U)` → `Result<U, E>`                                | Ok      |
-| transform the error                            | `mapErr`          | `(e: E) => E2` → `Result<T, E2>`                             | Err     |
-| try a fallback that returns a `Result`         | `orElse`          | `(e: E) => Result<U, E2>` → `Result<T \| U, E2>`             | Err     |
-| turn an error into a success value             | `recover`         | `(e: E) => U` → `Result<T \| U, never>`                      | Err     |
-| run a side effect on the error                 | `tapErr`          | `(e: E) => void` → `Result<T, E>`                            | Err     |
-| run a **failable** side effect on the error    | `flatTapErr`      | `(e: E) => Result<unknown, E2>` → `Result<T, E \| E2>`       | Err     |
-| recover from a defect (rare)                   | `recoverDefect`   | `(cause) => Result<U, E2>` → `Result<T \| U, E \| E2>`       | Defect  |
-| observe a defect, e.g. log it                  | `tapDefect`       | `(cause) => void` → `Result<T, E>`                           | Defect  |
-| handle all three channels at the edge          | `match`           | `{ ok, err, defect }` → `R`                                  | all     |
-| combine an array of `Result`s                  | `all`             | `Result<T, E>[]` → `Result<T[], E>`                          | —       |
-| combine a record of `Result`s                  | `allFromDict`     | `{ [k]: Result<T, E> }` → `Result<{ [k]: T }, E>`            | —       |
+| I want to…                                      | use               | signature                                                    | channel |
+| ----------------------------------------------- | ----------------- | ------------------------------------------------------------ | ------- |
+| transform the success value                     | `map`             | `(v: T) => U` → `Result<U, E>`                               | Ok      |
+| chain a `Result`-returning step                 | `flatMap`         | `(v: T) => Result<U, E2>` → `Result<U, E \| E2>`             | Ok      |
+| run a side effect, keep the value               | `tap`             | `(v: T) => void` → `Result<T, E>`                            | Ok      |
+| run a **failable** side effect, keep the value  | `flatTap`         | `(v: T) => Result<unknown, E2>` → `Result<T, E \| E2>`       | Ok      |
+| sequence steps into a named scope               | `Do`/`bind`/`let` | `bind(k, (scope) => Result<U, E2>)` → `Result<{…}, E \| E2>` | Ok      |
+| replace the value with a constant               | `as`              | `(value: U)` → `Result<U, E>`                                | Ok      |
+| transform the error, or escalate it to a defect | `mapErr`          | `(e: E, defect) => R` → `Result<T, Exclude<R, Defect>>`      | Err     |
+| try a fallback that returns a `Result`          | `orElse`          | `(e: E) => Result<U, E2>` → `Result<T \| U, E2>`             | Err     |
+| turn an error into a success value              | `recover`         | `(e: E) => U` → `Result<T \| U, never>`                      | Err     |
+| run a side effect on the error                  | `tapErr`          | `(e: E) => void` → `Result<T, E>`                            | Err     |
+| run a **failable** side effect on the error     | `flatTapErr`      | `(e: E) => Result<unknown, E2>` → `Result<T, E \| E2>`       | Err     |
+| recover from a defect (rare)                    | `recoverDefect`   | `(cause) => Result<U, E2>` → `Result<T \| U, E \| E2>`       | Defect  |
+| observe a defect, e.g. log it                   | `tapDefect`       | `(cause) => void` → `Result<T, E>`                           | Defect  |
+| handle all three channels at the edge           | `match`           | `{ ok, err, defect }` → `R`                                  | all     |
+| combine an array of `Result`s                   | `all`             | `Result<T, E>[]` → `Result<T[], E>`                          | —       |
+| combine a record of `Result`s                   | `allFromDict`     | `{ [k]: Result<T, E> }` → `Result<{ [k]: T }, E>`            | —       |
+
+::: tip `mapErr` can also escalate to a defect
+`mapErr`'s callback receives an injected `defect` marker as a second argument —
+the same shape as `fromPromise` / `fromThrowable`'s `qualify`. Return
+`defect(cause)` to move that error out of `E` entirely and into the defect
+channel; return a plain value to keep it modeled. The resulting error type is
+inferred as `Exclude<R, Defect>` (`R` being the callback's return type), so a
+callback that always escalates (`(e, defect) => defect(e)`) empties `E` to
+`never`. See [The Defect Channel](./the-defect-channel#escalating-errors-to-defects).
+:::
 
 ## Behavior at a glance
 
@@ -52,18 +62,18 @@ untouched. This grid is the whole story — notice the `Defect` column is
 "passes ▸" everywhere except `recoverDefect` and `match`, which is the one
 invariant to remember:
 
-| method                  | on `Ok`  | on `Err`        | on `Defect` | resulting `E`   |
-| ----------------------- | -------- | --------------- | ----------- | --------------- |
-| `map`                   | runs `f` | passes ▸        | passes ▸    | `E`             |
-| `flatMap`               | runs `f` | passes ▸        | passes ▸    | `E \| E2`       |
-| `tap` / `flatTap`       | runs `f` | passes ▸        | passes ▸    | `E` / `E \| E2` |
-| `mapErr`                | passes ▸ | runs `f`        | passes ▸    | `E2`            |
-| `orElse`                | passes ▸ | runs `f`        | passes ▸    | `E2`            |
-| `recover`               | passes ▸ | runs `f` → `Ok` | passes ▸    | `never`         |
-| `tapErr` / `flatTapErr` | passes ▸ | runs `f`        | passes ▸    | `E` / `E \| E2` |
-| `recoverDefect`         | passes ▸ | passes ▸        | runs `f`    | `E \| E2`       |
-| `tapDefect`             | passes ▸ | passes ▸        | runs `f`    | `E`             |
-| `match`                 | `ok()`   | `err()`         | `defect()`  | —               |
+| method                  | on `Ok`  | on `Err`                            | on `Defect` | resulting `E`        |
+| ----------------------- | -------- | ----------------------------------- | ----------- | -------------------- |
+| `map`                   | runs `f` | passes ▸                            | passes ▸    | `E`                  |
+| `flatMap`               | runs `f` | passes ▸                            | passes ▸    | `E \| E2`            |
+| `tap` / `flatTap`       | runs `f` | passes ▸                            | passes ▸    | `E` / `E \| E2`      |
+| `mapErr`                | passes ▸ | runs `f` (may escalate to `Defect`) | passes ▸    | `Exclude<R, Defect>` |
+| `orElse`                | passes ▸ | runs `f`                            | passes ▸    | `E2`                 |
+| `recover`               | passes ▸ | runs `f` → `Ok`                     | passes ▸    | `never`              |
+| `tapErr` / `flatTapErr` | passes ▸ | runs `f`                            | passes ▸    | `E` / `E \| E2`      |
+| `recoverDefect`         | passes ▸ | passes ▸                            | runs `f`    | `E \| E2`            |
+| `tapDefect`             | passes ▸ | passes ▸                            | runs `f`    | `E`                  |
+| `match`                 | `ok()`   | `err()`                             | `defect()`  | —                    |
 
 ::: tip `recover`'s `never` under-describes the runtime
 `recover` empties only the **error** channel to `never` — a `Defect` can still be

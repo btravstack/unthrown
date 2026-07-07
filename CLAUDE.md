@@ -57,7 +57,10 @@ was planned).
 - **A `Defect` flows through every method untouched EXCEPT `match()` and
   `recoverDefect()`.** Therefore `unwrapOr`, `unwrapOrElse`, `getOrNull`,
   `getOrUndefined` still **throw** on a `Defect` — they recover the modeled `Err`,
-  never an unmodeled defect (a defect is a bug, not an absent value).
+  never an unmodeled defect (a defect is a bug, not an absent value). (An
+  _existing_ `Defect` is still untouched by `mapErr` — its callback runs only on
+  `Err`; `mapErr` can now turn that `Err` itself into a `Defect` via the injected
+  `defect` marker, which is a distinct thing from a defect passing through.)
 - **`unwrap()` is asymmetric.** On `Err` it throws a `UnwrapError` carrying `E`
   (on both the typed `.error` property and the standard `Error.cause`, so an
   `Error`-typed `E` chains its original stack under "caused by").
@@ -98,9 +101,11 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   pure value). On `AsyncResult`, `bind`'s `f` may return a `Result` or an
   `AsyncResult`. A throw in either becomes a `Defect`; `Err`/`Defect`
   short-circuits/passes through. To go async, lift with `toAsync()`.
-- error: `mapErr`, `orElse`, `recover`, `tapErr`, `flatTapErr` (the error-channel
-  mirror of `flatTap` — runs a `Result`-returning effect on the error, keeps the
-  original error, threads the effect's error)
+- error: `mapErr` (transform the error, **or escalate it to a defect** via the
+  injected `defect` marker — `(error, defect) => E2 | Defect`, inferred as
+  `Exclude<R, Defect>`), `orElse`, `recover`, `tapErr`, `flatTapErr` (the
+  error-channel mirror of `flatTap` — runs a `Result`-returning effect on the
+  error, keeps the original error, threads the effect's error)
 - defect: `recoverDefect`, `tapDefect`
 - eliminate: `match`, `unwrap`, `unwrapErr`, `unwrapOr`, `unwrapOrElse`,
   `getOrNull`, `getOrUndefined`
@@ -112,7 +117,8 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   plain `{ tag: "Ok" }` look-alike is not matched), for untyped boundaries.
 - constructors: `Ok`, `Err` (there is **no** `Defect` constructor — a defect-state
   `Result` arises only at boundaries; the qualify-time `defect` marker helper is
-  injected, not exported)
+  injected, not exported — `mapErr` is a second injection point for it, alongside
+  `fromPromise`/`fromThrowable`'s `qualify`)
 - interop: `fromNullable`, `fromThrowable`, `fromPromise`, `fromSafePromise`
 - aggregate: `all` / `allAsync` take a **tuple/array** (a fixed tuple keeps
   positional types; a dynamic `Result<T, E>[]` / `AsyncResult<T, E>[]` collapses

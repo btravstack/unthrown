@@ -86,6 +86,32 @@ try {
 }
 ```
 
+## Escalating errors to defects
+
+`recoverDefect` goes one direction: `Defect` → `Result`. `mapErr` can go the
+other way. Its callback receives the same injected `defect` marker as
+`fromPromise` / `fromThrowable`'s `qualify` — return `defect(cause)` to move a
+_modeled_ error out of `E` and into the defect channel, because you've decided
+it's no longer something the caller should have to handle as domain logic.
+
+```ts
+type ParseError = { _tag: "Corrupt" } | { _tag: "TooLarge" };
+
+// selective — keep some errors modeled, escalate the rest
+result.mapErr((e: ParseError, defect) => (e._tag === "Corrupt" ? defect(e) : e));
+// type: Result<T, { _tag: "TooLarge" }> — "Corrupt" is subtracted from E
+
+// blanket — every remaining error is now unrecoverable
+result.mapErr((e, defect) => defect(e));
+// type: Result<T, never>
+```
+
+The error type is inferred as `Exclude<R, Defect>` (`R` being the callback's
+return type) — the escalated arm is _subtracted_ from `E`, the same rule
+`fromPromise` / `fromThrowable` use for `qualify`. This is backward-compatible:
+a callback that never calls `defect` (`mapErr((e) => e2)`) behaves exactly as
+before.
+
 ## The only door: `recoverDefect`
 
 When you genuinely need to handle a defect — say, to convert a third-party
