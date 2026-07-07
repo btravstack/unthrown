@@ -118,8 +118,8 @@ matched.
 Once you are ready to leave the `Result` world, pick the right exit:
 
 ```ts
-Ok(1).unwrap(); // => 1         — throws on Err/Defect
-Err("e").unwrapErr(); // => "e" — throws on Ok/Defect
+Ok(1).unwrap(); // => 1         — panics on a Defect (Err doesn't compile here)
+Err("e").unwrapErr(); // => "e" — panics on a Defect (Ok doesn't compile here)
 Err("e").unwrapOr(0); // => 0   — recovers an Err; rethrows a Defect
 Err("e").getOrNull(); // => null — recovers an Err; rethrows a Defect
 Ok(1).match({ ok, err, defect }); // fold all three channels

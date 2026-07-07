@@ -73,10 +73,19 @@ an absent value). If you must not throw, handle the defect explicitly first with
 
 ## `unwrap` is asymmetric
 
-- On an `Err`, `unwrap()` throws an `UnwrapError` carrying your `E`.
-- On a `Defect`, `unwrap()` **rethrows the original cause** with its original
-  stack — so an unhandled defect reaches the global handler looking like the real
-  failure, not wrapped in library noise.
+`unwrap()` / `unwrapErr()` are **type-gated**: `unwrap()` only compiles when the
+error channel is `never` (`Result<T, never>`), `unwrapErr()` only when the success
+channel is `never` (`Result<never, E>`). Calling `.unwrap()` on a still-fallible
+`Result<T, E>` is a compile error, not a runtime throw — so the `Err` case can't
+reach either eliminator in well-typed code. The remaining wrong-variant throw
+(`UnwrapError`) is a defensive runtime guard for unsound edges (e.g. a cast), not
+something you should hit normally.
+
+A `Defect`, though, is invisible to the type system — `never` on the error
+channel says nothing about it (see above). So on a `Defect`, `unwrap()` /
+`unwrapErr()` **rethrow the original cause** with its original stack — so an
+unhandled defect reaches the global handler looking like the real failure, not
+wrapped in library noise.
 
 ```ts
 try {
