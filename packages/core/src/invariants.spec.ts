@@ -1,5 +1,7 @@
 // Explicit guards for the load-bearing runtime invariants documented in
-// CLAUDE.md. Each `describe` maps 1:1 to an invariant there.
+// CLAUDE.md. Most get a dedicated `describe` here; a couple are guarded where
+// their feature lives instead — prototype-pollution safety and `all` / `allAsync`
+// Defect-dominance are covered in `aggregate.spec.ts`.
 
 import { describe, expect, it, vi } from "vitest";
 

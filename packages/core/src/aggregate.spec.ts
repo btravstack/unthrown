@@ -163,4 +163,13 @@ describe("allFromDictAsync", () => {
   it("returns Ok({}) for an empty record", async () => {
     expect((await allFromDictAsync({})).unwrap()).toEqual({});
   });
+
+  it("does not let a `__proto__` key pollute the prototype", async () => {
+    const r = await allFromDictAsync({
+      ["__proto__"]: fromSafePromise(Promise.resolve({ polluted: true })),
+      safe: fromSafePromise(Promise.resolve(1)),
+    });
+    expect(r.isOk()).toBe(true);
+    expect(({} as Record<string, unknown>)["polluted"]).toBeUndefined();
+  });
 });

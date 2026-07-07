@@ -42,6 +42,7 @@ describe("pattern constructors", () => {
     expect(fold(Ok(5))).toBe("ok:5");
     expect(fold(Err(new NotFound()))).toBe("not-found");
     expect(fold(Err(new Forbidden({ user: "bob" })))).toBe("forbidden:bob");
+    expect(fold(aDefect)).toBe("defect");
   });
 
   it("P.Ok(pattern) constrains and selects the value", () => {

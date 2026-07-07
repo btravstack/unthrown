@@ -3,12 +3,15 @@ import { describe, expect, it } from "vitest";
 import {
   all,
   allAsync,
+  allFromDict,
   allFromDictAsync,
   AsyncResult,
+  Do,
   Err,
   fromNullable,
   fromPromise,
   fromSafePromise,
+  fromThrowable,
   isDefect,
   isErr,
   isOk,
@@ -45,9 +48,13 @@ describe("Result facade mirrors the free functions", () => {
 
   it("exposes the sync interop and aggregate entry points", () => {
     expect(Result.fromNullable).toBe(fromNullable);
+    expect(Result.fromThrowable).toBe(fromThrowable);
+    expect(Result.Do).toBe(Do);
     expect(Result.all).toBe(all);
+    expect(Result.allFromDict).toBe(allFromDict);
     expect(Result.fromNullable(null, () => "absent").unwrapErr()).toBe("absent");
     expect(Result.all([Result.Ok(1), Result.Ok(2)]).unwrap()).toEqual([1, 2]);
+    expect(Result.allFromDict({ a: Result.Ok(1) }).unwrap()).toEqual({ a: 1 });
   });
 
   it("does NOT carry the async entry points (those live on AsyncResult)", () => {

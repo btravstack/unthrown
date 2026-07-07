@@ -238,7 +238,10 @@ describe("AsyncResult eliminators", () => {
 
   it("a Defect rejects the eliminators with the original cause", async () => {
     await expect(asyncDefect().unwrap()).rejects.toBe(boom);
+    await expect(asyncDefect().unwrapErr()).rejects.toBe(boom);
     await expect(asyncDefect().unwrapOr(0)).rejects.toBe(boom);
+    await expect(asyncDefect().unwrapOrElse(() => 0)).rejects.toBe(boom);
     await expect(asyncDefect().getOrNull()).rejects.toBe(boom);
+    await expect(asyncDefect().getOrUndefined()).rejects.toBe(boom);
   });
 });
