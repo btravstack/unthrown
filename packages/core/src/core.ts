@@ -14,6 +14,7 @@
 // The only other casts are the builders' construction (`as OkView`/…) and the
 // `bind`/`let` scope merge (a computed key can't be spelled at the type level).
 
+import { type Defect, defect, isDefectMarker } from "./defect.js";
 import type { AsyncResult, Bound, DefectView, ErrView, OkView, Result } from "./types.js";
 
 /**
@@ -136,10 +137,13 @@ class Res<T, E> {
     return okRes(value);
   }
 
-  mapErr<E2>(this: Result<T, E>, f: (error: E) => E2): Result<T, E2> {
+  mapErr<R>(
+    this: Result<T, E>,
+    f: (error: E, defect: (cause: unknown) => Defect) => R,
+  ): Result<T, Exclude<R, Defect>> {
     if (this.tag !== "Err") return passThrough(this);
     try {
-      return errRes(f(this.error));
+      return errOrDefect(f(this.error, defect) as Exclude<R, Defect> | Defect);
     } catch (cause) {
       return defectRes(cause);
     }
@@ -323,6 +327,12 @@ export function defectRes<T, E>(cause: unknown): Result<T, E> {
     tag: "Defect" as const,
     cause,
   }) as DefectView<T, E>;
+}
+
+// A qualify-style callback returns `E | Defect`; route it to the matching Result
+// variant. Shared by `mapErr` (sync + async) so the triage isn't duplicated.
+function errOrDefect<T, E>(r: E | Defect): Result<T, E> {
+  return isDefectMarker(r) ? defectRes<T, E>(r.cause) : errRes<T, E>(r);
 }
 
 /**
@@ -512,12 +522,14 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  mapErr<E2>(f: (error: E) => E2): AsyncResult<T, E2> {
-    return new AsyncRes<T, E2>(
+  mapErr<R>(
+    f: (error: E, defect: (cause: unknown) => Defect) => R,
+  ): AsyncResult<T, Exclude<R, Defect>> {
+    return new AsyncRes<T, Exclude<R, Defect>>(
       this.promise.then((r) => {
         if (r.tag !== "Err") return passThrough(r);
         try {
-          return errRes(f(r.error));
+          return errOrDefect(f(r.error, defect) as Exclude<R, Defect> | Defect);
         } catch (cause) {
           return defectRes(cause);
         }

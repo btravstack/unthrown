@@ -242,3 +242,19 @@ new WithCode({ code: 1, name: "nope" });
 type _nameNotShadowed = Expect<
   Equal<TaggedErrorInstance<"X", { code: number; name: "lit" }>["name"], string>
 >;
+
+// --- mapErr can escalate an error to the defect channel ----------------------
+declare const rUnion: Result<number, { _tag: "A" } | { _tag: "B" }>;
+// backward compat: a 1-arg callback infers the same E2
+const _me1 = rUnion.mapErr((e) => e._tag);
+type _me1t = Expect<Equal<typeof _me1, Result<number, "A" | "B">>>;
+// selective escalation narrows E (the escalated arm is subtracted)
+const _me2 = rUnion.mapErr((e, defect) => (e._tag === "B" ? defect(e) : e));
+type _me2t = Expect<Equal<typeof _me2, Result<number, { _tag: "A" }>>>;
+// blanket escalation empties the error channel
+const _me3 = rUnion.mapErr((e, defect) => defect(e));
+type _me3t = Expect<Equal<typeof _me3, Result<number, never>>>;
+// async twin behaves the same
+declare const arUnion: AsyncResult<number, { _tag: "A" } | { _tag: "B" }>;
+const _me4 = arUnion.mapErr((e, defect) => defect(e));
+type _me4t = Expect<Equal<typeof _me4, AsyncResult<number, never>>>;

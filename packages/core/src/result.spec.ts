@@ -186,6 +186,19 @@ describe("Result.mapErr", () => {
         .isDefect(),
     ).toBe(true);
   });
+
+  it("escalates an error to the defect channel via the injected defect marker", () => {
+    const r = Err("boom").mapErr((e, defect) => defect(e));
+    expect(r.isDefect()).toBe(true);
+    expect(r.match({ ok: () => "ok", err: () => "err", defect: (c) => c })).toBe("boom");
+  });
+
+  it("selectively escalates: the non-escalated error stays an Err", () => {
+    const keep = Err<"A" | "B">("A").mapErr((e, defect) => (e === "B" ? defect(e) : e));
+    expect(keep.unwrapErr()).toBe("A");
+    const gone = Err<"A" | "B">("B").mapErr((e, defect) => (e === "B" ? defect(e) : e));
+    expect(gone.isDefect()).toBe(true);
+  });
 });
 
 describe("Result.orElse", () => {

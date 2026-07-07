@@ -138,6 +138,11 @@ describe("AsyncResult error channel", () => {
     expect((await asyncErr("e").mapErr((s) => `${s}!`)).unwrapErr()).toBe("e!");
   });
 
+  it("escalates an error to a Defect (async)", async () => {
+    const r = await asyncErr("boom").mapErr((e, defect) => defect(e));
+    expect(r.isDefect()).toBe(true);
+  });
+
   it("orElse recovers an Err", async () => {
     expect((await asyncErr("e").orElse(() => Ok(9))).unwrap()).toBe(9);
   });

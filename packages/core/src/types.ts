@@ -1,5 +1,7 @@
 // unthrown — public type surface. Pure types, no runtime.
 
+import type { Defect } from "./defect.js";
+
 /**
  * Flatten an intersection into a single object literal so accumulated `bind` /
  * `let` scopes display cleanly (`{ a; b }` rather than `{ a } & { b }`).
@@ -130,15 +132,20 @@ export type ResultMethods<T, E> = {
   as<U>(value: U): Result<U, E>;
 
   /**
-   * Transform the modeled error with `f`.
+   * Transform the modeled error — to a new error, or **escalate it to a defect**.
    *
-   * Runs `f` only on `Err`; `Ok` passes through and a `Defect` is **never**
-   * touched. If `f` throws, the throw becomes a `Defect`.
+   * Runs `f` only on `Err`; `Ok` passes through and an existing `Defect` is
+   * **never** touched. `f` returns either a new modeled error (kept as `Err`) or
+   * `defect(cause)` — the marker injected as its second argument, exactly like
+   * {@link fromThrowable}'s `qualify` — to move that error to the defect channel.
+   * The result's error type is `Exclude<R, Defect>` (the escalated arm is
+   * subtracted), so `(e, defect) => defect(e)` yields `Result<T, never>`. If `f`
+   * throws, the throw becomes a `Defect`.
    *
-   * @typeParam E2 - the mapped error type.
-   * @param f - maps the current error to a new one.
+   * @typeParam R - `f`'s return type; the new error `E2` is `Exclude<R, Defect>`.
+   * @param f - maps the error to a new one, or escalates it via `defect(cause)`.
    */
-  mapErr<E2>(f: (error: E) => E2): Result<T, E2>;
+  mapErr<R>(f: (error: E, defect: (cause: unknown) => Defect) => R): Result<T, Exclude<R, Defect>>;
   /**
    * Recover from an `Err` by producing another `Result`.
    *
@@ -461,10 +468,13 @@ export type AsyncResultMethods<T, E> = {
   as<U>(value: U): AsyncResult<U, E>;
 
   /**
-   * Asynchronous {@link ResultMethods.mapErr | mapErr}. `f` is synchronous; a
-   * throw becomes a `Defect`.
+   * Asynchronous {@link ResultMethods.mapErr | mapErr}. `f` is synchronous and may
+   * escalate an error to a defect via the injected `defect` marker; a throw
+   * becomes a `Defect`.
    */
-  mapErr<E2>(f: (error: E) => E2): AsyncResult<T, E2>;
+  mapErr<R>(
+    f: (error: E, defect: (cause: unknown) => Defect) => R,
+  ): AsyncResult<T, Exclude<R, Defect>>;
   /**
    * Asynchronous {@link ResultMethods.orElse | orElse}. `f` may return a `Result`
    * or an `AsyncResult`.
