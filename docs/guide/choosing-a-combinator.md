@@ -9,6 +9,14 @@ method surface, so both tables below apply to each. The handful of async-only
 rules (and how to move between the two types) are in
 [Result and AsyncResult](#result-and-asyncresult) at the bottom.
 
+::: tip Full per-method reference
+These tables are the _selection_ cheat-sheet — which combinator to reach for. For
+each one's full signature and prose, see
+[`ResultMethods`](/api/core/#resultmethods) (the surface every `Result` carries)
+and [`AsyncResultMethods`](/api/core/#asyncresultmethods) (its async mirror) in
+the API reference.
+:::
+
 ## By intent
 
 The `→ Result<…>` half of each signature is the tell — it shows how the combinator

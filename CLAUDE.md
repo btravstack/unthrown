@@ -139,21 +139,24 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   styles — not a second concept. (Each companion re-aliases its type in
   `facade.ts`, so the `types.ts` `Result`/`AsyncResult` declarations both sit in
   `typedoc.json`'s `intentionallyNotExported`.)
-- method surface: the fluent combinators live on the **internal**
-  `ResultMethods<T, E>` — the object-literal type each `Result` variant
-  intersects (`@internal`, in `typedoc.json`'s `intentionallyNotExported`). It is
-  **deliberately not a public/exported type**: a `Result` is a discriminated
-  union, and a union alias can't hang a method list off itself in TypeDoc, so
-  exposing `ResultMethods` (plus an async twin) would just split the surface into
-  two near-duplicate, off-to-the-side method blocks. Instead the combinators are
-  documented **by intent** — one table covering both `Result` and `AsyncResult` —
-  in the `docs/guide/choosing-a-combinator.md` guide, which the generated
-  `Result` / `AsyncResult` type docs link to (a root-relative
-  `/guide/choosing-a-combinator` markdown link, base-prefixed by
-  VitePress). The core `typedoc.json` also sets an explicit `categoryOrder`
-  (`Facade`, `Types`, `Constructors`, … then `Aggregate`, `Errors`) so the core
-  surface leads the API reference instead of the default alphabetical order
-  (which buried it under `Aggregate`).
+- method surface: the fluent combinators live on two exported, **documentation-only**
+  object-literal types — `ResultMethods<T, E>` (the sync surface every `Result`
+  variant intersects) and `AsyncResultMethods<T, E>` (its async mirror, with
+  `AsyncResult`-returning / `Promise`-returning signatures) — both under a
+  `Methods` category. They are not meant to be authored against (you get the
+  surface by holding a `Result`/`AsyncResult`), but they **are** rendered so the
+  API reference lists every combinator's signature and prose. `Result` /
+  `AsyncResult` stay value+type companion pairs (value and type share one name,
+  declared together in `facade.ts`), so their public type is a re-alias TypeDoc
+  can't hang a method list on — that is _why_ the surface is factored out and
+  documented on the separate `*Methods` types, which the `Result` / `AsyncResult`
+  aliases and the `OkView`/`ErrView`/`DefectView` variants link to. The async
+  method docs link back to their sync `ResultMethods` counterpart and state the
+  async delta. The `docs/guide/choosing-a-combinator.md` guide remains the "by
+  intent" selection cheat-sheet — one table covering both — and links to these API
+  sections. The core `typedoc.json` sets an explicit `categoryOrder` (`Facade`,
+  `Types`, `Methods`, `Constructors`, … then `Aggregate`, `Errors`) so the core
+  surface leads the API reference instead of the default alphabetical order.
 - tagged errors: `TaggedError(tag, options?)` (the error-class factory; optional
   `options.name` sets `Error.name` independently of the `_tag` discriminant, so a
   tag can be namespaced for collision-safety without leaking into the display
