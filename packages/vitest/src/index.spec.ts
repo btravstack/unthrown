@@ -86,6 +86,17 @@ describe("non-Result input", () => {
     expect(42).not.toBeOk();
     expect({}).not.toBeErr();
   });
+
+  it("rejects a foreign Result-like object (e.g. neverthrow/Boxed) as not-a-Result", () => {
+    // A neverthrow/Boxed result carries `isOk`/`isErr` methods — the exact
+    // interop mistake these matchers exist to catch. It must fail as "not an
+    // unthrown Result", not be mistaken for an Err.
+    const foreign = { isOk: () => true, isErr: () => false, value: 1 };
+    expect(foreign).not.toBeOk();
+    expect(() => expect(foreign).toBeOk()).toThrowError(
+      /expected an unthrown Result, but received/,
+    );
+  });
 });
 
 describe("failure messages", () => {
