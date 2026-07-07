@@ -36,3 +36,6 @@ docs/api/*/
 
 # macOS
 .DS_Store
+
+# Local brainstorming specs (not tracked)
+docs/superpowers/
