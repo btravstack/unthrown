@@ -228,6 +228,14 @@ matchTags(tagged, { Ok: () => 1, Defect: () => 2, TagA: () => 3, TagB: () => 4 }
 // @ts-expect-error - the TagB handler is missing
 matchTags(tagged, { Ok: () => 1, Defect: () => 2, TagA: () => 3 });
 
+// matchTags rejects error unions containing the reserved tags "Ok" / "Defect".
+{
+  class Reserved extends TaggedError("Defect") {}
+  const bad = Err(new Reserved()) as Result<number, InstanceType<typeof Reserved>>;
+  // @ts-expect-error — a tag named "Defect" would collide with the channel handler
+  matchTags(bad, { Ok: () => 0, Defect: () => 0 });
+}
+
 // `_tag` is the literal; `options.name` is independent (still a literal `_tag`)
 class Named extends TaggedError("@scope/Named", { name: "Named" }) {}
 type _namedTag = Expect<Equal<(typeof Named)["prototype"]["_tag"], "@scope/Named">>;
