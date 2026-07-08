@@ -149,4 +149,26 @@ describe("matchTags", () => {
     });
     expect(out).toBe("defect");
   });
+
+  it("routes an error whose _tag is the reserved 'Defect' to the Defect handler", () => {
+    class Known extends TaggedError("Known") {}
+    const rogue = { _tag: "Defect" } as unknown as Known;
+    const out = matchTags(Err(rogue), {
+      Ok: () => "ok",
+      Defect: () => "defect",
+      Known: () => "known",
+    });
+    expect(out).toBe("defect");
+  });
+
+  it("routes a rogue _tag that collides with an inherited Object.prototype member (e.g. 'constructor') to the Defect handler, not the prototype's value", () => {
+    class Known extends TaggedError("Known") {}
+    const rogue = { _tag: "constructor" } as unknown as Known;
+    const out = matchTags(Err(rogue), {
+      Ok: () => "ok",
+      Defect: (cause) => `defect:${(cause as { _tag: string })._tag}`,
+      Known: () => "known",
+    });
+    expect(out).toBe("defect:constructor");
+  });
 });

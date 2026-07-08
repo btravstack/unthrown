@@ -187,8 +187,11 @@ export function matchTags<T, E extends { _tag: string }, R>(
 ): R | Promise<R> {
   const onErr = (error: E): R => {
     const tag = error._tag as E["_tag"];
+    // `Object.hasOwn` guards against a rogue tag (e.g. "constructor") resolving
+    // through the prototype chain to an unrelated `Object.prototype` member —
+    // only an own property of `handlers` counts as a real handler.
     const handler =
-      tag === "Ok" || tag === "Defect"
+      tag === "Ok" || tag === "Defect" || !Object.hasOwn(handlers, tag)
         ? undefined
         : (handlers[tag] as unknown as ((e: E) => R) | undefined);
     // An unhandled or reserved tag can only arise outside the typed contract (a
