@@ -303,3 +303,11 @@ type _nameNotShadowed = Expect<
     defect: async () => 0,
   });
 }
+
+// --- unwrapOr widens: the fallback may be a different type ----
+
+{
+  const r = Ok(1) as Result<number, "e">;
+  const widened = r.unwrapOr(null);
+  type _Widens = Expect<Equal<typeof widened, number | null>>;
+}

@@ -279,11 +279,12 @@ export type ResultMethods<T, E> = {
   /**
    * The success value, or `fallback` on `Err`.
    *
-   * @param fallback - returned when the result is an `Err`.
+   * @typeParam U - the fallback type (may differ from `T`; the return widens to `T | U`).
+   * @param fallback - returned when the result is an `Err` (may be a different type; the return widens to `T | U`).
    * @throws Re-throws on a `Defect` — a Defect is a bug, not an absent value, so
    * it is never silently replaced.
    */
-  unwrapOr(fallback: T): T;
+  unwrapOr<U>(fallback: U): T | U;
   /**
    * The success value, or `f(error)` on `Err`.
    *
@@ -567,7 +568,7 @@ export type AsyncResultMethods<T, E> = {
   /** Asynchronous {@link ResultMethods.unwrapErr | unwrapErr}. */
   unwrapErr(): Promise<E>;
   /** Asynchronous {@link ResultMethods.unwrapOr | unwrapOr}. */
-  unwrapOr(fallback: T): Promise<T>;
+  unwrapOr<U>(fallback: U): Promise<T | U>;
   /** Asynchronous {@link ResultMethods.unwrapOrElse | unwrapOrElse}. */
   unwrapOrElse(f: (error: E) => T): Promise<T>;
   /** Asynchronous {@link ResultMethods.getOrNull | getOrNull}. */
