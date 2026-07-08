@@ -414,7 +414,7 @@ function observerThrowToDefect<T, E>(thrown: unknown, original: unknown): Result
  * @internal
  */
 function scopeOf(value: unknown): object {
-  if (typeof value !== "object" || value === null) {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new TypeError("bind/let requires an object scope — start a do-chain with Do()");
   }
   return value;
