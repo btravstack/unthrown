@@ -63,6 +63,49 @@ describe("toBoxedFuture", () => {
       globalThis.queueMicrotask = original;
     }
   });
+
+  it("does not intercept a downstream subscriber's throw as an onDefect bug", async () => {
+    const subscriberBoom = new Error("subscriber-threw");
+    const rethrown: unknown[] = [];
+    const originalQueue = globalThis.queueMicrotask;
+    globalThis.queueMicrotask = (cb: () => void) => {
+      try {
+        cb();
+      } catch (e) {
+        rethrown.push(e);
+      }
+    };
+    // The subscriber throw escapes through Boxed's synchronous fan-out into
+    // toBoxedFuture's internal (void-ed) promise chain — contain that
+    // unhandled rejection so it doesn't fail the run, and restore vitest's
+    // own listeners afterwards.
+    const unhandled: unknown[] = [];
+    const priorListeners = process.listeners("unhandledRejection");
+    process.removeAllListeners("unhandledRejection");
+    process.on("unhandledRejection", (reason) => {
+      unhandled.push(reason);
+    });
+    try {
+      const defect = fromSafePromise(Promise.reject(new Error("bug")));
+      const future = toBoxedFuture(defect, () => "triaged");
+      future.tap(() => {
+        throw subscriberBoom;
+      });
+      await new Promise((r) => setTimeout(r, 0));
+      // Our handler must not reroute the subscriber throw...
+      expect(rethrown).toEqual([]);
+      // ...it surfaces through the promise machinery (Boxed's pre-existing
+      // behaviour), and the Future still resolved.
+      expect(unhandled).toEqual([subscriberBoom]);
+      expect((await future.toPromise()).isError()).toBe(true);
+    } finally {
+      process.removeAllListeners("unhandledRejection");
+      for (const listener of priorListeners) {
+        process.on("unhandledRejection", listener);
+      }
+      globalThis.queueMicrotask = originalQueue;
+    }
+  });
 });
 
 describe("fromBoxedFuture", () => {
