@@ -121,7 +121,7 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
 - defect: `recoverDefect`, `tapDefect`
 - eliminate: `match`, `unwrap`, `unwrapErr`, `unwrapOr` (signature
   `unwrapOr<U>(fallback: U): T | U` — widening, not narrowed to `T`),
-  `unwrapOrElse`, `getOrNull`, `getOrUndefined`
+  `unwrapOrElse` (same `T | U` widening), `getOrNull`, `getOrUndefined`
 - guards: methods `isOk`/`isErr`/`isDefect` **and** standalone
   `isOk`/`isErr`/`isDefect` both narrow (to `OkView`/`ErrView`/`DefectView`) — the
   methods are `this is …` type predicates, so `if (r.isErr()) r.error` compiles.
