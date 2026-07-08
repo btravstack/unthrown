@@ -32,12 +32,15 @@ import type { AsyncResult, Result } from "unthrown";
  *
  * @example
  * ```ts
- * import { Err } from "unthrown";
+ * import { fromThrowable } from "unthrown";
  * import { toBoxed } from "@unthrown/boxed";
  *
- * // A Defect has no home in Boxed's Result — you must fold it into E:
- * const boxed = toBoxed(Err("nope"), (cause) => `bug: ${String(cause)}`);
- * boxed.isError(); // => true
+ * // Mint a Defect, then convert: it has no home in Boxed's Result, so onDefect folds it into E.
+ * const defective = fromThrowable((): number => {
+ *   throw new Error("boom");
+ * }, (cause, defect) => defect(cause))();
+ * const boxed = toBoxed(defective, (cause) => `bug: ${String(cause)}`);
+ * boxed.isError(); // => true — the Error carries "bug: Error: boom"
  * ```
  */
 export function toBoxed<T, E>(
@@ -101,9 +104,10 @@ export function fromBoxed<T, E>(result: BoxedResult<T, E>): Result<T, E> {
  * import { fromSafePromise } from "unthrown";
  * import { toBoxedFuture } from "@unthrown/boxed";
  *
- * const asyncResult = fromSafePromise(Promise.resolve(1));
- * const future = toBoxedFuture(asyncResult, (cause) => `bug: ${String(cause)}`);
- * (await future.toPromise()).isOk(); // => true
+ * // A rejection inside fromSafePromise is a Defect; onDefect folds it into E on the way out.
+ * const defective = fromSafePromise(Promise.reject(new Error("boom")));
+ * const future = toBoxedFuture(defective, (cause) => `bug: ${String(cause)}`);
+ * (await future.toPromise()).isError(); // => true — the Error carries "bug: Error: boom"
  * ```
  */
 export function toBoxedFuture<T, E>(
