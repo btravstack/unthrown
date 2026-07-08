@@ -150,7 +150,7 @@ type User = { id: string; name: string };
 // qualified `AsyncResult`, so there's nothing left to triage at the call site.
 declare const userRepo: { findById(id: string): AsyncResult<User, NotFound> };
 
-const parseId = fromSchema(z.string().uuid());
+const parseId = fromSchema(z.uuid());
 
 const app = new Hono();
 
@@ -189,7 +189,7 @@ import { z } from "zod";
 import { fromSchema, type SchemaIssues } from "@unthrown/standard-schema";
 
 const signupSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   password: z.string().min(8),
 });
 
@@ -225,8 +225,5 @@ validateSignup({ email: "not-an-email", password: "short" });
 
 The `defect` arm only fires if the schema itself throws instead of returning
 issues — a bug in the validator, not a bad submission.
-
-→ Back to the [Guide](./why-unthrown), or browse the
-[API Reference](/api/core/).
 
 → Continue to [Tagged Errors](./tagged-errors).
