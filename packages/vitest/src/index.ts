@@ -115,9 +115,25 @@ function toBeErrTagged(
   tag: string,
   expected?: unknown,
 ): MatcherResult {
+  // Arity, not `expected !== undefined`, decides whether a payload assertion
+  // was requested: `arguments.length` distinguishes an omitted second
+  // argument (tag-only, length 2) from an explicitly-passed `undefined`
+  // (length 3), so `toBeErrTagged(tag, undefined)` asserts the payload
+  // equals `undefined` instead of silently degrading to tag-only.
+  //
+  // A rest-args parameter list (`...args: [tag] | [tag, expected]`), as
+  // sketched for this fix, would make that arity observable at the type
+  // level too — but it does not typecheck against vitest's `expect.extend`:
+  // `RawMatcherFn`'s `Parameters<Matchers<T>[K]>` derives the plain optional
+  // tuple `[tag: string, expected?: unknown]` from the public
+  // `UnthrownMatchers` type, and TS cannot prove that shape is assignable
+  // into a tuple *union* (only into a plain trailing-optional tuple, which
+  // is what this parameter list already is). `arguments.length` gets the
+  // same runtime distinction without perturbing the signature that
+  // `expect.extend` — and the public `UnthrownMatchers` type — expect.
+  const hasExpected = arguments.length > 2;
   const { stringify } = this.utils;
   const { equals } = this;
-  const hasExpected = expected !== undefined;
   const label = hasExpected
     ? `Err tagged ${stringify(tag)} matching ${stringify(expected)}`
     : `Err tagged ${stringify(tag)}`;
@@ -167,7 +183,9 @@ export type UnthrownMatchers<R = unknown> = {
    * Assert an `Err` whose error has `_tag === tag`. Optionally pass `expected`
    * to also match the error's payload (its own props minus `_tag`/`name`): a
    * plain object matches exactly, an asymmetric matcher (e.g.
-   * `expect.objectContaining(...)`) matches partially.
+   * `expect.objectContaining(...)`) matches partially. An explicitly-passed
+   * `undefined` asserts the payload equals `undefined` (it does not degrade
+   * to tag-only).
    */
   toBeErrTagged: (tag: string, expected?: unknown) => R;
   toBeDefect: () => R;
