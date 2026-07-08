@@ -15,7 +15,7 @@ type Props = Record<string, unknown>;
  * @category Types
  */
 export type TaggedErrorInstance<Tag extends string, A extends Props> = Error &
-  Readonly<Omit<A, "name">> & { readonly _tag: Tag };
+  Readonly<Omit<A, "name" | "message">> & { readonly _tag: Tag };
 
 /**
  * The class constructor returned by {@link TaggedError}. Generic in its payload:
@@ -23,10 +23,13 @@ export type TaggedErrorInstance<Tag extends string, A extends Props> = Error &
  *
  * @remarks
  * When the payload is empty, the constructor takes **no** arguments (the
- * `keyof A extends never ? void : A` trick); otherwise it takes the payload. A
- * `name` key is **rejected** (`name?: never`) because it is reserved for the
- * display label — mirroring how {@link TaggedErrorInstance} excludes it — so the
- * reservation is enforced at the call site, not just ignored at runtime.
+ * `keyof A extends never ? void : A` trick); otherwise it takes the payload. The
+ * `name` and `message` keys are both **rejected** (`name?: never` /
+ * `message?: never`) because both are reserved: `name` is the display label, and
+ * `message` is the human string owned by `Error`. Set the message the standard
+ * way — `override message = "…"` (or a constructor override) on the subclass —
+ * never as a free-form per-call payload field. The reservations are enforced at
+ * the call site, mirroring how {@link TaggedErrorInstance} excludes both.
  *
  * @typeParam Tag - the string literal discriminant.
  *
@@ -34,7 +37,7 @@ export type TaggedErrorInstance<Tag extends string, A extends Props> = Error &
  */
 export type TaggedErrorConstructor<Tag extends string> = {
   new <A extends Props = {}>(
-    args: keyof A extends never ? void : A & { readonly name?: never },
+    args: keyof A extends never ? void : A & { readonly name?: never; readonly message?: never },
   ): TaggedErrorInstance<Tag, A>;
 };
 
@@ -44,8 +47,13 @@ export type TaggedErrorConstructor<Tag extends string> = {
  *
  * @remarks
  * Extend the returned class to declare a concrete error. Supply the payload with
- * an instantiation expression; omit it for a payload-less error. A `message`
- * field in the payload is forwarded to `Error`. The `_tag` always reflects
+ * an instantiation expression; omit it for a payload-less error. The `message`
+ * is **not** a payload field — it is the human string owned by `Error`, not
+ * structured data, so it is reserved. Define it once per subclass the standard
+ * way, `override message = "…"` (it may interpolate the payload via `this`,
+ * which the base populates before the subclass field initialiser runs); a
+ * payload `message` is rejected at compile time, so contextual detail lives in
+ * typed fields, never baked into per-call prose. The `_tag` always reflects
  * `tag` and cannot be overridden by the payload. `name` is likewise reserved —
  * it is the display label (set it with `options.name`); a payload `name` is
  * rejected at compile time (and excluded from the instance type), so it can't
@@ -60,11 +68,14 @@ export type TaggedErrorConstructor<Tag extends string> = {
  * ```ts
  * class RetryableError extends TaggedError("@my-lib/RetryableError", {
  *   name: "RetryableError",
- * })<{ message: string }> {}
+ * }) {
+ *   override message = "operation failed; safe to retry";
+ * }
  *
- * const e = new RetryableError({ message: "boom" });
- * e._tag; // "@my-lib/RetryableError" — namespaced discriminant
- * e.name; // "RetryableError"          — clean display name
+ * const e = new RetryableError();
+ * e._tag;    // "@my-lib/RetryableError" — namespaced discriminant
+ * e.name;    // "RetryableError"          — clean display name
+ * e.message; // "operation failed; safe to retry" — the standard Error.message
  * ```
  *
  * @typeParam Tag - the string literal discriminant.
@@ -92,10 +103,12 @@ export function TaggedError<Tag extends string>(
     readonly _tag!: Tag;
 
     constructor(props?: Props) {
-      super(typeof props?.["message"] === "string" ? (props["message"] as string) : undefined);
+      super();
       if (props) Object.assign(this, props);
-      // The tag is authoritative — assign it after the payload so it can't be
-      // clobbered. `name` is the display label, independent of the discriminant.
+      // `_tag` and `name` are authoritative — assigned after the payload so an
+      // untyped caller can't clobber them. `message` is left to `Error` (and to
+      // the subclass's own `override message = …`, whose field initialiser runs
+      // after this constructor returns, once the payload fields are populated).
       (this as { _tag: Tag })._tag = tag;
       this.name = displayName;
       Object.setPrototypeOf(this, new.target.prototype);

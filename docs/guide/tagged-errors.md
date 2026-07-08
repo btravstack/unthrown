@@ -20,9 +20,38 @@ new NotFound()._tag; // "NotFound"
 new Forbidden({ user: "bob" }).user; // "bob"
 ```
 
-The class extends `Error` (so `instanceof Error` holds and stacks work), the
-`_tag` is authoritative (a payload can't overwrite it), and a `message` field in
-the payload is forwarded to `Error`.
+The class extends `Error` (so `instanceof Error` holds and stacks work) and the
+`_tag` is authoritative (a payload can't overwrite it).
+
+### Defining the message
+
+`message` is **not** a payload field — it's the human string owned by `Error`,
+not structured data, so it's reserved (a payload `message` is a compile error,
+like `name`). Set it the standard way, **once per subclass**, with `override
+message`:
+
+```ts
+class TicketNotFound extends TaggedError("TicketNotFound")<{ ticketId: string }> {
+  override message = "ticket not found";
+}
+
+new TicketNotFound({ ticketId: "t1" }).message; // "ticket not found"
+```
+
+The field may interpolate the payload via `this` — the base populates the
+payload fields before the subclass field initialiser runs:
+
+```ts
+class InvalidState extends TaggedError("InvalidState")<{ got: string; want: string }> {
+  override message = `expected ${this.want}, got ${this.got}`;
+}
+```
+
+Keeping the message off the payload is deliberate: the contextual detail that
+used to get baked into a per-call string (`` `no manager for ${id}` ``) lives in
+**typed fields** instead — greppable, matchable, and defined once per error type
+rather than drifting across call sites. For a message that needs real branching,
+set `this.message` in a constructor override.
 
 ### Namespacing the tag without renaming the error
 
@@ -34,9 +63,11 @@ collision-safety without that prefix leaking into the display name:
 ```ts
 class RetryableError extends TaggedError("@my-lib/RetryableError", {
   name: "RetryableError",
-})<{ message: string }> {}
+}) {
+  override message = "boom";
+}
 
-const e = new RetryableError({ message: "boom" });
+const e = new RetryableError();
 e._tag; // "@my-lib/RetryableError" — namespaced discriminant
 e.name; // "RetryableError"          — clean stack-trace label
 ```

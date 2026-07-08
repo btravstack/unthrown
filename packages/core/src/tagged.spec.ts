@@ -12,7 +12,7 @@ import {
 
 class NotFound extends TaggedError("NotFound") {}
 class Forbidden extends TaggedError("Forbidden")<{ user: string }> {}
-class HttpError extends TaggedError("HttpError")<{ status: number; message: string }> {}
+class HttpError extends TaggedError("HttpError")<{ status: number }> {}
 type ApiError = NotFound | Forbidden | HttpError;
 
 describe("TaggedError", () => {
@@ -32,11 +32,28 @@ describe("TaggedError", () => {
     expect(e).toBeInstanceOf(Forbidden);
   });
 
-  it("forwards a `message` payload field to Error", () => {
-    const e = new HttpError({ status: 500, message: "boom" });
-    expect(e.message).toBe("boom");
-    expect(e.status).toBe(500);
-    expect(e._tag).toBe("HttpError");
+  it("defines Error.message per subclass via a standard `override message` field", () => {
+    class Timeout extends TaggedError("Timeout") {
+      override message = "request timed out";
+    }
+    const e = new Timeout();
+    expect(e.message).toBe("request timed out");
+    expect(e._tag).toBe("Timeout");
+  });
+
+  it("lets the message field interpolate the payload fields via `this`", () => {
+    class RangeErr extends TaggedError("RangeErr")<{ min: number; max: number }> {
+      override message = `expected ${this.min}..${this.max}`;
+    }
+    const e = new RangeErr({ min: 1, max: 9 });
+    expect(e.message).toBe("expected 1..9");
+    expect(e.min).toBe(1);
+    expect(e._tag).toBe("RangeErr");
+  });
+
+  it("leaves Error.message empty when the subclass does not set one", () => {
+    class Bare extends TaggedError("Bare") {}
+    expect(new Bare().message).toBe("");
   });
 
   it("keeps `_tag` authoritative even if the payload tries to set it", () => {
@@ -62,10 +79,10 @@ describe("TaggedError", () => {
   });
 
   it("decouples Error.name from a namespaced _tag via options.name", () => {
-    class Retryable extends TaggedError("@my-lib/Retryable", { name: "Retryable" })<{
-      message: string;
-    }> {}
-    const e = new Retryable({ message: "boom" });
+    class Retryable extends TaggedError("@my-lib/Retryable", { name: "Retryable" }) {
+      override message = "boom";
+    }
+    const e = new Retryable();
     expect(e._tag).toBe("@my-lib/Retryable"); // namespaced discriminant
     expect(e.name).toBe("Retryable"); // clean display name
     expect(e.message).toBe("boom");
@@ -99,7 +116,7 @@ describe("matchTags", () => {
   it("dispatches each tagged error to the handler matching its _tag", () => {
     expect(fold(Err(new NotFound()))).toBe("not-found");
     expect(fold(Err(new Forbidden({ user: "bob" })))).toBe("forbidden:bob");
-    expect(fold(Err(new HttpError({ status: 503, message: "down" })))).toBe("http:503");
+    expect(fold(Err(new HttpError({ status: 503 })))).toBe("http:503");
   });
 
   it("narrows each error variant to its payload in its handler", () => {
