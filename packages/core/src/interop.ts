@@ -139,7 +139,10 @@ export function fromPromise<T, R>(
 ): AsyncResult<T, Exclude<R, Defect>> {
   type E = Exclude<R, Defect>;
   const triage = qualify as (cause: unknown, defect: (cause: unknown) => Defect) => E | Defect;
-  const p = typeof promise === "function" ? Promise.resolve().then(promise) : promise;
+  // Promise.resolve() also absorbs a non-thenable passed from untyped code, so
+  // this boundary never throws synchronously — it exists to prevent throws.
+  const p =
+    typeof promise === "function" ? Promise.resolve().then(promise) : Promise.resolve(promise);
   const settled: Promise<Result<T, E>> = p.then(
     (value) => okRes<T, E>(value),
     (cause) => qualifyToResult<T, E>(cause, triage),
@@ -173,7 +176,10 @@ export function fromPromise<T, R>(
 export function fromSafePromise<T>(
   promise: Promise<T> | (() => Promise<T>),
 ): AsyncResult<T, never> {
-  const p = typeof promise === "function" ? Promise.resolve().then(promise) : promise;
+  // Promise.resolve() also absorbs a non-thenable passed from untyped code, so
+  // this boundary never throws synchronously — it exists to prevent throws.
+  const p =
+    typeof promise === "function" ? Promise.resolve().then(promise) : Promise.resolve(promise);
   const settled: Promise<Result<T, never>> = p.then(
     (value) => okRes<T, never>(value),
     (cause) => defectRes<T, never>(cause),
