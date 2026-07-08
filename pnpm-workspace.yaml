@@ -11,28 +11,28 @@ packages:
 
 catalog:
   "@changesets/cli": 2.31.0
-  "@commitlint/cli": 21.1.0
+  "@commitlint/cli": 21.2.0
   "@bloodyowl/boxed": 3.4.0
   "@btravstack/theme": 1.5.0
   "@standard-schema/spec": 1.1.0
-  "@commitlint/config-conventional": 21.1.0
-  "@types/node": 24.13.2
-  "@vitest/coverage-v8": 4.1.8
+  "@commitlint/config-conventional": 21.2.0
+  "@types/node": 26.1.0
+  "@vitest/coverage-v8": 4.1.9
   effect: 3.21.4
-  knip: 6.20.0
+  knip: 6.23.0
   lefthook: 2.1.9
   neverthrow: 8.2.0
-  oxfmt: 0.56.0
-  oxlint: 1.71.0
+  oxfmt: 0.57.0
+  oxlint: 1.72.0
   ts-pattern: 5.9.0
   tsdown: 0.22.3
   tsx: 4.22.4
-  turbo: 2.10.0
+  turbo: 2.10.2
   typedoc: 0.28.19
   typedoc-plugin-markdown: 4.12.0
   typescript: 6.0.3
   vitepress: 1.6.4
-  vitest: 4.1.8
+  vitest: 4.1.9
 
 peerDependencyRules:
   ignoreMissing:
