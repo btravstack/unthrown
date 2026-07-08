@@ -37,12 +37,15 @@ import type { AsyncResult, Result } from "unthrown";
  *
  * @example
  * ```ts
- * import { Err } from "unthrown";
+ * import { fromThrowable } from "unthrown";
  * import { toNeverthrow } from "@unthrown/neverthrow";
  *
- * // A Defect has no home in neverthrow — you must fold it into E:
- * const nt = toNeverthrow(Err("nope"), (cause) => `bug: ${String(cause)}`);
- * nt.isErr(); // => true
+ * // Mint a Defect, then convert: it has no home in neverthrow, so onDefect folds it into E.
+ * const defective = fromThrowable((): number => {
+ *   throw new Error("boom");
+ * }, (cause, defect) => defect(cause))();
+ * const nt = toNeverthrow(defective, (cause) => `bug: ${String(cause)}`);
+ * nt.isErr(); // => true — the Err carries "bug: Error: boom"
  * ```
  */
 export function toNeverthrow<T, E>(
@@ -103,10 +106,10 @@ export function fromNeverthrow<T, E>(result: NeverthrowResult<T, E>): Result<T, 
  * import { fromSafePromise } from "unthrown";
  * import { toNeverthrowAsync } from "@unthrown/neverthrow";
  *
- * const asyncResult = fromSafePromise(Promise.resolve(1));
- * const nt = toNeverthrowAsync(asyncResult, (cause) => `bug: ${String(cause)}`);
- * const result = await nt;
- * result.isOk(); // => true
+ * // A rejection inside fromSafePromise is a Defect; onDefect folds it into E on the way out.
+ * const defective = fromSafePromise(Promise.reject(new Error("boom")));
+ * const result = await toNeverthrowAsync(defective, (cause) => `bug: ${String(cause)}`);
+ * result.isErr(); // => true — the Err carries "bug: Error: boom"
  * ```
  */
 export function toNeverthrowAsync<T, E>(

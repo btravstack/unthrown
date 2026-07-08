@@ -106,12 +106,15 @@ export function fromExit<T, E>(exit: Exit.Exit<T, E>): Result<T, E> {
  *
  * @example
  * ```ts
- * import { Err } from "unthrown";
+ * import { fromThrowable } from "unthrown";
  * import { toEither } from "@unthrown/effect";
  *
- * // A Defect has no home in Either — you must fold it into E:
- * const either = toEither(Err("nope"), (cause) => `bug: ${String(cause)}`);
- * either._tag; // => "Left"
+ * // Mint a Defect, then convert: it has no home in Either, so onDefect folds it into E.
+ * const defective = fromThrowable((): number => {
+ *   throw new Error("boom");
+ * }, (cause, defect) => defect(cause))();
+ * const either = toEither(defective, (cause) => `bug: ${String(cause)}`);
+ * either._tag; // => "Left" — carrying "bug: Error: boom"
  * ```
  */
 export function toEither<T, E>(
