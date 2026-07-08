@@ -23,6 +23,7 @@ export type {
   DefectView,
   ErrOf,
   ErrView,
+  NotThenable,
   OkOf,
   OkView,
   ResultMethods,
