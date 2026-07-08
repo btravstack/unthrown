@@ -70,6 +70,10 @@ export function fromNeverthrow<T, E>(result: NeverthrowResult<T, E>): Result<T, 
  * same reason. The `AsyncResult` is awaited (it never rejects) and each settled
  * `Result` is converted.
  *
+ * A throwing `onDefect` surfaces as a rejection of the returned
+ * `ResultAsync`'s inner promise — neverthrow's own failure mode; do not throw
+ * from triage.
+ *
  * @typeParam T - the success value type.
  * @typeParam E - the modeled error type.
  * @param asyncResult - the async result to convert.
