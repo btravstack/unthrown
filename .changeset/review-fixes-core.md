@@ -16,8 +16,9 @@ Soundness and hardening fixes from a full review:
 - **`matchTags`** routes an unhandled `_tag` (possible only outside the typed
   contract) to the `Defect` handler instead of crashing, and rejects the
   reserved tags `"Ok"`/`"Defect"` at compile time.
-- **`unwrapOr` widens**: `unwrapOr<U>(fallback: U): T | U`, so
-  `r.unwrapOr(null)` now type-checks.
+- **`unwrapOr` / `unwrapOrElse` widen**: `unwrapOr<U>(fallback: U): T | U` and
+  `unwrapOrElse<U>(f: (error: E) => U): T | U`, so `r.unwrapOr(null)` and
+  `r.unwrapOrElse(() => null)` now type-check.
 - `fromPromise`/`fromSafePromise` absorb a non-thenable input instead of
   throwing synchronously; `bind`/`let` reject an array scope as misuse
   (Defect) instead of silently index-spreading it; `Result` instances are

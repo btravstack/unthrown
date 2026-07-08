@@ -260,7 +260,7 @@ class Res<T, E> {
     return fallback;
   }
 
-  unwrapOrElse(this: Result<T, E>, f: (error: E) => T): T {
+  unwrapOrElse<U>(this: Result<T, E>, f: (error: E) => U): T | U {
     if (this.tag === "Ok") return this.value;
     if (this.tag === "Defect") throw this.cause;
     return f(this.error);
@@ -665,7 +665,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   unwrapOr<U>(fallback: U): Promise<T | U> {
     return this.promise.then((r) => r.unwrapOr(fallback));
   }
-  unwrapOrElse(f: (error: E) => T): Promise<T> {
+  unwrapOrElse<U>(f: (error: E) => U): Promise<T | U> {
     return this.promise.then((r) => r.unwrapOrElse(f));
   }
   getOrNull(): Promise<T | null> {

@@ -311,3 +311,11 @@ type _nameNotShadowed = Expect<
   const widened = r.unwrapOr(null);
   type _Widens = Expect<Equal<typeof widened, number | null>>;
 }
+
+// --- unwrapOrElse widens: the fallback function may return a different type ----
+
+{
+  const r = Ok(1) as Result<number, "e">;
+  const widened = r.unwrapOrElse(() => null);
+  type _Widens = Expect<Equal<typeof widened, number | null>>;
+}
