@@ -16,7 +16,7 @@ catalog:
   "@btravstack/theme": 1.5.0
   "@standard-schema/spec": 1.1.0
   "@commitlint/config-conventional": 21.2.0
-  "@types/node": 26.1.0
+  "@types/node": 24.13.2
   "@vitest/coverage-v8": 4.1.9
   effect: 3.21.4
   knip: 6.23.0
