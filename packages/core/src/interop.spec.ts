@@ -4,6 +4,7 @@ import {
   type AsyncResult,
   fromNullable,
   fromPromise,
+  fromSafePromise,
   fromThrowable,
   Ok,
   type Result,
@@ -110,5 +111,21 @@ describe("fromPromise — error-channel inference", () => {
     const typed: AsyncResult<never, "known"> = ar;
     // `boom` matches the modeled arm, so it lands in Err — not a Defect.
     expect((await typed).unwrapErr()).toBe("known");
+  });
+});
+
+describe("fromPromise — non-thenable absorption", () => {
+  it("fromPromise tolerates a non-thenable input instead of throwing synchronously", async () => {
+    const r = await fromPromise(42 as unknown as Promise<number>, (c, d) => d(c));
+    expect(r.tag).toBe("Ok");
+    if (r.isOk()) expect(r.value).toBe(42);
+  });
+});
+
+describe("fromSafePromise — non-thenable absorption", () => {
+  it("fromSafePromise tolerates a non-thenable input instead of throwing synchronously", async () => {
+    const r = await fromSafePromise("x" as unknown as Promise<string>);
+    expect(r.tag).toBe("Ok");
+    if (r.isOk()) expect(r.value).toBe("x");
   });
 });
