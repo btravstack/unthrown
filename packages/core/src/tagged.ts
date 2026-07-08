@@ -105,12 +105,14 @@ export function TaggedError<Tag extends string>(
     constructor(props?: Props) {
       super();
       if (props) Object.assign(this, props);
-      // `_tag` and `name` are authoritative — assigned after the payload so an
-      // untyped caller can't clobber them. `message` is left to `Error` (and to
-      // the subclass's own `override message = …`, whose field initialiser runs
-      // after this constructor returns, once the payload fields are populated).
+      // `_tag`, `name`, and `message` are authoritative — an untyped caller
+      // can't set them via the payload. `_tag`/`name` are re-assigned to their
+      // canonical values; `message` is `Error`'s channel (set per subclass via
+      // `override message = …`, whose field initialiser runs after this
+      // constructor returns), so any payload-supplied `message` is dropped here.
       (this as { _tag: Tag })._tag = tag;
       this.name = displayName;
+      delete (this as { message?: unknown }).message;
       Object.setPrototypeOf(this, new.target.prototype);
     }
   }

@@ -68,6 +68,14 @@ describe("TaggedError", () => {
     expect(e.user).toBe("Alice");
   });
 
+  it("keeps `message` reserved — a payload `message` cannot set Error.message", () => {
+    class UserError extends TaggedError("UserError")<{ user: string }> {}
+    // An untyped/JS caller sneaks a `message` past the compile-time reservation.
+    const e = new UserError({ user: "Bob", message: "sneaky" } as { user: string });
+    expect(e.message).toBe(""); // dropped — message is not sourced from the payload
+    expect(e.user).toBe("Bob");
+  });
+
   it("distinct tags produce distinct, discriminable classes", () => {
     const errors: ApiError[] = [new NotFound(), new Forbidden({ user: "a" })];
     expect(errors.map((e) => e._tag)).toEqual(["NotFound", "Forbidden"]);
