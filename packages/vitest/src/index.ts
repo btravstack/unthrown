@@ -173,11 +173,35 @@ export { toBeDefect, toBeErr, toBeErrTagged, toBeOk, toBeOkWith };
  * The matchers `@unthrown/vitest` contributes to Vitest's `expect`. For an
  * `AsyncResult`, `await` the assertion; `toBeOkWith` compares deeply.
  *
+ * @remarks
+ * Import the package once (e.g. in a test setup file) to register the
+ * matchers and pull in this type augmentation.
+ *
  * @typeParam R - the assertion's chaining return type.
+ *
+ * @example
+ * ```ts
+ * import "@unthrown/vitest";
+ * import { Ok, fromSafePromise } from "unthrown";
+ * import { expect, test } from "vitest";
+ *
+ * test("sync", () => {
+ *   expect(Ok(1)).toBeOkWith(1);
+ * });
+ *
+ * test("async", async () => {
+ *   await expect(fromSafePromise(Promise.resolve(1))).toBeOk();
+ * });
+ * ```
+ *
+ * @see {@link https://btravstack.github.io/unthrown/guide/testing | The Testing guide}
  */
 export type UnthrownMatchers<R = unknown> = {
+  /** `expect(Ok(1)).toBeOk()` asserts the result is `Ok`, regardless of value. */
   toBeOk: () => R;
+  /** `expect(Ok(1)).toBeOkWith(1)` asserts the result is `Ok` with a deeply-equal value. */
   toBeOkWith: (value: unknown) => R;
+  /** `expect(Err("nope")).toBeErr()` asserts the result is `Err`, regardless of the error. */
   toBeErr: () => R;
   /**
    * Assert an `Err` whose error has `_tag === tag`. Optionally pass `expected`
@@ -186,8 +210,11 @@ export type UnthrownMatchers<R = unknown> = {
    * `expect.objectContaining(...)`) matches partially. An explicitly-passed
    * `undefined` asserts the payload equals `undefined` (it does not degrade
    * to tag-only).
+   *
+   * `expect(result).toBeErrTagged("NotFound", { id })` asserts the tag and payload.
    */
   toBeErrTagged: (tag: string, expected?: unknown) => R;
+  /** `expect(result).toBeDefect()` asserts the result is a `Defect`. */
   toBeDefect: () => R;
 };
 
