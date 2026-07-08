@@ -279,4 +279,18 @@ describe("AsyncResult eliminators", () => {
     await expect(asyncDefect().getOrNull()).rejects.toBe(boom);
     await expect(asyncDefect().getOrUndefined()).rejects.toBe(boom);
   });
+
+  it("Promise.all adopts AsyncResults, settling to Results", async () => {
+    const [a, b] = await Promise.all([Ok(1).toAsync(), Err("e").toAsync()]);
+    expect(a!.tag).toBe("Ok");
+    expect(b!.tag).toBe("Err");
+  });
+
+  it("an AsyncResult can be awaited more than once", async () => {
+    const ar = Ok(1).toAsync();
+    const first = await ar;
+    const second = await ar;
+    expect(first.tag).toBe("Ok");
+    expect(second.tag).toBe("Ok");
+  });
 });
