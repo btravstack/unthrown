@@ -303,10 +303,14 @@ const RESULT_PROTO = Res.prototype;
  * @internal
  */
 export function okRes<T, E>(value: T): Result<T, E> {
-  return Object.assign(Object.create(RESULT_PROTO), {
-    tag: "Ok" as const,
-    value,
-  }) as OkView<T, E>;
+  // Frozen so the `readonly` surface is real at runtime: a variant cannot be
+  // forged by mutating `tag`/payload after construction.
+  return Object.freeze(
+    Object.assign(Object.create(RESULT_PROTO), {
+      tag: "Ok" as const,
+      value,
+    }),
+  ) as OkView<T, E>;
 }
 
 /**
@@ -315,10 +319,12 @@ export function okRes<T, E>(value: T): Result<T, E> {
  * @internal
  */
 export function errRes<T, E>(error: E): Result<T, E> {
-  return Object.assign(Object.create(RESULT_PROTO), {
-    tag: "Err" as const,
-    error,
-  }) as ErrView<E, T>;
+  return Object.freeze(
+    Object.assign(Object.create(RESULT_PROTO), {
+      tag: "Err" as const,
+      error,
+    }),
+  ) as ErrView<E, T>;
 }
 
 /**
@@ -327,10 +333,12 @@ export function errRes<T, E>(error: E): Result<T, E> {
  * @internal
  */
 export function defectRes<T, E>(cause: unknown): Result<T, E> {
-  return Object.assign(Object.create(RESULT_PROTO), {
-    tag: "Defect" as const,
-    cause,
-  }) as DefectView<T, E>;
+  return Object.freeze(
+    Object.assign(Object.create(RESULT_PROTO), {
+      tag: "Defect" as const,
+      cause,
+    }),
+  ) as DefectView<T, E>;
 }
 
 /**
