@@ -1,6 +1,6 @@
 {
   "name": "@unthrown/neverthrow",
-  "version": "3.0.1",
+  "version": "3.1.0",
   "description": "neverthrow interop for unthrown",
   "keywords": [
     "errors-as-values",
