@@ -264,8 +264,14 @@ export type ResultMethods<T, E> = {
    *
    * @remarks
    * Compiles only when the error channel is empty (`E = never`) — eliminate
-   * modeled errors first (`match` / `recover` / `orElse`). A `Defect` still
-   * **rethrows its original cause** (a defect is a bug, not an absent value).
+   * modeled errors first (`match` / `recover` / `orElse`), or reach for the
+   * `unwrapOr` / `unwrapOrElse` / `getOrNull` / `getOrUndefined` family (which
+   * recover an `Err`). If you get a `'this' context` type error here, that is
+   * the gate: the receiver still has a non-`never` error channel.
+   *
+   * `E = never` empties only the **modeled** error channel — a `Defect` can
+   * still be present, and `unwrap()` **rethrows its original cause** (it
+   * _panics_); `Result<T, never>` does not mean `unwrap()` cannot throw.
    *
    * @returns the `Ok` value.
    */
@@ -275,8 +281,11 @@ export type ResultMethods<T, E> = {
    *
    * @remarks
    * Compiles only when the success channel is empty (`T = never`) — eliminate
-   * the success case first. A `Defect` still **rethrows its original cause**
-   * (a defect is a bug, not an absent value).
+   * the success case first. `T = never` is rarely the case in practice (a
+   * `Result` you hold usually still has a success type), so to inspect an
+   * error prefer an `isErr()` guard or, in tests, `@unthrown/vitest`'s
+   * `toBeErrWith`. A `Defect` still **rethrows its original cause** (a defect is
+   * a bug, not an absent value), so this does not mean `unwrapErr()` can't throw.
    *
    * @returns the `Err` value.
    */
