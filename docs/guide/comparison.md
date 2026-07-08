@@ -87,4 +87,7 @@ unthrown's bet is narrow on purpose: the modeled-vs-defect split, qualification
 forced at boundaries, and a runtime that can't leak a raw throw — and nothing
 else. If those three are what you want, that's the whole library.
 
-→ Continue to [Getting Started](./getting-started).
+Coming from one of these? See [Migrating from neverthrow](./migrating-from-neverthrow)
+and [From try/catch](./from-try-catch).
+
+→ Continue to [Migrating from neverthrow](./migrating-from-neverthrow).
