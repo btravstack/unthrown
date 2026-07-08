@@ -66,6 +66,15 @@ export function toExit<T, E>(result: Result<T, E>): Exit.Exit<T, E> {
  * @typeParam T - the success value type.
  * @typeParam E - the modeled error type.
  * @param exit - the exit to convert.
+ *
+ * @example
+ * ```ts
+ * import { Exit } from "effect";
+ * import { fromExit } from "@unthrown/effect";
+ *
+ * const result = fromExit(Exit.succeed(1));
+ * result.isOk(); // => true
+ * ```
  */
 export function fromExit<T, E>(exit: Exit.Exit<T, E>): Result<T, E> {
   return Exit.match(exit, {
@@ -94,6 +103,16 @@ export function fromExit<T, E>(exit: Exit.Exit<T, E>): Result<T, E> {
  * @typeParam E - the modeled error type.
  * @param result - the result to convert.
  * @param onDefect - folds a Defect's unknown cause into a modeled `E`.
+ *
+ * @example
+ * ```ts
+ * import { Err } from "unthrown";
+ * import { toEither } from "@unthrown/effect";
+ *
+ * // A Defect has no home in Either — you must fold it into E:
+ * const either = toEither(Err("nope"), (cause) => `bug: ${String(cause)}`);
+ * either._tag; // => "Left"
+ * ```
  */
 export function toEither<T, E>(
   result: Result<T, E>,
@@ -116,6 +135,15 @@ export function toEither<T, E>(
  * @typeParam T - the success value type.
  * @typeParam E - the modeled error type.
  * @param either - the either to convert.
+ *
+ * @example
+ * ```ts
+ * import { Either } from "effect";
+ * import { fromEither } from "@unthrown/effect";
+ *
+ * const result = fromEither(Either.right(1));
+ * result.isOk(); // => true
+ * ```
  */
 export function fromEither<T, E>(either: Either.Either<T, E>): Result<T, E> {
   return Either.match(either, {
@@ -136,6 +164,16 @@ export function fromEither<T, E>(either: Either.Either<T, E>): Result<T, E> {
  * @typeParam T - the success value type.
  * @typeParam E - the modeled error type.
  * @param source - the result, or async result, to lift.
+ *
+ * @example
+ * ```ts
+ * import { Effect } from "effect";
+ * import { Ok } from "unthrown";
+ * import { toEffect } from "@unthrown/effect";
+ *
+ * const effect = toEffect(Ok(1));
+ * await Effect.runPromise(effect); // => 1
+ * ```
  */
 export function toEffect<T, E>(source: Result<T, E>): Effect.Effect<T, E>;
 export function toEffect<T, E>(source: AsyncResult<T, E>): Effect.Effect<T, E>;
@@ -161,6 +199,15 @@ export function toEffect<T, E>(source: Result<T, E> | AsyncResult<T, E>): Effect
  * @typeParam T - the success value type.
  * @typeParam E - the modeled error type.
  * @param effect - the effect to run.
+ *
+ * @example
+ * ```ts
+ * import { Effect } from "effect";
+ * import { fromEffect } from "@unthrown/effect";
+ *
+ * const result = await fromEffect(Effect.succeed(1));
+ * result.isOk(); // => true
+ * ```
  */
 export function fromEffect<T, E>(effect: Effect.Effect<T, E>): AsyncResult<T, E> {
   return fromSafePromise(Effect.runPromiseExit(effect)).flatMap((exit) => fromExit(exit));

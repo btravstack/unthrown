@@ -29,6 +29,16 @@ import type { AsyncResult, Result } from "unthrown";
  * @typeParam E - the modeled error type.
  * @param result - the result to convert.
  * @param onDefect - folds a Defect's unknown cause into a modeled `E`.
+ *
+ * @example
+ * ```ts
+ * import { Err } from "unthrown";
+ * import { toBoxed } from "@unthrown/boxed";
+ *
+ * // A Defect has no home in Boxed's Result — you must fold it into E:
+ * const boxed = toBoxed(Err("nope"), (cause) => `bug: ${String(cause)}`);
+ * boxed.isError(); // => true
+ * ```
  */
 export function toBoxed<T, E>(
   result: Result<T, E>,
@@ -51,6 +61,15 @@ export function toBoxed<T, E>(
  * @typeParam T - the success value type.
  * @typeParam E - the modeled error type.
  * @param result - the Boxed result to convert.
+ *
+ * @example
+ * ```ts
+ * import { Result as BoxedResult } from "@bloodyowl/boxed";
+ * import { fromBoxed } from "@unthrown/boxed";
+ *
+ * const result = fromBoxed(BoxedResult.Ok(1));
+ * result.isOk(); // => true
+ * ```
  */
 export function fromBoxed<T, E>(result: BoxedResult<T, E>): Result<T, E> {
   return result.match({
@@ -76,6 +95,16 @@ export function fromBoxed<T, E>(result: BoxedResult<T, E>): Result<T, E> {
  * @typeParam E - the modeled error type.
  * @param asyncResult - the async result to convert.
  * @param onDefect - folds a Defect's unknown cause into a modeled `E`.
+ *
+ * @example
+ * ```ts
+ * import { fromSafePromise } from "unthrown";
+ * import { toBoxedFuture } from "@unthrown/boxed";
+ *
+ * const asyncResult = fromSafePromise(Promise.resolve(1));
+ * const future = toBoxedFuture(asyncResult, (cause) => `bug: ${String(cause)}`);
+ * (await future.toPromise()).isOk(); // => true
+ * ```
  */
 export function toBoxedFuture<T, E>(
   asyncResult: AsyncResult<T, E>,
@@ -117,6 +146,15 @@ export function toBoxedFuture<T, E>(
  * @typeParam T - the success value type.
  * @typeParam E - the modeled error type.
  * @param future - the Boxed future to convert.
+ *
+ * @example
+ * ```ts
+ * import { Future, Result as BoxedResult } from "@bloodyowl/boxed";
+ * import { fromBoxedFuture } from "@unthrown/boxed";
+ *
+ * const result = await fromBoxedFuture(Future.value(BoxedResult.Ok(1)));
+ * result.isOk(); // => true
+ * ```
  */
 export function fromBoxedFuture<T, E>(future: Future<BoxedResult<T, E>>): AsyncResult<T, E> {
   return fromSafePromise(future.toPromise()).flatMap((result) => fromBoxed(result));

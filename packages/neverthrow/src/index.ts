@@ -34,6 +34,16 @@ import type { AsyncResult, Result } from "unthrown";
  * @typeParam E - the modeled error type.
  * @param result - the result to convert.
  * @param onDefect - folds a Defect's unknown cause into a modeled `E`.
+ *
+ * @example
+ * ```ts
+ * import { Err } from "unthrown";
+ * import { toNeverthrow } from "@unthrown/neverthrow";
+ *
+ * // A Defect has no home in neverthrow — you must fold it into E:
+ * const nt = toNeverthrow(Err("nope"), (cause) => `bug: ${String(cause)}`);
+ * nt.isErr(); // => true
+ * ```
  */
 export function toNeverthrow<T, E>(
   result: Result<T, E>,
@@ -56,6 +66,15 @@ export function toNeverthrow<T, E>(
  * @typeParam T - the success value type.
  * @typeParam E - the modeled error type.
  * @param result - the neverthrow result to convert.
+ *
+ * @example
+ * ```ts
+ * import { ok } from "neverthrow";
+ * import { fromNeverthrow } from "@unthrown/neverthrow";
+ *
+ * const result = fromNeverthrow(ok(1));
+ * result.isOk(); // => true
+ * ```
  */
 export function fromNeverthrow<T, E>(result: NeverthrowResult<T, E>): Result<T, E> {
   return result.isOk() ? Ok(result.value) : Err(result.error);
@@ -78,6 +97,17 @@ export function fromNeverthrow<T, E>(result: NeverthrowResult<T, E>): Result<T, 
  * @typeParam E - the modeled error type.
  * @param asyncResult - the async result to convert.
  * @param onDefect - folds a Defect's unknown cause into a modeled `E`.
+ *
+ * @example
+ * ```ts
+ * import { fromSafePromise } from "unthrown";
+ * import { toNeverthrowAsync } from "@unthrown/neverthrow";
+ *
+ * const asyncResult = fromSafePromise(Promise.resolve(1));
+ * const nt = toNeverthrowAsync(asyncResult, (cause) => `bug: ${String(cause)}`);
+ * const result = await nt;
+ * result.isOk(); // => true
+ * ```
  */
 export function toNeverthrowAsync<T, E>(
   asyncResult: AsyncResult<T, E>,
@@ -99,6 +129,15 @@ export function toNeverthrowAsync<T, E>(
  * @typeParam T - the success value type.
  * @typeParam E - the modeled error type.
  * @param resultAsync - the neverthrow async result to convert.
+ *
+ * @example
+ * ```ts
+ * import { okAsync } from "neverthrow";
+ * import { fromNeverthrowAsync } from "@unthrown/neverthrow";
+ *
+ * const result = await fromNeverthrowAsync(okAsync(1));
+ * result.isOk(); // => true
+ * ```
  */
 export function fromNeverthrowAsync<T, E>(
   resultAsync: NeverthrowResultAsync<T, E>,
