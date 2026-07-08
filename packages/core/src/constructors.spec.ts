@@ -112,6 +112,18 @@ describe("method guards narrow (parity with the standalone guards)", () => {
   });
 });
 
+describe("Result instances are frozen — a variant cannot be forged by mutation", () => {
+  it("freezes instances so tag cannot be mutated", () => {
+    const r = Ok(1);
+    expect(Object.isFrozen(r)).toBe(true);
+    expect(() => {
+      (r as { tag: string }).tag = "Err";
+    }).toThrow(TypeError);
+    expect(r.isOk()).toBe(true);
+    expect(Object.isFrozen(Err("e"))).toBe(true);
+  });
+});
+
 describe("UnwrapError", () => {
   it("carries the offending error and is an Error instance", () => {
     const e = new UnwrapError("payload");
