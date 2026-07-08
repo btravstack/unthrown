@@ -41,5 +41,20 @@ ruleTester.run("prefer-async-result", preferAsyncResult, {
       errors: [{ messageId: "preferAsyncResult" }],
       output: null,
     },
+    // An async function's return annotation is reported but NOT auto-fixed:
+    // `async function` must return a native Promise, so rewriting the annotation
+    // to AsyncResult<…> would not compile.
+    {
+      code: `import { AsyncResult, type Result } from "unthrown";
+async function f(): Promise<Result<number, string>> { return null as never; }`,
+      errors: [{ messageId: "preferAsyncResult" }],
+      output: null,
+    },
+    {
+      code: `import { AsyncResult, type Result } from "unthrown";
+const f = async (): Promise<Result<number, string>> => null as never;`,
+      errors: [{ messageId: "preferAsyncResult" }],
+      output: null,
+    },
   ],
 });

@@ -50,7 +50,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@oxlint/plugins": "catalog:"
+    "@oxlint/plugins": "^1.71.0"
   },
   "devDependencies": {
     "@types/node": "catalog:",
@@ -62,7 +62,7 @@
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "oxlint": "^1"
+    "oxlint": "^1.69.0"
   },
   "engines": {
     "node": ">=20"
