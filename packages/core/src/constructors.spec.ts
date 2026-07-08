@@ -24,6 +24,23 @@ describe("constructors", () => {
     expect(r.isDefect()).toBe(false);
     expect(r.unwrapErr()).toBe("nope");
   });
+
+  it("Err(undefined) and Err(null) are real Errs — discrimination is by tag, never payload presence", () => {
+    const u = Err(undefined);
+    expect(u.tag).toBe("Err");
+    expect(u.isErr()).toBe(true);
+    if (u.isErr()) expect(u.error).toBeUndefined();
+    const n = Err(null);
+    if (n.isErr()) expect(n.error).toBeNull();
+  });
+
+  it("Ok(Err(x)) does not flatten — a Result is an ordinary value", () => {
+    const nested = Ok(Err("inner"));
+    expect(nested.tag).toBe("Ok");
+    if (nested.isOk()) {
+      expect(nested.value.tag).toBe("Err");
+    }
+  });
 });
 
 describe("standalone guards narrow and expose the relevant field", () => {
