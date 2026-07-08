@@ -68,6 +68,10 @@ export function fromBoxed<T, E>(result: BoxedResult<T, E>): Result<T, E> {
  * reason. The `AsyncResult` is awaited (it never rejects) and its settled
  * `Result` is converted, then resolved into the `Future`.
  *
+ * `onDefect` must not throw: Boxed's `Future` has no failure channel, so a
+ * throw is re-raised out-of-band (uncaught) rather than left as a hung
+ * `Future`.
+ *
  * @typeParam T - the success value type.
  * @typeParam E - the modeled error type.
  * @param asyncResult - the async result to convert.
@@ -79,7 +83,16 @@ export function toBoxedFuture<T, E>(
 ): Future<BoxedResult<T, E>> {
   return Future.make<BoxedResult<T, E>>((resolve) => {
     void settle(asyncResult).then((result) => {
-      resolve(toBoxed(result, onDefect));
+      try {
+        resolve(toBoxed(result, onDefect));
+      } catch (cause) {
+        // A throwing onDefect is a bug in the caller's triage. Swallowing it
+        // would leave the Future pending forever; rethrow out-of-band so it
+        // surfaces as an uncaught error instead of a silent hang.
+        queueMicrotask(() => {
+          throw cause;
+        });
+      }
     });
   });
 }

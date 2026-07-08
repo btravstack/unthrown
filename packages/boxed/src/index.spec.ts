@@ -1,5 +1,5 @@
 import { Future, Result as BoxedResult } from "@bloodyowl/boxed";
-import { Err, Ok, type Result } from "unthrown";
+import { Err, fromSafePromise, Ok, type Result } from "unthrown";
 import { describe, expect, it } from "vitest";
 
 import { fromBoxed, fromBoxedFuture, toBoxed, toBoxedFuture } from "./index.js";
@@ -39,6 +39,29 @@ describe("toBoxedFuture", () => {
       (cause) => `bug:${String(cause)}`,
     ).toPromise();
     expect(defR.isError() && defR.getError()).toBe(`bug:${String(boom)}`);
+  });
+
+  it("surfaces a throwing onDefect out-of-band instead of hanging the Future", async () => {
+    const boomDefect = new Error("onDefect-threw");
+    const rethrown: unknown[] = [];
+    const original = globalThis.queueMicrotask;
+    globalThis.queueMicrotask = (cb: () => void) => {
+      try {
+        cb();
+      } catch (e) {
+        rethrown.push(e);
+      }
+    };
+    try {
+      const defect = fromSafePromise(Promise.reject(new Error("bug")));
+      toBoxedFuture(defect, () => {
+        throw boomDefect;
+      });
+      await new Promise((r) => setTimeout(r, 0));
+      expect(rethrown).toEqual([boomDefect]);
+    } finally {
+      globalThis.queueMicrotask = original;
+    }
   });
 });
 
