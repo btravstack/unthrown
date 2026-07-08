@@ -274,6 +274,10 @@ type _nameNotShadowed = Expect<
   ar.mapErr(async (e) => e);
   // @ts-expect-error — async recover callback is banned (async surface)
   ar.recover(async () => 0);
+  // @ts-expect-error — async tapErr callback is banned (async surface)
+  ar.tapErr(async () => {});
+  // @ts-expect-error — async tapDefect callback is banned (async surface)
+  ar.tapDefect(async () => {});
   const emptyAsync = Ok({}).toAsync();
   // @ts-expect-error — async let callback is banned (async surface)
   emptyAsync.let("x", async () => 1);
