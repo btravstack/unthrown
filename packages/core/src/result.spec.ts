@@ -367,6 +367,53 @@ describe("Result.tapDefect", () => {
   });
 });
 
+describe("failure-observer throws preserve the original failure", () => {
+  it("tapErr: a throwing callback yields a Defect aggregating [thrown, original]", () => {
+    const boom = new Error("boom");
+    const r = Err("original").tapErr(() => {
+      throw boom;
+    });
+    expect(r.tag).toBe("Defect");
+    if (r.isDefect()) {
+      expect(r.cause).toBeInstanceOf(AggregateError);
+      expect((r.cause as AggregateError).errors).toEqual([boom, "original"]);
+    }
+  });
+
+  it("tapDefect: a throwing callback yields a Defect aggregating [thrown, original cause]", () => {
+    const original = new Error("original-bug");
+    const defect = defectOf(original);
+    const boom = new Error("logger-failed");
+    const r = defect.tapDefect(() => {
+      throw boom;
+    });
+    expect(r.tag).toBe("Defect");
+    if (r.isDefect()) {
+      expect((r.cause as AggregateError).errors).toEqual([boom, original]);
+    }
+  });
+
+  it("flatTapErr: a throwing callback yields a Defect aggregating [thrown, original]", () => {
+    const boom = new Error("boom");
+    const r = Err("original").flatTapErr(() => {
+      throw boom;
+    });
+    expect(r.tag).toBe("Defect");
+    if (r.isDefect()) {
+      expect((r.cause as AggregateError).errors).toEqual([boom, "original"]);
+    }
+  });
+
+  it("tap (success channel) is unchanged: the Defect cause is the thrown value itself", () => {
+    const boom = new Error("boom");
+    const r = Ok(1).tap(() => {
+      throw boom;
+    });
+    expect(r.tag).toBe("Defect");
+    if (r.isDefect()) expect(r.cause).toBe(boom);
+  });
+});
+
 describe("Result.match", () => {
   it("dispatches each of the three channels", () => {
     const fold = (r: Result<number, string>) =>
