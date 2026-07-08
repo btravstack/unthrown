@@ -44,7 +44,15 @@ was planned).
 4. **`TaggedError` is the error convention** (à la Effect's `Data.TaggedError`):
    a `_tag` discriminant on a class extending `Error`. Core `Result<T, E>` stays
    **generic in `E`** (unconstrained); only the tag-aware utilities require
-   `E extends { _tag: string }`.
+   `E extends { _tag: string }`. The payload carries **only structured domain
+   fields** — both `name` and `message` are **reserved** out of it (each typed
+   `?: never`): `name` is the display label (set via `options.name`), and
+   `message` is `Error`'s human string, defined once per subclass the standard
+   way (`override message = "…"`, which may interpolate the payload via `this`
+   because the base populates the fields before the subclass field initialiser
+   runs). Keeping `message` off the payload is deliberate — contextual detail
+   lives in typed fields, defined per error type, never baked into a per-call
+   string.
 
 ## Load-bearing runtime invariants (tests must guard these)
 
@@ -181,7 +189,9 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
 - tagged errors: `TaggedError(tag, options?)` (the error-class factory; optional
   `options.name` sets `Error.name` independently of the `_tag` discriminant, so a
   tag can be namespaced for collision-safety without leaking into the display
-  name) and `matchTags(result, handlers)` (an exhaustive `{ Ok, Defect } &
+  name; the payload reserves `name` **and** `message` via `?: never`, so the
+  message is set per subclass with `override message = "…"`, never as a payload
+  field) and `matchTags(result, handlers)` (an exhaustive `{ Ok, Defect } &
 per-tag` fold; has an async overload resolving to `Promise<R>`); see the
   `TaggedError` convention in Thesis #4.
 

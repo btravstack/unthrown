@@ -246,10 +246,22 @@ class WithCode extends TaggedError("WithCode")<{ code: number }> {}
 new WithCode({ code: 1 });
 // @ts-expect-error - a `name` payload key is reserved, not constructable
 new WithCode({ code: 1, name: "nope" });
+// @ts-expect-error - a `message` payload key is reserved (owned by Error)
+new WithCode({ code: 1, message: "nope" });
 // Even a forced `name` payload does not narrow `Error.name`: it stays `string`.
 type _nameNotShadowed = Expect<
   Equal<TaggedErrorInstance<"X", { code: number; name: "lit" }>["name"], string>
 >;
+// Likewise a forced `message` payload does not narrow `Error.message`.
+type _messageNotShadowed = Expect<
+  Equal<TaggedErrorInstance<"X", { code: number; message: "lit" }>["message"], string>
+>;
+// The message is defined per subclass the standard way — `override message`,
+// which may interpolate the payload via `this`.
+class WithMsg extends TaggedError("WithMsg")<{ ticketId: string }> {
+  override message = `ticket ${this.ticketId} not found`;
+}
+new WithMsg({ ticketId: "t1" });
 
 // ---------------------------------------------------------------------------
 // Thenable callbacks are rejected: an async callback's rejection would bypass
