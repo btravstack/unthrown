@@ -148,7 +148,7 @@ importers:
   packages/boxed:
     dependencies:
       unthrown:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
     devDependencies:
       '@bloodyowl/boxed':
@@ -215,7 +215,7 @@ importers:
   packages/effect:
     dependencies:
       unthrown:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
     devDependencies:
       '@types/node':
@@ -252,7 +252,7 @@ importers:
   packages/neverthrow:
     dependencies:
       unthrown:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
     devDependencies:
       '@types/node':
@@ -317,7 +317,7 @@ importers:
   packages/pattern:
     dependencies:
       unthrown:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
     devDependencies:
       '@types/node':
@@ -357,7 +357,7 @@ importers:
         specifier: 'catalog:'
         version: 1.1.0
       unthrown:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
     devDependencies:
       '@types/node':
@@ -389,10 +389,6 @@ importers:
         version: 4.1.8(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0)
 
   packages/vitest:
-    dependencies:
-      unthrown:
-        specifier: workspace:*
-        version: link:../core
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -418,6 +414,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      unthrown:
+        specifier: workspace:^
+        version: link:../core
       vitest:
         specifier: 'catalog:'
         version: 4.1.8(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0)

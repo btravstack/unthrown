@@ -29,7 +29,7 @@
   "sideEffects": false,
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
-  "types": "./dist/index.d.mts",
+  "types": "./dist/index.d.cts",
   "exports": {
     ".": {
       "import": {
@@ -65,6 +65,6 @@
     "oxlint": "^1"
   },
   "engines": {
-    "node": ">=22.19"
+    "node": ">=20"
   }
 }

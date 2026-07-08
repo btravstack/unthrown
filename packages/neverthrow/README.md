@@ -33,4 +33,4 @@ fromNeverthrow(ntOk(1)); // Result<number, never>
 
 ## License
 
-[MIT](../../LICENSE) © Benoit TRAVERS
+[MIT](https://github.com/btravstack/unthrown/blob/main/LICENSE) © Benoit TRAVERS

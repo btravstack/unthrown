@@ -23,13 +23,12 @@
     "directory": "packages/vitest"
   },
   "files": [
-    "dist",
-    "docs"
+    "dist"
   ],
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
-  "types": "./dist/index.d.mts",
+  "types": "./dist/index.d.cts",
   "exports": {
     ".": {
       "import": {
@@ -50,9 +49,6 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "unthrown": "workspace:*"
-  },
   "devDependencies": {
     "@types/node": "catalog:",
     "@unthrown/tsconfig": "workspace:*",
@@ -62,12 +58,14 @@
     "typedoc": "catalog:",
     "typedoc-plugin-markdown": "catalog:",
     "typescript": "catalog:",
+    "unthrown": "workspace:^",
     "vitest": "catalog:"
   },
   "peerDependencies": {
+    "unthrown": "workspace:^",
     "vitest": "^4"
   },
   "engines": {
-    "node": ">=22.19"
+    "node": ">=20"
   }
 }

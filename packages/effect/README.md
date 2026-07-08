@@ -42,4 +42,4 @@ onDefect)` **forces** you to triage the defect into `E` (Thesis #3). `fromEither
 
 ## License
 
-[MIT](../../LICENSE) © Benoit TRAVERS
+[MIT](https://github.com/btravstack/unthrown/blob/main/LICENSE) © Benoit TRAVERS
