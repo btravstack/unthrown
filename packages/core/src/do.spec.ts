@@ -77,6 +77,11 @@ describe("Do / bind / let", () => {
         .isDefect(),
     ).toBe(true);
   });
+
+  it("bind on an array scope is misuse and becomes a Defect (not a silent index-spread)", () => {
+    const r = Ok([1, 2]).bind("a", () => Ok("x"));
+    expect(r.tag).toBe("Defect");
+  });
 });
 
 describe("Do / bind / let — async", () => {
