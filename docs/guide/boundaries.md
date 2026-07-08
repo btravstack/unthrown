@@ -12,7 +12,10 @@ The sanctioned bridge for nullable values. `null` / `undefined` become a modeled
 ```ts
 import { fromNullable } from "unthrown";
 
-fromNullable(map.get(key), () => "missing").unwrapOr(null);
+const cache = new Map([["a", 1]]);
+
+fromNullable(cache.get("a"), () => "missing"); // Ok(1)
+fromNullable(cache.get("z"), () => "missing"); // Err("missing")
 ```
 
 This is why `unthrown` ships no `Option` type — absence is expressed with the
