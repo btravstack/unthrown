@@ -21,9 +21,6 @@ catalogs:
     '@commitlint/config-conventional':
       specifier: 21.1.0
       version: 21.1.0
-    '@oxlint/plugins':
-      specifier: 1.71.0
-      version: 1.71.0
     '@standard-schema/spec':
       specifier: 1.1.0
       version: 1.1.0
@@ -289,7 +286,7 @@ importers:
   packages/oxlint:
     dependencies:
       '@oxlint/plugins':
-        specifier: 'catalog:'
+        specifier: ^1.71.0
         version: 1.71.0
     devDependencies:
       '@types/node':

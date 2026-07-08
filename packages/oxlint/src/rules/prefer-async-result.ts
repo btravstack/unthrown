@@ -1,3 +1,4 @@
+import type { ESTree } from "@oxlint/plugins";
 import { defineRule } from "@oxlint/plugins";
 
 import { getImportSource } from "../helpers/get-import-source.js";
@@ -28,7 +29,23 @@ export const preferAsyncResult = defineRule({
     fixable: "code",
   },
   createOnce: (context) => {
+    // Spans of return-type annotations on `async` functions: a report inside
+    // one carries no autofix, because an `async` function must return a
+    // native `Promise` — rewriting the annotation to `AsyncResult<…>` would
+    // not compile. Function nodes are visited before their return-type
+    // children, so the set is populated in time.
+    const asyncReturnSpans = new Set<string>();
+    const trackAsyncFunction = (node: ESTree.Function | ESTree.ArrowFunctionExpression) => {
+      if (node.async && node.returnType) {
+        const t = node.returnType.typeAnnotation;
+        asyncReturnSpans.add(`${t.start}:${t.end}`);
+      }
+    };
+
     return {
+      FunctionDeclaration: trackAsyncFunction,
+      FunctionExpression: trackAsyncFunction,
+      ArrowFunctionExpression: trackAsyncFunction,
       TSTypeReference: (node) => {
         if (!isIdentifierTypeName(node, ["Promise"])) return;
         if (!hasTypeArguments(node, 1)) return;
@@ -41,9 +58,12 @@ export const preferAsyncResult = defineRule({
         const scope = context.sourceCode.getScope(node);
         if (getImportSource(scope, inner.typeName) !== MODULE) return;
 
-        // Only autofix when `AsyncResult` is already importable — otherwise the
-        // rewrite would reference an undefined name. Report without a fix instead.
-        const canFix = hasNamedImport(scope, "AsyncResult", MODULE);
+        // Withhold the fix when this annotation is an `async` function's
+        // return type — see the `asyncReturnSpans` comment above — or when
+        // `AsyncResult` isn't importable (the rewrite would reference an
+        // undefined name).
+        const inAsyncReturn = asyncReturnSpans.has(`${node.start}:${node.end}`);
+        const canFix = !inAsyncReturn && hasNamedImport(scope, "AsyncResult", MODULE);
 
         context.report({
           node,
