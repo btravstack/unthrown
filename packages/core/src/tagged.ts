@@ -122,6 +122,16 @@ export type TagHandlers<T, E extends { _tag: string }, R> = {
 } & { [K in E["_tag"]]: (error: Extract<E, { _tag: K }>) => R };
 
 /**
+ * The channel-handler names are reserved: an error tag named `"Ok"` or
+ * `"Defect"` would collide with them inside {@link TagHandlers}, so
+ * {@link matchTags} rejects such unions at the call site.
+ *
+ * @internal
+ */
+type ReservedTagError =
+  'unthrown: error tags "Ok" and "Defect" are reserved by matchTags — rename the colliding tag (TaggedError\'s options.name can keep the display name)';
+
+/**
  * Exhaustively fold a {@link Result} (or {@link AsyncResult}) whose error type is
  * a tagged union, dispatching each error to the handler matching its `_tag`.
  *
@@ -129,7 +139,10 @@ export type TagHandlers<T, E extends { _tag: string }, R> = {
  * The `handlers` object must provide `Ok`, `Defect`, and exactly one function
  * per error tag; each tag's handler receives the narrowed error variant. A
  * missing tag is a compile error. For an `AsyncResult`, the fold resolves to a
- * `Promise<R>`.
+ * `Promise<R>`. At runtime, an error whose `_tag` has no handler (possible only
+ * outside the typed contract) is routed to the `Defect` handler — an unmodeled
+ * tag is an unmodeled failure. Tags named `"Ok"` or `"Defect"` are rejected at
+ * compile time.
  *
  * @typeParam T - the success value type.
  * @typeParam E - the tagged error union (`E extends { _tag: string }`).
@@ -160,19 +173,28 @@ export type TagHandlers<T, E extends { _tag: string }, R> = {
  */
 export function matchTags<T, E extends { _tag: string }, R>(
   result: Result<T, E>,
-  handlers: TagHandlers<T, E, R>,
+  handlers: TagHandlers<T, E, R> &
+    ([Extract<E["_tag"], "Ok" | "Defect">] extends [never] ? unknown : ReservedTagError),
 ): R;
 export function matchTags<T, E extends { _tag: string }, R>(
   result: AsyncResult<T, E>,
-  handlers: TagHandlers<T, E, R>,
+  handlers: TagHandlers<T, E, R> &
+    ([Extract<E["_tag"], "Ok" | "Defect">] extends [never] ? unknown : ReservedTagError),
 ): Promise<R>;
 export function matchTags<T, E extends { _tag: string }, R>(
   result: Result<T, E> | AsyncResult<T, E>,
   handlers: TagHandlers<T, E, R>,
 ): R | Promise<R> {
   const onErr = (error: E): R => {
-    const handler = handlers[error._tag as E["_tag"]] as unknown as (e: E) => R;
-    return handler(error);
+    const tag = error._tag as E["_tag"];
+    const handler =
+      tag === "Ok" || tag === "Defect"
+        ? undefined
+        : (handlers[tag] as unknown as ((e: E) => R) | undefined);
+    // An unhandled or reserved tag can only arise outside the typed contract (a
+    // widened cast, a JS caller). That is an unmodeled failure — route it to the
+    // Defect handler rather than crashing on `undefined(error)`.
+    return handler ? handler(error) : handlers.Defect(error);
   };
   // Both Result and AsyncResult share `match`; the cast picks one signature for
   // the call while the public overloads keep the return type correct.

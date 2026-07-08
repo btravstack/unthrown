@@ -127,4 +127,26 @@ describe("matchTags", () => {
     });
     expect(out).toBe("ok:1");
   });
+
+  it("routes an error with an unhandled _tag to the Defect handler instead of crashing", () => {
+    class Known extends TaggedError("Known") {}
+    const rogue = { _tag: "Rogue" } as unknown as Known;
+    const out = matchTags(Err(rogue), {
+      Ok: () => "ok",
+      Defect: (cause) => `defect:${(cause as { _tag: string })._tag}`,
+      Known: () => "known",
+    });
+    expect(out).toBe("defect:Rogue");
+  });
+
+  it("routes an error whose _tag is the reserved 'Ok' to the Defect handler", () => {
+    class Known extends TaggedError("Known") {}
+    const rogue = { _tag: "Ok" } as unknown as Known;
+    const out = matchTags(Err(rogue), {
+      Ok: () => "ok",
+      Defect: () => "defect",
+      Known: () => "known",
+    });
+    expect(out).toBe("defect");
+  });
 });
