@@ -62,6 +62,12 @@ describe("toBeErr / toBeErrTagged", () => {
     const r: Result<number, MyError> = Err(new MyError({ code: 42 }));
     expect(r).not.toBeErrTagged("Other", { code: 42 });
   });
+
+  it("toBeErrTagged with an explicitly-passed undefined payload asserts the payload, not tag-only", () => {
+    const r: Result<number, MyError> = Err(new MyError({ code: 1 }));
+    expect(r).toBeErrTagged("MyError"); // one-arg: tag-only, passes
+    expect(r).not.toBeErrTagged("MyError", undefined); // explicit undefined: payload {code:1} !== undefined
+  });
 });
 
 describe("toBeDefect", () => {
