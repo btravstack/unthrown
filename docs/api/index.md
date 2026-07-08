@@ -15,3 +15,18 @@ This reference is generated from the source with
   `toBeOkWith`, `toBeErr`, `toBeErrTagged`, `toBeDefect`).
 - [**@unthrown/pattern**](./pattern/) — thin `ts-pattern` sugar for the
   natively-matchable `Result` (`P.Ok`/`P.Err`/`P.Defect`, `tag`).
+- [**@unthrown/effect**](./effect/) — bijective `Result ↔ Exit` bridges
+  (Effect has a genuine defect channel, `Cause.die`), plus `toEither` with a
+  mandatory `onDefect`.
+- [**@unthrown/neverthrow**](./neverthrow/) — `to*`/`from*` bridges to
+  neverthrow's `Result`/`ResultAsync`; every `to*` takes a mandatory `onDefect`
+  (neverthrow has no defect channel).
+- [**@unthrown/boxed**](./boxed/) — `to*`/`from*` bridges to Boxed's
+  `Result`/`Future`; every `to*` takes a mandatory `onDefect`.
+- [**@unthrown/standard-schema**](./standard-schema/) — `fromSchema` /
+  `fromSchemaAsync`: run any Standard Schema validator (Zod, Valibot, ArkType)
+  into a `Result` with the validation issues as the modeled error.
+
+`@unthrown/oxlint` (the lint rules `no-ambiguous-error-type` and
+`prefer-async-result`) has no generated API page — it is documented in the
+[Linting guide](../guide/linting).

@@ -49,8 +49,9 @@ function findUser(id: string): Result<User, NotFound> {
 }
 
 // Cross an async boundary — every rejection MUST be triaged.
-const profile = fromPromise(fetch(`/u/${id}`), (cause, defect) =>
-  cause instanceof Response ? new NotFound() : defect(cause),
+// (db.loadProfile rejects with MissingRowError when there is no row.)
+const profile = fromPromise(db.loadProfile(id), (cause, defect) =>
+  cause instanceof MissingRowError ? new NotFound() : defect(cause),
 );
 
 // Handle every channel once, at the edge — no surrounding try/catch.

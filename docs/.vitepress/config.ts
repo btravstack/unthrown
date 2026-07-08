@@ -36,6 +36,13 @@ export default defineConfig({
     pageData.frontmatter ??= {};
     pageData.frontmatter.head ??= [];
 
+    // The /api/ pages (except the hand-written overview) are TypeDoc output copied
+    // in at build time — they have no source file in the repo, so "Edit this page"
+    // would 404. docs/api/index.md is the one committed file there.
+    if (pageData.relativePath.startsWith("api/") && pageData.relativePath !== "api/index.md") {
+      pageData.frontmatter.editLink = false;
+    }
+
     pageData.frontmatter.head.push(["link", { rel: "canonical", href: canonicalUrl }]);
 
     const pageTitle = pageData.title || pageData.frontmatter.title || "unthrown";
@@ -131,6 +138,10 @@ export default defineConfig({
     search: {
       provider: "local",
     },
+
+    // The single-page core API reference is a long scroll; surfacing h3s in the
+    // right-rail outline is what makes it navigable.
+    outline: { level: [2, 3] },
 
     editLink: {
       pattern: "https://github.com/btravstack/unthrown/edit/main/docs/:path",

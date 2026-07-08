@@ -128,3 +128,5 @@ const status = matchTags(result, {
 
 → Back to the [Guide](./why-unthrown), or browse the
 [API Reference](/api/core/).
+
+→ Continue to [Tagged Errors](./tagged-errors).
