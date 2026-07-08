@@ -33,18 +33,20 @@ do-notation). The rest of the table is where the libraries genuinely differ.
 ### 1. The defect channel
 
 In neverthrow, a throw inside `.map` (or a bug that slips past `mapErr`)
-escapes as a real exception — and an async one can reject the underlying
+escapes as a real exception — and an async one rejects the underlying
 `ResultAsync`. neverthrow's own `_unsafeUnwrap()` is the sharpest version of the
-same gap: it's a documented escape hatch that throws on an `Err`, so one bad
-call site turns a typed `Result` back into an uncaught exception. In practice
-this means every handler still needs a `try`/`catch` as a backstop for
-whatever `mapErr` didn't anticipate — the type says "handled," the runtime
-doesn't fully agree.
+same gap: it's a documented escape hatch that throws on an `Err` (neverthrow
+itself documents it as intended for tests, not production code), yet one bad
+call site in production turns a typed `Result` back into an uncaught exception.
+In practice this means every handler still needs a `try`/`catch` as a backstop
+for whatever the pipeline didn't anticipate — the type says "handled," the
+runtime doesn't fully agree.
 
-In unthrown, a throw inside any combinator becomes a `Defect` instead — a third
-state, not part of `E`, that flows to `match`'s mandatory `defect` arm. The
-handler doesn't need a backstop, because there's no path left for something to
-escape uncaught.
+In unthrown, a throw inside any **combinator** (`.map`, `.flatMap`, `mapErr`,
+…) becomes a `Defect` instead — a third state, not part of `E`, that flows down
+the pipeline and arrives at `match`'s mandatory `defect` arm. So the
+`try`/`catch` around the pipeline goes away: nothing a pipeline step throws can
+escape it as a raw exception.
 
 ```ts
 // neverthrow — a try/catch backstop is load-bearing, not defensive fluff
@@ -56,13 +58,13 @@ function getUser(id: string): ResultAsync<User, NotFoundError> {
 
 app.get("/users/:id", async (req, res) => {
   try {
-    const result = await getUser(req.params.id);
+    const result = await getUser(req.params.id).map((user) => formatUser(user)); // a bug in formatUser rejects the ResultAsync
     result.match(
-      (user) => res.status(200).json(formatUser(user)), // a typo here (formatUesr) throws
+      (view) => res.status(200).json(view),
       (error) => res.status(404).json({ error: error.message }),
     );
   } catch (cause) {
-    // catches the typo above, and anything getUser's mapErr didn't triage —
+    // catches the formatUser bug, and anything else the pipeline let escape —
     // neverthrow has one bucket for "everything else that went wrong"
     console.error(cause);
     res.status(500).json({ error: "internal error" });
@@ -71,7 +73,8 @@ app.get("/users/:id", async (req, res) => {
 ```
 
 ```ts
-// unthrown — the same typo becomes a Defect; no surrounding try/catch
+// unthrown — the same bug becomes a Defect inside the pipeline;
+// no try/catch around it
 import { fromPromise } from "unthrown";
 
 function getUser(id: string) {
@@ -81,20 +84,24 @@ function getUser(id: string) {
 }
 
 app.get("/users/:id", async (req, res) => {
-  const result = await getUser(req.params.id);
-  await result.match({
-    ok: (user) => res.status(200).json(formatUser(user)), // a typo here → Defect, not an uncaught throw
+  const result = await getUser(req.params.id).map((user) => formatUser(user)); // a bug in formatUser → Defect
+  result.match({
+    ok: (view) => res.status(200).json(view),
     err: () => res.status(404).json({ error: "not found" }),
     defect: (cause) => {
-      console.error(cause); // everything unexpected lands here, and only here
+      console.error(cause); // everything the pipeline caught lands here
       res.status(500).json({ error: "internal error" });
     },
   });
 });
 ```
 
-Same handler, same failure mode — but the unthrown version has no `try`/`catch`
-because there's nothing left that can throw past it.
+Same handler, same failure mode — but the unthrown version needs no
+`try`/`catch` around the pipeline, because every combinator converts a throw
+into a `Defect` that arrives at `match`'s `defect` arm. One precise caveat: the
+containment covers the **combinators**, not `match`'s own callbacks — `match`
+invokes your handlers directly, so keep them trivial edge code (send the
+response, log) and put anything failable in a pipeline step above.
 
 ### 2. `qualify` replaces the error mapper
 
