@@ -110,6 +110,10 @@ export default defineConfig({
             { text: "Pattern Matching", link: "/guide/pattern-matching" },
             { text: "Linting", link: "/guide/linting" },
             { text: "Interop", link: "/guide/interop" },
+            {
+              text: "Validation (standard-schema)",
+              link: "/guide/interop#standard-schema-—-validators-as-results",
+            },
           ],
         },
       ],
