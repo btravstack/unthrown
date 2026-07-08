@@ -50,4 +50,4 @@ import unthrown from "@unthrown/oxlint";
 
 ## License
 
-[MIT](../../LICENSE) © Benoit TRAVERS
+[MIT](https://github.com/btravstack/unthrown/blob/main/LICENSE) © Benoit TRAVERS

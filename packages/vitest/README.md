@@ -44,4 +44,4 @@ Matchers: `toBeOk`, `toBeOkWith`, `toBeErr`, `toBeErrTagged(tag, expected?)`, `t
 
 ## License
 
-[MIT](../../LICENSE) © Benoit TRAVERS
+[MIT](https://github.com/btravstack/unthrown/blob/main/LICENSE) © Benoit TRAVERS

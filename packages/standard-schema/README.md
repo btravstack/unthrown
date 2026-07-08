@@ -38,4 +38,4 @@ library (Zod, Valibot, …) provides the runtime.
 
 ## License
 
-[MIT](../../LICENSE) © Benoit TRAVERS
+[MIT](https://github.com/btravstack/unthrown/blob/main/LICENSE) © Benoit TRAVERS

@@ -25,14 +25,13 @@
     "directory": "packages/standard-schema"
   },
   "files": [
-    "dist",
-    "docs"
+    "dist"
   ],
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
-  "types": "./dist/index.d.mts",
+  "types": "./dist/index.d.cts",
   "exports": {
     ".": {
       "import": {
@@ -55,7 +54,7 @@
   },
   "dependencies": {
     "@standard-schema/spec": "catalog:",
-    "unthrown": "workspace:*"
+    "unthrown": "workspace:^"
   },
   "devDependencies": {
     "@types/node": "catalog:",
@@ -69,6 +68,6 @@
     "vitest": "catalog:"
   },
   "engines": {
-    "node": ">=22.19"
+    "node": ">=20"
   }
 }

@@ -40,4 +40,4 @@ when you need ts-pattern's guards, nested patterns, or wildcards.
 
 ## License
 
-[MIT](../../LICENSE) © Benoit TRAVERS
+[MIT](https://github.com/btravstack/unthrown/blob/main/LICENSE) © Benoit TRAVERS

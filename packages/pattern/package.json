@@ -22,14 +22,13 @@
     "directory": "packages/pattern"
   },
   "files": [
-    "dist",
-    "docs"
+    "dist"
   ],
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
-  "types": "./dist/index.d.mts",
+  "types": "./dist/index.d.cts",
   "exports": {
     ".": {
       "import": {
@@ -51,7 +50,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "unthrown": "workspace:*"
+    "unthrown": "workspace:^"
   },
   "devDependencies": {
     "@types/node": "catalog:",
@@ -69,6 +68,6 @@
     "ts-pattern": "^5"
   },
   "engines": {
-    "node": ">=22.19"
+    "node": ">=20"
   }
 }
