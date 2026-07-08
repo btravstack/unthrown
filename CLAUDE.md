@@ -54,10 +54,27 @@ was planned).
   escapes a pipeline as a raw throw.
   This is what lets an HTTP adapter do a single `match({ ok, err, defect })`
   with **no surrounding `try/catch`**.
-- **A `Defect` flows through every method untouched EXCEPT `match()` and
-  `recoverDefect()`.** Therefore `unwrapOr`, `unwrapOrElse`, `getOrNull`,
-  `getOrUndefined` still **throw** on a `Defect` — they recover the modeled `Err`,
-  never an unmodeled defect (a defect is a bug, not an absent value).
+- **A `Defect` flows through every method untouched EXCEPT `match()`,
+  `recoverDefect()`, and `tapDefect()` (which observes it without consuming
+  it).** Therefore `unwrapOr`, `unwrapOrElse`, `getOrNull`, `getOrUndefined`
+  still **throw** on a `Defect` — they recover the modeled `Err`, never an
+  unmodeled defect (a defect is a bug, not an absent value).
+- **A failure-observer throw preserves the original failure.** A throw inside
+  `tapErr` / `tapDefect` / `flatTapErr` produces a `Defect` whose cause is an
+  `AggregateError([thrown, original])` — observing a failure never destroys it.
+  (A throw in the success-channel `tap`/`map` keeps the plain thrown cause.)
+- **Thenable callback returns are rejected at compile time.** Every combinator
+  callback not already constrained to return a `Result` (`map`, `tap*`, `let`,
+  `mapErr`, `recover`) intersects its return with `NotThenable<R>` — an `async`
+  callback is a compile error, because its rejection would bypass
+  qualification. `match` handlers are deliberately exempt (edge elimination).
+- **Result instances are frozen.** `okRes`/`errRes`/`defectRes` return
+  `Object.freeze`d objects, so a variant cannot be forged by mutation; the
+  `readonly` types are real at runtime.
+- **`matchTags` never crashes on an unhandled tag.** Outside the typed contract
+  (widened cast, JS caller) an unknown or reserved (`"Ok"`/`"Defect"`) `_tag`
+  routes to the `Defect` handler; reserved tags in `E` are additionally a
+  compile error.
 - **`unwrap()` is asymmetric.** On `Err` it throws a `UnwrapError` carrying `E`
   (on both the typed `.error` property and the standard `Error.cause`, so an
   `Error`-typed `E` chains its original stack under "caused by").
@@ -102,14 +119,18 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   mirror of `flatTap` — runs a `Result`-returning effect on the error, keeps the
   original error, threads the effect's error)
 - defect: `recoverDefect`, `tapDefect`
-- eliminate: `match`, `unwrap`, `unwrapErr`, `unwrapOr`, `unwrapOrElse`,
-  `getOrNull`, `getOrUndefined`
+- eliminate: `match`, `unwrap`, `unwrapErr`, `unwrapOr` (signature
+  `unwrapOr<U>(fallback: U): T | U` — widening, not narrowed to `T`),
+  `unwrapOrElse`, `getOrNull`, `getOrUndefined`
 - guards: methods `isOk`/`isErr`/`isDefect` **and** standalone
   `isOk`/`isErr`/`isDefect` both narrow (to `OkView`/`ErrView`/`DefectView`) — the
   methods are `this is …` type predicates, so `if (r.isErr()) r.error` compiles.
   One narrowing concept, two call styles. Plus the standalone `isResult(x)` —
   narrows an `unknown` to `Result<unknown, unknown>` (a prototype check, so a
   plain `{ tag: "Ok" }` look-alike is not matched), for untyped boundaries.
+- types: `NotThenable<R>` — rejects a `PromiseLike` at the type level, so a
+  combinator callback that returns one is a compile error instead of a silently
+  unqualified rejection.
 - constructors: `Ok`, `Err` (there is **no** `Defect` constructor — a defect-state
   `Result` arises only at boundaries; the qualify-time `defect` marker helper is
   injected, not exported)
@@ -227,11 +248,13 @@ library can be "done".
   the modeled `E`)
 - `packages/oxlint` → `@unthrown/oxlint` (an oxlint **JS plugin**, peerDep
   `oxlint`, dep `@oxlint/plugins`; ships `no-ambiguous-error-type` — enforces
-  Thesis #1 against `unknown`/`any`/`Error`/`{}` in `E` — and
-  `prefer-async-result`. Purely syntactic AST rules that resolve the import
-  source via scope analysis so they only fire on unthrown's `Result`. No TypeDoc
-  API page; documented in the Linting guide. Tested with oxlint's `RuleTester`
-  from `oxlint/plugins-dev`.)
+  Thesis #1 against `unknown`/`any`/`Error`/`{}` **and the primitive keywords**
+  in `E` — and `prefer-async-result` (reports `Promise<Result<T, E>>` in favour
+  of `AsyncResult<T, E>`, but withholds the autofix on an `async` function's
+  return annotation, since that must stay a native `Promise`). Purely syntactic
+  AST rules that resolve the import source via scope analysis so they only fire
+  on unthrown's `Result`. No TypeDoc API page; documented in the Linting guide.
+  Tested with oxlint's `RuleTester` from `oxlint/plugins-dev`.)
 - `tools/tsconfig`, `tools/typedoc` → private shared config (`@unthrown/tsconfig`,
   `@unthrown/typedoc`)
 - `docs` → `@unthrown/docs`, the VitePress site (guide + TypeDoc-generated API
@@ -239,6 +262,12 @@ library can be "done".
 
 Never pull `ts-pattern`, `vitest`, or any interop peer (`effect`, `neverthrow`,
 `@bloodyowl/boxed`) into core.
+
+Every satellite package depends on core via `workspace:^` (an exact pin would
+create a dual-copy hazard with the `instanceof`-based `isResult`); for the same
+reason, `@unthrown/vitest` takes core as a **peerDependency**, not a regular
+dependency. Every published package carries `engines: { node: ">=20" }`, ships
+its own `LICENSE`, and sets `files: ["dist"]`.
 
 ### Interop packages (`packages/effect`, `packages/neverthrow`, `packages/boxed`)
 
@@ -264,8 +293,9 @@ channel?**
 1. ✅ **Scaffold the workspace.** Done — pnpm + turbo workspace, dual CJS/ESM
    tsdown build, strict shared tsconfig, oxlint/oxfmt, knip, changesets, CI. The
    core `unthrown` package is split into focused modules, fully TSDoc'd, and
-   covered by a 108-test suite (100% line/function coverage). (Publishing the
-   names to npm remains a manual step.)
+   covered by a test suite held at 100% line/function coverage. (`unthrown`
+   and the `@unthrown` scope are published on npm; releases flow through the
+   changesets `release.yml`.)
 2. ✅ **`packages/core/src/tagged.ts`** — Done. `TaggedError(tag)` factory
    (extends `Error`, `_tag`, no-arg constructor when payload is empty via the
    `keyof A extends never ? void : A` trick) and `matchTags(result, handlers)`:
