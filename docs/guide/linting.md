@@ -36,7 +36,10 @@ rule keeps them out.
 
 Prefer `AsyncResult<T, E>` over `Promise<Result<T, E>>`. A raw `Promise<Result>`
 can still **reject**, reintroducing the throw channel that `AsyncResult` is
-designed to eliminate. Autofixable.
+designed to eliminate. Autofixable — except on an `async` function's return-type
+annotation, where the rule reports without a fix (an `async` function must
+return a native `Promise`, so rewriting the annotation to `AsyncResult<…>` would
+not compile).
 
 ```ts
 type Slow = Promise<Result<User, NotFound>>; // ✗ → AsyncResult<User, NotFound>
