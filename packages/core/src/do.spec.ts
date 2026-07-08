@@ -82,6 +82,21 @@ describe("Do / bind / let", () => {
     const r = Ok([1, 2]).bind("a", () => Ok("x"));
     expect(r.tag).toBe("Defect");
   });
+
+  it('bind("__proto__", …) stores an own property and never pollutes Object.prototype', () => {
+    const r = Do().bind("__proto__", () => Ok({ polluted: true }));
+    expect(r.tag).toBe("Ok");
+    expect(({} as { polluted?: boolean }).polluted).toBeUndefined();
+    if (r.isOk()) {
+      expect(Object.getOwnPropertyDescriptor(r.value, "__proto__")).toBeDefined();
+    }
+  });
+
+  it('let("__proto__", …) likewise stays an own property', () => {
+    const r = Do().let("__proto__", () => ({ polluted: true }));
+    expect(r.tag).toBe("Ok");
+    expect(({} as { polluted?: boolean }).polluted).toBeUndefined();
+  });
 });
 
 describe("Do / bind / let — async", () => {
