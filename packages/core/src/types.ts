@@ -420,8 +420,11 @@ export type Result<T, E> = OkView<T, E> | ErrView<E, T> | DefectView<T, E>;
  * An {@link AsyncResult}'s internal promise never rejects, so `await`-ing one
  * always yields a {@link Result} and never throws — there is no rejection
  * channel to model, and none is advertised. At runtime it is still a thenable
- * (the only way `await` can collapse it); the narrowing simply keeps it from
- * being treated as a raw promise (e.g. dropped into `Promise.all`).
+ * (the only way `await` can collapse it), and `Promise.all` / `Promise.resolve`
+ * will still adopt it — harmlessly, since it settles to a `Result` and never
+ * rejects. What the narrowing prevents is treating it as a full promise:
+ * `.catch()` / `.finally()` do not type-check, because there is no rejection to
+ * handle.
  *
  * @typeParam T - the value `await` resolves to.
  *

@@ -259,8 +259,10 @@ function foldRecord(results: ResultRecord): Result<unknown, unknown> {
   let firstDefect: Result<unknown, unknown> | undefined;
   const values: Record<string, unknown> = {};
   for (const [key, r] of Object.entries(results)) {
-    if (r.tag === "Defect") firstDefect ??= r;
-    else if (r.tag === "Err") firstErr ??= r;
+    if (r.tag === "Defect") {
+      firstDefect ??= r;
+      break; // any Defect dominates — nothing later can change the outcome
+    } else if (r.tag === "Err") firstErr ??= r;
     else
       Object.defineProperty(values, key, {
         value: r.value,
