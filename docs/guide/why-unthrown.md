@@ -17,6 +17,20 @@ returning a `Result<T, E>` so failures are part of the type.
 
 But most of them stop there, and that leaves a gap.
 
+```ts
+// Before: the signature hides every failure — and a bug in a callback
+// escapes as a runtime exception three layers up.
+function getUser(id: string): User; // throws NotFoundError? TimeoutError? TypeError?
+
+// After: anticipated failures are in the type; a thrown bug becomes a
+// Defect that can't masquerade as either.
+function getUser(id: string): Result<User, NotFound | Timeout>;
+
+getUser(id)
+  .map((u) => u.emial.trim()) // typo — TypeError → Defect, NOT an Err
+  .match({ ok: render, err: showMessage, defect: report500 });
+```
+
 ## The gap: unexpected failures
 
 There are really **two** kinds of failure:

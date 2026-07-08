@@ -68,4 +68,31 @@ const profile = await Do()
   .match({ ok: (s) => s, err: () => null, defect: () => null });
 ```
 
+## Why not a generator (`safeTry` / `gen`)?
+
+If you come from neverthrow's `safeTry` or Effect's `gen`, you may miss
+`yield*`-style flattening. The exclusion is deliberate:
+
+```ts
+// Generator style (not in unthrown):
+safeTry(function* () {
+  const user = yield* findUser(id);
+  const plan = yield* findPlan(user);
+  return Ok({ user, plan });
+});
+
+// unthrown's Do-notation — same flattening, no generator machinery:
+Do()
+  .bind("user", () => findUser(id))
+  .bind("plan", ({ user }) => findPlan(user));
+```
+
+The two are semantically equivalent for sequential code. What the generator
+buys — early `return` mid-block, `try`/`finally` around yields — comes at the
+cost of a second composition style, generator-transpilation overhead, and a
+`yield*` operator whose error-channel typing surprises people. One concept,
+one name: `bind` is the way to sequence dependent steps. If your chain is
+long enough that `Do` feels heavy, that is usually a sign the steps deserve
+named functions composed with `flatMap`.
+
 → Continue to [Choosing a Combinator](./choosing-a-combinator).

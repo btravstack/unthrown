@@ -24,6 +24,10 @@ than a full `PromiseLike` — there is no rejection channel to model. It is stil
 thenable at runtime (that is how `await` collapses it), but it is deliberately
 not interchangeable with a raw promise.
 
+> `AsyncResult` deliberately has no `isOk` / `isErr` / `isDefect`: the state
+> isn't known until it settles. `await` it first — the guards live on the
+> `Result` you get back.
+
 ::: warning Eliminators still reject
 The async eliminators do throw when you ask them to: `await result.unwrap()`
 rejects on an `Err` or `Defect`, just like the synchronous `unwrap()`. It is the
