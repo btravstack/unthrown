@@ -79,6 +79,11 @@ export default defineConfig({
           items: [
             { text: "Why unthrown?", link: "/guide/why-unthrown" },
             { text: "Comparison", link: "/guide/comparison" },
+            {
+              text: "Migrating from neverthrow",
+              link: "/guide/migrating-from-neverthrow",
+            },
+            { text: "From try/catch", link: "/guide/from-try-catch" },
             { text: "Getting Started", link: "/guide/getting-started" },
             { text: "Core Concepts", link: "/guide/core-concepts" },
           ],
