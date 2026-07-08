@@ -100,4 +100,4 @@ modeled errors — and ships just that, in a library small enough to be _done_.
 For a feature-by-feature table across all of these, see
 [Comparison](./comparison).
 
-→ Continue to [Getting Started](./getting-started).
+→ Continue to [Comparison](./comparison).

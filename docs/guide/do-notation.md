@@ -68,4 +68,4 @@ const profile = await Do()
   .match({ ok: (s) => s, err: () => null, defect: () => null });
 ```
 
-→ Continue to [The Defect Channel](./the-defect-channel).
+→ Continue to [Choosing a Combinator](./choosing-a-combinator).

@@ -55,4 +55,4 @@ The extra `fromPromise` is not ceremony — it is the forced triage decision tha
 guarantees the failure becomes a modeled error or a defect, never an untyped
 `unknown`.
 
-→ Continue to [Tagged Errors](./tagged-errors).
+→ Continue to [Do Notation](./do-notation).
