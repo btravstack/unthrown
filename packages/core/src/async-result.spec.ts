@@ -182,6 +182,29 @@ describe("AsyncResult error channel", () => {
     expect((await asyncDefect().flatTapErr(f)).isDefect()).toBe(true);
     expect(f).not.toHaveBeenCalled();
   });
+
+  it("tapErr: a throwing callback preserves the original error in an AggregateError", async () => {
+    const thrown = new Error("boom");
+    const r = await asyncErr("original").tapErr(() => {
+      throw thrown;
+    });
+    expect(r.tag).toBe("Defect");
+    if (r.isDefect()) {
+      expect(r.cause).toBeInstanceOf(AggregateError);
+      expect((r.cause as AggregateError).errors).toEqual([thrown, "original"]);
+    }
+  });
+
+  it("flatTapErr: a throwing callback preserves the original error in an AggregateError", async () => {
+    const thrown = new Error("boom");
+    const r = await asyncErr("original").flatTapErr(() => {
+      throw thrown;
+    });
+    expect(r.tag).toBe("Defect");
+    if (r.isDefect()) {
+      expect((r.cause as AggregateError).errors).toEqual([thrown, "original"]);
+    }
+  });
 });
 
 describe("AsyncResult Defect channel", () => {
@@ -203,6 +226,18 @@ describe("AsyncResult Defect channel", () => {
     const r = await asyncDefect().tapDefect((c) => seen.push(c));
     expect(seen).toEqual([boom]);
     expect(r.isDefect()).toBe(true);
+  });
+
+  it("tapDefect: a throwing callback preserves the original cause in an AggregateError", async () => {
+    const original = new Error("original-bug");
+    const thrown = new Error("logger-failed");
+    const r = await fromSafePromise(Promise.reject(original)).tapDefect(() => {
+      throw thrown;
+    });
+    expect(r.tag).toBe("Defect");
+    if (r.isDefect()) {
+      expect((r.cause as AggregateError).errors).toEqual([thrown, original]);
+    }
   });
 });
 

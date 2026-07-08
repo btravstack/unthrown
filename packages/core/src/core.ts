@@ -177,7 +177,7 @@ class Res<T, E> {
       f(this.error);
       return this;
     } catch (cause) {
-      return defectRes(cause);
+      return observerThrowToDefect(cause, this.error);
     }
   }
 
@@ -188,7 +188,7 @@ class Res<T, E> {
       // Keep the original error on the effect's success; an Err/Defect threads through.
       return r.tag === "Ok" ? this : passThrough(r);
     } catch (cause) {
-      return defectRes(cause);
+      return observerThrowToDefect(cause, this.error);
     }
   }
 
@@ -210,7 +210,7 @@ class Res<T, E> {
       f(this.cause);
       return this;
     } catch (cause) {
-      return defectRes(cause);
+      return observerThrowToDefect(cause, this.cause);
     }
   }
 
@@ -375,6 +375,24 @@ export function isResult(x: unknown): x is Result<unknown, unknown> {
  */
 function passThrough<T, E>(self: Result<unknown, unknown>): Result<T, E> {
   return self as unknown as Result<T, E>;
+}
+
+/**
+ * A throw inside a *failure observer* (`tapErr` / `tapDefect` / `flatTapErr`)
+ * must not destroy the failure being observed — that is the exact place (e.g. a
+ * failing error-logger) where losing the underlying failure hurts most. The
+ * resulting Defect aggregates both: `errors[0]` is the observer's throw,
+ * `errors[1]` the original failure.
+ *
+ * @internal
+ */
+function observerThrowToDefect<T, E>(thrown: unknown, original: unknown): Result<T, E> {
+  return defectRes(
+    new AggregateError(
+      [thrown, original],
+      "unthrown: a failure-observer callback threw; errors[0] is the callback's throw, errors[1] the original failure",
+    ),
+  );
 }
 
 /**
@@ -570,7 +588,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
           f(r.error);
           return r;
         } catch (cause) {
-          return defectRes<T, E>(cause);
+          return observerThrowToDefect<T, E>(cause, r.error);
         }
       }),
     );
@@ -587,7 +605,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
           // Keep the original error on success; an Err/Defect from `f` wins.
           return inner.tag === "Ok" ? passThrough(r) : passThrough(inner);
         } catch (cause) {
-          return defectRes(cause);
+          return observerThrowToDefect(cause, r.error);
         }
       }),
     );
@@ -616,7 +634,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
           f(r.cause);
           return r;
         } catch (cause) {
-          return defectRes<T, E>(cause);
+          return observerThrowToDefect<T, E>(cause, r.cause);
         }
       }),
     );

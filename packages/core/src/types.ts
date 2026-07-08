@@ -193,8 +193,10 @@ export type ResultMethods<T, E> = {
   /**
    * Run a side effect on the error and pass the `Result` through unchanged.
    *
-   * Runs only on `Err`. If `f` throws, the throw becomes a `Defect`. An async
-   * callback is rejected at compile time ({@link NotThenable}).
+   * Runs only on `Err`. If `f` throws, the result is a `Defect` whose cause is
+   * an `AggregateError` of `[thrown, original failure]` — observing a failure
+   * never destroys it. An async callback is rejected at compile time
+   * ({@link NotThenable}).
    *
    * @param f - the side effect (its return value is ignored).
    */
@@ -208,9 +210,10 @@ export type ResultMethods<T, E> = {
    * returns a `Result`, but its **success value is discarded** — on the effect's
    * `Ok` the original `Err` flows through unchanged, while an `Err` (or `Defect`)
    * from `f` short-circuits and threads its error (`Result<T, E | E2>`). Runs only
-   * on `Err`; `Ok` and `Defect` pass through. If `f` throws, the throw becomes a
-   * `Defect`. Use it for a failable effect _during_ error handling (e.g. writing
-   * the error to an audit log that may itself fail).
+   * on `Err`; `Ok` and `Defect` pass through. If `f` throws, the result is a
+   * `Defect` whose cause is an `AggregateError` of `[thrown, original failure]` —
+   * observing a failure never destroys it. Use it for a failable effect _during_
+   * error handling (e.g. writing the error to an audit log that may itself fail).
    *
    * @typeParam E2 - the error type the effect may introduce.
    * @param f - the failable side effect; its `Ok` value is ignored.
@@ -233,8 +236,10 @@ export type ResultMethods<T, E> = {
   recoverDefect<U, E2>(f: (cause: unknown) => Result<U, E2>): Result<T | U, E | E2>;
   /**
    * Run a side effect on a present `Defect`'s cause (e.g. logging) and pass the
-   * `Defect` through unchanged. If `f` throws, the throw becomes a new `Defect`.
-   * An async callback is rejected at compile time ({@link NotThenable}).
+   * `Defect` through unchanged. If `f` throws, the result is a `Defect` whose
+   * cause is an `AggregateError` of `[thrown, original failure]` — observing a
+   * failure never destroys it. An async callback is rejected at compile time
+   * ({@link NotThenable}).
    *
    * @param f - the side effect over the unknown cause.
    */
@@ -512,16 +517,19 @@ export type AsyncResultMethods<T, E> = {
    */
   recover<U>(f: (error: E) => U & NotThenable<U>): AsyncResult<T | U, never>;
   /**
-   * Asynchronous {@link ResultMethods.tapErr | tapErr}. `f` is synchronous; a
-   * throw becomes a `Defect`. An async callback is rejected at compile time
-   * ({@link NotThenable}).
+   * Asynchronous {@link ResultMethods.tapErr | tapErr}. `f` is synchronous; if it
+   * throws, the result is a `Defect` whose cause is an `AggregateError` of
+   * `[thrown, original failure]` — observing a failure never destroys it. An
+   * async callback is rejected at compile time ({@link NotThenable}).
    */
   tapErr<R>(f: (error: E) => R & NotThenable<R>): AsyncResult<T, E>;
   /**
    * Asynchronous {@link ResultMethods.flatTapErr | flatTapErr} — the
    * error-channel mirror of `flatTap`. `f` may return a `Result` **or** an
    * `AsyncResult`; its `Ok` value is discarded, an `Err`/`Defect` from `f`
-   * threads through, and a throw becomes a `Defect`.
+   * threads through, and if `f` throws, the result is a `Defect` whose cause is
+   * an `AggregateError` of `[thrown, original failure]` — observing a failure
+   * never destroys it.
    */
   flatTapErr<E2>(
     f: (error: E) => Result<unknown, E2> | AsyncResult<unknown, E2>,
@@ -535,8 +543,10 @@ export type AsyncResultMethods<T, E> = {
     f: (cause: unknown) => Result<U, E2> | AsyncResult<U, E2>,
   ): AsyncResult<T | U, E | E2>;
   /**
-   * Asynchronous {@link ResultMethods.tapDefect | tapDefect}. An async callback
-   * is rejected at compile time ({@link NotThenable}).
+   * Asynchronous {@link ResultMethods.tapDefect | tapDefect}. If `f` throws, the
+   * result is a `Defect` whose cause is an `AggregateError` of `[thrown,
+   * original failure]` — observing a failure never destroys it. An async
+   * callback is rejected at compile time ({@link NotThenable}).
    */
   tapDefect<R>(f: (cause: unknown) => R & NotThenable<R>): AsyncResult<T, E>;
 
