@@ -1,5 +1,70 @@
 # unthrown
 
+## 3.1.0
+
+### Minor Changes
+
+- b8d20d7: Soundness and hardening fixes from a full review:
+
+  - **Async combinator callbacks are now a compile error** (`NotThenable`): an
+    `async` callback passed to `map`/`tap`/`tapErr`/`tapDefect`/`mapErr`/
+    `recover`/`let` no longer type-checks. Such code was already broken at
+    runtime — its rejection escaped the pipeline as an unhandled rejection
+    instead of a `Defect`. Lift async work with `fromPromise` + `flatMap`.
+    (`match` handlers may still be async.)
+  - **A throw inside `tapErr`/`tapDefect`/`flatTapErr` no longer destroys the
+    failure being observed**: the resulting `Defect`'s cause is now an
+    `AggregateError([thrown, original])`.
+  - **`matchTags`** routes an unhandled `_tag` (possible only outside the typed
+    contract) to the `Defect` handler instead of crashing, and rejects the
+    reserved tags `"Ok"`/`"Defect"` at compile time.
+  - **`unwrapOr` / `unwrapOrElse` widen**: `unwrapOr<U>(fallback: U): T | U` and
+    `unwrapOrElse<U>(f: (error: E) => U): T | U`, so `r.unwrapOr(null)` and
+    `r.unwrapOrElse(() => null)` now type-check.
+  - `fromPromise`/`fromSafePromise` absorb a non-thenable input instead of
+    throwing synchronously; `bind`/`let` reject an array scope as misuse
+    (Defect) instead of silently index-spreading it; `Result` instances are
+    frozen so a variant cannot be forged by mutation.
+
+### Patch Changes
+
+- 199c543: Polish the generated API reference (comment-only): give the `Types`-section
+  aliases practical framing and examples (`OkView`/`ErrView`/`DefectView` note what
+  each guard narrows to; `OkOf`/`ErrOf`/`AsyncOkOf`/`AsyncErrOf` show a type-extraction
+  example), and group the `Result`/`AsyncResult` **type** aliases under the `Facade`
+  category alongside their companion objects, cross-linked so the value+type pairing
+  is clear.
+- 4b6754a: Improve the generated API reference: add `@category` grouping (Constructors,
+  Guards, Interop, Aggregate, Tagged errors, Facade, Types, …) to every exported
+  symbol, and give the standalone functions richer, convention-following `@example`
+  blocks (both Ok and Err branches, `// =>` output comments). Comment-only — no
+  runtime or type changes.
+- 3fb471b: Document the fluent combinators on the generated API reference. The method
+  surface every `Result` / `AsyncResult` carries is now exported as two
+  **documentation-only** types — `ResultMethods` (sync) and `AsyncResultMethods`
+  (async, with the `AsyncResult`/`Promise`-returning signatures) — categorized
+  under `Methods`, so the reference lists every combinator's signature and prose.
+  The `Result` / `AsyncResult` aliases and the `OkView`/`ErrView`/`DefectView`
+  variants link to them, and the async method docs link to their sync counterparts.
+  The "Choosing a combinator" guide stays the "which one do I reach for?"
+  cheat-sheet and links to these API sections.
+- 52997b3: Fixes from a whole-repo review:
+
+  - **`unthrown`** — `TaggedError` now reserves `name`: a payload field named `name`
+    can no longer shadow the display label (it was silently clobbered at runtime
+    while the instance type still promised it). `name` is excluded from the payload
+    type, consistent with how `_tag` is authoritative.
+  - **`@unthrown/vitest`** — the matchers now reject a foreign `Result`-like object
+    (e.g. a neverthrow/Boxed result) via core's canonical `isResult` instead of a
+    loose `isOk`-duck-type, so such a value fails clearly as "not an unthrown
+    Result" rather than being mistaken for an `Err`.
+  - **`@unthrown/oxlint`** — `no-ambiguous-error-type` resolves a bare `Error`
+    through scope analysis, so a locally-declared `type Error` or a generic
+    `<Error>` parameter is no longer a false positive.
+  - **`@unthrown/standard-schema`** — async-schema detection uses a structural
+    thenable check instead of `instanceof Promise`, so a promise from another realm
+    (vm/worker) is correctly caught instead of silently producing `Ok(undefined)`.
+
 ## 3.0.1
 
 ### Patch Changes
