@@ -47,7 +47,11 @@ toExit(Err("e")); // Exit.fail("e")  — a modeled Cause.fail
 // a Defect would become Exit.die(cause)
 
 // Run an Effect and collect its outcome; a die/interrupt becomes a Defect:
-await fromEffect(Effect.succeed(1)).match({ ok, err, defect: String });
+await fromEffect(Effect.succeed(1)).match({
+  ok: (value) => value,
+  err: (error) => error,
+  defect: String,
+});
 ```
 
 `toEffect` also accepts an `AsyncResult` (the `AsyncResult → Effect` direction),
