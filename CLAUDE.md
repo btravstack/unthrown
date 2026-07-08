@@ -317,10 +317,9 @@ channel?**
    `matchTags` covers the everyday exhaustive case.
 
 Also shipped: a root `README` + `LICENSE`, per-package READMEs, and the VitePress
-docs site (guide + generated API reference). **Remaining work is manual** and
-cannot be automated from here: publish `unthrown` + the `@unthrown` scope to npm,
-create the `RELEASE_PAT` secret, and configure npm Trusted Publishers for the
-changesets `release.yml` (plus enabling GitHub Pages for `deploy-docs.yml`).
+docs site (guide + generated API reference). Both the npm packages and the
+GitHub Pages site are live (the release secrets / npm Trusted Publishers are
+configured outside the repo).
 
 ## Toolchain & conventions
 
