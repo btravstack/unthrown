@@ -83,6 +83,45 @@ Pick the affected packages and a semver bump, and describe the change in one lin
 Purely internal changes (tests, CI, refactors with no API/behaviour impact) don't
 need one.
 
+### Pre-releases (beta)
+
+When a change is breaking, or a batch of changes needs to be validated in a real
+consumer before it becomes a stable major, publish it as a **beta** first instead
+of cutting the major straight to `latest`. This uses [changesets pre
+mode](https://github.com/changesets/changesets/blob/main/docs/prereleases.md); all
+eight packages are `fixed`, so they move together to the same beta version.
+
+The release pipeline needs **no changes** — while a `.changeset/pre.json` is
+present, `changeset publish` (run by `release.yml`) publishes under the `beta`
+dist-tag instead of `latest` automatically. Because every package already has a
+stable release on npm, none of them fall back to `latest`.
+
+```sh
+# 1. Enter pre mode (once, from a clean main). Commit the .changeset/pre.json it
+#    writes and merge it — from here every release is a beta.
+pnpm changeset pre enter beta
+
+# 2. Iterate. Add changesets as usual; each merged "Version Packages" PR ships the
+#    next x.y.z-beta.N to the `beta` tag. Do NOT delete accumulated changesets —
+#    they are all consumed to build the final changelog at exit.
+
+# 3. Graduate. The next "Version Packages" PR after this cuts the stable version to
+#    `latest`.
+pnpm changeset pre exit
+```
+
+Consume a beta from a downstream project with:
+
+```sh
+pnpm add unthrown@beta
+```
+
+> **Note:** while in pre mode on `main` you cannot ship a stable patch to `latest`
+> until `pre exit` — every release is a beta. That is the intended trade for
+> batching breaking changes toward a major. If `main` must keep shipping stable
+> patches in parallel, run pre mode on a dedicated `next` branch instead (and set
+> `branch: next` on the changesets action) rather than on `main`.
+
 ## Pull requests
 
 - Keep PRs focused — one concern each.
