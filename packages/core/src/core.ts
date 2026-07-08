@@ -14,7 +14,15 @@
 // The only other casts are the builders' construction (`as OkView`/…) and the
 // `bind`/`let` scope merge (a computed key can't be spelled at the type level).
 
-import type { AsyncResult, Bound, DefectView, ErrView, OkView, Result } from "./types.js";
+import type {
+  AsyncResult,
+  Bound,
+  DefectView,
+  ErrView,
+  NotThenable,
+  OkView,
+  Result,
+} from "./types.js";
 
 /**
  * Thrown by a {@link Result}'s `unwrap` / `unwrapErr` when the assertion is
@@ -56,7 +64,7 @@ export class UnwrapError<E = unknown> extends Error {
  * @internal
  */
 class Res<T, E> {
-  map<U>(this: Result<T, E>, f: (value: T) => U): Result<U, E> {
+  map<U>(this: Result<T, E>, f: (value: T) => U & NotThenable<U>): Result<U, E> {
     if (this.tag !== "Ok") return passThrough(this);
     try {
       return okRes(f(this.value));
@@ -74,7 +82,7 @@ class Res<T, E> {
     }
   }
 
-  tap(this: Result<T, E>, f: (value: T) => void): Result<T, E> {
+  tap<R>(this: Result<T, E>, f: (value: T) => R & NotThenable<R>): Result<T, E> {
     if (this.tag !== "Ok") return this;
     try {
       f(this.value);
@@ -118,7 +126,7 @@ class Res<T, E> {
   let<K extends string, U>(
     this: Result<T, E>,
     name: K,
-    f: (scope: T) => U,
+    f: (scope: T) => U & NotThenable<U>,
   ): Result<Bound<T, K, U>, E> {
     if (this.tag !== "Ok") return passThrough(this);
     try {
@@ -136,7 +144,7 @@ class Res<T, E> {
     return okRes(value);
   }
 
-  mapErr<E2>(this: Result<T, E>, f: (error: E) => E2): Result<T, E2> {
+  mapErr<E2>(this: Result<T, E>, f: (error: E) => E2 & NotThenable<E2>): Result<T, E2> {
     if (this.tag !== "Err") return passThrough(this);
     try {
       return errRes(f(this.error));
@@ -154,7 +162,7 @@ class Res<T, E> {
     }
   }
 
-  recover<U>(this: Result<T, E>, f: (error: E) => U): Result<T | U, never> {
+  recover<U>(this: Result<T, E>, f: (error: E) => U & NotThenable<U>): Result<T | U, never> {
     if (this.tag !== "Err") return passThrough(this);
     try {
       return okRes(f(this.error));
@@ -163,7 +171,7 @@ class Res<T, E> {
     }
   }
 
-  tapErr(this: Result<T, E>, f: (error: E) => void): Result<T, E> {
+  tapErr<R>(this: Result<T, E>, f: (error: E) => R & NotThenable<R>): Result<T, E> {
     if (this.tag !== "Err") return this;
     try {
       f(this.error);
@@ -196,7 +204,7 @@ class Res<T, E> {
     }
   }
 
-  tapDefect(this: Result<T, E>, f: (cause: unknown) => void): Result<T, E> {
+  tapDefect<R>(this: Result<T, E>, f: (cause: unknown) => R & NotThenable<R>): Result<T, E> {
     if (this.tag !== "Defect") return this;
     try {
       f(this.cause);
@@ -412,7 +420,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     return this.promise.then(onfulfilled, onrejected);
   }
 
-  map<U>(f: (value: T) => U): AsyncResult<U, E> {
+  map<U>(f: (value: T) => U & NotThenable<U>): AsyncResult<U, E> {
     return new AsyncRes<U, E>(
       this.promise.then((r) => {
         if (r.tag !== "Ok") return passThrough(r);
@@ -438,7 +446,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  tap(f: (value: T) => void): AsyncResult<T, E> {
+  tap<R>(f: (value: T) => R & NotThenable<R>): AsyncResult<T, E> {
     return new AsyncRes<T, E>(
       this.promise.then((r) => {
         if (r.tag !== "Ok") return r;
@@ -490,7 +498,10 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  let<K extends string, U>(name: K, f: (scope: T) => U): AsyncResult<Bound<T, K, U>, E> {
+  let<K extends string, U>(
+    name: K,
+    f: (scope: T) => U & NotThenable<U>,
+  ): AsyncResult<Bound<T, K, U>, E> {
     return new AsyncRes<Bound<T, K, U>, E>(
       this.promise.then((r) => {
         if (r.tag !== "Ok") return passThrough(r);
@@ -512,7 +523,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  mapErr<E2>(f: (error: E) => E2): AsyncResult<T, E2> {
+  mapErr<E2>(f: (error: E) => E2 & NotThenable<E2>): AsyncResult<T, E2> {
     return new AsyncRes<T, E2>(
       this.promise.then((r) => {
         if (r.tag !== "Err") return passThrough(r);
@@ -538,7 +549,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  recover<U>(f: (error: E) => U): AsyncResult<T | U, never> {
+  recover<U>(f: (error: E) => U & NotThenable<U>): AsyncResult<T | U, never> {
     return new AsyncRes<T | U, never>(
       this.promise.then((r) => {
         if (r.tag !== "Err") return passThrough(r);
@@ -551,7 +562,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  tapErr(f: (error: E) => void): AsyncResult<T, E> {
+  tapErr<R>(f: (error: E) => R & NotThenable<R>): AsyncResult<T, E> {
     return new AsyncRes<T, E>(
       this.promise.then((r) => {
         if (r.tag !== "Err") return r;
@@ -597,7 +608,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  tapDefect(f: (cause: unknown) => void): AsyncResult<T, E> {
+  tapDefect<R>(f: (cause: unknown) => R & NotThenable<R>): AsyncResult<T, E> {
     return new AsyncRes<T, E>(
       this.promise.then((r) => {
         if (r.tag !== "Defect") return r;

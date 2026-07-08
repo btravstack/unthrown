@@ -242,3 +242,52 @@ new WithCode({ code: 1, name: "nope" });
 type _nameNotShadowed = Expect<
   Equal<TaggedErrorInstance<"X", { code: number; name: "lit" }>["name"], string>
 >;
+
+// ---------------------------------------------------------------------------
+// Thenable callbacks are rejected: an async callback's rejection would bypass
+// qualification and float as an unhandled rejection (Thesis #3).
+// ---------------------------------------------------------------------------
+{
+  const r = Ok(1) as Result<number, "e">;
+  const ar = r.toAsync();
+
+  // @ts-expect-error — async tap callback is banned (sync surface)
+  r.tap(async () => {});
+  // @ts-expect-error — async map callback is banned (sync surface)
+  r.map(async (n) => n + 1);
+  // @ts-expect-error — async mapErr callback is banned
+  r.mapErr(async (e) => e);
+  // @ts-expect-error — async recover callback is banned
+  r.recover(async () => 0);
+  // @ts-expect-error — async tapErr callback is banned
+  r.tapErr(async () => {});
+  // @ts-expect-error — async tapDefect callback is banned
+  r.tapDefect(async () => {});
+  // @ts-expect-error — async let callback is banned
+  Ok({}).let("x", async () => 1);
+
+  // @ts-expect-error — async tap callback is banned (async surface)
+  ar.tap(async () => {});
+  // @ts-expect-error — async map callback is banned (async surface)
+  ar.map(async (n) => n + 1);
+  // @ts-expect-error — async mapErr callback is banned (async surface)
+  ar.mapErr(async (e) => e);
+  // @ts-expect-error — async recover callback is banned (async surface)
+  ar.recover(async () => 0);
+  const emptyAsync = Ok({}).toAsync();
+  // @ts-expect-error — async let callback is banned (async surface)
+  emptyAsync.let("x", async () => 1);
+
+  // Synchronous callbacks still infer exactly as before.
+  const mapped = r.map((n) => n + 1);
+  type _MapKeeps = Expect<Equal<typeof mapped, Result<number, "e">>>;
+  const recovered = r.recover((e) => e.length);
+  type _RecoverKeeps = Expect<Equal<typeof recovered, Result<number, never>>>;
+
+  // match handlers may still be async (edge elimination is not a combinator).
+  void r.match({
+    ok: async (n) => n,
+    err: async (e) => e.length,
+    defect: async () => 0,
+  });
+}

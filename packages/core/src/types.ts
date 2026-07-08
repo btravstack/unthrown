@@ -19,6 +19,26 @@ export type Prettify<T> = { [K in keyof T]: T[K] } & {};
 export type Bound<T, K extends string, U> = Prettify<Omit<T, K> & { readonly [P in K]: U }>;
 
 /**
+ * Compile-time rejection of a thenable callback result — the type-level
+ * enforcement of "combinator callbacks are synchronous" (see the
+ * {@link AsyncResult} remarks).
+ *
+ * @remarks
+ * Resolves to `unknown` (a no-op in an intersection) for any non-thenable `R`,
+ * and to an explanatory string-literal type when `R` is a `PromiseLike` — so an
+ * `async` callback fails to compile with the explanation in the error. Without
+ * this, `async () => …` would be assignable to `() => void`, and its rejection
+ * would escape the pipeline as an unhandled rejection instead of a `Defect`.
+ * Lift async work with {@link fromPromise} and compose it with `flatMap`.
+ *
+ * @typeParam R - the callback's inferred return type.
+ * @category Types
+ */
+export type NotThenable<R> = [R] extends [PromiseLike<unknown>]
+  ? "unthrown: combinator callbacks are synchronous — lift async work with fromPromise and compose with flatMap"
+  : unknown;
+
+/**
  * The fluent method surface every {@link Result} variant carries — the
  * combinators (`map`, `flatMap`, `mapErr`, `match`, `unwrap`, …), documented one
  * per entry below. Factored out so the three variants ({@link OkView},
@@ -41,10 +61,12 @@ export type ResultMethods<T, E> = {
    * Runs `f` only on `Ok`; `Err` and `Defect` pass through untouched. If `f`
    * throws, the thrown value is captured as a `Defect`.
    *
+   * An async callback is rejected at compile time ({@link NotThenable}).
+   *
    * @typeParam U - the mapped success type.
    * @param f - maps the current success value to a new one.
    */
-  map<U>(f: (value: T) => U): Result<U, E>;
+  map<U>(f: (value: T) => U & NotThenable<U>): Result<U, E>;
   /**
    * Sequence a dependent, `Result`-returning step (monadic bind).
    *
@@ -60,11 +82,12 @@ export type ResultMethods<T, E> = {
    * Run a side effect on the success value and pass the `Result` through
    * unchanged.
    *
-   * Runs only on `Ok`. If `f` throws, the throw becomes a `Defect`.
+   * Runs only on `Ok`. If `f` throws, the throw becomes a `Defect`. An async
+   * callback is rejected at compile time ({@link NotThenable}).
    *
    * @param f - the side effect (its return value is ignored).
    */
-  tap(f: (value: T) => void): Result<T, E>;
+  tap<R>(f: (value: T) => R & NotThenable<R>): Result<T, E>;
   /**
    * Run a **failable** side effect on the success value, keeping the original
    * value but threading the effect's error.
@@ -112,14 +135,15 @@ export type ResultMethods<T, E> = {
    * @remarks
    * `f` receives the scope and returns a value (not a `Result`); it is added as
    * `{ ...scope, [name]: value }`. Runs only on `Ok`; `Err`/`Defect` pass
-   * through. A throw becomes a `Defect`.
+   * through. A throw becomes a `Defect`. An async callback is rejected at
+   * compile time ({@link NotThenable}).
    *
    * @typeParam K - the key the value is stored under.
    * @typeParam U - the value type.
    * @param name - the scope key.
    * @param f - computes a value from the accumulated scope.
    */
-  let<K extends string, U>(name: K, f: (scope: T) => U): Result<Bound<T, K, U>, E>;
+  let<K extends string, U>(name: K, f: (scope: T) => U & NotThenable<U>): Result<Bound<T, K, U>, E>;
   /**
    * Replace the success value with a constant `value`.
    *
@@ -133,12 +157,13 @@ export type ResultMethods<T, E> = {
    * Transform the modeled error with `f`.
    *
    * Runs `f` only on `Err`; `Ok` passes through and a `Defect` is **never**
-   * touched. If `f` throws, the throw becomes a `Defect`.
+   * touched. If `f` throws, the throw becomes a `Defect`. An async callback is
+   * rejected at compile time ({@link NotThenable}).
    *
    * @typeParam E2 - the mapped error type.
    * @param f - maps the current error to a new one.
    */
-  mapErr<E2>(f: (error: E) => E2): Result<T, E2>;
+  mapErr<E2>(f: (error: E) => E2 & NotThenable<E2>): Result<T, E2>;
   /**
    * Recover from an `Err` by producing another `Result`.
    *
@@ -158,20 +183,22 @@ export type ResultMethods<T, E> = {
    * The result type is `Result<T | U, never>`, but `never` describes only the
    * **error** channel — a `Defect` can still be present at runtime, so do not
    * read `never` as "total". Runs `f` only on `Err`; `Ok` and `Defect` pass
-   * through. If `f` throws, the throw becomes a `Defect`.
+   * through. If `f` throws, the throw becomes a `Defect`. An async callback is
+   * rejected at compile time ({@link NotThenable}).
    *
    * @typeParam U - the recovered success type.
    * @param f - produces a success value from the current error.
    */
-  recover<U>(f: (error: E) => U): Result<T | U, never>;
+  recover<U>(f: (error: E) => U & NotThenable<U>): Result<T | U, never>;
   /**
    * Run a side effect on the error and pass the `Result` through unchanged.
    *
-   * Runs only on `Err`. If `f` throws, the throw becomes a `Defect`.
+   * Runs only on `Err`. If `f` throws, the throw becomes a `Defect`. An async
+   * callback is rejected at compile time ({@link NotThenable}).
    *
    * @param f - the side effect (its return value is ignored).
    */
-  tapErr(f: (error: E) => void): Result<T, E>;
+  tapErr<R>(f: (error: E) => R & NotThenable<R>): Result<T, E>;
   /**
    * Run a **failable** side effect on the error, keeping the original error but
    * threading the effect's own error.
@@ -207,10 +234,11 @@ export type ResultMethods<T, E> = {
   /**
    * Run a side effect on a present `Defect`'s cause (e.g. logging) and pass the
    * `Defect` through unchanged. If `f` throws, the throw becomes a new `Defect`.
+   * An async callback is rejected at compile time ({@link NotThenable}).
    *
    * @param f - the side effect over the unknown cause.
    */
-  tapDefect(f: (cause: unknown) => void): Result<T, E>;
+  tapDefect<R>(f: (cause: unknown) => R & NotThenable<R>): Result<T, E>;
 
   /**
    * Exhaustively fold all three runtime states into a single value of type `R`.
@@ -420,9 +448,10 @@ export type Awaitable<T> = {
 export type AsyncResultMethods<T, E> = {
   /**
    * Asynchronous {@link ResultMethods.map | map}: transforms the success value
-   * with `f`. `f` is synchronous; a throw becomes a `Defect`.
+   * with `f`. `f` is synchronous; a throw becomes a `Defect`. An async callback
+   * is rejected at compile time ({@link NotThenable}).
    */
-  map<U>(f: (value: T) => U): AsyncResult<U, E>;
+  map<U>(f: (value: T) => U & NotThenable<U>): AsyncResult<U, E>;
   /**
    * Asynchronous {@link ResultMethods.flatMap | flatMap}. Unlike the sync form,
    * `f` may return a `Result` **or** an `AsyncResult` (never a raw `Promise`); a
@@ -431,9 +460,10 @@ export type AsyncResultMethods<T, E> = {
   flatMap<U, E2>(f: (value: T) => Result<U, E2> | AsyncResult<U, E2>): AsyncResult<U, E | E2>;
   /**
    * Asynchronous {@link ResultMethods.tap | tap}. `f` is synchronous; a throw
-   * becomes a `Defect`.
+   * becomes a `Defect`. An async callback is rejected at compile time
+   * ({@link NotThenable}).
    */
-  tap(f: (value: T) => void): AsyncResult<T, E>;
+  tap<R>(f: (value: T) => R & NotThenable<R>): AsyncResult<T, E>;
   /**
    * Asynchronous {@link ResultMethods.flatTap | flatTap} — a failable tap that
    * keeps the original value. `f` may return a `Result` **or** an `AsyncResult`;
@@ -454,17 +484,22 @@ export type AsyncResultMethods<T, E> = {
   ): AsyncResult<Bound<T, K, U>, E | E2>;
   /**
    * Asynchronous {@link ResultMethods.let | let} (do-notation). `f` returns a
-   * plain value, bound under `name`.
+   * plain value, bound under `name`. An async callback is rejected at compile
+   * time ({@link NotThenable}).
    */
-  let<K extends string, U>(name: K, f: (scope: T) => U): AsyncResult<Bound<T, K, U>, E>;
+  let<K extends string, U>(
+    name: K,
+    f: (scope: T) => U & NotThenable<U>,
+  ): AsyncResult<Bound<T, K, U>, E>;
   /** Asynchronous {@link ResultMethods.as | as}: replaces the value with `value`. */
   as<U>(value: U): AsyncResult<U, E>;
 
   /**
    * Asynchronous {@link ResultMethods.mapErr | mapErr}. `f` is synchronous; a
-   * throw becomes a `Defect`.
+   * throw becomes a `Defect`. An async callback is rejected at compile time
+   * ({@link NotThenable}).
    */
-  mapErr<E2>(f: (error: E) => E2): AsyncResult<T, E2>;
+  mapErr<E2>(f: (error: E) => E2 & NotThenable<E2>): AsyncResult<T, E2>;
   /**
    * Asynchronous {@link ResultMethods.orElse | orElse}. `f` may return a `Result`
    * or an `AsyncResult`.
@@ -472,14 +507,16 @@ export type AsyncResultMethods<T, E> = {
   orElse<U, E2>(f: (error: E) => Result<U, E2> | AsyncResult<U, E2>): AsyncResult<T | U, E2>;
   /**
    * Asynchronous {@link ResultMethods.recover | recover}. `f` is synchronous; a
-   * throw becomes a `Defect`.
+   * throw becomes a `Defect`. An async callback is rejected at compile time
+   * ({@link NotThenable}).
    */
-  recover<U>(f: (error: E) => U): AsyncResult<T | U, never>;
+  recover<U>(f: (error: E) => U & NotThenable<U>): AsyncResult<T | U, never>;
   /**
    * Asynchronous {@link ResultMethods.tapErr | tapErr}. `f` is synchronous; a
-   * throw becomes a `Defect`.
+   * throw becomes a `Defect`. An async callback is rejected at compile time
+   * ({@link NotThenable}).
    */
-  tapErr(f: (error: E) => void): AsyncResult<T, E>;
+  tapErr<R>(f: (error: E) => R & NotThenable<R>): AsyncResult<T, E>;
   /**
    * Asynchronous {@link ResultMethods.flatTapErr | flatTapErr} — the
    * error-channel mirror of `flatTap`. `f` may return a `Result` **or** an
@@ -497,8 +534,11 @@ export type AsyncResultMethods<T, E> = {
   recoverDefect<U, E2>(
     f: (cause: unknown) => Result<U, E2> | AsyncResult<U, E2>,
   ): AsyncResult<T | U, E | E2>;
-  /** Asynchronous {@link ResultMethods.tapDefect | tapDefect}. */
-  tapDefect(f: (cause: unknown) => void): AsyncResult<T, E>;
+  /**
+   * Asynchronous {@link ResultMethods.tapDefect | tapDefect}. An async callback
+   * is rejected at compile time ({@link NotThenable}).
+   */
+  tapDefect<R>(f: (cause: unknown) => R & NotThenable<R>): AsyncResult<T, E>;
 
   /**
    * Asynchronous {@link ResultMethods.match | match}. Handlers are synchronous;
