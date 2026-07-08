@@ -126,6 +126,106 @@ const status = matchTags(result, {
 });
 ```
 
+## 6. An HTTP route end-to-end (Hono)
+
+A complete route, no `try`/`catch` anywhere: `fromSchema` validates the path
+param, `flatMap` feeds the parsed id into a repository call that returns its
+own `AsyncResult`, and `matchTags` folds every tag straight to a status code.
+A throw in `mapErr`'s callback or inside the repository call is caught by that
+combinator and becomes a `Defect` — the same containment as recipe 1 — so a
+bug in any pipeline step surfaces as the `Defect` arm's 500, never an unhandled
+exception:
+
+```ts
+import { Hono } from "hono";
+import { z } from "zod";
+import { fromSchema } from "@unthrown/standard-schema";
+import { matchTags, TaggedError, type AsyncResult } from "unthrown";
+
+class InvalidId extends TaggedError("InvalidId") {}
+
+type User = { id: string; name: string };
+
+// The repository is its own boundary (see recipe 2) — it already hands back a
+// qualified `AsyncResult`, so there's nothing left to triage at the call site.
+declare const userRepo: { findById(id: string): AsyncResult<User, NotFound> };
+
+const parseId = fromSchema(z.string().uuid());
+
+const app = new Hono();
+
+app.get("/users/:id", (c) => {
+  const user = parseId(c.req.param("id"))
+    .mapErr(() => new InvalidId())
+    .toAsync()
+    .flatMap((id) => userRepo.findById(id));
+  // AsyncResult<User, InvalidId | NotFound>
+
+  return matchTags(user, {
+    Ok: (u) => c.json(u, 200),
+    InvalidId: () => c.json({ error: "invalid id" }, 400),
+    NotFound: (e) => c.json({ error: `no user ${e.id}` }, 404),
+    Defect: (cause) => {
+      logger.error(cause); // a real bug — log it, don't leak it
+      return c.json({ error: "Internal Error" }, 500);
+    },
+  });
+});
+```
+
+`matchTags` accepts an `AsyncResult` directly and resolves to a `Promise` —
+Hono awaits whatever the handler returns, so there's no manual `await` to
+remember.
+
+## 7. Form validation with Standard Schema
+
+`fromSchema` turns any [Standard Schema](https://standardschema.dev) validator
+(Zod, Valibot, ArkType, …) into a function returning a `Result` whose error is
+the validator's own **issues array** — not the schema library's exception
+type. Map that array to per-field messages in the `err` arm:
+
+```ts
+import { z } from "zod";
+import { fromSchema, type SchemaIssues } from "@unthrown/standard-schema";
+
+const signupSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+});
+
+const parseSignup = fromSchema(signupSchema);
+
+const fieldOf = (issue: SchemaIssues[number]) => {
+  const segment = issue.path?.[0];
+  const key = typeof segment === "object" ? segment.key : segment;
+  return key === undefined ? "_form" : String(key);
+};
+
+function validateSignup(input: unknown) {
+  return parseSignup(input).match({
+    ok: (data) => ({ ok: true as const, data }),
+    err: (issues) => ({
+      ok: false as const,
+      fieldErrors: issues.reduce<Record<string, string[]>>((byField, issue) => {
+        const field = fieldOf(issue);
+        (byField[field] ??= []).push(issue.message);
+        return byField;
+      }, {}),
+    }),
+    defect: (cause) => {
+      logger.error(cause); // the validator itself threw — a real bug, not a bad form
+      return { ok: false as const, fieldErrors: { _form: ["Something went wrong."] } };
+    },
+  });
+}
+
+validateSignup({ email: "not-an-email", password: "short" });
+// { ok: false, fieldErrors: { email: [...], password: [...] } }
+```
+
+The `defect` arm only fires if the schema itself throws instead of returning
+issues — a bug in the validator, not a bad submission.
+
 → Back to the [Guide](./why-unthrown), or browse the
 [API Reference](/api/core/).
 
