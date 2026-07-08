@@ -101,12 +101,13 @@ stable release on npm, none of them fall back to `latest`.
 #    writes and merge it — from here every release is a beta.
 pnpm changeset pre enter beta
 
-# 2. Iterate. Add changesets as usual; each merged "Version Packages" PR ships the
-#    next x.y.z-beta.N to the `beta` tag. Do NOT delete accumulated changesets —
-#    they are all consumed to build the final changelog at exit.
+# 2. Iterate. Add changesets as usual; each merged release PR (the one this repo's
+#    workflow titles "chore: release packages") ships the next x.y.z-beta.N to the
+#    `beta` tag. Do NOT delete accumulated changesets — they are all consumed to
+#    build the final changelog at exit.
 
-# 3. Graduate. The next "Version Packages" PR after this cuts the stable version to
-#    `latest`.
+# 3. Graduate. The next "chore: release packages" PR after this cuts the stable
+#    version to `latest`.
 pnpm changeset pre exit
 ```
 
@@ -118,9 +119,12 @@ pnpm add unthrown@beta
 
 > **Note:** while in pre mode on `main` you cannot ship a stable patch to `latest`
 > until `pre exit` — every release is a beta. That is the intended trade for
-> batching breaking changes toward a major. If `main` must keep shipping stable
-> patches in parallel, run pre mode on a dedicated `next` branch instead (and set
-> `branch: next` on the changesets action) rather than on `main`.
+> batching breaking changes toward a major. Running pre mode on a dedicated `next`
+> branch instead is possible but not a one-line change: the release pipeline is
+> currently hard-wired to `main` in three places — `baseBranch` in
+> `.changeset/config.json`, the `workflow_run` trigger in `release.yml`, and the
+> changesets action's `branch` input would need to point at `next` — so that setup
+> is out of scope for this note.
 
 ## Pull requests
 
