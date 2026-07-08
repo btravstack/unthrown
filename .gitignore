@@ -39,3 +39,4 @@ docs/api/*/
 
 # Local brainstorming specs (not tracked)
 docs/superpowers/
+.superpowers/
