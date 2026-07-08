@@ -43,6 +43,13 @@ export const preferAsyncResult = defineRule({
     };
 
     return {
+      // Spans are file-relative, but `createOnce` runs once per lint *run* (not
+      // per file) — without a reset, a non-async annotation in a later file at
+      // the same offsets as an earlier file's async one would wrongly lose its
+      // autofix, and the set would grow unbounded across a whole project lint.
+      before: () => {
+        asyncReturnSpans.clear();
+      },
       FunctionDeclaration: trackAsyncFunction,
       FunctionExpression: trackAsyncFunction,
       ArrowFunctionExpression: trackAsyncFunction,
