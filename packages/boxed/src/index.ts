@@ -83,8 +83,9 @@ export function toBoxedFuture<T, E>(
 ): Future<BoxedResult<T, E>> {
   return Future.make<BoxedResult<T, E>>((resolve) => {
     void settle(asyncResult).then((result) => {
+      let boxed: BoxedResult<T, E>;
       try {
-        resolve(toBoxed(result, onDefect));
+        boxed = toBoxed(result, onDefect);
       } catch (cause) {
         // A throwing onDefect is a bug in the caller's triage. Swallowing it
         // would leave the Future pending forever; rethrow out-of-band so it
@@ -92,7 +93,12 @@ export function toBoxedFuture<T, E>(
         queueMicrotask(() => {
           throw cause;
         });
+        return;
       }
+      // Deliberately outside the try: `resolve` fans out synchronously to the
+      // Future's subscribers, and a subscriber's throw is Boxed's failure to
+      // surface, not an onDefect bug for us to reroute.
+      resolve(boxed);
     });
   });
 }
