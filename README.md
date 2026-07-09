@@ -88,6 +88,7 @@ defect, so the edge of your program needs a single `match` and no `try`/`catch`.
 | [`@unthrown/effect`](./packages/effect)         | Effect interop: `Result ↔ Exit` (bijection), `Either`, `Effect`.                               |
 | [`@unthrown/neverthrow`](./packages/neverthrow) | neverthrow interop: `Result ↔ Result`, `AsyncResult ↔ ResultAsync`.                            |
 | [`@unthrown/boxed`](./packages/boxed)           | Boxed interop: `Result ↔ Result`, `AsyncResult ↔ Future<Result>`.                              |
+| [`@unthrown/prisma`](./packages/prisma)         | Prisma Client extension: `try*` query methods returning `AsyncResult`, per-operation errors.   |
 
 ## Contributing
 

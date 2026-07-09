@@ -6,6 +6,9 @@
     "packages/*": {
       "project": ["src/**/*.ts"]
     },
+    "packages/prisma": {
+      "project": ["src/**/*.ts", "!src/generated/**"]
+    },
     "docs": {
       "entry": ["scripts/*.ts"],
       "project": ["scripts/**/*.ts"]

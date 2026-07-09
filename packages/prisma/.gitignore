@@ -1,0 +1,3 @@
+# Prisma's generated test client — regenerated from prisma/schema.prisma by the
+# test/typecheck scripts (`prisma generate`). Not committed, never published.
+src/generated/

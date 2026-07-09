@@ -14,11 +14,15 @@ catalog:
   "@commitlint/cli": 21.2.0
   "@bloodyowl/boxed": 3.4.0
   "@btravstack/theme": 1.5.0
+  "@prisma/adapter-better-sqlite3": 7.8.0
+  "@prisma/client": 7.8.0
   "@standard-schema/spec": 1.1.0
   "@commitlint/config-conventional": 21.2.0
   "@types/node": 24.13.2
   "@vitest/coverage-v8": 4.1.9
+  better-sqlite3: 12.11.1
   effect: 3.21.4
+  prisma: 7.8.0
   knip: 6.23.0
   lefthook: 2.1.9
   neverthrow: 8.2.0
@@ -38,10 +42,20 @@ peerDependencyRules:
   ignoreMissing:
     # Optional analytics peer of VitePress's bundled Algolia DocSearch.
     - search-insights
+    # React peers of `@prisma/studio-core`, pulled in transitively by the `prisma`
+    # CLI (v7 bundles Prisma Studio). We never run `prisma studio`; the CLI is a
+    # dev-only dependency of `@unthrown/prisma` (its test-client generation).
+    - react
+    - react-dom
 
 allowBuilds:
+  # Prisma 7 is engine-less (WASM query compiler); nothing to build or download.
+  "@prisma/engines": false
+  # Native SQLite bindings for `@unthrown/prisma`'s tests (prebuilt binaries).
+  better-sqlite3: true
   esbuild: true
   lefthook: true
+  prisma: true
 
 # Supply-chain maturity delay: don't adopt a freshly published version until it
 # has been on the registry for 7 days (10080 minutes). Strict mode also validates
