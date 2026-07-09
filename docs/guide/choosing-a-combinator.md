@@ -129,7 +129,7 @@ metric — is `tap`; an effect that returns a `Result`/`AsyncResult` **must** be
 sequenced with `flatTap` on the matching surface, because a `tap` callback cannot
 thread it. `tapErr`/`flatTapErr` split the same way on the error channel.
 
-::: warning A `Result`-returning effect inside `tap` is a fire-and-forget
+::: warning A failable effect inside `tap` is silently dropped
 `tap` ignores its callback's return value, so the effect's outcome is lost — in
 one of two shapes:
 
