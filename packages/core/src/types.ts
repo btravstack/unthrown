@@ -85,6 +85,15 @@ export type ResultMethods<T, E> = {
    * Runs only on `Ok`. If `f` throws, the throw becomes a `Defect`. An async
    * callback is rejected at compile time ({@link NotThenable}).
    *
+   * @remarks
+   * `f`'s return value is **ignored** — a `Result` returned by the effect
+   * compiles but is discarded, `Err` and all. If the effect can fail, sequence
+   * it instead of tapping it: a `Result`-returning effect goes in
+   * {@link ResultMethods.flatTap | flatTap}; an `AsyncResult`-returning effect
+   * cannot be sequenced from the sync surface — lift the chain with
+   * {@link ResultMethods.toAsync | toAsync} and use the async
+   * {@link AsyncResultMethods.flatTap | flatTap} (which accepts both).
+   *
    * @param f - the side effect (its return value is ignored).
    */
   tap<R>(f: (value: T) => R & NotThenable<R>): Result<T, E>;
@@ -197,6 +206,14 @@ export type ResultMethods<T, E> = {
    * an `AggregateError` of `[thrown, original failure]` — observing a failure
    * never destroys it. An async callback is rejected at compile time
    * ({@link NotThenable}).
+   *
+   * @remarks
+   * As with {@link ResultMethods.tap | tap}, `f`'s return value is ignored — a
+   * failable `Result`-returning effect belongs in
+   * {@link ResultMethods.flatTapErr | flatTapErr}; an `AsyncResult`-returning
+   * one needs the chain lifted with {@link ResultMethods.toAsync | toAsync}
+   * first (the async {@link AsyncResultMethods.flatTapErr | flatTapErr}
+   * accepts both).
    *
    * @param f - the side effect (its return value is ignored).
    */
@@ -485,7 +502,12 @@ export type AsyncResultMethods<T, E> = {
   /**
    * Asynchronous {@link ResultMethods.tap | tap}. `f` is synchronous; a throw
    * becomes a `Defect`. An async callback is rejected at compile time
-   * ({@link NotThenable}).
+   * ({@link NotThenable}) — and so is a returned `AsyncResult` (it is
+   * awaitable). Beware the near-miss: _calling_ an `AsyncResult`-returning
+   * effect inside the callback without returning it compiles and leaves the
+   * effect floating — fire-and-forget, never awaited, its `Err`/`Defect`
+   * unobserved. If the effect returns a `Result`/`AsyncResult`, use
+   * {@link AsyncResultMethods.flatTap | flatTap}.
    */
   tap<R>(f: (value: T) => R & NotThenable<R>): AsyncResult<T, E>;
   /**
@@ -539,7 +561,10 @@ export type AsyncResultMethods<T, E> = {
    * Asynchronous {@link ResultMethods.tapErr | tapErr}. `f` is synchronous; if it
    * throws, the result is a `Defect` whose cause is an `AggregateError` of
    * `[thrown, original failure]` — observing a failure never destroys it. An
-   * async callback is rejected at compile time ({@link NotThenable}).
+   * async callback is rejected at compile time ({@link NotThenable}). The
+   * {@link AsyncResultMethods.tap | tap} fire-and-forget caveat applies here
+   * too — a failable effect belongs in
+   * {@link AsyncResultMethods.flatTapErr | flatTapErr}.
    */
   tapErr<R>(f: (error: E) => R & NotThenable<R>): AsyncResult<T, E>;
   /**
