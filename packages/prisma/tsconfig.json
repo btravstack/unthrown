@@ -1,0 +1,13 @@
+{
+  "extends": "@unthrown/tsconfig/base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    // The generated test client (src/generated, gitignored) imports its own
+    // files with explicit `.ts` extensions; `noEmit` in the base config makes
+    // this legal.
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "src/generated"]
+}

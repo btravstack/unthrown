@@ -129,6 +129,7 @@ export default defineConfig({
             { text: "@unthrown/neverthrow", link: "/api/neverthrow/" },
             { text: "@unthrown/boxed", link: "/api/boxed/" },
             { text: "@unthrown/standard-schema", link: "/api/standard-schema/" },
+            { text: "@unthrown/prisma", link: "/api/prisma/" },
           ],
         },
       ],

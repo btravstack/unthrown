@@ -11,7 +11,8 @@
       "@unthrown/neverthrow",
       "@unthrown/boxed",
       "@unthrown/oxlint",
-      "@unthrown/standard-schema"
+      "@unthrown/standard-schema",
+      "@unthrown/prisma"
     ]
   ],
   "linked": [],

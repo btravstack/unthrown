@@ -1,0 +1,326 @@
+// @unthrown/prisma — a Prisma Client extension that bridges Prisma queries into
+// unthrown's `AsyncResult`.
+//
+// `$extends(unthrownPrisma)` adds `try`-prefixed variants of the model delegate
+// operations ALONGSIDE the raw promise ones: each returns an `AsyncResult` whose
+// error channel is the set of P-codes THAT operation can produce, mapped to
+// tagged errors — a read cannot fail with `UniqueConstraintViolation` in the
+// type. Qualification happens once, inside the extension (Thesis #3): no raw
+// Promise ever crosses into a combinator.
+//
+//   const db = new PrismaClient({ adapter }).$extends(unthrownPrisma);
+//
+//   await db.user.tryCreate({ data }).match({ ok, err, defect });
+//   // err is UniqueConstraintViolation | ForeignKeyViolation | DriverError
+//
+// The raw promise methods stay available on purpose: they are the escape hatch
+// for batch `$transaction([...])`, which needs unexecuted `PrismaPromise`s.
+
+import { Prisma } from "@prisma/client/extension";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
+import { type AsyncResult, fromPromise, TaggedError } from "unthrown";
+
+/**
+ * A unique constraint was violated (Prisma error `P2002`).
+ *
+ * @remarks
+ * `fields` carries the offending column set from the error's `meta.target`
+ * (empty when the driver does not report it).
+ */
+export class UniqueConstraintViolation extends TaggedError("UniqueConstraintViolation")<{
+  fields: readonly string[];
+  cause: unknown;
+}> {}
+
+/** A foreign key constraint was violated (Prisma error `P2003`). */
+export class ForeignKeyViolation extends TaggedError("ForeignKeyViolation")<{ cause: unknown }> {}
+
+/**
+ * A record required by the operation does not exist (Prisma error `P2025`) —
+ * the missing row of a `findUniqueOrThrow`, `update`, or `delete`.
+ */
+export class RecordNotFound extends TaggedError("RecordNotFound")<{ cause: unknown }> {}
+
+/**
+ * Any other query failure: connection drops, timeouts, unmapped P-codes,
+ * driver-level errors.
+ *
+ * @remarks
+ * Prisma validation errors land here too. Arguably a malformed query is a
+ * programmer bug rather than an anticipated outcome; triage it further at the
+ * call site if the distinction matters to you.
+ */
+export class DriverError extends TaggedError("DriverError")<{ cause: unknown }> {}
+
+/**
+ * The full union of tagged errors a Prisma query can surface.
+ *
+ * @remarks
+ * This is the RUNTIME-side union: {@link qualifyPrismaError} maps into it. Each
+ * `try*` method narrows the static type to the codes its operation can
+ * actually hit (a read is typed `DriverError` only).
+ */
+export type PrismaQueryError =
+  | UniqueConstraintViolation
+  | ForeignKeyViolation
+  | RecordNotFound
+  | DriverError;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+// The offending column set of a P2002, wherever this Prisma version put it:
+// `meta.target` (the classic engine shape) or
+// `meta.driverAdapterError.cause.constraint.fields` (the driver-adapter shape).
+const constraintFields = (meta: unknown): readonly string[] => {
+  if (!isRecord(meta)) return [];
+  const target = meta["target"];
+  if (Array.isArray(target)) return target.map(String);
+  const adapterError = meta["driverAdapterError"];
+  if (!isRecord(adapterError)) return [];
+  const cause = adapterError["cause"];
+  if (!isRecord(cause)) return [];
+  const constraint = cause["constraint"];
+  if (!isRecord(constraint)) return [];
+  const fields = constraint["fields"];
+  return Array.isArray(fields) ? fields.map(String) : [];
+};
+
+/**
+ * Qualify a Prisma rejection into a tagged error — the runtime half of the
+ * bridge.
+ *
+ * @remarks
+ * Recognized P-codes map to their dedicated errors (`P2002` →
+ * {@link UniqueConstraintViolation}, `P2003` → {@link ForeignKeyViolation},
+ * `P2025` → {@link RecordNotFound}); everything else — including non-Prisma
+ * causes — folds into {@link DriverError} with the cause preserved.
+ *
+ * @param cause - the rejected value from a Prisma query.
+ */
+export const qualifyPrismaError = (cause: unknown): PrismaQueryError => {
+  if (cause instanceof PrismaClientKnownRequestError) {
+    switch (cause.code) {
+      case "P2002":
+        return new UniqueConstraintViolation({ fields: constraintFields(cause.meta), cause });
+      case "P2003":
+        return new ForeignKeyViolation({ cause });
+      case "P2025":
+        return new RecordNotFound({ cause });
+      default:
+        break;
+    }
+  }
+  return new DriverError({ cause });
+};
+
+// Per-operation error unions — the static half. Reads can only fail in the
+// driver; writes add the constraint violations their SQL can raise; `*OrThrow`
+// and mutations of a specific record add P2025.
+type ReadError = DriverError;
+type CreateError = UniqueConstraintViolation | ForeignKeyViolation | DriverError;
+type UpdateError = RecordNotFound | UniqueConstraintViolation | ForeignKeyViolation | DriverError;
+type DeleteError = RecordNotFound | ForeignKeyViolation | DriverError;
+
+// The untyped runtime call under the typed surface: `getExtensionContext`
+// resolves the concrete delegate and the promise is qualified at the boundary,
+// so a raw Promise never escapes. Each public method casts the result down to
+// its per-operation payload and error union (the `$allModels` implementation
+// side is untyped by design; the declared signatures carry the safety).
+type UntypedDelegate = Record<string, (args?: unknown) => Promise<unknown>>;
+
+const query = (self: unknown, op: string, args?: unknown): AsyncResult<unknown, PrismaQueryError> =>
+  fromPromise(
+    (Prisma.getExtensionContext(self) as unknown as UntypedDelegate)[op]!(args),
+    qualifyPrismaError,
+  );
+
+// The rollback sentinel: an `Err` (or defect) inside `$tryTransaction`'s
+// callback is thrown so Prisma aborts the transaction, then unwrapped back out
+// on the other side.
+class Rollback extends Error {
+  constructor(
+    readonly carried: unknown,
+    readonly wasDefect: boolean,
+  ) {
+    super("transaction rolled back");
+  }
+}
+
+// Mirrors Prisma's `ITXClientDenyList` — what an interactive-transaction client
+// cannot do — plus `$tryTransaction` itself: nested transactions are not a
+// thing, and the itx client has no `$transaction` for the bridge to delegate to.
+type TxDenyList =
+  | "$connect"
+  | "$disconnect"
+  | "$on"
+  | "$transaction"
+  | "$use"
+  | "$extends"
+  | "$tryTransaction";
+
+/**
+ * The Prisma Client extension. Apply it with `$extends` to add the `try*`
+ * methods to every model delegate, and `$tryTransaction` to the client.
+ *
+ * @remarks
+ * Typing follows Prisma's documented `$allModels` pattern: `this: T` binds the
+ * concrete delegate, `Prisma.Exact` checks args, and `Prisma.Result` computes
+ * the payload — so `select` / `include` inference survives the wrap.
+ *
+ * @example
+ * ```ts
+ * import { PrismaClient } from "./generated/prisma/client.ts";
+ * import { unthrownPrisma } from "@unthrown/prisma";
+ *
+ * const db = new PrismaClient({ adapter }).$extends(unthrownPrisma);
+ *
+ * const users = db.user.tryFindMany({ select: { id: true } });
+ * //    ^? AsyncResult<{ id: number }[], DriverError>
+ * ```
+ */
+export const unthrownPrisma = Prisma.defineExtension({
+  name: "@unthrown/prisma",
+  model: {
+    $allModels: {
+      /** `findMany`, qualified: the list, or a {@link DriverError}. */
+      tryFindMany<T, A = Record<string, never>>(
+        this: T,
+        args?: Prisma.Exact<A, Prisma.Args<T, "findMany">>,
+      ): AsyncResult<Prisma.Result<T, A, "findMany">, ReadError> {
+        return query(this, "findMany", args) as AsyncResult<
+          Prisma.Result<T, A, "findMany">,
+          ReadError
+        >;
+      },
+
+      /** `findUnique`, qualified: the row or `null`, or a {@link DriverError}. */
+      tryFindUnique<T, A>(
+        this: T,
+        args: Prisma.Exact<A, Prisma.Args<T, "findUnique">>,
+      ): AsyncResult<Prisma.Result<T, A, "findUnique">, ReadError> {
+        return query(this, "findUnique", args) as AsyncResult<
+          Prisma.Result<T, A, "findUnique">,
+          ReadError
+        >;
+      },
+
+      /**
+       * `findUniqueOrThrow`, qualified: the missing row is a modeled
+       * {@link RecordNotFound}, not a throw.
+       */
+      tryFindUniqueOrThrow<T, A>(
+        this: T,
+        args: Prisma.Exact<A, Prisma.Args<T, "findUniqueOrThrow">>,
+      ): AsyncResult<Prisma.Result<T, A, "findUniqueOrThrow">, RecordNotFound | DriverError> {
+        return query(this, "findUniqueOrThrow", args) as AsyncResult<
+          Prisma.Result<T, A, "findUniqueOrThrow">,
+          RecordNotFound | DriverError
+        >;
+      },
+
+      /** `count`, qualified. */
+      tryCount<T, A = Record<string, never>>(
+        this: T,
+        args?: Prisma.Exact<A, Prisma.Args<T, "count">>,
+      ): AsyncResult<Prisma.Result<T, A, "count">, ReadError> {
+        return query(this, "count", args) as AsyncResult<Prisma.Result<T, A, "count">, ReadError>;
+      },
+
+      /**
+       * `create`, qualified: constraint violations are modeled —
+       * {@link UniqueConstraintViolation} and {@link ForeignKeyViolation}.
+       */
+      tryCreate<T, A>(
+        this: T,
+        args: Prisma.Exact<A, Prisma.Args<T, "create">>,
+      ): AsyncResult<Prisma.Result<T, A, "create">, CreateError> {
+        return query(this, "create", args) as AsyncResult<
+          Prisma.Result<T, A, "create">,
+          CreateError
+        >;
+      },
+
+      /**
+       * `update`, qualified: the missing row is a modeled
+       * {@link RecordNotFound}; constraint violations are modeled too.
+       */
+      tryUpdate<T, A>(
+        this: T,
+        args: Prisma.Exact<A, Prisma.Args<T, "update">>,
+      ): AsyncResult<Prisma.Result<T, A, "update">, UpdateError> {
+        return query(this, "update", args) as AsyncResult<
+          Prisma.Result<T, A, "update">,
+          UpdateError
+        >;
+      },
+
+      /**
+       * `delete`, qualified: the missing row is a modeled
+       * {@link RecordNotFound}.
+       */
+      tryDelete<T, A>(
+        this: T,
+        args: Prisma.Exact<A, Prisma.Args<T, "delete">>,
+      ): AsyncResult<Prisma.Result<T, A, "delete">, DeleteError> {
+        return query(this, "delete", args) as AsyncResult<
+          Prisma.Result<T, A, "delete">,
+          DeleteError
+        >;
+      },
+    },
+  },
+  client: {
+    /**
+     * An interactive transaction whose callback speaks `AsyncResult`: an `Err`
+     * triggers a ROLLBACK and comes out as the same typed `Err`.
+     *
+     * @remarks
+     * The callback's `Err` is thrown internally as a sentinel so Prisma aborts
+     * the transaction, then unwrapped back into the typed error channel —
+     * `AsyncResult<T, E | PrismaQueryError>`. A defect inside the callback also
+     * rolls back and stays a defect. The `try*` methods are available on `tx`
+     * (extensions propagate into the interactive transaction); the deny list
+     * additionally removes `$tryTransaction` itself — no nesting.
+     *
+     * @example
+     * ```ts
+     * const moved = db.$tryTransaction((tx) =>
+     *   tx.account.tryUpdate({ where: { id: from }, data: { balance: { decrement: amount } } })
+     *     .flatMap(() =>
+     *       tx.account.tryUpdate({ where: { id: to }, data: { balance: { increment: amount } } }),
+     *     ),
+     * );
+     * // Err anywhere → both updates rolled back, and the Err is in `moved`.
+     * ```
+     */
+    $tryTransaction<C, T, E>(
+      this: C,
+      fn: (tx: Omit<C, TxDenyList>) => AsyncResult<T, E>,
+      options?: {
+        maxWait?: number;
+        timeout?: number;
+        isolationLevel?: string;
+      },
+    ): AsyncResult<T, E | PrismaQueryError> {
+      const client = Prisma.getExtensionContext(this) as unknown as {
+        $transaction: <R>(f: (tx: unknown) => Promise<R>, opts?: unknown) => Promise<R>;
+      };
+      return fromPromise(
+        client.$transaction(async (tx) => {
+          const result = await fn(tx as Omit<C, TxDenyList>);
+          if (result.isOk()) return result.value;
+          throw result.isErr()
+            ? new Rollback(result.error, false)
+            : new Rollback(result.cause, true);
+        }, options),
+        (cause, defect) =>
+          cause instanceof Rollback
+            ? cause.wasDefect
+              ? defect(cause.carried)
+              : (cause.carried as E | PrismaQueryError)
+            : qualifyPrismaError(cause),
+      );
+    },
+  },
+});

@@ -15,6 +15,7 @@
     "@unthrown/effect": "workspace:*",
     "@unthrown/neverthrow": "workspace:*",
     "@unthrown/pattern": "workspace:*",
+    "@unthrown/prisma": "workspace:*",
     "@unthrown/standard-schema": "workspace:*",
     "@unthrown/vitest": "workspace:*",
     "unthrown": "workspace:*"

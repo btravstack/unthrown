@@ -1,0 +1,27 @@
+// Test-only schema — the smallest shape that can provoke every mapped P-code:
+// `User.email @unique` for P2002, the `Post → User` relation for P2003, and any
+// update/delete of a missing row for P2025. Generated into src/generated
+// (gitignored) by the test/typecheck scripts.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id    Int    @id @default(autoincrement())
+  email String @unique
+  name  String?
+  posts Post[]
+}
+
+model Post {
+  id       Int    @id @default(autoincrement())
+  title    String
+  author   User   @relation(fields: [authorId], references: [id])
+  authorId Int
+}

@@ -11,6 +11,7 @@ import "@unthrown/effect";
 import "@unthrown/neverthrow";
 import "@unthrown/boxed";
 import "@unthrown/standard-schema";
+import "@unthrown/prisma";
 
 import { cp, mkdir, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -28,6 +29,7 @@ const packages: ReadonlyArray<{ readonly pkg: string; readonly out: string }> = 
   { pkg: "@unthrown/neverthrow", out: "neverthrow" },
   { pkg: "@unthrown/boxed", out: "boxed" },
   { pkg: "@unthrown/standard-schema", out: "standard-schema" },
+  { pkg: "@unthrown/prisma", out: "prisma" },
 ];
 
 await mkdir(apiDir, { recursive: true });
