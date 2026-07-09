@@ -123,6 +123,46 @@ you nest a `Result<Result<…>>`).
 the original (a validation or write whose _outcome_ matters but whose _value_
 you don't need). `tapErr`/`flatTapErr` are the same pair on the error channel.
 
+**`tap` vs `flatTap`** — decided by what the _effect_ returns, not by what you do
+with its value (both keep the original). An effect that cannot fail — logging, a
+metric — is `tap`; an effect that returns a `Result`/`AsyncResult` **must** be
+sequenced with `flatTap` on the matching surface, because a `tap` callback cannot
+thread it. `tapErr`/`flatTapErr` split the same way on the error channel.
+
+::: warning A `Result`-returning effect inside `tap` is a fire-and-forget
+`tap` ignores its callback's return value, so the effect's outcome is lost — in
+one of two shapes:
+
+- a **sync `Result`** returned from the callback compiles (a `Result` is not a
+  thenable), but its `Err` is silently discarded;
+- an **`AsyncResult`** is rejected at compile time (it is awaitable, so
+  `NotThenable` catches it) — and the tempting "fix" of wrapping the call in
+  braces compiles, but leaves the effect **floating**: never awaited, its
+  `Err`/`Defect` unobserved.
+
+```ts
+.tap((user) => {
+  auditLog.record(user); // AsyncResult — floats, never awaited
+})
+```
+
+Sequence the effect instead. A `Result`-returning effect goes in `flatTap` on
+either surface; an `AsyncResult`-returning one only in the **async** `flatTap` —
+the sync one takes only a `Result`, so lift a still-sync chain with `.toAsync()`
+first ([Result and AsyncResult](#result-and-asyncresult)). A raw `Promise` gets
+qualified through `fromPromise` / `fromSafePromise` before either. Here the
+chain is already an `AsyncResult`, so `flatTap` takes the effect directly, awaits
+it, and short-circuits on its failure:
+
+```ts
+.flatTap((user) => auditLog.record(user))
+```
+
+If a fire-and-forget is deliberate, say so in a comment at the call site —
+otherwise the same effect ends up `tap`ped at one site and `flatTap`ped at
+another, and a reviewer has to guess which one is the bug.
+:::
+
 **`orElse` vs `recover`** — both run on `Err`. `recover` produces a plain success
 value (emptying the error channel to `never`); `orElse` produces another `Result`
 (which may still be an `Err`).
