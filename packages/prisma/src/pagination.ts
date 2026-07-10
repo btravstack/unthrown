@@ -32,9 +32,11 @@ export type CursorPaginationMeta = {
  * `take` can express.
  *
  * The default cursor is the record's `id` field, serialized with `String` and
- * parsed back to a number when it is all digits (autoincrement ids) or kept as
- * a string otherwise (uuid / cuid ids). Provide `getCursor` / `parseCursor`
- * for composite keys, or when the selection omits `id`.
+ * parsed back to a number when it is all digits (autoincrement ids) — a bigint
+ * once it exceeds `Number.MAX_SAFE_INTEGER`, so `BigInt` ids never lose
+ * precision — or kept as a string otherwise (uuid / cuid ids). Provide
+ * `getCursor` / `parseCursor` for composite keys, or when the selection omits
+ * `id`.
  *
  * @typeParam Row - the (selection-narrowed) result row type.
  * @typeParam Cursor - the model's `cursor` input (its unique-where shape).
@@ -82,10 +84,14 @@ const defaultGetCursor = (row: unknown): string => {
 };
 
 // Preserve the id's type through the round-trip: an all-digits cursor parses
-// back to a number (autoincrement ids), anything else stays a string.
-const defaultParseCursor = (cursor: string): unknown => ({
-  id: /^\d+$/.test(cursor) ? Number(cursor) : cursor,
-});
+// back to a number (autoincrement ids) — or a bigint once it exceeds
+// Number.MAX_SAFE_INTEGER, so a BigInt id never loses precision — and anything
+// else stays a string (uuid / cuid).
+const defaultParseCursor = (cursor: string): unknown => {
+  if (!/^\d+$/.test(cursor)) return { id: cursor };
+  const n = Number(cursor);
+  return { id: Number.isSafeInteger(n) ? n : BigInt(cursor) };
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;

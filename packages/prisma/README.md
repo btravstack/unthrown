@@ -76,7 +76,7 @@ const page = await db.user
 // | Err(DriverError) — a malformed cursor included.
 
 // Custom serialization (composite keys, non-id cursors):
-.withCursor({
+const liked = await db.like.tryPaginate({ orderBy: { postId: "asc" } }).withCursor({
   limit: 20,
   getCursor: ({ postId, userId }) => `${postId}:${userId}`,
   parseCursor: (cursor) => {

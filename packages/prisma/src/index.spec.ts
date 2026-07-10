@@ -435,6 +435,35 @@ describe("tryPaginate / withCursor", () => {
     );
   });
 
+  it("the DEFAULT parser preserves a BigInt id beyond Number.MAX_SAFE_INTEGER", async () => {
+    // 2^53 + 1 is not representable as a number; a Number(...) default would
+    // silently address the wrong row. The default parser must emit a bigint —
+    // and still emit a plain number for safe-range ids.
+    const big = 9007199254740993n; // 2^53 + 1
+    const seen: unknown[] = [];
+    const model = {
+      findMany: (args: object) => {
+        seen.push((args as { cursor?: unknown }).cursor);
+        return Promise.resolve(
+          (args as { take?: number }).take === -1 ? [{ id: big }] : [{ id: big }, { id: big + 1n }],
+        );
+      },
+    };
+    await expect(
+      paginateWithCursor(model, undefined, { limit: 2, after: String(big) }),
+    ).resolves.toEqual([
+      [{ id: big + 1n }],
+      {
+        hasPreviousPage: true,
+        hasNextPage: false,
+        startCursor: "9007199254740994",
+        endCursor: "9007199254740994",
+      },
+    ]);
+    // The cursor Prisma received is the EXACT bigint, not a lossy number.
+    expect(seen[0]).toEqual({ id: big });
+  });
+
   it("compares cursors structurally — bigint ids survive the round-trip", async () => {
     // JSON.stringify-based comparison would throw on bigint cursor values.
     const model = {
