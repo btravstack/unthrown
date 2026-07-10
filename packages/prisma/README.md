@@ -35,11 +35,16 @@ await db.user.tryCreate({ data }).match({
 });
 ```
 
-- **Per-operation errors** — reads (`tryFindMany` / `tryFindUnique` / `tryCount`)
-  fail only with `DriverError`; writes add `UniqueConstraintViolation` (P2002)
-  and `ForeignKeyViolation` (P2003); `tryFindUniqueOrThrow` / `tryUpdate` /
-  `tryDelete` add `RecordNotFound` (P2025). Everything else folds into
-  `DriverError` with the cause preserved.
+- **Per-operation errors** — reads (`tryFindMany` / `tryFindUnique` /
+  `tryFindFirst` / `tryCount` / `tryAggregate` / `tryGroupBy`) fail only with
+  `DriverError`; writes (`tryCreate` / `tryCreateMany` / `tryCreateManyAndReturn`
+  / `tryUpsert` / `tryUpdateMany` / `tryUpdateManyAndReturn`) add
+  `UniqueConstraintViolation` (P2002) and `ForeignKeyViolation` (P2003);
+  `tryFindUniqueOrThrow` / `tryFindFirstOrThrow` / `tryUpdate` / `tryDelete` add
+  `RecordNotFound` (P2025) — the batch mutations and `tryUpsert` never carry it
+  (zero matches is `Ok({ count: 0 })`; an upsert miss creates). `tryDeleteMany`
+  models only `ForeignKeyViolation`. Everything else folds into `DriverError`
+  with the cause preserved.
 - **`$tryTransaction`** — an interactive transaction whose callback speaks
   `AsyncResult`: an `Err` triggers a ROLLBACK and comes out as the same typed
   `Err`; a defect also rolls back and stays a defect. The `try*` methods are

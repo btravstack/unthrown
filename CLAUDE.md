@@ -294,18 +294,20 @@ library can be "done".
   on unthrown's `Result`. No TypeDoc API page; documented in the Linting guide.
   Tested with oxlint's `RuleTester` from `oxlint/plugins-dev`.)
 - `packages/prisma` → `@unthrown/prisma` (peerDep `@prisma/client` ^7; a Prisma
-  Client **extension** — `$extends(unthrownPrisma)` adds `try*` variants of the
-  model delegate operations alongside the raw promise ones, each an
-  `AsyncResult` whose error channel is exactly the P-codes that operation can
-  raise: `UniqueConstraintViolation` P2002, `ForeignKeyViolation` P2003,
-  `RecordNotFound` P2025, everything else `DriverError` with the cause
-  preserved. Also `$tryTransaction` (an interactive transaction whose callback
+  Client **extension** — `$extends(unthrownPrisma)` adds `try*` variants of
+  **all seventeen** model delegate operations alongside the raw promise ones,
+  each an `AsyncResult` whose error channel is exactly the P-codes that
+  operation can raise: `UniqueConstraintViolation` P2002, `ForeignKeyViolation`
+  P2003, `RecordNotFound` P2025, everything else `DriverError` with the cause
+  preserved — `upsert` and the `*Many` batch mutations never carry P2025 (an
+  upsert miss creates; zero batch matches is `Ok({ count: 0 })`). Also
+  `$tryTransaction` (an interactive transaction whose callback
   speaks `AsyncResult` — an `Err` rolls back and re-surfaces typed; a defect
   rolls back and stays a defect) and `tryPaginate(...).withCursor(...)` (the
   `prisma-extension-pagination` cursor API with its unmerged #35 fix folded
   in). Qualification happens once inside the extension via the exported
   `qualifyPrismaError`; the raw methods stay as the escape hatch for batch
-  `$transaction([...])` and the not-yet-wrapped operations. Tested against a
+  `$transaction([...])` and raw SQL. Tested against a
   real in-memory SQLite client (`@prisma/adapter-better-sqlite3`) with a
   generated, gitignored test client; **deliberately outside the fixed version
   group** — its majors track `@prisma/client`'s cadence, not the family's.

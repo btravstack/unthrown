@@ -2,5 +2,13 @@
   "extends": "@unthrown/typedoc/base.json",
   "entryPoints": ["src/index.ts"],
   "out": "docs",
-  "intentionallyNotExported": ["CreateError", "UpdateError", "DeleteError", "TxDenyList"]
+  "intentionallyNotExported": [
+    "CreateError",
+    "UpdateError",
+    "DeleteError",
+    "UpsertError",
+    "UpdateManyError",
+    "DeleteManyError",
+    "TxDenyList"
+  ]
 }
