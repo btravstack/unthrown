@@ -91,14 +91,14 @@ exactly three ways:
 
 Use this table to move between the two:
 
-| I have… and want to…                    | use                                                   |
-| --------------------------------------- | ----------------------------------------------------- |
-| build an `AsyncResult` from a value     | `OkAsync(v)` / `ErrAsync(e)` (no `Ok(v).toAsync()`)   |
-| lift a sync `Result` into async         | `result.toAsync()` → `AsyncResult`                    |
-| collapse an `AsyncResult` to a `Result` | `await asyncResult`                                   |
-| add an **async** step mid-chain         | `.flatMap((v) => fromPromise(work(v), qualify))`      |
-| add a **sync** step to an async chain   | `.flatMap((v) => Ok(v + 1))` — a `Result` is accepted |
-| combine async results                   | `allAsync` / `allFromDictAsync`                       |
+| I have… and want to…                      | use                                                   |
+| ----------------------------------------- | ----------------------------------------------------- |
+| build an `AsyncResult` from a value/error | `OkAsync(v)` / `ErrAsync(e)` (no `Ok(v).toAsync()`)   |
+| lift a sync `Result` into async           | `result.toAsync()` → `AsyncResult`                    |
+| collapse an `AsyncResult` to a `Result`   | `await asyncResult`                                   |
+| add an **async** step mid-chain           | `.flatMap((v) => fromPromise(work(v), qualify))`      |
+| add a **sync** step to an async chain     | `.flatMap((v) => Ok(v + 1))` — a `Result` is accepted |
+| combine async results                     | `allAsync` / `allFromDictAsync`                       |
 
 ```ts
 // A chain that crosses an async boundary stays an AsyncResult to the end.

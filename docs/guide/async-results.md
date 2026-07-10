@@ -5,7 +5,7 @@ the **same method surface**, and `await`-ing it collapses it to a `Result`.
 
 You get one from a qualified boundary ([`fromPromise`](./boundaries),
 `fromSafePromise`), by lifting a sync `Result` with `.toAsync()`, or — for a pure
-value — directly with `OkAsync` / `ErrAsync`.
+value or error — directly with `OkAsync` / `ErrAsync`.
 
 ```ts
 import { fromSafePromise } from "unthrown";
