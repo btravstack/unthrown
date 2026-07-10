@@ -108,6 +108,7 @@ export default defineConfig({
           items: [
             { text: "Testing", link: "/guide/testing" },
             { text: "Pattern Matching", link: "/guide/pattern-matching" },
+            { text: "Prisma", link: "/guide/prisma" },
             { text: "Linting", link: "/guide/linting" },
             { text: "Interop", link: "/guide/interop" },
             {
