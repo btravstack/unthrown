@@ -14,8 +14,8 @@ const boom = new Error("boom");
 
 describe("fromNullable", () => {
   it("turns null/undefined into a modeled Err", () => {
-    expect(fromNullable(null, () => "absent").unwrapErr()).toBe("absent");
-    expect(fromNullable(undefined, () => "absent").unwrapErr()).toBe("absent");
+    expect(fromNullable(null, () => "absent").getErr()).toBe("absent");
+    expect(fromNullable(undefined, () => "absent").getErr()).toBe("absent");
   });
 
   it("keeps a present value as Ok (and treats falsy non-null as present)", () => {
@@ -76,7 +76,7 @@ describe("fromThrowable", () => {
     const r = fn();
     expect(r.isDefect()).toBe(true);
     // the original cause is preserved on the Defect channel
-    expect(r.recoverDefect((c) => Ok(c === boom)).unwrap()).toBe(true);
+    expect(r.recoverDefect((c) => Ok(c === boom)).get()).toBe(true);
     // the injected helper yields an opaque marker carrying the cause — NOT a
     // Result (it has no Result methods).
     expect(marker).toMatchObject({ cause: boom });
@@ -102,7 +102,7 @@ describe("fromThrowable", () => {
     );
     // Compiles only if `E` is `never` — `Defect` must not leak into the channel.
     const r: Result<number, never> = fn();
-    expect(r.unwrap()).toBe(1);
+    expect(r.get()).toBe(1);
   });
 
   it("keeps the modeled arm while subtracting Defect: mixed qualify yields just E", () => {
@@ -129,7 +129,7 @@ describe("fromPromise — error-channel inference", () => {
     );
     const typed: AsyncResult<never, "known"> = ar;
     // `boom` matches the modeled arm, so it lands in Err — not a Defect.
-    expect((await typed).unwrapErr()).toBe("known");
+    expect((await typed).getErr()).toBe("known");
   });
 });
 

@@ -27,9 +27,9 @@ import type { AsyncErrOf, AsyncOkOf, AsyncResult, ErrOf, OkOf, Result } from "./
  * import { fromNullable } from "unthrown";
  *
  * const map = new Map([["a", 1]]);
- * fromNullable(map.get("a"), () => "absent").unwrapOr(0); // => 1
+ * fromNullable(map.get("a"), () => "absent").getOr(0); // => 1
  * fromNullable(map.get("z"), () => "absent"); // => Err("absent")
- * fromNullable(0, () => "absent").unwrapOr(-1); // => 0 (falsy but present)
+ * fromNullable(0, () => "absent").getOr(-1); // => 0 (falsy but present)
  * ```
  */
 export function fromNullable<T, E>(
@@ -77,7 +77,7 @@ export function fromNullable<T, E>(
  *     cause instanceof SyntaxError ? ("invalid_json" as const) : defect(cause),
  * );
  *
- * parse('{"ok":true}').unwrapOr(null); // => { ok: true }
+ * parse('{"ok":true}').getOr(null); // => { ok: true }
  * parse("nope"); // => Err("invalid_json")
  * ```
  */
@@ -168,7 +168,7 @@ export function fromPromise<T, R>(
  * ```ts
  * import { fromSafePromise } from "unthrown";
  *
- * (await fromSafePromise(Promise.resolve(3))).unwrap(); // => 3
+ * (await fromSafePromise(Promise.resolve(3))).get(); // => 3
  * // a rejection becomes a Defect (never a modeled Err):
  * await fromSafePromise(Promise.reject(new Error("boom"))); // => Defect(Error("boom"))
  * ```
@@ -292,7 +292,7 @@ function foldRecord(results: ResultRecord): Result<unknown, unknown> {
  * ```ts
  * import { all, Ok, Err } from "unthrown";
  *
- * all([Ok(1), Ok("a"), Ok(true)]).unwrap(); // => [1, "a", true] (typed [number, string, boolean])
+ * all([Ok(1), Ok("a"), Ok(true)]).get(); // => [1, "a", true] (typed [number, string, boolean])
  * all([Ok(1), Err("e"), Ok(3)]); // => Err("e") (short-circuits on the first Err)
  * ```
  */
@@ -321,7 +321,7 @@ export function all<Rs extends readonly Result<unknown, unknown>[]>(
  * ```ts
  * import { allFromDict, Ok, Err } from "unthrown";
  *
- * allFromDict({ id: Ok(1), name: Ok("ada") }).unwrap(); // => { id: 1, name: "ada" }
+ * allFromDict({ id: Ok(1), name: Ok("ada") }).get(); // => { id: 1, name: "ada" }
  * allFromDict({ id: Ok(1), name: Err("missing") }); // => Err("missing")
  * ```
  */
@@ -351,7 +351,7 @@ export function allFromDict<R extends ResultRecord>(
  * import { allAsync, fromSafePromise } from "unthrown";
  *
  * const both = allAsync([fromSafePromise(Promise.resolve(1)), fromSafePromise(Promise.resolve(2))]);
- * (await both).unwrap(); // => [1, 2]
+ * (await both).get(); // => [1, 2]
  * ```
  */
 export function allAsync<Rs extends readonly AsyncResult<unknown, unknown>[]>(
@@ -386,7 +386,7 @@ export function allAsync<Rs extends readonly AsyncResult<unknown, unknown>[]>(
  *   a: fromSafePromise(Promise.resolve(1)),
  *   b: fromSafePromise(Promise.resolve("x")),
  * });
- * (await both).unwrap(); // => { a: 1, b: "x" }
+ * (await both).get(); // => { a: 1, b: "x" }
  * ```
  */
 export function allFromDictAsync<R extends AsyncResultRecord>(

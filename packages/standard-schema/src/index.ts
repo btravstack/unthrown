@@ -56,8 +56,8 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
  * ```ts
  * import { fromSchema } from "@unthrown/standard-schema";
  * const parse = fromSchema(z.string());
- * parse("hi").unwrap(); // "hi"
- * parse(42).unwrapErr(); // the issues array
+ * parse("hi").get(); // "hi"
+ * parse(42).getErr(); // the issues array
  * ```
  */
 export function fromSchema<S extends StandardSchemaV1>(

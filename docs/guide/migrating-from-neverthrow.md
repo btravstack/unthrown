@@ -13,9 +13,9 @@ search-and-replace.
 | `ok(v)` / `err(e)`                   | `Ok(v)` / `Err(e)`           | constructors are capitalized                                        |
 | `result.andThen(f)`                  | `result.flatMap(f)`          | one name per concept                                                |
 | `result.map(f)` / `mapErr(f)`        | same                         | callbacks must be synchronous                                       |
-| `result.orElse(f)`                   | `orElse(f)`                  | same shape                                                          |
+| `result.orElse(f)`                   | `result.flatMapErr(f)`       | `flatMap` on the error channel (`orElse` is a deprecated alias)     |
 | `result.match(okFn, errFn)`          | `match({ ok, err, defect })` | the third channel is new — see below                                |
-| `result.unwrapOr(v)`                 | `unwrapOr(v)`                | still throws on a Defect (a bug is not an absent value)             |
+| `result.unwrapOr(v)`                 | `result.getOr(v)`            | still throws on a Defect (a bug is not an absent value)             |
 | `ResultAsync`                        | `AsyncResult`                | `await` collapses it to a `Result`; it never rejects                |
 | `ResultAsync.fromPromise(p, mapErr)` | `fromPromise(p, qualify)`    | `qualify` must return `E` **or** `defect(cause)` — triage is forced |
 | `ResultAsync.fromSafePromise(p)`     | `fromSafePromise(p)`         | a rejection becomes a `Defect`, not an `Err`                        |

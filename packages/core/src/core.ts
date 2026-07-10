@@ -25,8 +25,8 @@ import type {
 } from "./types.js";
 
 /**
- * Thrown by a {@link Result}'s `unwrap` / `unwrapErr` when the assertion is
- * wrong on a *modeled* result — `unwrap()` on an `Err`, or `unwrapErr()` on an
+ * Thrown by a {@link Result}'s `get` / `getErr` when the assertion is
+ * wrong on a *modeled* result — `get()` on an `Err`, or `getErr()` on an
  * `Ok`.
  *
  * @remarks
@@ -38,7 +38,7 @@ import type {
  * A `Defect` is never wrapped in an `UnwrapError`: its original cause is
  * re-thrown (with its original stack) instead.
  *
- * `unwrap()` and `unwrapErr()` are type-gated (`this: Result<T, never>` /
+ * `get()` and `getErr()` are type-gated (`this: Result<T, never>` /
  * `Result<never, E>`), so the wrong-variant branch that throws this is
  * unreachable through well-typed code — it remains only as a defensive guard
  * against unsound runtime misuse (e.g. an `as` cast past the gate).
@@ -49,8 +49,8 @@ import type {
  */
 export class UnwrapError<E = unknown> extends Error {
   /**
-   * The offending value: the `Err` error for `unwrap()`, or the `Ok` value for
-   * `unwrapErr()`.
+   * The offending value: the `Err` error for `get()`, or the `Ok` value for
+   * `getErr()`.
    */
   readonly error: E;
   constructor(error: E) {
@@ -158,7 +158,7 @@ class Res<T, E> {
     }
   }
 
-  orElse<U, E2>(this: Result<T, E>, f: (error: E) => Result<U, E2>): Result<T | U, E2> {
+  flatMapErr<U, E2>(this: Result<T, E>, f: (error: E) => Result<U, E2>): Result<T | U, E2> {
     if (this.tag !== "Err") return passThrough(this);
     try {
       return f(this.error);
@@ -167,13 +167,23 @@ class Res<T, E> {
     }
   }
 
-  recover<U>(this: Result<T, E>, f: (error: E) => U & NotThenable<U>): Result<T | U, never> {
+  /** @deprecated Use {@link Res.flatMapErr}. */
+  orElse<U, E2>(this: Result<T, E>, f: (error: E) => Result<U, E2>): Result<T | U, E2> {
+    return this.flatMapErr(f);
+  }
+
+  recoverErr<U>(this: Result<T, E>, f: (error: E) => U & NotThenable<U>): Result<T | U, never> {
     if (this.tag !== "Err") return passThrough(this);
     try {
       return okRes(f(this.error));
     } catch (cause) {
       return defectRes(cause);
     }
+  }
+
+  /** @deprecated Use {@link Res.recoverErr}. */
+  recover<U>(this: Result<T, E>, f: (error: E) => U & NotThenable<U>): Result<T | U, never> {
+    return this.recoverErr(f);
   }
 
   tapErr<R>(this: Result<T, E>, f: (error: E) => R & NotThenable<R>): Result<T, E> {
@@ -237,7 +247,7 @@ class Res<T, E> {
     }
   }
 
-  unwrap(this: Result<T, E>): T {
+  get(this: Result<T, E>): T {
     switch (this.tag) {
       case "Ok":
         return this.value;
@@ -248,7 +258,14 @@ class Res<T, E> {
     }
   }
 
-  unwrapErr(this: Result<T, E>): E {
+  /** @deprecated Use {@link Res.get}. */
+  unwrap(this: Result<T, E>): T {
+    // Runtime-identical alias; the cast only sidesteps `get`'s type-gate, which
+    // is re-imposed on the public `unwrap` signature in `types.ts`.
+    return (this as Result<T, never>).get();
+  }
+
+  getErr(this: Result<T, E>): E {
     switch (this.tag) {
       case "Err":
         return this.error;
@@ -259,16 +276,32 @@ class Res<T, E> {
     }
   }
 
-  unwrapOr<U>(this: Result<T, E>, fallback: U): T | U {
+  /** @deprecated Use {@link Res.getErr}. */
+  unwrapErr(this: Result<T, E>): E {
+    // Runtime-identical alias; the cast only sidesteps `getErr`'s type-gate.
+    return (this as Result<never, E>).getErr();
+  }
+
+  getOr<U>(this: Result<T, E>, fallback: U): T | U {
     if (this.tag === "Ok") return this.value;
     if (this.tag === "Defect") throw this.cause;
     return fallback;
   }
 
-  unwrapOrElse<U>(this: Result<T, E>, f: (error: E) => U): T | U {
+  /** @deprecated Use {@link Res.getOr}. */
+  unwrapOr<U>(this: Result<T, E>, fallback: U): T | U {
+    return this.getOr(fallback);
+  }
+
+  getOrElse<U>(this: Result<T, E>, f: (error: E) => U): T | U {
     if (this.tag === "Ok") return this.value;
     if (this.tag === "Defect") throw this.cause;
     return f(this.error);
+  }
+
+  /** @deprecated Use {@link Res.getOrElse}. */
+  unwrapOrElse<U>(this: Result<T, E>, f: (error: E) => U): T | U {
+    return this.getOrElse(f);
   }
 
   getOrNull(this: Result<T, E>): T | null {
@@ -573,7 +606,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  orElse<U, E2>(f: (error: E) => Result<U, E2> | AsyncResult<U, E2>): AsyncResult<T | U, E2> {
+  flatMapErr<U, E2>(f: (error: E) => Result<U, E2> | AsyncResult<U, E2>): AsyncResult<T | U, E2> {
     return new AsyncRes<T | U, E2>(
       this.promise.then(async (r) => {
         if (r.tag !== "Err") return passThrough(r);
@@ -586,7 +619,12 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  recover<U>(f: (error: E) => U & NotThenable<U>): AsyncResult<T | U, never> {
+  /** @deprecated Use {@link AsyncRes.flatMapErr}. */
+  orElse<U, E2>(f: (error: E) => Result<U, E2> | AsyncResult<U, E2>): AsyncResult<T | U, E2> {
+    return this.flatMapErr(f);
+  }
+
+  recoverErr<U>(f: (error: E) => U & NotThenable<U>): AsyncResult<T | U, never> {
     return new AsyncRes<T | U, never>(
       this.promise.then((r) => {
         if (r.tag !== "Err") return passThrough(r);
@@ -597,6 +635,11 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
         }
       }),
     );
+  }
+
+  /** @deprecated Use {@link AsyncRes.recoverErr}. */
+  recover<U>(f: (error: E) => U & NotThenable<U>): AsyncResult<T | U, never> {
+    return this.recoverErr(f);
   }
 
   tapErr<R>(f: (error: E) => R & NotThenable<R>): AsyncResult<T, E> {
@@ -667,17 +710,33 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     return this.promise.then((r) => r.match(cases));
   }
 
+  get(): Promise<T> {
+    return this.promise.then((r) => (r as Result<T, never>).get());
+  }
+  /** @deprecated Use {@link AsyncRes.get}. */
   unwrap(): Promise<T> {
-    return this.promise.then((r) => (r as Result<T, never>).unwrap());
+    return this.get();
   }
+  getErr(): Promise<E> {
+    return this.promise.then((r) => (r as Result<never, E>).getErr());
+  }
+  /** @deprecated Use {@link AsyncRes.getErr}. */
   unwrapErr(): Promise<E> {
-    return this.promise.then((r) => (r as Result<never, E>).unwrapErr());
+    return this.getErr();
   }
+  getOr<U>(fallback: U): Promise<T | U> {
+    return this.promise.then((r) => r.getOr(fallback));
+  }
+  /** @deprecated Use {@link AsyncRes.getOr}. */
   unwrapOr<U>(fallback: U): Promise<T | U> {
-    return this.promise.then((r) => r.unwrapOr(fallback));
+    return this.getOr(fallback);
   }
+  getOrElse<U>(f: (error: E) => U): Promise<T | U> {
+    return this.promise.then((r) => r.getOrElse(f));
+  }
+  /** @deprecated Use {@link AsyncRes.getOrElse}. */
   unwrapOrElse<U>(f: (error: E) => U): Promise<T | U> {
-    return this.promise.then((r) => r.unwrapOrElse(f));
+    return this.getOrElse(f);
   }
   getOrNull(): Promise<T | null> {
     return this.promise.then((r) => r.getOrNull());

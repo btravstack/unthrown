@@ -40,7 +40,7 @@ export type NotThenable<R> = [R] extends [PromiseLike<unknown>]
 
 /**
  * The fluent method surface every {@link Result} variant carries — the
- * combinators (`map`, `flatMap`, `mapErr`, `match`, `unwrap`, …), documented one
+ * combinators (`map`, `flatMap`, `mapErr`, `match`, `get`, …), documented one
  * per entry below. Factored out so the three variants ({@link OkView},
  * {@link ErrView}, {@link DefectView}) can each intersect it; {@link AsyncResult}
  * mirrors this surface with async signatures.
@@ -174,7 +174,8 @@ export type ResultMethods<T, E> = {
    */
   mapErr<E2>(f: (error: E) => E2 & NotThenable<E2>): Result<T, E2>;
   /**
-   * Recover from an `Err` by producing another `Result`.
+   * Sequence from an `Err` by producing another `Result` — the error-channel
+   * mirror of {@link ResultMethods.flatMap | flatMap}.
    *
    * Runs `f` only on `Err`; `Ok` and `Defect` pass through. If `f` throws, the
    * throw becomes a `Defect`.
@@ -183,10 +184,22 @@ export type ResultMethods<T, E> = {
    * @typeParam E2 - the error type `f` may produce instead.
    * @param f - produces a fallback `Result` from the current error.
    */
+  flatMapErr<U, E2>(f: (error: E) => Result<U, E2>): Result<T | U, E2>;
+  /**
+   * The success value or the produced fallback `Result`.
+   *
+   * @deprecated Renamed to {@link ResultMethods.flatMapErr | flatMapErr} — it is
+   * `flatMap` on the error channel, so it now follows the `…Err` convention. This
+   * alias will be removed in a future major.
+   *
+   * @typeParam U - an alternative success type `f` may produce.
+   * @typeParam E2 - the error type `f` may produce instead.
+   * @param f - produces a fallback `Result` from the current error.
+   */
   orElse<U, E2>(f: (error: E) => Result<U, E2>): Result<T | U, E2>;
   /**
    * Recover from an `Err` by producing a success value, emptying the error
-   * channel.
+   * channel. Pairs with {@link ResultMethods.recoverDefect | recoverDefect}.
    *
    * @remarks
    * The result type is `Result<T | U, never>`, but `never` describes only the
@@ -194,6 +207,17 @@ export type ResultMethods<T, E> = {
    * read `never` as "total". Runs `f` only on `Err`; `Ok` and `Defect` pass
    * through. If `f` throws, the throw becomes a `Defect`. An async callback is
    * rejected at compile time ({@link NotThenable}).
+   *
+   * @typeParam U - the recovered success type.
+   * @param f - produces a success value from the current error.
+   */
+  recoverErr<U>(f: (error: E) => U & NotThenable<U>): Result<T | U, never>;
+  /**
+   * Recover from an `Err` by producing a success value.
+   *
+   * @deprecated Renamed to {@link ResultMethods.recoverErr | recoverErr} — it now
+   * pairs with {@link ResultMethods.recoverDefect | recoverDefect} and follows the
+   * `…Err` convention. This alias will be removed in a future major.
    *
    * @typeParam U - the recovered success type.
    * @param f - produces a success value from the current error.
@@ -281,14 +305,23 @@ export type ResultMethods<T, E> = {
    *
    * @remarks
    * Compiles only when the error channel is empty (`E = never`) — eliminate
-   * modeled errors first (`match` / `recover` / `orElse`), or reach for the
-   * `unwrapOr` / `unwrapOrElse` / `getOrNull` / `getOrUndefined` family (which
+   * modeled errors first (`match` / `recoverErr` / `flatMapErr`), or reach for the
+   * `getOr` / `getOrElse` / `getOrNull` / `getOrUndefined` family (which
    * recover an `Err`). If you get a `'this' context` type error here, that is
    * the gate: the receiver still has a non-`never` error channel.
    *
    * `E = never` empties only the **modeled** error channel — a `Defect` can
-   * still be present, and `unwrap()` **rethrows its original cause** (it
-   * _panics_); `Result<T, never>` does not mean `unwrap()` cannot throw.
+   * still be present, and `get()` **rethrows its original cause** (it
+   * _panics_); `Result<T, never>` does not mean `get()` cannot throw.
+   *
+   * @returns the `Ok` value.
+   */
+  get(this: Result<T, never>): T;
+  /**
+   * Extract the success value.
+   *
+   * @deprecated Renamed to {@link ResultMethods.get | get}, unifying the extractor
+   * family under `get…`. This alias will be removed in a future major.
    *
    * @returns the `Ok` value.
    */
@@ -302,7 +335,16 @@ export type ResultMethods<T, E> = {
    * `Result` you hold usually still has a success type), so to inspect an
    * error prefer an `isErr()` guard or, in tests, `@unthrown/vitest`'s
    * `toBeErrWith`. A `Defect` still **rethrows its original cause** (a defect is
-   * a bug, not an absent value), so this does not mean `unwrapErr()` can't throw.
+   * a bug, not an absent value), so this does not mean `getErr()` can't throw.
+   *
+   * @returns the `Err` value.
+   */
+  getErr(this: Result<never, E>): E;
+  /**
+   * Extract the modeled error.
+   *
+   * @deprecated Renamed to {@link ResultMethods.getErr | getErr}, unifying the
+   * extractor family under `get…`. This alias will be removed in a future major.
    *
    * @returns the `Err` value.
    */
@@ -315,12 +357,34 @@ export type ResultMethods<T, E> = {
    * @throws Re-throws on a `Defect` — a Defect is a bug, not an absent value, so
    * it is never silently replaced.
    */
+  getOr<U>(fallback: U): T | U;
+  /**
+   * The success value, or `fallback` on `Err`.
+   *
+   * @deprecated Renamed to {@link ResultMethods.getOr | getOr}, unifying the
+   * extractor family under `get…`. This alias will be removed in a future major.
+   *
+   * @typeParam U - the fallback type (may differ from `T`; the return widens to `T | U`).
+   * @param fallback - returned when the result is an `Err`.
+   * @throws Re-throws on a `Defect`.
+   */
   unwrapOr<U>(fallback: U): T | U;
   /**
    * The success value, or `f(error)` on `Err`.
    *
    * @typeParam U - the fallback type (may differ from `T`; the return widens to `T | U`).
    * @param f - lazily computes the fallback from the error (may return a different type; the return widens to `T | U`).
+   * @throws Re-throws on a `Defect`.
+   */
+  getOrElse<U>(f: (error: E) => U): T | U;
+  /**
+   * The success value, or `f(error)` on `Err`.
+   *
+   * @deprecated Renamed to {@link ResultMethods.getOrElse | getOrElse}, unifying
+   * the extractor family under `get…`. This alias will be removed in a future major.
+   *
+   * @typeParam U - the fallback type (may differ from `T`; the return widens to `T | U`).
+   * @param f - lazily computes the fallback from the error.
    * @throws Re-throws on a `Defect`.
    */
   unwrapOrElse<U>(f: (error: E) => U): T | U;
@@ -341,13 +405,13 @@ export type ResultMethods<T, E> = {
    *
    * @remarks
    * A deliberate escape hatch off the errors-as-values model. Unlike
-   * {@link ResultMethods.unwrap | unwrap} (type-gated to an empty error
+   * {@link ResultMethods.get | get} (type-gated to an empty error
    * channel), this compiles on any `Result<T, E>` and **throws the `Err` value
    * as-is** at the call site. Its purpose is to move a literal `throw` behind a
    * method, so a `no-throw` lint rule can ban raw throws while this one
    * sanctioned extraction remains — _not_ to replace principled handling. When
    * you can keep the error a value, prefer {@link ResultMethods.match | match} /
-   * {@link ResultMethods.recover | recover} / {@link ResultMethods.orElse | orElse}.
+   * {@link ResultMethods.recoverErr | recoverErr} / {@link ResultMethods.flatMapErr | flatMapErr}.
    *
    * @returns the `Ok` value.
    * @throws the modeled `error` on `Err`; re-throws the original `cause` on a
@@ -486,7 +550,7 @@ export type Awaitable<T> = {
 
 /**
  * The async method surface every {@link AsyncResult} carries — the combinators
- * (`map`, `flatMap`, `mapErr`, `match`, `unwrap`, …) with their asynchronous
+ * (`map`, `flatMap`, `mapErr`, `match`, `get`, …) with their asynchronous
  * signatures, documented one per entry below. The async mirror of
  * {@link ResultMethods}: each entry links its synchronous counterpart and states
  * only the async delta.
@@ -565,14 +629,24 @@ export type AsyncResultMethods<T, E> = {
    */
   mapErr<E2>(f: (error: E) => E2 & NotThenable<E2>): AsyncResult<T, E2>;
   /**
-   * Asynchronous {@link ResultMethods.orElse | orElse}. `f` may return a `Result`
-   * or an `AsyncResult`.
+   * Asynchronous {@link ResultMethods.flatMapErr | flatMapErr}. `f` may return a
+   * `Result` or an `AsyncResult`.
+   */
+  flatMapErr<U, E2>(f: (error: E) => Result<U, E2> | AsyncResult<U, E2>): AsyncResult<T | U, E2>;
+  /**
+   * @deprecated Renamed to {@link AsyncResultMethods.flatMapErr | flatMapErr}.
+   * This alias will be removed in a future major.
    */
   orElse<U, E2>(f: (error: E) => Result<U, E2> | AsyncResult<U, E2>): AsyncResult<T | U, E2>;
   /**
-   * Asynchronous {@link ResultMethods.recover | recover}. `f` is synchronous; a
-   * throw becomes a `Defect`. An async callback is rejected at compile time
-   * ({@link NotThenable}).
+   * Asynchronous {@link ResultMethods.recoverErr | recoverErr}. `f` is
+   * synchronous; a throw becomes a `Defect`. An async callback is rejected at
+   * compile time ({@link NotThenable}).
+   */
+  recoverErr<U>(f: (error: E) => U & NotThenable<U>): AsyncResult<T | U, never>;
+  /**
+   * @deprecated Renamed to {@link AsyncResultMethods.recoverErr | recoverErr}.
+   * This alias will be removed in a future major.
    */
   recover<U>(f: (error: E) => U & NotThenable<U>): AsyncResult<T | U, never>;
   /**
@@ -622,20 +696,40 @@ export type AsyncResultMethods<T, E> = {
     defect: (cause: unknown) => R;
   }): Promise<R>;
   /**
-   * Asynchronous {@link ResultMethods.unwrap | unwrap}. Compiles only when the
+   * Asynchronous {@link ResultMethods.get | get}. Compiles only when the
    * error channel is empty (`this: AsyncResult<T, never>`); the returned promise
    * rejects on a `Defect` (rethrowing its cause).
    */
+  get(this: AsyncResult<T, never>): Promise<T>;
+  /**
+   * @deprecated Renamed to {@link AsyncResultMethods.get | get}. This alias will
+   * be removed in a future major.
+   */
   unwrap(this: AsyncResult<T, never>): Promise<T>;
   /**
-   * Asynchronous {@link ResultMethods.unwrapErr | unwrapErr}. Compiles only when
+   * Asynchronous {@link ResultMethods.getErr | getErr}. Compiles only when
    * the success channel is empty (`this: AsyncResult<never, E>`); the returned
    * promise rejects on a `Defect` (rethrowing its cause).
    */
+  getErr(this: AsyncResult<never, E>): Promise<E>;
+  /**
+   * @deprecated Renamed to {@link AsyncResultMethods.getErr | getErr}. This alias
+   * will be removed in a future major.
+   */
   unwrapErr(this: AsyncResult<never, E>): Promise<E>;
-  /** Asynchronous {@link ResultMethods.unwrapOr | unwrapOr}. */
+  /** Asynchronous {@link ResultMethods.getOr | getOr}. */
+  getOr<U>(fallback: U): Promise<T | U>;
+  /**
+   * @deprecated Renamed to {@link AsyncResultMethods.getOr | getOr}. This alias
+   * will be removed in a future major.
+   */
   unwrapOr<U>(fallback: U): Promise<T | U>;
-  /** Asynchronous {@link ResultMethods.unwrapOrElse | unwrapOrElse}. */
+  /** Asynchronous {@link ResultMethods.getOrElse | getOrElse}. */
+  getOrElse<U>(f: (error: E) => U): Promise<T | U>;
+  /**
+   * @deprecated Renamed to {@link AsyncResultMethods.getOrElse | getOrElse}. This
+   * alias will be removed in a future major.
+   */
   unwrapOrElse<U>(f: (error: E) => U): Promise<T | U>;
   /** Asynchronous {@link ResultMethods.getOrNull | getOrNull}. */
   getOrNull(): Promise<T | null>;
@@ -660,8 +754,8 @@ export type AsyncResultMethods<T, E> = {
  * rejection would silently become a `Defect`, skipping the triage that
  * {@link fromPromise} forces. To do further async work, re-enter through a
  * qualified boundary and compose it: `ar.flatMap((v) => fromPromise(work(v),
- * qualify))`. The eliminators (`unwrap`, …) return promises; the binds
- * (`flatMap`, `flatTap`, `orElse`, `recoverDefect`) additionally accept an
+ * qualify))`. The eliminators (`get`, …) return promises; the binds
+ * (`flatMap`, `flatTap`, `flatMapErr`, `recoverDefect`) additionally accept an
  * `AsyncResult`. Its combinators are documented one per entry on
  * {@link AsyncResultMethods}.
  *

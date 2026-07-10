@@ -9,7 +9,7 @@ qualification when crossing async boundaries; `effect` is too heavy and conflate
 error handling with context, runtime, etc. `unthrown` does one thing.
 
 The name states the concern: ordinary errors are _unthrown_ — returned as values,
-not flung up the stack. Only a true defect ever throws (at `unwrap`).
+not flung up the stack. Only a true defect ever throws (at `get`).
 
 This file is the authoritative spec — the rules _and_ the reasoning behind them.
 Keep it in sync with the code as the library evolves (describe what _is_, not what
@@ -57,14 +57,14 @@ was planned).
 ## Load-bearing runtime invariants (tests must guard these)
 
 - **Throw → defect.** Any value thrown by a callback inside a combinator
-  (`map`, `flatMap`, `flatTap`, `bind`, `let`, `mapErr`, `orElse`, `recover`,
+  (`map`, `flatMap`, `flatTap`, `bind`, `let`, `mapErr`, `flatMapErr`, `recoverErr`,
   `tap*`, `flatTapErr`, `recoverDefect`) is caught and converted to a `Defect`. Nothing
   escapes a pipeline as a raw throw.
   This is what lets an HTTP adapter do a single `match({ ok, err, defect })`
   with **no surrounding `try/catch`**.
 - **A `Defect` flows through every method untouched EXCEPT `match()`,
   `recoverDefect()`, and `tapDefect()` (which observes it without consuming
-  it).** Therefore `unwrapOr`, `unwrapOrElse`, `getOrNull`, `getOrUndefined`
+  it).** Therefore `getOr`, `getOrElse`, `getOrNull`, `getOrUndefined`
   still **throw** on a `Defect` — they recover the modeled `Err`, never an
   unmodeled defect (a defect is a bug, not an absent value).
 - **A failure-observer throw preserves the original failure.** A throw inside
@@ -73,7 +73,7 @@ was planned).
   (A throw in the success-channel `tap`/`map` keeps the plain thrown cause.)
 - **Thenable callback returns are rejected at compile time.** Every combinator
   callback not already constrained to return a `Result` (`map`, `tap*`, `let`,
-  `mapErr`, `recover`) intersects its return with `NotThenable<R>` — an `async`
+  `mapErr`, `recoverErr`) intersects its return with `NotThenable<R>` — an `async`
   callback is a compile error, because its rejection would bypass
   qualification. `match` handlers are deliberately exempt (edge elimination).
 - **Result instances are frozen.** `okRes`/`errRes`/`defectRes` return
@@ -83,17 +83,17 @@ was planned).
   (widened cast, JS caller) an unknown or reserved (`"Ok"`/`"Defect"`) `_tag`
   routes to the `Defect` handler; reserved tags in `E` are additionally a
   compile error.
-- **`unwrap()` / `unwrapErr()` are type-gated.** `unwrap()` compiles only when the
-  error channel is empty (`this: Result<T, never>`); `unwrapErr()` only when the
+- **`get()` / `getErr()` are type-gated.** `get()` compiles only when the
+  error channel is empty (`this: Result<T, never>`); `getErr()` only when the
   success channel is empty (`this: Result<never, E>`). Eliminate the opposite
-  channel first (`match` / `recover` / `orElse`), or use the `unwrapOr` /
-  `unwrapOrElse` / `getOrNull` / `getOrUndefined` family (which recover an `Err`).
+  channel first (`match` / `recoverErr` / `flatMapErr`), or use the `getOr` /
+  `getOrElse` / `getOrNull` / `getOrUndefined` family (which recover an `Err`).
   On a `Defect` they still **rethrow the original `cause`** (they _panic_) with its
   original stack — so `Result<T, never>` means the modeled error channel is empty,
-  **not** that `unwrap()` cannot throw. The `UnwrapError`-on-wrong-variant branch
+  **not** that `get()` cannot throw. The `UnwrapError`-on-wrong-variant branch
   remains at runtime as a defensive guard but is **unreachable through well-typed
   code** (only a cast or a raw-JS caller can reach it).
-- **`recover` returns `Result<T | U, never>`, and `never` means only the _error_
+- **`recoverErr` returns `Result<T | U, never>`, and `never` means only the _error_
   channel is empty — a `Defect` can still be present at runtime.** This is the one
   place the type intentionally under-describes the runtime. Do not read `never`
   as "total".
@@ -127,24 +127,31 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   pure value). On `AsyncResult`, `bind`'s `f` may return a `Result` or an
   `AsyncResult`. A throw in either becomes a `Defect`; `Err`/`Defect`
   short-circuits/passes through. To go async, lift with `toAsync()`.
-- error: `mapErr`, `orElse`, `recover`, `tapErr`, `flatTapErr` (the error-channel
+- error: `mapErr`, `flatMapErr`, `recoverErr`, `tapErr`, `flatTapErr` (the error-channel
   mirror of `flatTap` — runs a `Result`-returning effect on the error, keeps the
   original error, threads the effect's error)
 - defect: `recoverDefect`, `tapDefect`
-- eliminate: `match`, `unwrap`/`unwrapErr` (type-gated — `unwrap` only compiles on
-  `Result<T, never>`, `unwrapErr` only on `Result<never, E>`; use `match` /
-  `recover` / `orElse` to empty the opposite channel first), `unwrapOr` (signature
-  `unwrapOr<U>(fallback: U): T | U` — widening, not narrowed to `T`), `unwrapOrElse`
-  (same `T | U` widening), `getOrNull`, `getOrUndefined` — the `unwrapOr…`/`getOr…`
+- eliminate: `match`, `get`/`getErr` (type-gated — `get` only compiles on
+  `Result<T, never>`, `getErr` only on `Result<never, E>`; use `match` /
+  `recoverErr` / `flatMapErr` to empty the opposite channel first), `getOr` (signature
+  `getOr<U>(fallback: U): T | U` — widening, not narrowed to `T`), `getOrElse`
+  (same `T | U` widening), `getOrNull`, `getOrUndefined` — the `getOr…`
   family extracts from a still-fallible `Result` with a fallback, since
-  `unwrap`/`unwrapErr` won't compile on it. `getOrThrow` completes the `getOr…`
+  `get`/`getErr` won't compile on it. `getOrThrow` completes the `getOr…`
   family with a **deliberate escape hatch**: not type-gated, it extracts `T` from
   any `Result<T, E>` and **throws the modeled `error` as-is** on `Err` (and
   panics on a `Defect`, like the rest of the family). It exists so a `no-throw`
   lint rule can ban raw `throw` while this one sanctioned extraction remains — the
-  faithful, lint-clean form of `.orElse((e) => { throw e }).unwrap()`; it is
-  **off the errors-as-values thesis** by design, so reach for `match` / `recover`
-  / `orElse` whenever the error can stay a value
+  faithful, lint-clean form of `.flatMapErr((e) => { throw e }).get()`; it is
+  **off the errors-as-values thesis** by design, so reach for `match` / `recoverErr`
+  / `flatMapErr` whenever the error can stay a value
+- deprecated aliases: the error/eliminate operators were renamed for channel-suffix
+  consistency (success `map`/`flatMap` ↔ error `mapErr`/`flatMapErr`; the extractor
+  family unified under `get…`). The old names remain as **deprecated, runtime-identical
+  aliases** — one concept, not a second: `orElse` → `flatMapErr`, `recover` →
+  `recoverErr`, `unwrap` → `get`, `unwrapErr` → `getErr`, `unwrapOr` → `getOr`,
+  `unwrapOrElse` → `getOrElse`. Each alias just delegates to its replacement (the
+  gated `unwrap`/`unwrapErr` keep their `this` gate); slated for removal in a future major.
 - guards: methods `isOk`/`isErr`/`isDefect` **and** standalone
   `isOk`/`isErr`/`isDefect` both narrow (to `OkView`/`ErrView`/`DefectView`) — the
   methods are `this is …` type predicates, so `if (r.isErr()) r.error` compiles.
@@ -370,7 +377,7 @@ configured outside the repo).
   enforced by thresholds in its `vitest.config.ts`.
 - **Type-level tests:** `packages/core/src/types.test-d.ts` asserts the
   type-level behaviour the runtime can't (the conditional `all`/`allFromDict`
-  shapes, `Exclude<R, Defect>` boundary inference, `flatTap`/`recover` channel
+  shapes, `Exclude<R, Defect>` boundary inference, `flatTap`/`recoverErr` channel
   widening, the `this is …` guard narrowing, `matchTags` exhaustiveness) with a
   `Expect<Equal<…>>` helper plus `@ts-expect-error` for must-not-compile cases.
   They are checked by `tsc` via `tsconfig.test-d.json` (which relaxes

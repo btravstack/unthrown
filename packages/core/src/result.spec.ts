@@ -13,7 +13,7 @@ describe("Result.map", () => {
     expect(
       Ok(2)
         .map((n) => n + 1)
-        .unwrap(),
+        .get(),
     ).toBe(3);
   });
 
@@ -37,7 +37,7 @@ describe("Result.map", () => {
       throw boom;
     });
     expect(r.isDefect()).toBe(true);
-    expect(r.recoverDefect((c) => Ok(c === boom)).unwrap()).toBe(true);
+    expect(r.recoverDefect((c) => Ok(c === boom)).get()).toBe(true);
   });
 });
 
@@ -46,7 +46,7 @@ describe("Result.flatMap", () => {
     expect(
       Ok(2)
         .flatMap((n) => Ok(n * 10))
-        .unwrap(),
+        .get(),
     ).toBe(20);
   });
 
@@ -54,7 +54,7 @@ describe("Result.flatMap", () => {
     expect(
       Ok(2)
         .flatMap(() => Err("downstream"))
-        .unwrapErr(),
+        .getErr(),
     ).toBe("downstream");
   });
 
@@ -88,7 +88,7 @@ describe("Result.tap", () => {
     const seen: number[] = [];
     const r = Ok(5).tap((n) => seen.push(n));
     expect(seen).toEqual([5]);
-    expect(r.unwrap()).toBe(5);
+    expect(r.get()).toBe(5);
   });
 
   it("does not run on Err or Defect", () => {
@@ -117,7 +117,7 @@ describe("Result.flatTap", () => {
       return Ok("ignored");
     });
     expect(seen).toEqual([5]);
-    expect(r.unwrap()).toBe(5); // original value preserved, not "ignored"
+    expect(r.get()).toBe(5); // original value preserved, not "ignored"
   });
 
   it("short-circuits to the effect's Err", () => {
@@ -151,7 +151,7 @@ describe("Result.flatTap", () => {
 
 describe("Result.as", () => {
   it("replaces the Ok value", () => {
-    expect(Ok(1).as("x").unwrap()).toBe("x");
+    expect(Ok(1).as("x").get()).toBe("x");
   });
 
   it("passes Err and Defect through", () => {
@@ -167,7 +167,7 @@ describe("Result.mapErr", () => {
     expect(
       Err("e")
         .mapErr((s) => `${s}!`)
-        .unwrapErr(),
+        .getErr(),
     ).toBe("e!");
   });
 
@@ -196,26 +196,26 @@ describe("Result.mapErr", () => {
   });
 });
 
-describe("Result.orElse", () => {
+describe("Result.flatMapErr", () => {
   it("recovers an Err into an Ok", () => {
     expect(
       Err("e")
-        .orElse(() => Ok(99))
-        .unwrap(),
+        .flatMapErr(() => Ok(99))
+        .get(),
     ).toBe(99);
   });
 
   it("recovers an Err into another Err", () => {
     expect(
       Err("e")
-        .orElse(() => Err("e2"))
-        .unwrapErr(),
+        .flatMapErr(() => Err("e2"))
+        .getErr(),
     ).toBe("e2");
   });
 
   it("passes Ok through and does not call the callback", () => {
     const f = vi.fn();
-    const r = Ok(1).orElse(f);
+    const r = Ok(1).flatMapErr(f);
     expect(r.isOk()).toBe(true);
     if (r.isOk()) expect(r.value).toBe(1);
     expect(f).not.toHaveBeenCalled();
@@ -223,14 +223,14 @@ describe("Result.orElse", () => {
 
   it("passes a Defect through and does not call the callback", () => {
     const f = vi.fn();
-    expect(defectOf(boom).orElse(f).isDefect()).toBe(true);
+    expect(defectOf(boom).flatMapErr(f).isDefect()).toBe(true);
     expect(f).not.toHaveBeenCalled();
   });
 
   it("converts a throw into a Defect", () => {
     expect(
       Err("e")
-        .orElse(() => {
+        .flatMapErr(() => {
           throw boom;
         })
         .isDefect(),
@@ -238,24 +238,24 @@ describe("Result.orElse", () => {
   });
 });
 
-describe("Result.recover", () => {
+describe("Result.recoverErr", () => {
   it("turns an Err into an Ok", () => {
     expect(
       Err("e")
-        .recover(() => 7)
-        .unwrap(),
+        .recoverErr(() => 7)
+        .get(),
     ).toBe(7);
   });
 
   it("passes Ok through and does not call the callback", () => {
     const f = vi.fn();
-    expect(Ok(1).recover(f).unwrap()).toBe(1);
+    expect(Ok(1).recoverErr(f).get()).toBe(1);
     expect(f).not.toHaveBeenCalled();
   });
 
   it("does NOT recover a Defect — `never` empties only the error channel", () => {
     const f = vi.fn();
-    const recovered = defectOf(boom).recover(f);
+    const recovered = defectOf(boom).recoverErr(f);
     expect(f).not.toHaveBeenCalled();
     expect(recovered.isDefect()).toBe(true);
   });
@@ -263,7 +263,7 @@ describe("Result.recover", () => {
   it("converts a throw into a Defect", () => {
     expect(
       Err("e")
-        .recover(() => {
+        .recoverErr(() => {
           throw boom;
         })
         .isDefect(),
@@ -276,12 +276,12 @@ describe("Result.tapErr", () => {
     const seen: string[] = [];
     const r = Err("e").tapErr((s) => seen.push(s));
     expect(seen).toEqual(["e"]);
-    expect(r.unwrapErr()).toBe("e");
+    expect(r.getErr()).toBe("e");
   });
 
   it("does not run on Ok or Defect", () => {
     const f = vi.fn();
-    expect(Ok(1).tapErr(f).unwrap()).toBe(1);
+    expect(Ok(1).tapErr(f).get()).toBe(1);
     expect(defectOf(boom).tapErr(f).isDefect()).toBe(true);
     expect(f).not.toHaveBeenCalled();
   });
@@ -295,12 +295,12 @@ describe("Result.flatTapErr", () => {
       return Ok("ignored");
     });
     expect(seen).toEqual(["e"]);
-    expect(r.unwrapErr()).toBe("e"); // original error preserved
+    expect(r.getErr()).toBe("e"); // original error preserved
   });
 
   it("threads the effect's Err", () => {
     const r = Err("e").flatTapErr(() => Err("log_failed"));
-    expect(r.unwrapErr()).toBe("log_failed");
+    expect(r.getErr()).toBe("log_failed");
   });
 
   it("propagates a Defect from the effect", () => {
@@ -310,7 +310,7 @@ describe("Result.flatTapErr", () => {
 
   it("does not run on Ok or Defect", () => {
     const f = vi.fn(() => Ok(1));
-    expect(Ok(1).flatTapErr(f).unwrap()).toBe(1);
+    expect(Ok(1).flatTapErr(f).get()).toBe(1);
     expect(defectOf(boom).flatTapErr(f).isDefect()).toBe(true);
     expect(f).not.toHaveBeenCalled();
   });
@@ -331,7 +331,7 @@ describe("Result.recoverDefect (the only door to a Defect)", () => {
     expect(
       defectOf(boom)
         .recoverDefect((c) => Ok(c === boom ? "handled" : "other"))
-        .unwrap(),
+        .get(),
     ).toBe("handled");
   });
 
@@ -373,8 +373,8 @@ describe("Result.tapDefect", () => {
 
   it("does not run on Ok or Err", () => {
     const f = vi.fn();
-    expect(Ok(1).tapDefect(f).unwrap()).toBe(1);
-    expect(Err("e").tapDefect(f).unwrapErr()).toBe("e");
+    expect(Ok(1).tapDefect(f).get()).toBe(1);
+    expect(Err("e").tapDefect(f).getErr()).toBe("e");
     expect(f).not.toHaveBeenCalled();
   });
 });
@@ -441,12 +441,12 @@ describe("Result.match", () => {
 });
 
 describe("Result eliminators on Ok / Err", () => {
-  it("unwrap returns the Ok value; throws UnwrapError on Err", () => {
-    expect(Ok(1).unwrap()).toBe(1);
+  it("get returns the Ok value; throws UnwrapError on Err", () => {
+    expect(Ok(1).get()).toBe(1);
     try {
-      // The Err branch is unreachable in typed code (unwrap needs E = never);
+      // The Err branch is unreachable in typed code (get needs E = never);
       // force it via a cast to exercise the defensive runtime guard.
-      (Err("e") as unknown as Result<number, never>).unwrap();
+      (Err("e") as unknown as Result<number, never>).get();
       expect.unreachable();
     } catch (e) {
       expect(e).toBeInstanceOf(Error);
@@ -455,32 +455,32 @@ describe("Result eliminators on Ok / Err", () => {
     }
   });
 
-  it("unwrapErr returns the Err; throws UnwrapError on Ok; rethrows the cause on a Defect", () => {
-    expect(Err("e").unwrapErr()).toBe("e");
+  it("getErr returns the Err; throws UnwrapError on Ok; rethrows the cause on a Defect", () => {
+    expect(Err("e").getErr()).toBe("e");
     try {
-      // The Ok branch is unreachable in typed code (unwrapErr needs T = never);
+      // The Ok branch is unreachable in typed code (getErr needs T = never);
       // force it via a cast to exercise the defensive runtime guard.
-      (Ok(1) as unknown as Result<never, number>).unwrapErr();
+      (Ok(1) as unknown as Result<never, number>).getErr();
       expect.unreachable();
     } catch (e) {
       expect((e as { name: string }).name).toBe("UnwrapError");
       expect((e as { error: unknown }).error).toBe(1);
     }
     try {
-      // Also type-unreachable (unwrapErr needs T = never; defectOf's declared
+      // Also type-unreachable (getErr needs T = never; defectOf's declared
       // T is number) — cast to exercise the Defect-rethrow guard.
-      (defectOf(boom) as unknown as Result<never, never>).unwrapErr();
+      (defectOf(boom) as unknown as Result<never, never>).getErr();
       expect.unreachable();
     } catch (e) {
       expect(e).toBe(boom);
     }
   });
 
-  it("unwrapOr / unwrapOrElse recover an Err", () => {
+  it("getOr / getOrElse recover an Err", () => {
     const e: Result<number, string> = Err("e");
-    expect(e.unwrapOr(9)).toBe(9);
-    expect(e.unwrapOrElse((s) => s.length)).toBe(1);
-    expect(Ok(3).unwrapOr(9)).toBe(3);
+    expect(e.getOr(9)).toBe(9);
+    expect(e.getOrElse((s) => s.length)).toBe(1);
+    expect(Ok(3).getOr(9)).toBe(3);
   });
 
   it("getOrNull / getOrUndefined return the value or the empty sentinel on Err", () => {
@@ -494,7 +494,7 @@ describe("Result eliminators on Ok / Err", () => {
     expect(Ok(3).getOrThrow()).toBe(3);
 
     // Err throws the error value itself, BY REFERENCE (faithful to
-    // `.orElse((e) => { throw e })`). `toThrow(err)` only matches the message,
+    // `.flatMapErr((e) => { throw e })`). `toThrow(err)` only matches the message,
     // so assert identity via try/catch instead.
     const err = new Error("modeled");
     try {
@@ -524,8 +524,8 @@ describe("Result eliminators on Ok / Err", () => {
 
 describe("Result.toAsync", () => {
   it("lifts a Result into an awaitable AsyncResult", async () => {
-    expect((await Ok(5).toAsync()).unwrap()).toBe(5);
-    expect((await Err("e").toAsync()).unwrapErr()).toBe("e");
+    expect((await Ok(5).toAsync()).get()).toBe(5);
+    expect((await Err("e").toAsync()).getErr()).toBe("e");
     expect((await defectOf(boom).toAsync()).isDefect()).toBe(true);
   });
 });

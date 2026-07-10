@@ -137,8 +137,8 @@ type _flatTapped = Expect<Equal<typeof flatTapped, Result<number, "e1" | "e2">>>
 const flatTapErred = r1.flatTapErr(() => Err<"e2">("e2"));
 type _flatTapErred = Expect<Equal<typeof flatTapErred, Result<number, "e1" | "e2">>>;
 
-// recover empties the error channel (to `never`)
-const recovered = r1.recover(() => 0);
+// recoverErr empties the error channel (to `never`)
+const recovered = r1.recoverErr(() => 0);
 type _recovered = Expect<Equal<typeof recovered, Result<number, never>>>;
 
 // map changes the value type; mapErr changes the error type
@@ -219,25 +219,25 @@ const _noValue = g.value;
 // @ts-expect-error - `.error` only exists on the Err variant
 const _noError = g.error;
 
-// --- unwrap / unwrapErr are gated on an empty opposite channel ---------------
+// --- get / getErr are gated on an empty opposite channel ---------------
 
 declare const rNever: Result<number, never>;
 declare const rFallible: Result<number, "e">;
 declare const rErrOnly: Result<never, "e">;
-rNever.unwrap(); // ok: E = never
-rErrOnly.unwrapErr(); // ok: T = never
-// @ts-expect-error - unwrap requires E = never
-rFallible.unwrap();
-// @ts-expect-error - unwrapErr requires T = never
-rFallible.unwrapErr();
+rNever.get(); // ok: E = never
+rErrOnly.getErr(); // ok: T = never
+// @ts-expect-error - get requires E = never
+rFallible.get();
+// @ts-expect-error - getErr requires T = never
+rFallible.getErr();
 
 declare const arNever: AsyncResult<number, never>;
 declare const arFallible: AsyncResult<number, "e">;
-arNever.unwrap();
-// @ts-expect-error - async unwrap requires E = never
-arFallible.unwrap();
-// @ts-expect-error - async unwrapErr requires T = never
-arFallible.unwrapErr();
+arNever.get();
+// @ts-expect-error - async get requires E = never
+arFallible.get();
+// @ts-expect-error - async getErr requires T = never
+arFallible.getErr();
 
 // getOrThrow is NOT gated — it compiles on a fallible Result and returns T
 // (it throws the modeled error at runtime instead of eliminating it in the type)
@@ -311,8 +311,8 @@ new WithMsg({ ticketId: "t1" });
   r.map(async (n) => n + 1);
   // @ts-expect-error — async mapErr callback is banned
   r.mapErr(async (e) => e);
-  // @ts-expect-error — async recover callback is banned
-  r.recover(async () => 0);
+  // @ts-expect-error — async recoverErr callback is banned
+  r.recoverErr(async () => 0);
   // @ts-expect-error — async tapErr callback is banned
   r.tapErr(async () => {});
   // @ts-expect-error — async tapDefect callback is banned
@@ -326,8 +326,8 @@ new WithMsg({ ticketId: "t1" });
   ar.map(async (n) => n + 1);
   // @ts-expect-error — async mapErr callback is banned (async surface)
   ar.mapErr(async (e) => e);
-  // @ts-expect-error — async recover callback is banned (async surface)
-  ar.recover(async () => 0);
+  // @ts-expect-error — async recoverErr callback is banned (async surface)
+  ar.recoverErr(async () => 0);
   // @ts-expect-error — async tapErr callback is banned (async surface)
   ar.tapErr(async () => {});
   // @ts-expect-error — async tapDefect callback is banned (async surface)
@@ -339,7 +339,7 @@ new WithMsg({ ticketId: "t1" });
   // Synchronous callbacks still infer exactly as before.
   const mapped = r.map((n) => n + 1);
   type _MapKeeps = Expect<Equal<typeof mapped, Result<number, "e">>>;
-  const recovered = r.recover((e) => e.length);
+  const recovered = r.recoverErr((e) => e.length);
   type _RecoverKeeps = Expect<Equal<typeof recovered, Result<number, never>>>;
 
   // match handlers may still be async (edge elimination is not a combinator).
@@ -350,18 +350,18 @@ new WithMsg({ ticketId: "t1" });
   });
 }
 
-// --- unwrapOr widens: the fallback may be a different type ----
+// --- getOr widens: the fallback may be a different type ----
 
 {
   const r = Ok(1) as Result<number, "e">;
-  const widened = r.unwrapOr(null);
+  const widened = r.getOr(null);
   type _Widens = Expect<Equal<typeof widened, number | null>>;
 }
 
-// --- unwrapOrElse widens: the fallback function may return a different type ----
+// --- getOrElse widens: the fallback function may return a different type ----
 
 {
   const r = Ok(1) as Result<number, "e">;
-  const widened = r.unwrapOrElse(() => null);
+  const widened = r.getOrElse(() => null);
   type _Widens = Expect<Equal<typeof widened, number | null>>;
 }

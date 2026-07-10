@@ -14,7 +14,7 @@ import type { AsyncResult, DefectView, ErrView, OkView, Result } from "./types.j
  * import { Ok } from "unthrown";
  *
  * Ok(2).map((n) => n + 1); // => Ok(3)
- * Ok(42).unwrap(); // => 42
+ * Ok(42).get(); // => 42
  * ```
  *
  * @category Constructors
@@ -34,7 +34,7 @@ export function Ok<T>(value: T): Result<T, never> {
  * import { Err } from "unthrown";
  *
  * Err("not_found").map((n) => n + 1); // => Err("not_found") (map skipped)
- * Err("not_found").unwrapErr(); // => "not_found"
+ * Err("not_found").getErr(); // => "not_found"
  * ```
  *
  * @category Constructors

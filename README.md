@@ -17,7 +17,7 @@
 </div>
 
 Ordinary errors are _unthrown_ — returned as values, not flung up the stack.
-Only a true defect ever throws, and only at `unwrap`.
+Only a true defect ever throws, and only at `get`.
 
 ## Why unthrown?
 

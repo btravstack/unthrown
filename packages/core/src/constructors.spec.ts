@@ -26,7 +26,7 @@ describe("constructors", () => {
     expect(r.isOk()).toBe(true);
     expect(r.isErr()).toBe(false);
     expect(r.isDefect()).toBe(false);
-    expect(r.unwrap()).toBe(42);
+    expect(r.get()).toBe(42);
   });
 
   it("Err wraps a modeled error", () => {
@@ -34,7 +34,7 @@ describe("constructors", () => {
     expect(r.isErr()).toBe(true);
     expect(r.isOk()).toBe(false);
     expect(r.isDefect()).toBe(false);
-    expect(r.unwrapErr()).toBe("nope");
+    expect(r.getErr()).toBe("nope");
   });
 
   it("Err(undefined) and Err(null) are real Errs — discrimination is by tag, never payload presence", () => {
@@ -59,13 +59,13 @@ describe("pre-lifted async constructors (OkAsync / ErrAsync)", () => {
   it("OkAsync lifts a value into a success AsyncResult — no Ok(x).toAsync()", async () => {
     const r = await OkAsync(42);
     expect(r.isOk()).toBe(true);
-    expect(r.unwrap()).toBe(42);
+    expect(r.get()).toBe(42);
   });
 
   it("ErrAsync lifts an error into a failed AsyncResult", async () => {
     const r = await ErrAsync("nope");
     expect(r.isErr()).toBe(true);
-    expect(r.unwrapErr()).toBe("nope");
+    expect(r.getErr()).toBe("nope");
   });
 
   it("await-ing never throws and yields the same outcome as Ok(x).toAsync()", async () => {

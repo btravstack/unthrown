@@ -26,9 +26,9 @@ Every `Result` shares one method surface, grouped by the channel it touches:
 - **success** (runs on `Ok`): `map`, `flatMap`, `tap`, `flatTap`, `as`
 - **do-notation** (runs on `Ok`): `bind`, `let` — accumulate a named scope; see
   [Do Notation](./do-notation)
-- **error** (runs on `Err`): `mapErr`, `orElse`, `recover`, `tapErr`, `flatTapErr`
+- **error** (runs on `Err`): `mapErr`, `flatMapErr`, `recoverErr`, `tapErr`, `flatTapErr`
 - **defect** (the only door to a `Defect`): `recoverDefect`, `tapDefect`
-- **eliminate**: `match`, `unwrap`, `unwrapErr`, `unwrapOr`, `unwrapOrElse`,
+- **eliminate**: `match`, `get`, `getErr`, `getOr`, `getOrElse`,
   `getOrNull`, `getOrUndefined`
 
 A combinator only runs its callback on its own channel — the other states flow
@@ -118,14 +118,14 @@ matched.
 Once you are ready to leave the `Result` world, pick the right exit:
 
 ```ts
-Ok(1).unwrap(); // => 1         — panics on a Defect (Err doesn't compile here)
-Err("e").unwrapErr(); // => "e" — panics on a Defect (Ok doesn't compile here)
-Err("e").unwrapOr(0); // => 0   — recovers an Err; rethrows a Defect
+Ok(1).get(); // => 1         — panics on a Defect (Err doesn't compile here)
+Err("e").getErr(); // => "e" — panics on a Defect (Ok doesn't compile here)
+Err("e").getOr(0); // => 0   — recovers an Err; rethrows a Defect
 Err("e").getOrNull(); // => null — recovers an Err; rethrows a Defect
 Ok(1).match({ ok, err, defect }); // fold all three channels
 ```
 
-`unwrapOr`, `unwrapOrElse`, `getOrNull`, and `getOrUndefined` recover a modeled
+`getOr`, `getOrElse`, `getOrNull`, and `getOrUndefined` recover a modeled
 `Err` but **rethrow a `Defect`** — a defect is a bug, not an absent value. See
 [The Defect Channel](./the-defect-channel).
 
@@ -139,8 +139,8 @@ earlier `Err`). A fixed tuple keeps its positional types; a dynamic
 ```ts
 import { all, Ok, type Result } from "unthrown";
 
-all([Ok(1), Ok("two"), Ok(true)]).unwrap(); // => [1, "two", true] (typed [number, string, boolean])
-all([Ok(1), Ok(2)] as Result<number, never>[]).unwrap(); // => number[]
+all([Ok(1), Ok("two"), Ok(true)]).get(); // => [1, "two", true] (typed [number, string, boolean])
+all([Ok(1), Ok(2)] as Result<number, never>[]).get(); // => number[]
 ```
 
 For **named** parallel work, `allFromDict` takes a record instead — same rules,
@@ -149,7 +149,7 @@ no tupling:
 ```ts
 import { allFromDict, Ok } from "unthrown";
 
-allFromDict({ id: Ok(1), name: Ok("ada") }).unwrap(); // => { id: 1, name: "ada" }
+allFromDict({ id: Ok(1), name: Ok("ada") }).get(); // => { id: 1, name: "ada" }
 ```
 
 Both short-circuit on the first `Err` — this is **not** error accumulation. If
@@ -163,7 +163,7 @@ folding rules, inputs resolved concurrently (order preserved), and (like every
 ```ts
 import { allAsync, fromSafePromise } from "unthrown";
 
-const [a, b] = (await allAsync([fromSafePromise(loadA()), fromSafePromise(loadB())])).unwrap();
+const [a, b] = (await allAsync([fromSafePromise(loadA()), fromSafePromise(loadB())])).get();
 ```
 
 → Continue to [The Defect Channel](./the-defect-channel).
