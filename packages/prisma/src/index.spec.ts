@@ -232,6 +232,20 @@ describe("$tryTransaction", () => {
     await expect(db.user.tryCount()).toBeOkWith(0);
   });
 
+  it("a callback that THROWS (instead of returning an AsyncResult) is a defect, not a DriverError", async ({
+    db,
+  }) => {
+    // The throw bypasses every combinator (no AsyncResult exists yet), so it
+    // reaches the transaction boundary raw. A bug must stay a defect — never
+    // be downgraded to a modeled DriverError.
+    await expect(
+      db.$tryTransaction(() => {
+        throw new Error("sync callback bug");
+      }),
+    ).toBeDefect();
+    await expect(db.user.tryCount()).toBeOkWith(0);
+  });
+
   it("surfaces a query failure inside the transaction as its tagged error", async ({ db }) => {
     await db.user.tryCreate({ data: { email: "dup@example.com" } });
     await expect(

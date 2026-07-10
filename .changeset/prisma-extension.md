@@ -15,7 +15,8 @@ tagged errors (`UniqueConstraintViolation` / `ForeignKeyViolation` /
 `RecordNotFound` / `DriverError`) — with `select` / `include` payload inference
 preserved. `$tryTransaction` runs an interactive transaction whose callback
 speaks `AsyncResult`: an `Err` triggers a rollback and comes out as the same
-typed `Err`; a defect also rolls back and stays a defect.
+typed `Err`; a defect also rolls back and stays a defect (a callback that throws
+outright included — a bug is never downgraded to a modeled `DriverError`).
 
 `tryPaginate(query).withCursor({ limit, after, before, getCursor, parseCursor })`
 provides cursor pagination in the style of `prisma-extension-pagination` (same
