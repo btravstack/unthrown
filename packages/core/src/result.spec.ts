@@ -493,9 +493,16 @@ describe("Result eliminators on Ok / Err", () => {
   it("getOrThrow returns the Ok value, throws the modeled error as-is on Err, and panics on a Defect", () => {
     expect(Ok(3).getOrThrow()).toBe(3);
 
-    // Err throws the error value itself (faithful to `.orElse((e) => { throw e })`)
+    // Err throws the error value itself, BY REFERENCE (faithful to
+    // `.orElse((e) => { throw e })`). `toThrow(err)` only matches the message,
+    // so assert identity via try/catch instead.
     const err = new Error("modeled");
-    expect(() => Err(err).getOrThrow()).toThrow(err);
+    try {
+      Err(err).getOrThrow();
+      expect.unreachable();
+    } catch (thrown) {
+      expect(thrown).toBe(err); // same instance, not merely same message
+    }
     // even a non-Error error value is thrown as-is
     try {
       Err("plain").getOrThrow();
