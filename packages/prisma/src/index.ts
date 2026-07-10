@@ -17,7 +17,7 @@
 // for batch `$transaction([...])`, which needs unexecuted `PrismaPromise`s.
 
 import { Prisma } from "@prisma/client/extension";
-import { type AsyncResult, fromPromise, TaggedError } from "unthrown";
+import { type AsyncResult, fromPromise, type Result, TaggedError } from "unthrown";
 
 import {
   type CursorPaginationMeta,
@@ -507,7 +507,9 @@ export const unthrownPrisma = Prisma.defineExtension({
      * The callback's `Err` is thrown internally as a sentinel so Prisma aborts
      * the transaction, then unwrapped back into the typed error channel —
      * `AsyncResult<T, E | PrismaQueryError>`. A defect inside the callback also
-     * rolls back and stays a defect. The `try*` methods are available on `tx`
+     * rolls back and stays a defect — including a callback that *throws*
+     * instead of returning an `AsyncResult` (a bug, never downgraded to a
+     * modeled `DriverError`). The `try*` methods are available on `tx`
      * (extensions propagate into the interactive transaction); the deny list
      * additionally removes `$tryTransaction` itself — no nesting.
      *
@@ -536,7 +538,16 @@ export const unthrownPrisma = Prisma.defineExtension({
       };
       return fromPromise(
         client.$transaction(async (tx) => {
-          const result = await fn(tx as Omit<C, TxDenyList>);
+          let result: Result<T, E>;
+          try {
+            result = await fn(tx as Omit<C, TxDenyList>);
+          } catch (cause) {
+            // A callback that throws (instead of returning an AsyncResult) is a
+            // bug — roll back and keep it a DEFECT. Only rejections outside
+            // this catch (Prisma's own BEGIN/COMMIT/timeout machinery) qualify
+            // as query failures below.
+            throw new Rollback(cause, true);
+          }
           if (result.isOk()) return result.value;
           throw result.isErr()
             ? new Rollback(result.error, false)

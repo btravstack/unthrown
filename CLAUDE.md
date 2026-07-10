@@ -303,7 +303,8 @@ library can be "done".
   upsert miss creates; zero batch matches is `Ok({ count: 0 })`). Also
   `$tryTransaction` (an interactive transaction whose callback
   speaks `AsyncResult` — an `Err` rolls back and re-surfaces typed; a defect
-  rolls back and stays a defect) and `tryPaginate(...).withCursor(...)` (the
+  rolls back and stays a defect, a throwing callback included) and
+  `tryPaginate(...).withCursor(...)` (the
   `prisma-extension-pagination` cursor API with its unmerged #35 fix folded
   in). Qualification happens once inside the extension via the exported
   `qualifyPrismaError`; the raw methods stay as the escape hatch for batch

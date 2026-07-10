@@ -104,7 +104,8 @@ const moved = await db.$tryTransaction((tx) =>
 
 - An `Err` from the callback rolls back and re-surfaces as that same modeled
   error.
-- A [`Defect`](./the-defect-channel) also rolls back and **stays a defect** — a
+- A [`Defect`](./the-defect-channel) also rolls back and **stays a defect** —
+  including a callback that _throws_ instead of returning an `AsyncResult`. A
   bug is never quietly downgraded into your error channel.
 - Nesting is a compile error: `tx` has no `$tryTransaction`. For a batch of
   independent writes, use the raw `$transaction([...])` with the raw (unexecuted)
