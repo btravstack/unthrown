@@ -55,7 +55,7 @@ describe("Invariant 2: a Defect flows through every method except match() and re
     expect(f).not.toHaveBeenCalled();
   });
 
-  it("the recovering eliminators still THROW on a Defect (they recoverErr Err, not a Defect)", () => {
+  it("the recovering eliminators still THROW on a Defect (they recover an Err, not a Defect)", () => {
     const d = defectOf(boom);
     expect(() => d.getOr(0)).toThrow();
     expect(() => d.getOrElse(() => 0)).toThrow();
