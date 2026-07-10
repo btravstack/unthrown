@@ -12,6 +12,7 @@ import "@unthrown/neverthrow";
 import "@unthrown/boxed";
 import "@unthrown/standard-schema";
 import "@unthrown/prisma";
+import "@unthrown/orpc/client";
 
 import { cp, mkdir, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -30,6 +31,7 @@ const packages: ReadonlyArray<{ readonly pkg: string; readonly out: string }> = 
   { pkg: "@unthrown/boxed", out: "boxed" },
   { pkg: "@unthrown/standard-schema", out: "standard-schema" },
   { pkg: "@unthrown/prisma", out: "prisma" },
+  { pkg: "@unthrown/orpc", out: "orpc" },
 ];
 
 await mkdir(apiDir, { recursive: true });

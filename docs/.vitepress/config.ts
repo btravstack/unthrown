@@ -109,6 +109,7 @@ export default defineConfig({
             { text: "Testing", link: "/guide/testing" },
             { text: "Pattern Matching", link: "/guide/pattern-matching" },
             { text: "Prisma", link: "/guide/prisma" },
+            { text: "oRPC", link: "/guide/orpc" },
             { text: "Linting", link: "/guide/linting" },
             { text: "Interop", link: "/guide/interop" },
             {
@@ -131,6 +132,7 @@ export default defineConfig({
             { text: "@unthrown/boxed", link: "/api/boxed/" },
             { text: "@unthrown/standard-schema", link: "/api/standard-schema/" },
             { text: "@unthrown/prisma", link: "/api/prisma/" },
+            { text: "@unthrown/orpc", link: "/api/orpc/" },
           ],
         },
       ],

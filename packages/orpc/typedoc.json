@@ -1,0 +1,5 @@
+{
+  "extends": "@unthrown/typedoc/base.json",
+  "entryPoints": ["src/client.ts", "src/server.ts", "src/extensions/result.ts"],
+  "out": "docs"
+}

@@ -21,6 +21,15 @@ catalogs:
     '@commitlint/config-conventional':
       specifier: 21.2.0
       version: 21.2.0
+    '@orpc/client':
+      specifier: 2.0.0-beta.14
+      version: 2.0.0-beta.14
+    '@orpc/contract':
+      specifier: 2.0.0-beta.14
+      version: 2.0.0-beta.14
+    '@orpc/server':
+      specifier: 2.0.0-beta.14
+      version: 2.0.0-beta.14
     '@prisma/adapter-better-sqlite3':
       specifier: 7.8.0
       version: 7.8.0
@@ -128,6 +137,9 @@ importers:
       '@unthrown/neverthrow':
         specifier: workspace:*
         version: link:../packages/neverthrow
+      '@unthrown/orpc':
+        specifier: workspace:*
+        version: link:../packages/orpc
       '@unthrown/pattern':
         specifier: workspace:*
         version: link:../packages/pattern
@@ -282,6 +294,52 @@ importers:
       neverthrow:
         specifier: 'catalog:'
         version: 8.2.0
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.3(oxc-resolver@11.21.3)(tsx@4.22.4)(typescript@6.0.3)
+      typedoc:
+        specifier: 'catalog:'
+        version: 0.28.19(typescript@6.0.3)
+      typedoc-plugin-markdown:
+        specifier: 'catalog:'
+        version: 4.12.0(typedoc@0.28.19(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.9(@types/node@24.13.2)(@vitest/coverage-v8@4.1.9)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0)
+
+  packages/orpc:
+    dependencies:
+      unthrown:
+        specifier: workspace:^
+        version: link:../core
+    devDependencies:
+      '@orpc/client':
+        specifier: 'catalog:'
+        version: 2.0.0-beta.14
+      '@orpc/contract':
+        specifier: 'catalog:'
+        version: 2.0.0-beta.14
+      '@orpc/server':
+        specifier: 'catalog:'
+        version: 2.0.0-beta.14
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.2
+      '@unthrown/tsconfig':
+        specifier: workspace:*
+        version: link:../../tools/tsconfig
+      '@unthrown/typedoc':
+        specifier: workspace:*
+        version: link:../../tools/typedoc
+      '@unthrown/vitest':
+        specifier: workspace:*
+        version: link:../vitest
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.1.9(vitest@4.1.9)
       tsdown:
         specifier: 'catalog:'
         version: 0.22.3(oxc-resolver@11.21.3)(tsx@4.22.4)(typescript@6.0.3)
@@ -1176,6 +1234,31 @@ packages:
   '@nodelib/fs.walk@1.2.8':
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
+
+  '@orpc/client@2.0.0-beta.14':
+    resolution: {integrity: sha512-bON0neFmoxZr0U0R1DosPAhbZoYnaBLX+LlL0OAjdiGjhLGY91SBoc63RSFDTHZgVBVzyAEQPOOmItupWoWweQ==}
+
+  '@orpc/contract@2.0.0-beta.14':
+    resolution: {integrity: sha512-sM6YT8RH+BqABSAkJN89i/V9GeJVwsUao+3UBwm87mvV6RcyUuj8yOZBTaMmQeZXZH6C3frFbv/TI/4TBe6A/w==}
+
+  '@orpc/interop@2.0.0-beta.14':
+    resolution: {integrity: sha512-Fm1wJeS9GEIhRN4zwriKNg8Gw30xE94mp6qUHn17FSsXg7jh35OKK7XB6QU+ruw3LamIbYfUUX4q7/EKvE7jzg==}
+
+  '@orpc/server@2.0.0-beta.14':
+    resolution: {integrity: sha512-Fxu0uZTvOANcYHpqHnIXDeUAMYoEe9axUwpn7qaslKvbX8hq+DMdxq0glFbWAtzVw0jJ9UJ8ugw3WqLOcBLang==}
+    peerDependencies:
+      crossws: '>=0.3.4'
+    peerDependenciesMeta:
+      crossws:
+        optional: true
+
+  '@orpc/shared@2.0.0-beta.14':
+    resolution: {integrity: sha512-Gqjfx4K2QD6bgomhdVETOcX5jNDwU16xnejchs/bY5nSCfJE+CbqEy1ZR79ojZa8+wKDAZVJNbDrwzykcp+Tbg==}
+    peerDependencies:
+      '@opentelemetry/api': '>=1.9.0'
+    peerDependenciesMeta:
+      '@opentelemetry/api':
+        optional: true
 
   '@oxc-parser/binding-android-arm-eabi@0.137.0':
     resolution: {integrity: sha512-KDs+0VPdEmasOkpuJHW9V5WCF+cvYdMQv2Jd+aJXt+cxIx12NToRQRbXaRwUEDsZw+/jMk81Ve8ZFbjUkJTOwA==}
@@ -2088,6 +2171,21 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
+  '@standardserver/core@0.0.25':
+    resolution: {integrity: sha512-WIp2orfBhFIMfIqejN8O0UEP+dzcD1485J9nIURapD3tSo7jZ+ElgYhaLVc7Ilfmf6N9qIMrzSdLOTD7qjeL8w==}
+
+  '@standardserver/fetch@0.0.25':
+    resolution: {integrity: sha512-8VpXDUTdhoqngX/pE6vv60rqtvds6N+KdQgo7JlKTYULgJOYToxuU6Imc2tp6nl+QHierhoP0pxRlbrpwL6ATg==}
+
+  '@standardserver/node@0.0.25':
+    resolution: {integrity: sha512-pSgTBPw6eKzsHwYOXwjt5jZmWzd7ePiNCnfMS0jUZci5QLWyUvL951dDF+6ERuxqE11BKXX5HjPcw9aaKTH3ig==}
+
+  '@standardserver/peer@0.0.25':
+    resolution: {integrity: sha512-tTe9ZSdFTYdhMH5T7UlujWFCU033jL5e6OJ3CgwSyhJp4iOWGaxNtYPq6CDXD0cQRJJpdOcKfoQ8PkmOwxWU8Q==}
+
+  '@standardserver/shared@0.0.25':
+    resolution: {integrity: sha512-w7c+dXX9Si2Gi5OJFqe0Yh+hhn2EC2MV3q7AUtTQTUadOb7vZ4Yb/4jgz9O8aTiwjK1UPAk/xWINLC/Ip2j7TA==}
+
   '@turbo/darwin-64@2.10.2':
     resolution: {integrity: sha512-wBM3ObqOWnKUDmg7QfUFDkDHPFUAJmrYlYqmEM8jMPAPA/I6wRJIbWimeQUqhOiQ8xPKhzyWM+xaiUP0wz8FEQ==}
     cpu: [x64]
@@ -2457,6 +2555,10 @@ packages:
 
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
+
+  cookie@1.1.1:
+    resolution: {integrity: sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==}
+    engines: {node: '>=18'}
 
   copy-anything@4.0.5:
     resolution: {integrity: sha512-7Vv6asjS4gMOuILabD3l739tsaxFQmC+a7pLZm02zyvs8p977bL3zEgq3yDk5rn9B0PbYgIv++jmHcuUab4RhA==}
@@ -3338,6 +3440,10 @@ packages:
   queue-microtask@1.2.3:
     resolution: {integrity: sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A==}
 
+  radash@12.1.1:
+    resolution: {integrity: sha512-h36JMxKRqrAxVD8201FrCpyeNuUY9Y5zZwujr20fFO77tpUtGa6EZzfKw/3WaiBX95fq7+MpsuMLNdSnORAwSA==}
+    engines: {node: '>=14.18.0'}
+
   rc9@3.0.1:
     resolution: {integrity: sha512-gMDyleLWVE+i6Sgtc0QbbY6pEKqYs97NGi6isHQPqYlLemPoO8dxQ3uGi0f4NiP98c+jMW6cG1Kx9dDwfvqARQ==}
 
@@ -3547,6 +3653,10 @@ packages:
   tabbable@6.5.0:
     resolution: {integrity: sha512-wieBHXygIm7OyQOu5hQlkk62/WyCFYGlWg7L6/ZCUZwx0o398Zkn4pVmMyfYhfMG8kGrj/Krt8eIk6UKC6VzwA==}
 
+  tagged-tag@1.0.0:
+    resolution: {integrity: sha512-yEFYrVhod+hdNyx7g5Bnkkb0G6si8HJurOoOEgC8B/O0uXLHlaey/65KRv6cuWBNhBgHKAROVpc7QyYqE5gFng==}
+    engines: {node: '>=20'}
+
   tar-fs@2.1.5:
     resolution: {integrity: sha512-OboTd8mmMhZDNPV+UjQcK9yKAatXu2aJ+r1w4im1Otd4M4fl2hwvdoXUxIYHFTHWK/3y3FarBP70v3vwmGlOxw==}
 
@@ -3639,6 +3749,10 @@ packages:
   turbo@2.10.2:
     resolution: {integrity: sha512-wTExrNrRjB8qzIcg+ZLm0A3GFNLDsWNwdS/RBXB0FPrBDyzk3i96Yx+TxWZC7a0k1SIreFB8ciUbxjmEqTH8IQ==}
     hasBin: true
+
+  type-fest@5.7.0:
+    resolution: {integrity: sha512-1URUxUqfHFM1c+zfSPsa3gnkO7Aq21qyH75SIduNYz4SzY964rn1X2vCMQaHSHhktiw+0kPa2iyb6PUpXqB6Vg==}
+    engines: {node: '>=20'}
 
   typedoc-plugin-markdown@4.12.0:
     resolution: {integrity: sha512-eJDEMAfxCmede22c/Jw7d0FA13ggAQv+KkwQYKYCdqI02cin6Rc9QRwbG/7XvvHWinuFejySnZVUWDtvGk3Vbg==}
@@ -4603,6 +4717,45 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
 
+  '@orpc/client@2.0.0-beta.14':
+    dependencies:
+      '@orpc/shared': 2.0.0-beta.14
+      '@standardserver/core': 0.0.25
+      '@standardserver/fetch': 0.0.25
+      '@standardserver/peer': 0.0.25
+    transitivePeerDependencies:
+      - '@opentelemetry/api'
+
+  '@orpc/contract@2.0.0-beta.14':
+    dependencies:
+      '@orpc/client': 2.0.0-beta.14
+      '@orpc/shared': 2.0.0-beta.14
+      '@standard-schema/spec': 1.1.0
+    transitivePeerDependencies:
+      - '@opentelemetry/api'
+
+  '@orpc/interop@2.0.0-beta.14': {}
+
+  '@orpc/server@2.0.0-beta.14':
+    dependencies:
+      '@orpc/client': 2.0.0-beta.14
+      '@orpc/contract': 2.0.0-beta.14
+      '@orpc/interop': 2.0.0-beta.14
+      '@orpc/shared': 2.0.0-beta.14
+      '@standardserver/core': 0.0.25
+      '@standardserver/fetch': 0.0.25
+      '@standardserver/node': 0.0.25
+      '@standardserver/peer': 0.0.25
+      cookie: 1.1.1
+    transitivePeerDependencies:
+      - '@opentelemetry/api'
+
+  '@orpc/shared@2.0.0-beta.14':
+    dependencies:
+      '@standardserver/shared': 0.0.25
+      radash: 12.1.1
+      type-fest: 5.7.0
+
   '@oxc-parser/binding-android-arm-eabi@0.137.0':
     optional: true
 
@@ -5167,6 +5320,28 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
+  '@standardserver/core@0.0.25':
+    dependencies:
+      '@standardserver/shared': 0.0.25
+
+  '@standardserver/fetch@0.0.25':
+    dependencies:
+      '@standardserver/core': 0.0.25
+      '@standardserver/shared': 0.0.25
+
+  '@standardserver/node@0.0.25':
+    dependencies:
+      '@standardserver/core': 0.0.25
+      '@standardserver/fetch': 0.0.25
+      '@standardserver/shared': 0.0.25
+
+  '@standardserver/peer@0.0.25':
+    dependencies:
+      '@standardserver/core': 0.0.25
+      '@standardserver/shared': 0.0.25
+
+  '@standardserver/shared@0.0.25': {}
+
   '@turbo/darwin-64@2.10.2':
     optional: true
 
@@ -5554,6 +5729,8 @@ snapshots:
       meow: 14.1.0
 
   convert-source-map@2.0.0: {}
+
+  cookie@1.1.1: {}
 
   copy-anything@4.0.5:
     dependencies:
@@ -6445,6 +6622,8 @@ snapshots:
 
   queue-microtask@1.2.3: {}
 
+  radash@12.1.1: {}
+
   rc9@3.0.1:
     dependencies:
       defu: 6.1.7
@@ -6673,6 +6852,8 @@ snapshots:
 
   tabbable@6.5.0: {}
 
+  tagged-tag@1.0.0: {}
+
   tar-fs@2.1.5:
     dependencies:
       chownr: 1.1.4
@@ -6760,6 +6941,10 @@ snapshots:
       '@turbo/linux-arm64': 2.10.2
       '@turbo/windows-64': 2.10.2
       '@turbo/windows-arm64': 2.10.2
+
+  type-fest@5.7.0:
+    dependencies:
+      tagged-tag: 1.0.0
 
   typedoc-plugin-markdown@4.12.0(typedoc@0.28.19(typescript@6.0.3)):
     dependencies:

@@ -26,6 +26,10 @@ This reference is generated from the source with
 - [**@unthrown/standard-schema**](./standard-schema/) — `fromSchema` /
   `fromSchemaAsync`: run any Standard Schema validator (Zod, Valibot, ArkType)
   into a `Result` with the validation issues as the modeled error.
+- [**@unthrown/orpc**](./orpc/) — the oRPC (v2) bridge: `handlerResult` /
+  `.result()` for `Result`-returning procedure handlers, `createResultClient` /
+  `fromCall` for an `AsyncResult` client, with the inferable `ORPCError` union
+  as the modeled error.
 
 `@unthrown/oxlint` (the lint rules `no-ambiguous-error-type` and
 `prefer-async-result`) has no generated API page — it is documented in the
