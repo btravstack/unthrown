@@ -149,7 +149,12 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   unqualified rejection.
 - constructors: `Ok`, `Err` (there is **no** `Defect` constructor — a defect-state
   `Result` arises only at boundaries; the qualify-time `defect` marker helper is
-  injected, not exported)
+  injected, not exported), plus the **pre-lifted async** constructors `OkAsync` /
+  `ErrAsync` — `Ok(v).toAsync()` / `Err(e).toAsync()` without the boilerplate, for
+  the synchronous branch of an `AsyncResult`-returning function. They carry the
+  `Async` **suffix** the async free functions use (`allAsync`); the `AsyncResult`
+  companion aliases them as `AsyncResult.Ok` / `AsyncResult.Err` (suffix dropped,
+  same rule as `AsyncResult.all`)
 - interop: `fromNullable`, `fromThrowable`, `fromPromise`, `fromSafePromise`
 - aggregate: `all` / `allAsync` take a **tuple/array** (a fixed tuple keeps
   positional types; a dynamic `Result<T, E>[]` / `AsyncResult<T, E>[]` collapses
@@ -167,8 +172,9 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   the `Result`-producing ones
   (`Result.Ok`/`Err`/`Do`/`fromNullable`/`fromThrowable`/`all`/`allFromDict`/`is*`);
   `AsyncResult.*` holds the `AsyncResult`-producing ones
-  (`AsyncResult.fromPromise`/`fromSafePromise`/`all`/`allFromDict` — the
-  aggregates drop the `Async` suffix the free functions carry, since the
+  (`AsyncResult.Ok`/`Err`/`fromPromise`/`fromSafePromise`/`all`/`allFromDict` — the
+  pre-lifted constructors and aggregates drop the `Async` suffix the free functions
+  carry (`OkAsync`→`AsyncResult.Ok`, `allAsync`→`AsyncResult.all`), since the
   namespace already says async). Both are value+type companions (the value and
   the `Result<T,E>` / `AsyncResult<T,E>` type share one name). The free functions
   remain the primary, tree-shakeable API; the companions are opt-in sugar (only

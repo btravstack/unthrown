@@ -4,7 +4,7 @@
 // `Result` and the type `Result<T, E>` (types.ts) share a name — the
 // companion-object pattern. See CLAUDE.md → "Internal design".
 
-import { Err, isDefect, isErr, isOk, Ok } from "./constructors.js";
+import { Err, ErrAsync, isDefect, isErr, isOk, Ok, OkAsync } from "./constructors.js";
 import { isResult } from "./core.js";
 import { Do } from "./do.js";
 import {
@@ -79,18 +79,20 @@ export type Result<T, E> = ResultType<T, E>;
 
 /**
  * Companion object grouping the **`AsyncResult`-producing** entry points under
- * the matching namespace: {@link AsyncResult.fromPromise},
- * {@link AsyncResult.fromSafePromise}, {@link AsyncResult.all},
- * {@link AsyncResult.allFromDict}.
+ * the matching namespace: {@link AsyncResult.Ok}, {@link AsyncResult.Err},
+ * {@link AsyncResult.fromPromise}, {@link AsyncResult.fromSafePromise},
+ * {@link AsyncResult.all}, {@link AsyncResult.allFromDict}.
  *
  * @remarks
  * The async sibling of {@link Result}. Statics are grouped by what they
- * **return**, so `fromPromise`/`fromSafePromise` and the async aggregates sit
- * here rather than on {@link Result}; the namespace already conveys "async", so
- * the aggregates drop the `Async` suffix (`AsyncResult.all` is the free function
- * `allAsync`; `AsyncResult.allFromDict` is `allFromDictAsync`). Like
- * {@link Result}, the free functions remain the primary, tree-shakeable API; the
- * value `AsyncResult` and the type {@link AsyncResult} share one name.
+ * **return**, so the pre-lifted constructors, `fromPromise`/`fromSafePromise`,
+ * and the async aggregates sit here rather than on {@link Result}; the namespace
+ * already conveys "async", so the members drop the `Async` suffix their free
+ * functions carry (`AsyncResult.Ok` is `OkAsync`; `AsyncResult.Err` is
+ * `ErrAsync`; `AsyncResult.all` is `allAsync`; `AsyncResult.allFromDict` is
+ * `allFromDictAsync`). Like {@link Result}, the free functions remain the
+ * primary, tree-shakeable API; the value `AsyncResult` and the type
+ * {@link AsyncResult} share one name.
  *
  * @category Facade
  *
@@ -102,6 +104,8 @@ export type Result<T, E> = ResultType<T, E>;
  * ```
  */
 export const AsyncResult = {
+  Ok: OkAsync,
+  Err: ErrAsync,
   fromPromise,
   fromSafePromise,
   all: allAsync,

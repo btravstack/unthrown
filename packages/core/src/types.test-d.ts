@@ -17,6 +17,7 @@ import {
   Do,
   type ErrOf,
   Err,
+  ErrAsync,
   type ErrView,
   fromPromise,
   fromThrowable,
@@ -26,6 +27,7 @@ import {
   isResult,
   matchTags,
   Ok,
+  OkAsync,
   type OkOf,
   type Result,
   TaggedError,
@@ -45,6 +47,13 @@ type _ok = Expect<Equal<typeof okV, Result<number, never>>>;
 
 const errV = Err<string>("e");
 type _err = Expect<Equal<typeof errV, Result<never, string>>>;
+
+// pre-lifted async constructors mirror Ok/Err but produce an AsyncResult
+const okAsyncV = OkAsync(1);
+type _okAsync = Expect<Equal<typeof okAsyncV, AsyncResult<number, never>>>;
+
+const errAsyncV = ErrAsync<string>("e");
+type _errAsync = Expect<Equal<typeof errAsyncV, AsyncResult<never, string>>>;
 
 // --- aggregation: `all` keeps positional tuple types -------------------------
 

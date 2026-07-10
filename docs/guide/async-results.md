@@ -4,7 +4,8 @@ An `AsyncResult<T, E>` is the asynchronous counterpart of `Result<T, E>`. It has
 the **same method surface**, and `await`-ing it collapses it to a `Result`.
 
 You get one from a qualified boundary ([`fromPromise`](./boundaries),
-`fromSafePromise`) or by lifting a sync `Result` with `.toAsync()`.
+`fromSafePromise`), by lifting a sync `Result` with `.toAsync()`, or — for a pure
+value — directly with `OkAsync` / `ErrAsync`.
 
 ```ts
 import { fromSafePromise } from "unthrown";
@@ -12,6 +13,23 @@ import { fromSafePromise } from "unthrown";
 const result = await fromSafePromise(Promise.resolve(1)).map((n) => n + 1);
 result.unwrap(); // => 2
 ```
+
+`OkAsync(value)` / `ErrAsync(error)` are the pre-lifted constructors — exactly
+`Ok(value).toAsync()` / `Err(error).toAsync()`, minus the boilerplate. Reach for
+them on the synchronous or early-return branch of an `AsyncResult`-returning
+function, so both branches share one return type:
+
+```ts
+import { OkAsync, type AsyncResult } from "unthrown";
+
+function loadItems(ids: string[]): AsyncResult<Item[], never> {
+  if (ids.length === 0) return OkAsync([]); // no trailing .toAsync()
+  return itemRepository.load(ids);
+}
+```
+
+They carry the `Async` suffix the async free functions use (`allAsync`); the
+`AsyncResult` companion aliases them as `AsyncResult.Ok` / `AsyncResult.Err`.
 
 ## Awaitable, not a Promise
 

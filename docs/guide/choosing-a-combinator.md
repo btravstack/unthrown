@@ -93,6 +93,7 @@ Use this table to move between the two:
 
 | I have… and want to…                    | use                                                   |
 | --------------------------------------- | ----------------------------------------------------- |
+| build an `AsyncResult` from a value     | `OkAsync(v)` / `ErrAsync(e)` (no `Ok(v).toAsync()`)   |
 | lift a sync `Result` into async         | `result.toAsync()` → `AsyncResult`                    |
 | collapse an `AsyncResult` to a `Result` | `await asyncResult`                                   |
 | add an **async** step mid-chain         | `.flatMap((v) => fromPromise(work(v), qualify))`      |
