@@ -20,6 +20,15 @@ import { Prisma } from "@prisma/client/extension";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { type AsyncResult, fromPromise, TaggedError } from "unthrown";
 
+import {
+  type CursorPaginationMeta,
+  type CursorPaginationOptions,
+  type PaginationDelegate,
+  paginateWithCursor,
+} from "./pagination.js";
+
+export type { CursorPaginationMeta, CursorPaginationOptions } from "./pagination.js";
+
 /**
  * A unique constraint was violated (Prisma error `P2002`).
  *
@@ -147,6 +156,23 @@ class Rollback extends Error {
   }
 }
 
+/**
+ * What `tryPaginate` returns: a builder holding the query, consumed by
+ * `withCursor`.
+ *
+ * @typeParam Results - the (selection-narrowed) `findMany` payload.
+ * @typeParam Cursor - the model's `cursor` input (its unique-where shape).
+ */
+export type CursorPaginator<Results extends readonly unknown[], Cursor> = {
+  /**
+   * Run the paginated query: the page and its metadata, or a
+   * {@link DriverError}.
+   */
+  readonly withCursor: (
+    options: CursorPaginationOptions<Results[number], Cursor>,
+  ) => AsyncResult<[Results, CursorPaginationMeta], DriverError>;
+};
+
 // Mirrors Prisma's `ITXClientDenyList` — what an interactive-transaction client
 // cannot do — plus `$tryTransaction` itself: nested transactions are not a
 // thing, and the itx client has no `$transaction` for the bridge to delegate to.
@@ -266,6 +292,47 @@ export const unthrownPrisma = Prisma.defineExtension({
         return query(this, "delete", args) as AsyncResult<
           Prisma.Result<T, A, "delete">,
           DeleteError
+        >;
+      },
+
+      /**
+       * Cursor pagination, in the style of `prisma-extension-pagination`:
+       * `tryPaginate(query).withCursor({ limit, after, before })` runs the
+       * `findMany` and answers with `[results, meta]`, where `meta` carries
+       * `hasPreviousPage` / `hasNextPage` / `startCursor` / `endCursor`.
+       *
+       * @remarks
+       * `args` is the `findMany` query WITHOUT `cursor` / `take` / `skip` —
+       * pagination owns those. A cursor pointing at a record that no longer
+       * matches the query filter is handled correctly (the first element of
+       * the page is not skipped). A throwing `parseCursor` — e.g. a malformed
+       * cursor from an API client — surfaces as a {@link DriverError}.
+       *
+       * @example
+       * ```ts
+       * const page = await db.user
+       *   .tryPaginate({ where: { active: true }, orderBy: { id: "asc" } })
+       *   .withCursor({ limit: 20, after: req.query.cursor });
+       * // Ok([users, { hasNextPage, endCursor, ... }]) | Err(DriverError)
+       * ```
+       */
+      tryPaginate<T, A>(
+        this: T,
+        args?: Prisma.Exact<A, Omit<Prisma.Args<T, "findMany">, "cursor" | "take" | "skip">>,
+      ): CursorPaginator<
+        Prisma.Result<T, A, "findMany">,
+        NonNullable<Prisma.Args<T, "findMany">["cursor"]>
+      > {
+        const delegate = Prisma.getExtensionContext(this) as unknown as PaginationDelegate;
+        return {
+          withCursor: (options: Parameters<typeof paginateWithCursor>[2]) =>
+            fromPromise(
+              paginateWithCursor(delegate, args as object | undefined, options),
+              qualifyPrismaError,
+            ),
+        } as unknown as CursorPaginator<
+          Prisma.Result<T, A, "findMany">,
+          NonNullable<Prisma.Args<T, "findMany">["cursor"]>
         >;
       },
     },
