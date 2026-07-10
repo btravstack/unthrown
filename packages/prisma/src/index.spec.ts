@@ -329,6 +329,88 @@ describe("tryPaginate / withCursor", () => {
       /default cursor reads the `id` field/,
     );
   });
+
+  it("compares cursors structurally — bigint ids survive the round-trip", async () => {
+    // JSON.stringify-based comparison would throw on bigint cursor values.
+    const model = {
+      findMany: (args: object) =>
+        Promise.resolve(
+          (args as { take?: number }).take === -1
+            ? [{ id: 1n }]
+            : [{ id: 1n }, { id: 2n }, { id: 3n }],
+        ),
+    };
+    await expect(
+      paginateWithCursor(model, undefined, {
+        limit: 2,
+        after: "1",
+        getCursor: (row: { id: bigint }) => String(row.id),
+        parseCursor: (cursor) => ({ id: BigInt(cursor) }),
+      }),
+    ).resolves.toEqual([
+      [{ id: 2n }, { id: 3n }],
+      { hasPreviousPage: true, hasNextPage: false, startCursor: "2", endCursor: "3" },
+    ]);
+  });
+
+  it("compares cursors structurally — Date and array values round-trip", async () => {
+    // A composite cursor carrying a DateTime and a (contrived) array: both
+    // compare by value, not by reference.
+    const rows = [
+      { at: new Date(1000), tags: ["a", "b"] },
+      { at: new Date(2000), tags: ["c"] },
+    ];
+    const model = {
+      findMany: (args: object) =>
+        Promise.resolve((args as { take?: number }).take === -1 ? [rows[0]] : [...rows]),
+    };
+    const cursorOf = (row: { at: Date; tags: string[] }) =>
+      `${row.at.getTime()}|${row.tags.join(",")}`;
+    await expect(
+      paginateWithCursor(model, undefined, {
+        limit: 2,
+        after: cursorOf(rows[0]!),
+        getCursor: cursorOf,
+        parseCursor: (cursor) => {
+          const [at = "", tags = ""] = cursor.split("|");
+          return { at: new Date(Number(at)), tags: tags.split(",") };
+        },
+      }),
+    ).resolves.toEqual([
+      [rows[1]],
+      { hasPreviousPage: true, hasNextPage: false, startCursor: "2000|c", endCursor: "2000|c" },
+    ]);
+  });
+
+  it("compares cursors structurally — key order does not matter", async () => {
+    // The request cursor and the boundary row's cursor are parsed by separate
+    // calls; a parseCursor emitting keys in a different order each time must
+    // still round-trip (JSON.stringify comparison would false-negative and
+    // leave the cursor row in the page).
+    let flip = false;
+    const rows = [
+      { userId: 1, postId: 2 },
+      { userId: 3, postId: 4 },
+    ];
+    const model = {
+      findMany: (args: object) =>
+        Promise.resolve((args as { take?: number }).take === -1 ? [rows[0]] : [...rows]),
+    };
+    await expect(
+      paginateWithCursor(model, undefined, {
+        limit: 2,
+        after: "1:2",
+        getCursor: (row: { userId: number; postId: number }) => `${row.userId}:${row.postId}`,
+        parseCursor: () => {
+          flip = !flip;
+          return flip ? { userId: 1, postId: 2 } : { postId: 2, userId: 1 };
+        },
+      }),
+    ).resolves.toEqual([
+      [{ userId: 3, postId: 4 }],
+      { hasPreviousPage: true, hasNextPage: false, startCursor: "3:4", endCursor: "3:4" },
+    ]);
+  });
 });
 
 describe("qualifyPrismaError", () => {

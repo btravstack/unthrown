@@ -66,6 +66,17 @@ db.user.tryPaginate({ select: { id: true } }).withCursor({
 // @ts-expect-error — parseCursor must return the model's unique-where input.
 db.user.tryPaginate().withCursor({ limit: 1, parseCursor: () => ({ bogus: 1 }) });
 
+// The meta's boundary cursors travel together: non-null startCursor proves endCursor.
+declare const meta: CursorPaginationMeta;
+if (meta.startCursor !== null) {
+  meta.endCursor satisfies string;
+}
+
+// $tryTransaction accepts only known isolation levels.
+db.$tryTransaction((txc) => txc.user.tryFindMany(), { isolationLevel: "Serializable" });
+// @ts-expect-error — not a Prisma isolation level.
+db.$tryTransaction((txc) => txc.user.tryFindMany(), { isolationLevel: "Chaotic" });
+
 // --- $tryTransaction: errors union, try-methods inside, no nesting -------------
 
 const tx = db.$tryTransaction((txc) => txc.user.tryCreate({ data: { email: "a@example.com" } }));
