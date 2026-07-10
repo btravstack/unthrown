@@ -10,6 +10,7 @@ import type { AsyncErrOf, AsyncOkOf } from "unthrown";
 
 import type { PrismaClient } from "./generated/prisma/client.ts";
 import type {
+  CursorPaginationMeta,
   DriverError,
   ForeignKeyViolation,
   RecordNotFound,
@@ -44,6 +45,27 @@ db.user.tryFindMany({ bogus: true });
 // @ts-expect-error — a read cannot fail with UniqueConstraintViolation.
 const _readNarrow: AsyncErrOf<typeof all> = null as unknown as UniqueConstraintViolation;
 
+// --- tryPaginate: query owns the filter, pagination owns the cursor ------------
+
+const paged = db.user.tryPaginate({ where: { name: "x" } }).withCursor({ limit: 2 });
+const pagedSelect = db.user.tryPaginate({ select: { id: true } }).withCursor({ limit: null });
+
+// @ts-expect-error — `take` belongs to pagination, not the query.
+db.user.tryPaginate({ take: 1 });
+// @ts-expect-error — `cursor` belongs to pagination, not the query.
+db.user.tryPaginate({ cursor: { id: 1 } });
+// @ts-expect-error — `limit: null` cannot be combined with `before`.
+db.user.tryPaginate().withCursor({ limit: null, before: "1" });
+
+db.user.tryPaginate({ select: { id: true } }).withCursor({
+  limit: 1,
+  // @ts-expect-error — `email` is not in the selection; getCursor sees the narrowed row.
+  getCursor: (row) => row.email,
+});
+
+// @ts-expect-error — parseCursor must return the model's unique-where input.
+db.user.tryPaginate().withCursor({ limit: 1, parseCursor: () => ({ bogus: 1 }) });
+
 // --- $tryTransaction: errors union, try-methods inside, no nesting -------------
 
 const tx = db.$tryTransaction((txc) => txc.user.tryCreate({ data: { email: "a@example.com" } }));
@@ -72,6 +94,11 @@ export type _Assertions = [
     Equal<AsyncErrOf<typeof created>, UniqueConstraintViolation | ForeignKeyViolation | DriverError>
   >,
   Expect<Equal<AsyncErrOf<typeof fetched>, RecordNotFound | DriverError>>,
+  // pagination: the payload is the narrowed page + meta; the error is read-only
+  Expect<Equal<AsyncOkOf<typeof paged>[0][number]["email"], string>>,
+  Expect<Equal<AsyncOkOf<typeof paged>[1], CursorPaginationMeta>>,
+  Expect<Equal<AsyncErrOf<typeof paged>, DriverError>>,
+  Expect<Equal<AsyncOkOf<typeof pagedSelect>[0], { id: number }[]>>,
   // the transaction unions the callback's errors with the transaction's own
   Expect<
     Equal<

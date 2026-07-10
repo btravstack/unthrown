@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { PrismaClient } from "./generated/prisma/client.ts";
 import { qualifyPrismaError, unthrownPrisma } from "./index.js";
+import { paginateWithCursor } from "./pagination.js";
 
 // The test schema's tables, created by hand (no Migrate): an in-memory database
 // is born empty, and DDL-by-hand keeps the suite free of any migration engine.
@@ -151,6 +152,198 @@ describe("$tryTransaction", () => {
         { timeout: 10 },
       ),
     ).toBeErrTagged("DriverError");
+  });
+});
+
+describe("tryPaginate / withCursor", () => {
+  // Six users, ids 1..6. `name` is the filter knob: flipping one row to
+  // "banned" makes its cursor stop matching a `where: { name: "member" }`.
+  const seed = async (db: Awaited<ReturnType<typeof makeDb>>) => {
+    await db.user.createMany({
+      data: [1, 2, 3, 4, 5, 6].map((n) => ({ email: `u${n}@example.com`, name: "member" })),
+    });
+  };
+  const ids = (rows: ReadonlyArray<{ id: number }>) => rows.map((r) => r.id);
+
+  it("serves the first page with default cursors", async () => {
+    const db = await makeDb();
+    await seed(db);
+    const page = await db.user.tryPaginate({ orderBy: { id: "asc" } }).withCursor({ limit: 2 });
+    expect(page.isOk() && [ids(page.value[0]), page.value[1]]).toEqual([
+      [1, 2],
+      { hasPreviousPage: false, hasNextPage: true, startCursor: "1", endCursor: "2" },
+    ]);
+  });
+
+  it("pages forward with after (exclusive) and reports both flags", async () => {
+    const db = await makeDb();
+    await seed(db);
+    const page = await db.user
+      .tryPaginate({ orderBy: { id: "asc" } })
+      .withCursor({ limit: 2, after: "2" });
+    expect(page.isOk() && [ids(page.value[0]), page.value[1]]).toEqual([
+      [3, 4],
+      { hasPreviousPage: true, hasNextPage: true, startCursor: "3", endCursor: "4" },
+    ]);
+  });
+
+  it("reaches the last page with hasNextPage false", async () => {
+    const db = await makeDb();
+    await seed(db);
+    const page = await db.user
+      .tryPaginate({ orderBy: { id: "asc" } })
+      .withCursor({ limit: 2, after: "5" });
+    expect(page.isOk() && [ids(page.value[0]), page.value[1]]).toEqual([
+      [6],
+      { hasPreviousPage: true, hasNextPage: false, startCursor: "6", endCursor: "6" },
+    ]);
+  });
+
+  it("pages backward with before (exclusive)", async () => {
+    const db = await makeDb();
+    await seed(db);
+    const page = await db.user
+      .tryPaginate({ orderBy: { id: "asc" } })
+      .withCursor({ limit: 2, before: "4" });
+    expect(page.isOk() && [ids(page.value[0]), page.value[1]]).toEqual([
+      [2, 3],
+      { hasPreviousPage: true, hasNextPage: true, startCursor: "2", endCursor: "3" },
+    ]);
+  });
+
+  it("serves an empty page past the end with null cursors", async () => {
+    const db = await makeDb();
+    await seed(db);
+    const page = await db.user
+      .tryPaginate({ orderBy: { id: "asc" } })
+      .withCursor({ limit: 2, after: "6" });
+    expect(page.isOk() && [ids(page.value[0]), page.value[1]]).toEqual([
+      [],
+      { hasPreviousPage: true, hasNextPage: false, startCursor: null, endCursor: null },
+    ]);
+  });
+
+  it("returns everything with limit null, from the after cursor when given", async () => {
+    const db = await makeDb();
+    await seed(db);
+    const all = await db.user.tryPaginate({ orderBy: { id: "asc" } }).withCursor({ limit: null });
+    expect(all.isOk() && [ids(all.value[0]), all.value[1].hasNextPage]).toEqual([
+      [1, 2, 3, 4, 5, 6],
+      false,
+    ]);
+    const rest = await db.user
+      .tryPaginate({ orderBy: { id: "asc" } })
+      .withCursor({ limit: null, after: "4" });
+    expect(rest.isOk() && [ids(rest.value[0]), rest.value[1].hasPreviousPage]).toEqual([
+      [5, 6],
+      true,
+    ]);
+  });
+
+  // The fix carried over from deptyped/prisma-extension-pagination#36 (#35):
+  // when the AFTER cursor row was mutated and no longer matches the filter, the
+  // first element of the page must NOT be skipped.
+  it("does not skip the first element when the after cursor no longer matches the filter", async () => {
+    const db = await makeDb();
+    await seed(db);
+    await db.user.update({ where: { id: 3 }, data: { name: "banned" } });
+    const query = { where: { name: "member" }, orderBy: { id: "asc" } } as const;
+    const wide = await db.user.tryPaginate(query).withCursor({ limit: 2, after: "3" });
+    expect(wide.isOk() && [ids(wide.value[0]), wide.value[1]]).toEqual([
+      [4, 5],
+      { hasPreviousPage: true, hasNextPage: true, startCursor: "4", endCursor: "5" },
+    ]);
+    // limit 1 exercises the fully-over-fetched trim (limit + 2 rows come back).
+    const narrow = await db.user.tryPaginate(query).withCursor({ limit: 1, after: "3" });
+    expect(narrow.isOk() && [ids(narrow.value[0]), narrow.value[1].hasNextPage]).toEqual([
+      [4],
+      true,
+    ]);
+  });
+
+  it("does not skip the last element when the before cursor no longer matches the filter", async () => {
+    const db = await makeDb();
+    await seed(db);
+    await db.user.update({ where: { id: 4 }, data: { name: "banned" } });
+    const query = { where: { name: "member" }, orderBy: { id: "asc" } } as const;
+    const wide = await db.user.tryPaginate(query).withCursor({ limit: 2, before: "4" });
+    expect(wide.isOk() && [ids(wide.value[0]), wide.value[1]]).toEqual([
+      [2, 3],
+      { hasPreviousPage: true, hasNextPage: true, startCursor: "2", endCursor: "3" },
+    ]);
+    // limit 1 exercises the fully-over-fetched trim on the backward side.
+    const narrow = await db.user.tryPaginate(query).withCursor({ limit: 1, before: "4" });
+    expect(narrow.isOk() && [ids(narrow.value[0]), narrow.value[1].hasPreviousPage]).toEqual([
+      [3],
+      true,
+    ]);
+  });
+
+  it("supports a custom cursor serialization (email)", async () => {
+    const db = await makeDb();
+    await seed(db);
+    const page = await db.user.tryPaginate({ orderBy: { id: "asc" } }).withCursor({
+      limit: 2,
+      after: "u2@example.com",
+      getCursor: (row) => row.email,
+      parseCursor: (cursor) => ({ email: cursor }),
+    });
+    expect(page.isOk() && [ids(page.value[0]), page.value[1].endCursor]).toEqual([
+      [3, 4],
+      "u4@example.com",
+    ]);
+  });
+
+  it("paginates a narrowed selection", async () => {
+    const db = await makeDb();
+    await seed(db);
+    await expect(
+      db.user
+        .tryPaginate({ select: { id: true }, orderBy: { id: "asc" } })
+        .withCursor({ limit: 2 }),
+    ).toBeOkWith([
+      [{ id: 1 }, { id: 2 }],
+      { hasPreviousPage: false, hasNextPage: true, startCursor: "1", endCursor: "2" },
+    ]);
+  });
+
+  it("surfaces a default cursor over a selection without id as DriverError", async () => {
+    const db = await makeDb();
+    await seed(db);
+    await expect(
+      db.user.tryPaginate({ select: { email: true } }).withCursor({ limit: 2 }),
+    ).toBeErrTagged("DriverError");
+  });
+
+  it("surfaces a malformed cursor as DriverError", async () => {
+    const db = await makeDb();
+    await seed(db);
+    // Default parseCursor keeps a non-numeric cursor as a string — invalid for
+    // this model's Int id, so Prisma rejects it.
+    await expect(
+      db.user.tryPaginate({ orderBy: { id: "asc" } }).withCursor({ limit: 2, after: "not-an-id" }),
+    ).toBeErrTagged("DriverError");
+  });
+
+  // The `before` + `limit: null` combination is typed away at the public
+  // surface (Prisma's negative take cannot express it); untyped callers get
+  // the upstream library's behavior. Runtime-only, via the engine directly.
+  it("keeps upstream parity for an untyped limit:null + before", async () => {
+    const rows = () => [{ id: 1 }, { id: 2 }];
+    const model = { findMany: () => Promise.resolve(rows()) };
+    await expect(
+      paginateWithCursor(model, undefined, { limit: null, before: "9" }),
+    ).resolves.toEqual([
+      [{ id: 1 }, { id: 2 }],
+      { hasPreviousPage: false, hasNextPage: true, startCursor: "1", endCursor: "2" },
+    ]);
+  });
+
+  it("rejects when the default cursor meets a null id", async () => {
+    const model = { findMany: () => Promise.resolve([{ id: null }]) };
+    await expect(paginateWithCursor(model, undefined, { limit: 2 })).rejects.toThrow(
+      /default cursor reads the `id` field/,
+    );
   });
 });
 

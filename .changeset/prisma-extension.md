@@ -13,3 +13,9 @@ tagged errors (`UniqueConstraintViolation` / `ForeignKeyViolation` /
 preserved. `$tryTransaction` runs an interactive transaction whose callback
 speaks `AsyncResult`: an `Err` triggers a rollback and comes out as the same
 typed `Err`; a defect also rolls back and stays a defect.
+
+`tryPaginate(query).withCursor({ limit, after, before, getCursor, parseCursor })`
+provides cursor pagination in the style of `prisma-extension-pagination` (same
+option names, same `[results, meta]` shape), with one fix folded in: a cursor
+pointing at a record that no longer matches the query filter does not skip the
+first element of the page.

@@ -56,6 +56,31 @@ const moved = db.$tryTransaction((tx) =>
 // Err anywhere → both updates rolled back, and the Err is in `moved`.
 ```
 
+- **`tryPaginate`** — cursor pagination in the style of
+  [`prisma-extension-pagination`](https://github.com/deptyped/prisma-extension-pagination)
+  (same option names, same `[results, meta]` shape), with one fix folded in: a
+  cursor pointing at a record that no longer matches the query filter does not
+  skip the first element of the page
+  ([deptyped/prisma-extension-pagination#35](https://github.com/deptyped/prisma-extension-pagination/issues/35)).
+
+```ts
+const page = await db.user
+  .tryPaginate({ where: { active: true }, orderBy: { id: "asc" } })
+  .withCursor({ limit: 20, after: req.query.cursor });
+// Ok([users, { hasPreviousPage, hasNextPage, startCursor, endCursor }])
+// | Err(DriverError) — a malformed cursor included.
+
+// Custom serialization (composite keys, non-id cursors):
+.withCursor({
+  limit: 20,
+  getCursor: ({ postId, userId }) => `${postId}:${userId}`,
+  parseCursor: (cursor) => {
+    const [postId, userId] = cursor.split(":");
+    return { userId_postId: { postId: Number(postId), userId: Number(userId) } };
+  },
+});
+```
+
 The raw promise methods stay available on purpose: they are the escape hatch for
 batch `$transaction([...])`, which needs unexecuted `PrismaPromise`s.
 
