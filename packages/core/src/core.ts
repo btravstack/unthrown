@@ -283,6 +283,12 @@ class Res<T, E> {
     return undefined;
   }
 
+  getOrThrow(this: Result<T, E>): T {
+    if (this.tag === "Ok") return this.value;
+    if (this.tag === "Defect") throw this.cause;
+    throw this.error;
+  }
+
   isOk(this: Result<T, E>): this is OkView<T, E> {
     return this.tag === "Ok";
   }
@@ -678,5 +684,8 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   }
   getOrUndefined(): Promise<T | undefined> {
     return this.promise.then((r) => r.getOrUndefined());
+  }
+  getOrThrow(): Promise<T> {
+    return this.promise.then((r) => r.getOrThrow());
   }
 }

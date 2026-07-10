@@ -489,6 +489,30 @@ describe("Result eliminators on Ok / Err", () => {
     expect(Ok(3).getOrUndefined()).toBe(3);
     expect(Err("e").getOrUndefined()).toBe(undefined);
   });
+
+  it("getOrThrow returns the Ok value, throws the modeled error as-is on Err, and panics on a Defect", () => {
+    expect(Ok(3).getOrThrow()).toBe(3);
+
+    // Err throws the error value itself (faithful to `.orElse((e) => { throw e })`)
+    const err = new Error("modeled");
+    expect(() => Err(err).getOrThrow()).toThrow(err);
+    // even a non-Error error value is thrown as-is
+    try {
+      Err("plain").getOrThrow();
+      expect.unreachable();
+    } catch (thrown) {
+      expect(thrown).toBe("plain");
+    }
+
+    // a Defect rethrows the ORIGINAL cause with its stack (a panic, like getOrNull)
+    try {
+      defectOf(boom).getOrThrow();
+      expect.unreachable();
+    } catch (thrown) {
+      expect(thrown).toBe(boom);
+      expect((thrown as Error).stack).toBe(boom.stack);
+    }
+  });
 });
 
 describe("Result.toAsync", () => {

@@ -336,6 +336,24 @@ export type ResultMethods<T, E> = {
    * @throws Re-throws on a `Defect`.
    */
   getOrUndefined(): T | undefined;
+  /**
+   * The success value, or **throw** the modeled error on `Err`.
+   *
+   * @remarks
+   * A deliberate escape hatch off the errors-as-values model. Unlike
+   * {@link ResultMethods.unwrap | unwrap} (type-gated to an empty error
+   * channel), this compiles on any `Result<T, E>` and **throws the `Err` value
+   * as-is** at the call site. Its purpose is to move a literal `throw` behind a
+   * method, so a `no-throw` lint rule can ban raw throws while this one
+   * sanctioned extraction remains — _not_ to replace principled handling. When
+   * you can keep the error a value, prefer {@link ResultMethods.match | match} /
+   * {@link ResultMethods.recover | recover} / {@link ResultMethods.orElse | orElse}.
+   *
+   * @returns the `Ok` value.
+   * @throws the modeled `error` on `Err`; re-throws the original `cause` on a
+   * `Defect` (a panic, like the rest of the `getOr…` family).
+   */
+  getOrThrow(): T;
 
   /** Whether this result is `Ok` — narrows `this` to its {@link OkView} on `true`. */
   isOk(): this is OkView<T, E>;
@@ -623,6 +641,12 @@ export type AsyncResultMethods<T, E> = {
   getOrNull(): Promise<T | null>;
   /** Asynchronous {@link ResultMethods.getOrUndefined | getOrUndefined}. */
   getOrUndefined(): Promise<T | undefined>;
+  /**
+   * Asynchronous {@link ResultMethods.getOrThrow | getOrThrow} — the returned
+   * promise **rejects** with the modeled error on `Err` (or the original cause
+   * on a `Defect`), rather than throwing synchronously.
+   */
+  getOrThrow(): Promise<T>;
 };
 
 /**

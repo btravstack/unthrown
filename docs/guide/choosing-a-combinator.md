@@ -182,6 +182,11 @@ Reach for an eliminator once you're done chaining:
   needs `Result<never, E>`), and _panicking_ (rethrowing the cause) on a defect.
 - `unwrapOr` / `unwrapOrElse` / `getOrNull` / `getOrUndefined` — recover an `Err`
   to a fallback, but **re-throw a defect** (it's a bug, not an absent value).
+- `getOrThrow` — extract `T`, but **throw the modeled error as-is** on `Err`
+  (panicking on a defect). A deliberate escape hatch off errors-as-values: its
+  point is to move a literal `throw` behind a method so a `no-throw` lint rule can
+  ban raw throws. Prefer `match` / `recover` / `orElse` when the error can stay a
+  value.
 
 On an `AsyncResult` every eliminator returns a `Promise` — `await` it (an `Err` or
 `Defect` still throws/rejects, exactly as above).

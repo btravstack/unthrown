@@ -137,7 +137,14 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   `unwrapOr<U>(fallback: U): T | U` — widening, not narrowed to `T`), `unwrapOrElse`
   (same `T | U` widening), `getOrNull`, `getOrUndefined` — the `unwrapOr…`/`getOr…`
   family extracts from a still-fallible `Result` with a fallback, since
-  `unwrap`/`unwrapErr` won't compile on it
+  `unwrap`/`unwrapErr` won't compile on it. `getOrThrow` completes the `getOr…`
+  family with a **deliberate escape hatch**: not type-gated, it extracts `T` from
+  any `Result<T, E>` and **throws the modeled `error` as-is** on `Err` (and
+  panics on a `Defect`, like the rest of the family). It exists so a `no-throw`
+  lint rule can ban raw `throw` while this one sanctioned extraction remains — the
+  faithful, lint-clean form of `.orElse((e) => { throw e }).unwrap()`; it is
+  **off the errors-as-values thesis** by design, so reach for `match` / `recover`
+  / `orElse` whenever the error can stay a value
 - guards: methods `isOk`/`isErr`/`isDefect` **and** standalone
   `isOk`/`isErr`/`isDefect` both narrow (to `OkView`/`ErrView`/`DefectView`) — the
   methods are `this is …` type predicates, so `if (r.isErr()) r.error` compiles.
