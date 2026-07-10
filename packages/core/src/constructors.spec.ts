@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { Err, isDefect, isErr, isOk, isResult, Ok, type Result, UnwrapError } from "./index.js";
+import {
+  AsyncResult,
+  Err,
+  ErrAsync,
+  isDefect,
+  isErr,
+  isOk,
+  isResult,
+  Ok,
+  OkAsync,
+  type Result,
+  UnwrapError,
+} from "./index.js";
 
 const boom = new Error("boom");
 const defectOf = (cause: unknown): Result<number, never> =>
@@ -40,6 +52,30 @@ describe("constructors", () => {
     if (nested.isOk()) {
       expect(nested.value.tag).toBe("Err");
     }
+  });
+});
+
+describe("pre-lifted async constructors (OkAsync / ErrAsync)", () => {
+  it("OkAsync lifts a value into a success AsyncResult — no Ok(x).toAsync()", async () => {
+    const r = await OkAsync(42);
+    expect(r.isOk()).toBe(true);
+    expect(r.unwrap()).toBe(42);
+  });
+
+  it("ErrAsync lifts an error into a failed AsyncResult", async () => {
+    const r = await ErrAsync("nope");
+    expect(r.isErr()).toBe(true);
+    expect(r.unwrapErr()).toBe("nope");
+  });
+
+  it("await-ing never throws and yields the same outcome as Ok(x).toAsync()", async () => {
+    expect(await OkAsync(1)).toStrictEqual(await Ok(1).toAsync());
+    expect(await ErrAsync("e")).toStrictEqual(await Err("e").toAsync());
+  });
+
+  it("the AsyncResult companion aliases them (suffix dropped inside the namespace)", () => {
+    expect(AsyncResult.Ok).toBe(OkAsync);
+    expect(AsyncResult.Err).toBe(ErrAsync);
   });
 });
 

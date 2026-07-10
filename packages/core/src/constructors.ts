@@ -1,7 +1,7 @@
 // Result constructors and the standalone narrowing guards.
 
 import { errRes, okRes } from "./core.js";
-import type { DefectView, ErrView, OkView, Result } from "./types.js";
+import type { AsyncResult, DefectView, ErrView, OkView, Result } from "./types.js";
 
 /**
  * Construct a successful {@link Result}.
@@ -41,6 +41,60 @@ export function Ok<T>(value: T): Result<T, never> {
  */
 export function Err<E>(error: E): Result<never, E> {
   return errRes(error);
+}
+
+/**
+ * Construct a successful {@link AsyncResult} from a pure value — the pre-lifted
+ * form of {@link Ok}, sparing you `Ok(value).toAsync()`.
+ *
+ * @remarks
+ * Reach for this on the synchronous/early branch of an `AsyncResult`-returning
+ * function, so both branches share one return type without a trailing
+ * `.toAsync()`. Named with the `Async` suffix the async free functions carry
+ * (`allAsync`, `allFromDictAsync`); the {@link AsyncResult} companion aliases it
+ * as `AsyncResult.Ok` (the namespace already says "async", so the suffix drops).
+ *
+ * @typeParam T - the success value type.
+ * @param value - the success value to wrap.
+ *
+ * @example
+ * ```ts
+ * import { OkAsync, type AsyncResult } from "unthrown";
+ *
+ * function loadItems(ids: string[]): AsyncResult<Item[], never> {
+ *   if (ids.length === 0) return OkAsync([]); // no more Ok([]).toAsync()
+ *   return itemRepository.load(ids);
+ * }
+ * ```
+ *
+ * @category Constructors
+ */
+export function OkAsync<T>(value: T): AsyncResult<T, never> {
+  return Ok(value).toAsync();
+}
+
+/**
+ * Construct a failed {@link AsyncResult} carrying a **modeled** error — the
+ * pre-lifted form of {@link Err}, sparing you `Err(error).toAsync()`.
+ *
+ * @remarks
+ * The error-channel mirror of {@link OkAsync}; see it for the naming and the
+ * `AsyncResult.Err` companion alias.
+ *
+ * @typeParam E - the modeled error type.
+ * @param error - the domain error to wrap.
+ *
+ * @example
+ * ```ts
+ * import { ErrAsync } from "unthrown";
+ *
+ * ErrAsync("not_found"); // AsyncResult<never, string>
+ * ```
+ *
+ * @category Constructors
+ */
+export function ErrAsync<E>(error: E): AsyncResult<never, E> {
+  return Err(error).toAsync();
 }
 
 /**

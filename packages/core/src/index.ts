@@ -1,4 +1,4 @@
-export { Err, isDefect, isErr, isOk, Ok } from "./constructors.js";
+export { Err, ErrAsync, isDefect, isErr, isOk, Ok, OkAsync } from "./constructors.js";
 export { isResult, UnwrapError } from "./core.js";
 export { Do } from "./do.js";
 export { AsyncResult, Result } from "./facade.js";
