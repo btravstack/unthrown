@@ -9,7 +9,7 @@ import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import "@unthrown/vitest";
 import { Err, fromSafePromise, TaggedError } from "unthrown";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 
 import { PrismaClient } from "./generated/prisma/client.ts";
 import { qualifyPrismaError, unthrownPrisma } from "./index.js";
@@ -24,23 +24,37 @@ const DDL = [
   `CREATE TABLE "Post" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "title" TEXT NOT NULL, "authorId" INTEGER NOT NULL, CONSTRAINT "Post_authorId_fkey" FOREIGN KEY ("authorId") REFERENCES "User" ("id"))`,
 ];
 
-const open: Array<{ $disconnect: () => Promise<void> }> = [];
+const makeClient = () =>
+  new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: ":memory:" }) }).$extends(
+    unthrownPrisma,
+  );
 
-const makeDb = async () => {
-  const adapter = new PrismaBetterSqlite3({ url: ":memory:" });
-  const db = new PrismaClient({ adapter }).$extends(unthrownPrisma);
-  open.push(db);
-  for (const stmt of DDL) await db.$executeRawUnsafe(stmt);
-  return db;
-};
-
-afterEach(async () => {
-  await Promise.all(open.splice(0).map((db) => db.$disconnect()));
+// Test-context fixtures (lazy — a test only pays for what it destructures):
+// `db` is a fresh extended client over its own in-memory database, disconnected
+// on teardown; `seededDb` layers six users on top, ids 1..6 — `name` is the
+// filter knob: flipping one row to "banned" makes its cursor stop matching a
+// `where: { name: "member" }`.
+const it = test.extend<{
+  db: ReturnType<typeof makeClient>;
+  seededDb: ReturnType<typeof makeClient>;
+}>({
+  // oxlint-disable-next-line no-empty-pattern -- Vitest fixtures require a destructuring pattern; `db` depends on no other fixture
+  db: async ({}, use) => {
+    const db = makeClient();
+    for (const stmt of DDL) await db.$executeRawUnsafe(stmt);
+    await use(db);
+    await db.$disconnect();
+  },
+  seededDb: async ({ db }, use) => {
+    await db.user.createMany({
+      data: [1, 2, 3, 4, 5, 6].map((n) => ({ email: `u${n}@example.com`, name: "member" })),
+    });
+    await use(db);
+  },
 });
 
 describe("try* model methods", () => {
-  it("wraps a successful create and read in Ok", async () => {
-    const db = await makeDb();
+  it("wraps a successful create and read in Ok", async ({ db }) => {
     await expect(db.user.tryCreate({ data: { email: "ada@example.com", name: "Ada" } })).toBeOkWith(
       expect.objectContaining({ email: "ada@example.com", name: "Ada" }),
     );
@@ -49,21 +63,18 @@ describe("try* model methods", () => {
     ]);
   });
 
-  it("applies a select at runtime (the narrowed payload is real)", async () => {
-    const db = await makeDb();
+  it("applies a select at runtime (the narrowed payload is real)", async ({ db }) => {
     await db.user.tryCreate({ data: { email: "ada@example.com", name: "Ada" } });
     await expect(db.user.tryFindMany({ select: { email: true } })).toBeOkWith([
       { email: "ada@example.com" },
     ]);
   });
 
-  it("returns Ok(null) for a findUnique miss (absence is not an error)", async () => {
-    const db = await makeDb();
+  it("returns Ok(null) for a findUnique miss (absence is not an error)", async ({ db }) => {
     await expect(db.user.tryFindUnique({ where: { id: 999 } })).toBeOkWith(null);
   });
 
-  it("maps a duplicate key to UniqueConstraintViolation (P2002)", async () => {
-    const db = await makeDb();
+  it("maps a duplicate key to UniqueConstraintViolation (P2002)", async ({ db }) => {
     await db.user.tryCreate({ data: { email: "dup@example.com" } });
     await expect(db.user.tryCreate({ data: { email: "dup@example.com" } })).toBeErrTagged(
       "UniqueConstraintViolation",
@@ -71,15 +82,15 @@ describe("try* model methods", () => {
     );
   });
 
-  it("maps a dangling relation to ForeignKeyViolation (P2003)", async () => {
-    const db = await makeDb();
+  it("maps a dangling relation to ForeignKeyViolation (P2003)", async ({ db }) => {
     await expect(db.post.tryCreate({ data: { title: "orphan", authorId: 999 } })).toBeErrTagged(
       "ForeignKeyViolation",
     );
   });
 
-  it("maps a missing row to RecordNotFound (P2025) on findUniqueOrThrow, update, and delete", async () => {
-    const db = await makeDb();
+  it("maps a missing row to RecordNotFound (P2025) on findUniqueOrThrow, update, and delete", async ({
+    db,
+  }) => {
     await expect(db.user.tryFindUniqueOrThrow({ where: { id: 999 } })).toBeErrTagged(
       "RecordNotFound",
     );
@@ -89,8 +100,7 @@ describe("try* model methods", () => {
     await expect(db.user.tryDelete({ where: { id: 999 } })).toBeErrTagged("RecordNotFound");
   });
 
-  it("updates, deletes, and counts through the bridge", async () => {
-    const db = await makeDb();
+  it("updates, deletes, and counts through the bridge", async ({ db }) => {
     await db.user.tryCreate({ data: { email: "ada@example.com" } });
     await expect(
       db.user.tryUpdate({ where: { email: "ada@example.com" }, data: { name: "Countess" } }),
@@ -103,17 +113,15 @@ describe("try* model methods", () => {
 });
 
 describe("$tryTransaction", () => {
-  it("commits when the callback returns Ok", async () => {
-    const db = await makeDb();
+  it("commits when the callback returns Ok", async ({ db }) => {
     await expect(
       db.$tryTransaction((tx) => tx.user.tryCreate({ data: { email: "tx@example.com" } })),
     ).toBeOkWith(expect.objectContaining({ email: "tx@example.com" }));
     await expect(db.user.tryCount()).toBeOkWith(1);
   });
 
-  it("rolls back on Err and re-surfaces the callback's typed error", async () => {
+  it("rolls back on Err and re-surfaces the callback's typed error", async ({ db }) => {
     class Nope extends TaggedError("Nope") {}
-    const db = await makeDb();
     await expect(
       db.$tryTransaction((tx) =>
         tx.user.tryCreate({ data: { email: "gone@example.com" } }).flatMap(() => Err(new Nope())),
@@ -122,8 +130,7 @@ describe("$tryTransaction", () => {
     await expect(db.user.tryCount()).toBeOkWith(0);
   });
 
-  it("rolls back on a defect and the defect stays a defect", async () => {
-    const db = await makeDb();
+  it("rolls back on a defect and the defect stays a defect", async ({ db }) => {
     await expect(
       db.$tryTransaction((tx) =>
         tx.user.tryCreate({ data: { email: "boom@example.com" } }).map(() => {
@@ -134,16 +141,16 @@ describe("$tryTransaction", () => {
     await expect(db.user.tryCount()).toBeOkWith(0);
   });
 
-  it("surfaces a query failure inside the transaction as its tagged error", async () => {
-    const db = await makeDb();
+  it("surfaces a query failure inside the transaction as its tagged error", async ({ db }) => {
     await db.user.tryCreate({ data: { email: "dup@example.com" } });
     await expect(
       db.$tryTransaction((tx) => tx.user.tryCreate({ data: { email: "dup@example.com" } })),
     ).toBeErrTagged("UniqueConstraintViolation");
   });
 
-  it("qualifies a transaction-level failure (commit after timeout) as DriverError", async () => {
-    const db = await makeDb();
+  it("qualifies a transaction-level failure (commit after timeout) as DriverError", async ({
+    db,
+  }) => {
     // The callback outlives the transaction timeout WITHOUT touching `tx`, so the
     // rejection comes from Prisma's commit — not through the sentinel.
     await expect(
@@ -156,18 +163,9 @@ describe("$tryTransaction", () => {
 });
 
 describe("tryPaginate / withCursor", () => {
-  // Six users, ids 1..6. `name` is the filter knob: flipping one row to
-  // "banned" makes its cursor stop matching a `where: { name: "member" }`.
-  const seed = async (db: Awaited<ReturnType<typeof makeDb>>) => {
-    await db.user.createMany({
-      data: [1, 2, 3, 4, 5, 6].map((n) => ({ email: `u${n}@example.com`, name: "member" })),
-    });
-  };
   const ids = (rows: ReadonlyArray<{ id: number }>) => rows.map((r) => r.id);
 
-  it("serves the first page with default cursors", async () => {
-    const db = await makeDb();
-    await seed(db);
+  it("serves the first page with default cursors", async ({ seededDb: db }) => {
     const page = await db.user.tryPaginate({ orderBy: { id: "asc" } }).withCursor({ limit: 2 });
     expect(page.isOk() && [ids(page.value[0]), page.value[1]]).toEqual([
       [1, 2],
@@ -175,9 +173,7 @@ describe("tryPaginate / withCursor", () => {
     ]);
   });
 
-  it("pages forward with after (exclusive) and reports both flags", async () => {
-    const db = await makeDb();
-    await seed(db);
+  it("pages forward with after (exclusive) and reports both flags", async ({ seededDb: db }) => {
     const page = await db.user
       .tryPaginate({ orderBy: { id: "asc" } })
       .withCursor({ limit: 2, after: "2" });
@@ -187,9 +183,7 @@ describe("tryPaginate / withCursor", () => {
     ]);
   });
 
-  it("reaches the last page with hasNextPage false", async () => {
-    const db = await makeDb();
-    await seed(db);
+  it("reaches the last page with hasNextPage false", async ({ seededDb: db }) => {
     const page = await db.user
       .tryPaginate({ orderBy: { id: "asc" } })
       .withCursor({ limit: 2, after: "5" });
@@ -199,9 +193,7 @@ describe("tryPaginate / withCursor", () => {
     ]);
   });
 
-  it("pages backward with before (exclusive)", async () => {
-    const db = await makeDb();
-    await seed(db);
+  it("pages backward with before (exclusive)", async ({ seededDb: db }) => {
     const page = await db.user
       .tryPaginate({ orderBy: { id: "asc" } })
       .withCursor({ limit: 2, before: "4" });
@@ -211,9 +203,7 @@ describe("tryPaginate / withCursor", () => {
     ]);
   });
 
-  it("serves an empty page past the end with null cursors", async () => {
-    const db = await makeDb();
-    await seed(db);
+  it("serves an empty page past the end with null cursors", async ({ seededDb: db }) => {
     const page = await db.user
       .tryPaginate({ orderBy: { id: "asc" } })
       .withCursor({ limit: 2, after: "6" });
@@ -223,9 +213,9 @@ describe("tryPaginate / withCursor", () => {
     ]);
   });
 
-  it("returns everything with limit null, from the after cursor when given", async () => {
-    const db = await makeDb();
-    await seed(db);
+  it("returns everything with limit null, from the after cursor when given", async ({
+    seededDb: db,
+  }) => {
     const all = await db.user.tryPaginate({ orderBy: { id: "asc" } }).withCursor({ limit: null });
     expect(all.isOk() && [ids(all.value[0]), all.value[1].hasNextPage]).toEqual([
       [1, 2, 3, 4, 5, 6],
@@ -243,9 +233,9 @@ describe("tryPaginate / withCursor", () => {
   // The fix carried over from deptyped/prisma-extension-pagination#36 (#35):
   // when the AFTER cursor row was mutated and no longer matches the filter, the
   // first element of the page must NOT be skipped.
-  it("does not skip the first element when the after cursor no longer matches the filter", async () => {
-    const db = await makeDb();
-    await seed(db);
+  it("does not skip the first element when the after cursor no longer matches the filter", async ({
+    seededDb: db,
+  }) => {
     await db.user.update({ where: { id: 3 }, data: { name: "banned" } });
     const query = { where: { name: "member" }, orderBy: { id: "asc" } } as const;
     const wide = await db.user.tryPaginate(query).withCursor({ limit: 2, after: "3" });
@@ -261,9 +251,9 @@ describe("tryPaginate / withCursor", () => {
     ]);
   });
 
-  it("does not skip the last element when the before cursor no longer matches the filter", async () => {
-    const db = await makeDb();
-    await seed(db);
+  it("does not skip the last element when the before cursor no longer matches the filter", async ({
+    seededDb: db,
+  }) => {
     await db.user.update({ where: { id: 4 }, data: { name: "banned" } });
     const query = { where: { name: "member" }, orderBy: { id: "asc" } } as const;
     const wide = await db.user.tryPaginate(query).withCursor({ limit: 2, before: "4" });
@@ -279,9 +269,7 @@ describe("tryPaginate / withCursor", () => {
     ]);
   });
 
-  it("supports a custom cursor serialization (email)", async () => {
-    const db = await makeDb();
-    await seed(db);
+  it("supports a custom cursor serialization (email)", async ({ seededDb: db }) => {
     const page = await db.user.tryPaginate({ orderBy: { id: "asc" } }).withCursor({
       limit: 2,
       after: "u2@example.com",
@@ -294,9 +282,7 @@ describe("tryPaginate / withCursor", () => {
     ]);
   });
 
-  it("paginates a narrowed selection", async () => {
-    const db = await makeDb();
-    await seed(db);
+  it("paginates a narrowed selection", async ({ seededDb: db }) => {
     await expect(
       db.user
         .tryPaginate({ select: { id: true }, orderBy: { id: "asc" } })
@@ -307,17 +293,15 @@ describe("tryPaginate / withCursor", () => {
     ]);
   });
 
-  it("surfaces a default cursor over a selection without id as DriverError", async () => {
-    const db = await makeDb();
-    await seed(db);
+  it("surfaces a default cursor over a selection without id as DriverError", async ({
+    seededDb: db,
+  }) => {
     await expect(
       db.user.tryPaginate({ select: { email: true } }).withCursor({ limit: 2 }),
     ).toBeErrTagged("DriverError");
   });
 
-  it("surfaces a malformed cursor as DriverError", async () => {
-    const db = await makeDb();
-    await seed(db);
+  it("surfaces a malformed cursor as DriverError", async ({ seededDb: db }) => {
     // Default parseCursor keeps a non-numeric cursor as a string — invalid for
     // this model's Int id, so Prisma rejects it.
     await expect(
