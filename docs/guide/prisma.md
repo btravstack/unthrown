@@ -141,10 +141,11 @@ Three deliberate differences from upstream:
   [deptyped/prisma-extension-pagination#35](https://github.com/deptyped/prisma-extension-pagination/issues/35)).
 - **`before` + `limit: null` is a compile error** — Prisma's negative `take`
   can't express "everything before the cursor, unbounded."
-- **The default cursor preserves the id's type** — all-digit cursors parse back
-  to numbers (autoincrement ids), anything else stays a string (uuid / cuid).
-  Provide `getCursor` / `parseCursor` for composite keys or a selection without
-  `id`.
+- **The default cursor preserves the id's type** — an all-digit cursor parses
+  back to a number (autoincrement ids), promoted to a `bigint` beyond
+  `Number.MAX_SAFE_INTEGER` so a `BigInt` id never loses precision; anything
+  else stays a string (uuid / cuid). Provide `getCursor` / `parseCursor` for
+  composite keys or a selection without `id`.
 
 ## The raw methods stay on purpose
 

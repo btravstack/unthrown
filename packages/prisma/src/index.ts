@@ -155,8 +155,11 @@ type DeleteManyError = ForeignKeyViolation | DriverError;
 type UntypedDelegate = Record<string, (args?: unknown) => Promise<unknown>>;
 
 const query = (self: unknown, op: string, args?: unknown): AsyncResult<unknown, PrismaQueryError> =>
+  // Passed as a THUNK: a delegate that throws synchronously (e.g. a validation
+  // error out of untyped args) is absorbed by the boundary instead of escaping
+  // the AsyncResult as a raw throw.
   fromPromise(
-    (Prisma.getExtensionContext(self) as unknown as UntypedDelegate)[op]!(args),
+    () => (Prisma.getExtensionContext(self) as unknown as UntypedDelegate)[op]!(args),
     qualifyPrismaError,
   );
 
@@ -536,23 +539,27 @@ export const unthrownPrisma = Prisma.defineExtension({
       const client = Prisma.getExtensionContext(this) as unknown as {
         $transaction: <R>(f: (tx: unknown) => Promise<R>, opts?: unknown) => Promise<R>;
       };
+      // Passed as a THUNK so even a synchronous throw out of `$transaction`
+      // itself (e.g. invalid options from untyped code) stays inside the
+      // boundary instead of escaping as a raw throw.
       return fromPromise(
-        client.$transaction(async (tx) => {
-          let result: Result<T, E>;
-          try {
-            result = await fn(tx as Omit<C, TxDenyList>);
-          } catch (cause) {
-            // A callback that throws (instead of returning an AsyncResult) is a
-            // bug — roll back and keep it a DEFECT. Only rejections outside
-            // this catch (Prisma's own BEGIN/COMMIT/timeout machinery) qualify
-            // as query failures below.
-            throw new Rollback(cause, true);
-          }
-          if (result.isOk()) return result.value;
-          throw result.isErr()
-            ? new Rollback(result.error, false)
-            : new Rollback(result.cause, true);
-        }, options),
+        () =>
+          client.$transaction(async (tx) => {
+            let result: Result<T, E>;
+            try {
+              result = await fn(tx as Omit<C, TxDenyList>);
+            } catch (cause) {
+              // A callback that throws (instead of returning an AsyncResult) is a
+              // bug — roll back and keep it a DEFECT. Only rejections outside
+              // this catch (Prisma's own BEGIN/COMMIT/timeout machinery) qualify
+              // as query failures below.
+              throw new Rollback(cause, true);
+            }
+            if (result.isOk()) return result.value;
+            throw result.isErr()
+              ? new Rollback(result.error, false)
+              : new Rollback(result.cause, true);
+          }, options),
         (cause, defect) =>
           cause instanceof Rollback
             ? cause.wasDefect
