@@ -293,6 +293,24 @@ library can be "done".
   AST rules that resolve the import source via scope analysis so they only fire
   on unthrown's `Result`. No TypeDoc API page; documented in the Linting guide.
   Tested with oxlint's `RuleTester` from `oxlint/plugins-dev`.)
+- `packages/prisma` → `@unthrown/prisma` (peerDep `@prisma/client` ^7; a Prisma
+  Client **extension** — `$extends(unthrownPrisma)` adds `try*` variants of the
+  model delegate operations alongside the raw promise ones, each an
+  `AsyncResult` whose error channel is exactly the P-codes that operation can
+  raise: `UniqueConstraintViolation` P2002, `ForeignKeyViolation` P2003,
+  `RecordNotFound` P2025, everything else `DriverError` with the cause
+  preserved. Also `$tryTransaction` (an interactive transaction whose callback
+  speaks `AsyncResult` — an `Err` rolls back and re-surfaces typed; a defect
+  rolls back and stays a defect) and `tryPaginate(...).withCursor(...)` (the
+  `prisma-extension-pagination` cursor API with its unmerged #35 fix folded
+  in). Qualification happens once inside the extension via the exported
+  `qualifyPrismaError`; the raw methods stay as the escape hatch for batch
+  `$transaction([...])` and the not-yet-wrapped operations. Tested against a
+  real in-memory SQLite client (`@prisma/adapter-better-sqlite3`) with a
+  generated, gitignored test client; **deliberately outside the fixed version
+  group** — its majors track `@prisma/client`'s cadence, not the family's.
+  `engines: { node: ">=20.19" }` (Prisma 7's floor), the one exception to the
+  family's `>=20`. Documented in the Prisma guide page.)
 - `tools/tsconfig`, `tools/typedoc` → private shared config (`@unthrown/tsconfig`,
   `@unthrown/typedoc`)
 - `docs` → `@unthrown/docs`, the VitePress site (guide + TypeDoc-generated API
@@ -304,7 +322,8 @@ Never pull `ts-pattern`, `vitest`, or any interop peer (`effect`, `neverthrow`,
 Every satellite package depends on core via `workspace:^` (an exact pin would
 create a dual-copy hazard with the `instanceof`-based `isResult`); for the same
 reason, `@unthrown/vitest` takes core as a **peerDependency**, not a regular
-dependency. Every published package carries `engines: { node: ">=20" }`, ships
+dependency. Every published package carries `engines: { node: ">=20" }`
+(`@unthrown/prisma` alone raises it to `>=20.19`, Prisma 7's floor), ships
 its own `LICENSE`, and sets `files: ["dist"]`.
 
 ### Interop packages (`packages/effect`, `packages/neverthrow`, `packages/boxed`)
