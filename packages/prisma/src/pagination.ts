@@ -7,12 +7,20 @@
 // when the cursor row itself is filtered out — the page is over-fetched by two
 // and the boundary row is dropped only when it IS the cursor row.
 
+/**
+ * The page metadata of `withCursor`.
+ *
+ * @remarks
+ * `startCursor` / `endCursor` are the cursors of the page's boundary rows, so
+ * they are `null` together exactly when the page is empty — checking one
+ * narrows the other. They are deliberately NOT coupled to the flags: the last
+ * page has `hasNextPage: false` with a non-null `endCursor`, and an empty page
+ * past the end has `hasPreviousPage: true` with a null `startCursor`.
+ */
 export type CursorPaginationMeta = {
   hasPreviousPage: boolean;
   hasNextPage: boolean;
-  startCursor: string | null;
-  endCursor: string | null;
-};
+} & ({ startCursor: string; endCursor: string } | { startCursor: null; endCursor: null });
 
 /**
  * Options of `withCursor`, in the style of `prisma-extension-pagination`.
@@ -79,6 +87,36 @@ const defaultParseCursor = (cursor: string): unknown => ({
   id: /^\d+$/.test(cursor) ? Number(cursor) : cursor,
 });
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+// Deep structural equality for parsed cursors: key-order independent, and safe
+// for every value a Prisma unique input can carry — `bigint` ids, `Date`
+// fields, nested composite-key records. (`JSON.stringify` would throw on
+// `bigint` and is sensitive to key order.)
+const cursorEquals = (a: unknown, b: unknown): boolean => {
+  if (a === b) return true;
+  if (a instanceof Date || b instanceof Date) {
+    return a instanceof Date && b instanceof Date && a.getTime() === b.getTime();
+  }
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return (
+      Array.isArray(a) &&
+      Array.isArray(b) &&
+      a.length === b.length &&
+      a.every((value, i) => cursorEquals(value, b[i]))
+    );
+  }
+  if (isRecord(a) && isRecord(b)) {
+    const keys = Object.keys(a);
+    return (
+      keys.length === Object.keys(b).length &&
+      keys.every((key) => key in b && cursorEquals(a[key], b[key]))
+    );
+  }
+  return false;
+};
+
 type RuntimeOptions = {
   limit: number | null;
   after?: string;
@@ -103,7 +141,7 @@ export const paginateWithCursor = async (
   // Is this row the cursor row? Compared through the cursor round-trip, so it
   // works for any serialization the caller chose.
   const sameCursor = (row: unknown, cursor: unknown): boolean =>
-    JSON.stringify(parseCursor(getCursor(row))) === JSON.stringify(cursor);
+    cursorEquals(parseCursor(getCursor(row)), cursor);
 
   let results: unknown[];
   let hasPreviousPage = false;
@@ -154,13 +192,12 @@ export const paginateWithCursor = async (
     }
   }
 
-  return [
-    results,
-    {
-      hasPreviousPage,
-      hasNextPage,
-      startCursor: results.length > 0 ? getCursor(results[0]!) : null,
-      endCursor: results.length > 0 ? getCursor(results[results.length - 1]!) : null,
-    },
-  ];
+  // Boundary cursors travel together: both strings on a non-empty page, both
+  // null on an empty one (see the CursorPaginationMeta union).
+  const cursors =
+    results.length > 0
+      ? { startCursor: getCursor(results[0]!), endCursor: getCursor(results[results.length - 1]!) }
+      : { startCursor: null, endCursor: null };
+
+  return [results, { hasPreviousPage, hasNextPage, ...cursors }];
 };

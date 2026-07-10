@@ -17,7 +17,6 @@
 // for batch `$transaction([...])`, which needs unexecuted `PrismaPromise`s.
 
 import { Prisma } from "@prisma/client/extension";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { type AsyncResult, fromPromise, TaggedError } from "unthrown";
 
 import {
@@ -78,6 +77,18 @@ export type PrismaQueryError =
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
+// Recognized structurally rather than with `instanceof` against a class
+// imported from a Prisma runtime entry: the runtime module path varies across
+// Prisma versions (`runtime/library` in v4–v6, `runtime/client` in v7), and an
+// `instanceof` against the wrong copy would silently fail. The `name` +
+// string-`code` shape is stable across all of them.
+type KnownRequestError = Error & { code: string; meta?: unknown };
+
+const isKnownRequestError = (cause: unknown): cause is KnownRequestError =>
+  cause instanceof Error &&
+  cause.name === "PrismaClientKnownRequestError" &&
+  typeof (cause as { code?: unknown }).code === "string";
+
 // The offending column set of a P2002, wherever this Prisma version put it:
 // `meta.target` (the classic engine shape) or
 // `meta.driverAdapterError.cause.constraint.fields` (the driver-adapter shape).
@@ -108,7 +119,7 @@ const constraintFields = (meta: unknown): readonly string[] => {
  * @param cause - the rejected value from a Prisma query.
  */
 export const qualifyPrismaError = (cause: unknown): PrismaQueryError => {
-  if (cause instanceof PrismaClientKnownRequestError) {
+  if (isKnownRequestError(cause)) {
     switch (cause.code) {
       case "P2002":
         return new UniqueConstraintViolation({ fields: constraintFields(cause.meta), cause });
@@ -155,6 +166,23 @@ class Rollback extends Error {
     super("transaction rolled back");
   }
 }
+
+/**
+ * The isolation levels Prisma accepts across databases, as a closed union.
+ *
+ * @remarks
+ * The schema-derived `Prisma.TransactionIsolationLevel` of a generated client
+ * is narrower (it lists only what YOUR database supports), but a shareable
+ * extension cannot name a generated type — this union at least rejects typos
+ * at compile time; a level your database does not support still fails at
+ * runtime as a {@link DriverError}.
+ */
+export type TransactionIsolationLevel =
+  | "ReadUncommitted"
+  | "ReadCommitted"
+  | "RepeatableRead"
+  | "Snapshot"
+  | "Serializable";
 
 /**
  * What `tryPaginate` returns: a builder holding the query, consumed by
@@ -367,7 +395,7 @@ export const unthrownPrisma = Prisma.defineExtension({
       options?: {
         maxWait?: number;
         timeout?: number;
-        isolationLevel?: string;
+        isolationLevel?: TransactionIsolationLevel;
       },
     ): AsyncResult<T, E | PrismaQueryError> {
       const client = Prisma.getExtensionContext(this) as unknown as {
