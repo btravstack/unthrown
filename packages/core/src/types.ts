@@ -186,7 +186,7 @@ export type ResultMethods<T, E> = {
    */
   flatMapErr<U, E2>(f: (error: E) => Result<U, E2>): Result<T | U, E2>;
   /**
-   * The success value or the produced fallback `Result`.
+   * Sequence from an `Err` by producing another `Result`.
    *
    * @deprecated Renamed to {@link ResultMethods.flatMapErr | flatMapErr} — it is
    * `flatMap` on the error channel, so it now follows the `…Err` convention. This
