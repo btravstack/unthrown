@@ -239,6 +239,11 @@ arFallible.unwrap();
 // @ts-expect-error - async unwrapErr requires T = never
 arFallible.unwrapErr();
 
+// getOrThrow is NOT gated — it compiles on a fallible Result and returns T
+// (it throws the modeled error at runtime instead of eliminating it in the type)
+type _getOrThrow = Expect<Equal<ReturnType<typeof rFallible.getOrThrow>, number>>;
+type _getOrThrowAsync = Expect<Equal<ReturnType<typeof arFallible.getOrThrow>, Promise<number>>>;
+
 // --- extractor types ---------------------------------------------------------
 
 type _okOf = Expect<Equal<OkOf<Result<number, "e">>, number>>;

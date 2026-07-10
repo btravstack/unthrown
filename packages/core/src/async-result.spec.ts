@@ -280,6 +280,11 @@ describe("AsyncResult eliminators", () => {
     await expect(asyncOk(2).getOrNull()).resolves.toBe(2);
   });
 
+  it("getOrThrow resolves the Ok value but rejects with the modeled error on Err", async () => {
+    await expect(asyncOk(2).getOrThrow()).resolves.toBe(2);
+    await expect(asyncErr("e").getOrThrow()).rejects.toBe("e");
+  });
+
   it("a Defect rejects the eliminators with the original cause", async () => {
     await expect(asyncDefect().unwrap()).rejects.toBe(boom);
     // Also type-unreachable (unwrapErr needs T = never; asyncDefect's declared
@@ -291,6 +296,7 @@ describe("AsyncResult eliminators", () => {
     await expect(asyncDefect().unwrapOrElse(() => 0)).rejects.toBe(boom);
     await expect(asyncDefect().getOrNull()).rejects.toBe(boom);
     await expect(asyncDefect().getOrUndefined()).rejects.toBe(boom);
+    await expect(asyncDefect().getOrThrow()).rejects.toBe(boom);
   });
 
   it("Promise.all adopts AsyncResults, settling to Results", async () => {
