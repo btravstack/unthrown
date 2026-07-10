@@ -1,0 +1,102 @@
+{
+  "name": "@unthrown/orpc",
+  "version": "0.0.0",
+  "description": "oRPC integration for unthrown: Result-returning procedure handlers and an AsyncResult client, with end-to-end typed errors",
+  "keywords": [
+    "errors-as-values",
+    "orpc",
+    "result",
+    "rpc",
+    "typescript",
+    "unthrown"
+  ],
+  "homepage": "https://github.com/btravstack/unthrown#readme",
+  "bugs": {
+    "url": "https://github.com/btravstack/unthrown/issues"
+  },
+  "license": "MIT",
+  "author": "Benoit TRAVERS <benoit.travers.fr@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/btravstack/unthrown.git",
+    "directory": "packages/orpc"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "./dist/extensions/result.mjs",
+    "./dist/extensions/result.cjs"
+  ],
+  "exports": {
+    "./client": {
+      "import": {
+        "types": "./dist/client.d.mts",
+        "default": "./dist/client.mjs"
+      },
+      "require": {
+        "types": "./dist/client.d.cts",
+        "default": "./dist/client.cjs"
+      }
+    },
+    "./server": {
+      "import": {
+        "types": "./dist/server.d.mts",
+        "default": "./dist/server.mjs"
+      },
+      "require": {
+        "types": "./dist/server.d.cts",
+        "default": "./dist/server.cjs"
+      }
+    },
+    "./extensions/result": {
+      "import": {
+        "types": "./dist/extensions/result.d.mts",
+        "default": "./dist/extensions/result.mjs"
+      },
+      "require": {
+        "types": "./dist/extensions/result.d.cts",
+        "default": "./dist/extensions/result.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown src/client.ts src/server.ts src/extensions/result.ts --format cjs,esm --dts --clean",
+    "build:docs": "typedoc",
+    "dev": "tsdown src/client.ts src/server.ts src/extensions/result.ts --format cjs,esm --dts --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "unthrown": "workspace:^"
+  },
+  "devDependencies": {
+    "@orpc/client": "catalog:",
+    "@orpc/contract": "catalog:",
+    "@orpc/server": "catalog:",
+    "@types/node": "catalog:",
+    "@unthrown/tsconfig": "workspace:*",
+    "@unthrown/typedoc": "workspace:*",
+    "@unthrown/vitest": "workspace:*",
+    "@vitest/coverage-v8": "catalog:",
+    "tsdown": "catalog:",
+    "typedoc": "catalog:",
+    "typedoc-plugin-markdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@orpc/client": "^2.0.0-beta",
+    "@orpc/server": "^2.0.0-beta"
+  },
+  "peerDependenciesMeta": {
+    "@orpc/server": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

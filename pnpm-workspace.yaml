@@ -18,6 +18,9 @@ catalog:
   "@prisma/client": 7.8.0
   "@standard-schema/spec": 1.1.0
   "@commitlint/config-conventional": 21.2.0
+  "@orpc/client": 2.0.0-beta.14
+  "@orpc/contract": 2.0.0-beta.14
+  "@orpc/server": 2.0.0-beta.14
   "@types/node": 24.13.2
   "@vitest/coverage-v8": 4.1.9
   better-sqlite3: 12.11.1
