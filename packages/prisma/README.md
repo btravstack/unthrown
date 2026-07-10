@@ -4,7 +4,7 @@
 > [unthrown](https://github.com/btravstack/unthrown)'s `Result`: `try`-prefixed
 > query methods returning `AsyncResult`, with per-operation tagged errors.
 
-📖 **[Documentation](https://btravstack.github.io/unthrown/guide/interop)** ·
+📖 **[Documentation](https://btravstack.github.io/unthrown/guide/prisma)** ·
 [API Reference](https://btravstack.github.io/unthrown/api/prisma/)
 
 ```sh
