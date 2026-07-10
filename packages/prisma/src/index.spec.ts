@@ -110,6 +110,97 @@ describe("try* model methods", () => {
     );
     await expect(db.user.tryCount()).toBeOkWith(0);
   });
+
+  it("finds the first match — Ok(row) on hit, Ok(null) on miss, RecordNotFound only for OrThrow", async ({
+    db,
+  }) => {
+    await db.user.tryCreate({ data: { email: "bee@example.com", name: "Bee" } });
+    await expect(db.user.tryFindFirst({ where: { name: "Bee" } })).toBeOkWith(
+      expect.objectContaining({ email: "bee@example.com" }),
+    );
+    await expect(db.user.tryFindFirst({ where: { name: "nobody" } })).toBeOkWith(null);
+    await expect(db.user.tryFindFirstOrThrow({ where: { name: "Bee" } })).toBeOkWith(
+      expect.objectContaining({ email: "bee@example.com" }),
+    );
+    await expect(db.user.tryFindFirstOrThrow({ where: { name: "nobody" } })).toBeErrTagged(
+      "RecordNotFound",
+    );
+  });
+
+  it("creates many — the count, the AndReturn rows, and P2002 for a duplicate in the batch", async ({
+    db,
+  }) => {
+    await expect(
+      db.user.tryCreateMany({ data: [{ email: "a@x.com" }, { email: "b@x.com" }] }),
+    ).toBeOkWith({ count: 2 });
+    await expect(
+      db.user.tryCreateManyAndReturn({ data: [{ email: "c@x.com" }], select: { email: true } }),
+    ).toBeOkWith([{ email: "c@x.com" }]);
+    await expect(db.user.tryCreateMany({ data: [{ email: "a@x.com" }] })).toBeErrTagged(
+      "UniqueConstraintViolation",
+    );
+  });
+
+  it("upserts — creates on miss (never P2025), updates on hit, and models a unique collision", async ({
+    db,
+  }) => {
+    const upsert = (update: { name?: string; email?: string }) =>
+      db.user.tryUpsert({
+        where: { email: "up@x.com" },
+        create: { email: "up@x.com", name: "created" },
+        update,
+      });
+    await expect(upsert({ name: "updated" })).toBeOkWith(
+      expect.objectContaining({ name: "created" }),
+    );
+    await expect(upsert({ name: "updated" })).toBeOkWith(
+      expect.objectContaining({ name: "updated" }),
+    );
+    await db.user.tryCreate({ data: { email: "taken@x.com" } });
+    await expect(upsert({ email: "taken@x.com" })).toBeErrTagged("UniqueConstraintViolation");
+  });
+
+  it("updates many — the count, Ok(0) on zero matches (never P2025), P2002 on a collision", async ({
+    seededDb: db,
+  }) => {
+    await expect(
+      db.user.tryUpdateMany({ where: { name: "member" }, data: { name: "crew" } }),
+    ).toBeOkWith({ count: 6 });
+    await expect(
+      db.user.tryUpdateMany({ where: { name: "nobody" }, data: { name: "x" } }),
+    ).toBeOkWith({ count: 0 });
+    await expect(
+      db.user.tryUpdateMany({ where: { id: 1 }, data: { email: "u2@example.com" } }),
+    ).toBeErrTagged("UniqueConstraintViolation");
+    await expect(
+      db.user.tryUpdateManyAndReturn({
+        where: { id: 1 },
+        data: { name: "solo" },
+        select: { name: true },
+      }),
+    ).toBeOkWith([{ name: "solo" }]);
+  });
+
+  it("deletes many — a referenced parent is P2003; the count otherwise (zero matches is Ok)", async ({
+    db,
+  }) => {
+    await db.user.tryCreate({ data: { email: "parent@x.com" } });
+    await db.post.tryCreate({ data: { title: "t", authorId: 1 } });
+    await expect(db.user.tryDeleteMany({ where: { id: 1 } })).toBeErrTagged("ForeignKeyViolation");
+    await expect(db.post.tryDeleteMany()).toBeOkWith({ count: 1 });
+    await expect(db.user.tryDeleteMany()).toBeOkWith({ count: 1 });
+    await expect(db.user.tryDeleteMany()).toBeOkWith({ count: 0 });
+  });
+
+  it("aggregates and groups through the bridge", async ({ seededDb: db }) => {
+    await expect(db.user.tryAggregate({ _count: true, _max: { id: true } })).toBeOkWith({
+      _count: 6,
+      _max: { id: 6 },
+    });
+    await expect(db.user.tryGroupBy({ by: ["name"], _count: true })).toBeOkWith([
+      { name: "member", _count: 6 },
+    ]);
+  });
 });
 
 describe("$tryTransaction", () => {

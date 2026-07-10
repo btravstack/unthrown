@@ -33,14 +33,21 @@ error channel is only what that operation can actually raise**. A read cannot
 fail with a `UniqueConstraintViolation` _in the type_, so you never write a
 handler for a case that can't happen.
 
-| Method                                       | Error channel                                                                       |
-| -------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `tryFindMany` / `tryFindUnique` / `tryCount` | `DriverError`                                                                       |
-| `tryFindUniqueOrThrow`                       | `RecordNotFound \| DriverError`                                                     |
-| `tryCreate`                                  | `UniqueConstraintViolation \| ForeignKeyViolation \| DriverError`                   |
-| `tryUpdate`                                  | `RecordNotFound \| UniqueConstraintViolation \| ForeignKeyViolation \| DriverError` |
-| `tryDelete`                                  | `RecordNotFound \| ForeignKeyViolation \| DriverError`                              |
-| `tryPaginate(...).withCursor(...)`           | `DriverError`                                                                       |
+| Method                                                                                        | Error channel                                                                       |
+| --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `tryFindMany` / `tryFindUnique` / `tryFindFirst` / `tryCount` / `tryAggregate` / `tryGroupBy` | `DriverError`                                                                       |
+| `tryFindUniqueOrThrow` / `tryFindFirstOrThrow`                                                | `RecordNotFound \| DriverError`                                                     |
+| `tryCreate` / `tryCreateMany` / `tryCreateManyAndReturn`                                      | `UniqueConstraintViolation \| ForeignKeyViolation \| DriverError`                   |
+| `tryUpsert`                                                                                   | `UniqueConstraintViolation \| ForeignKeyViolation \| DriverError`                   |
+| `tryUpdate`                                                                                   | `RecordNotFound \| UniqueConstraintViolation \| ForeignKeyViolation \| DriverError` |
+| `tryUpdateMany` / `tryUpdateManyAndReturn`                                                    | `UniqueConstraintViolation \| ForeignKeyViolation \| DriverError`                   |
+| `tryDelete`                                                                                   | `RecordNotFound \| ForeignKeyViolation \| DriverError`                              |
+| `tryDeleteMany`                                                                               | `ForeignKeyViolation \| DriverError`                                                |
+| `tryPaginate(...).withCursor(...)`                                                            | `DriverError`                                                                       |
+
+Note where `RecordNotFound` does **not** appear: `tryUpsert` (a miss _creates_)
+and the batch mutations (`*Many` — zero matches is `Ok({ count: 0 })`, not an
+error). The union tells you exactly which outcomes are worth a branch.
 
 The tagged errors map to Prisma's P-codes: `UniqueConstraintViolation` is `P2002`
 (and carries the offending `fields`), `ForeignKeyViolation` is `P2003`, and
@@ -141,19 +148,18 @@ Three deliberate differences from upstream:
 ## The raw methods stay on purpose
 
 The bridge is additive: `db.user.findMany(...)` (the raw promise) is still there.
-That's the escape hatch for anything the extension doesn't wrap — batch
-`$transaction([...])` (which needs unexecuted `PrismaPromise`s), and operations
-without a `try*` variant yet (`findFirst`, `upsert`, `createMany`, `aggregate`,
-`groupBy`, …). Qualify those yourself at the boundary with
-[`fromPromise`](./boundaries):
+Every model delegate operation has a `try*` variant, so the raw methods remain
+for exactly two things — batch `$transaction([...])` (which needs unexecuted
+`PrismaPromise`s) and raw SQL (`$queryRaw` / `$executeRaw`). Qualify those
+yourself at the boundary with [`fromPromise`](./boundaries):
 
 ```ts
 import { fromPromise } from "unthrown";
 import { qualifyPrismaError } from "@unthrown/prisma";
 
 // qualifyPrismaError is exported — reuse the same P-code triage for a raw call.
-const first = fromPromise(db.user.findFirst({ where: { active: true } }), qualifyPrismaError);
-//    ^? AsyncResult<User | null, UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound | DriverError>
+const rows = fromPromise(db.$queryRaw`SELECT 1`, qualifyPrismaError);
+//    ^? AsyncResult<unknown, UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound | DriverError>
 ```
 
 See the [API reference](/api/prisma/) for every method's exact signature.

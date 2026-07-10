@@ -4,9 +4,12 @@
 
 Initial release of **@unthrown/prisma** — a Prisma Client extension that bridges
 Prisma queries into unthrown's `AsyncResult`. `$extends(unthrownPrisma)` adds
-`try`-prefixed variants of the model delegate operations (`tryFindMany`,
-`tryFindUnique`, `tryFindUniqueOrThrow`, `tryCount`, `tryCreate`, `tryUpdate`,
-`tryDelete`) alongside the raw promise ones: each returns an `AsyncResult` whose
+`try`-prefixed variants of **all seventeen** model delegate operations
+(`tryFindMany`, `tryFindUnique`, `tryFindUniqueOrThrow`, `tryFindFirst`,
+`tryFindFirstOrThrow`, `tryCount`, `tryAggregate`, `tryGroupBy`, `tryCreate`,
+`tryCreateMany`, `tryCreateManyAndReturn`, `tryUpsert`, `tryUpdate`,
+`tryUpdateMany`, `tryUpdateManyAndReturn`, `tryDelete`, `tryDeleteMany`)
+alongside the raw promise ones: each returns an `AsyncResult` whose
 error channel is exactly the set of P-codes that operation can produce, mapped to
 tagged errors (`UniqueConstraintViolation` / `ForeignKeyViolation` /
 `RecordNotFound` / `DriverError`) — with `select` / `include` payload inference

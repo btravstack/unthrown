@@ -136,11 +136,16 @@ export const qualifyPrismaError = (cause: unknown): PrismaQueryError => {
 
 // Per-operation error unions — the static half. Reads can only fail in the
 // driver; writes add the constraint violations their SQL can raise; `*OrThrow`
-// and mutations of a specific record add P2025.
+// and mutations of a specific record add P2025. The batch mutations (`*Many`)
+// and `upsert` never raise P2025: zero matches is `Ok({ count: 0 })`, and an
+// upsert miss creates.
 type ReadError = DriverError;
 type CreateError = UniqueConstraintViolation | ForeignKeyViolation | DriverError;
 type UpdateError = RecordNotFound | UniqueConstraintViolation | ForeignKeyViolation | DriverError;
 type DeleteError = RecordNotFound | ForeignKeyViolation | DriverError;
+type UpsertError = UniqueConstraintViolation | ForeignKeyViolation | DriverError;
+type UpdateManyError = UniqueConstraintViolation | ForeignKeyViolation | DriverError;
+type DeleteManyError = ForeignKeyViolation | DriverError;
 
 // The untyped runtime call under the typed surface: `getExtensionContext`
 // resolves the concrete delegate and the promise is qualified at the boundary,
@@ -273,12 +278,59 @@ export const unthrownPrisma = Prisma.defineExtension({
         >;
       },
 
+      /** `findFirst`, qualified: the first match or `null`, or a {@link DriverError}. */
+      tryFindFirst<T, A = Record<string, never>>(
+        this: T,
+        args?: Prisma.Exact<A, Prisma.Args<T, "findFirst">>,
+      ): AsyncResult<Prisma.Result<T, A, "findFirst">, ReadError> {
+        return query(this, "findFirst", args) as AsyncResult<
+          Prisma.Result<T, A, "findFirst">,
+          ReadError
+        >;
+      },
+
+      /**
+       * `findFirstOrThrow`, qualified: no match is a modeled
+       * {@link RecordNotFound}, not a throw.
+       */
+      tryFindFirstOrThrow<T, A = Record<string, never>>(
+        this: T,
+        args?: Prisma.Exact<A, Prisma.Args<T, "findFirstOrThrow">>,
+      ): AsyncResult<Prisma.Result<T, A, "findFirstOrThrow">, RecordNotFound | DriverError> {
+        return query(this, "findFirstOrThrow", args) as AsyncResult<
+          Prisma.Result<T, A, "findFirstOrThrow">,
+          RecordNotFound | DriverError
+        >;
+      },
+
       /** `count`, qualified. */
       tryCount<T, A = Record<string, never>>(
         this: T,
         args?: Prisma.Exact<A, Prisma.Args<T, "count">>,
       ): AsyncResult<Prisma.Result<T, A, "count">, ReadError> {
         return query(this, "count", args) as AsyncResult<Prisma.Result<T, A, "count">, ReadError>;
+      },
+
+      /** `aggregate`, qualified. */
+      tryAggregate<T, A>(
+        this: T,
+        args: Prisma.Exact<A, Prisma.Args<T, "aggregate">>,
+      ): AsyncResult<Prisma.Result<T, A, "aggregate">, ReadError> {
+        return query(this, "aggregate", args) as AsyncResult<
+          Prisma.Result<T, A, "aggregate">,
+          ReadError
+        >;
+      },
+
+      /** `groupBy`, qualified. */
+      tryGroupBy<T, A>(
+        this: T,
+        args: Prisma.Exact<A, Prisma.Args<T, "groupBy">>,
+      ): AsyncResult<Prisma.Result<T, A, "groupBy">, ReadError> {
+        return query(this, "groupBy", args) as AsyncResult<
+          Prisma.Result<T, A, "groupBy">,
+          ReadError
+        >;
       },
 
       /**
@@ -291,6 +343,31 @@ export const unthrownPrisma = Prisma.defineExtension({
       ): AsyncResult<Prisma.Result<T, A, "create">, CreateError> {
         return query(this, "create", args) as AsyncResult<
           Prisma.Result<T, A, "create">,
+          CreateError
+        >;
+      },
+
+      /**
+       * `createMany`, qualified: the batch count, or the same modeled
+       * constraint violations as `tryCreate`.
+       */
+      tryCreateMany<T, A>(
+        this: T,
+        args: Prisma.Exact<A, Prisma.Args<T, "createMany">>,
+      ): AsyncResult<Prisma.Result<T, A, "createMany">, CreateError> {
+        return query(this, "createMany", args) as AsyncResult<
+          Prisma.Result<T, A, "createMany">,
+          CreateError
+        >;
+      },
+
+      /** `createManyAndReturn`, qualified: the created rows instead of a count. */
+      tryCreateManyAndReturn<T, A>(
+        this: T,
+        args: Prisma.Exact<A, Prisma.Args<T, "createManyAndReturn">>,
+      ): AsyncResult<Prisma.Result<T, A, "createManyAndReturn">, CreateError> {
+        return query(this, "createManyAndReturn", args) as AsyncResult<
+          Prisma.Result<T, A, "createManyAndReturn">,
           CreateError
         >;
       },
@@ -310,6 +387,47 @@ export const unthrownPrisma = Prisma.defineExtension({
       },
 
       /**
+       * `upsert`, qualified: no {@link RecordNotFound} in the union — a miss
+       * *creates* — but the write can still hit the modeled constraint
+       * violations.
+       */
+      tryUpsert<T, A>(
+        this: T,
+        args: Prisma.Exact<A, Prisma.Args<T, "upsert">>,
+      ): AsyncResult<Prisma.Result<T, A, "upsert">, UpsertError> {
+        return query(this, "upsert", args) as AsyncResult<
+          Prisma.Result<T, A, "upsert">,
+          UpsertError
+        >;
+      },
+
+      /**
+       * `updateMany`, qualified: the batch count. Zero matches is `Ok({ count:
+       * 0 })` — never {@link RecordNotFound} — but a constraint violation is
+       * still modeled.
+       */
+      tryUpdateMany<T, A>(
+        this: T,
+        args: Prisma.Exact<A, Prisma.Args<T, "updateMany">>,
+      ): AsyncResult<Prisma.Result<T, A, "updateMany">, UpdateManyError> {
+        return query(this, "updateMany", args) as AsyncResult<
+          Prisma.Result<T, A, "updateMany">,
+          UpdateManyError
+        >;
+      },
+
+      /** `updateManyAndReturn`, qualified: the updated rows instead of a count. */
+      tryUpdateManyAndReturn<T, A>(
+        this: T,
+        args: Prisma.Exact<A, Prisma.Args<T, "updateManyAndReturn">>,
+      ): AsyncResult<Prisma.Result<T, A, "updateManyAndReturn">, UpdateManyError> {
+        return query(this, "updateManyAndReturn", args) as AsyncResult<
+          Prisma.Result<T, A, "updateManyAndReturn">,
+          UpdateManyError
+        >;
+      },
+
+      /**
        * `delete`, qualified: the missing row is a modeled
        * {@link RecordNotFound}.
        */
@@ -320,6 +438,21 @@ export const unthrownPrisma = Prisma.defineExtension({
         return query(this, "delete", args) as AsyncResult<
           Prisma.Result<T, A, "delete">,
           DeleteError
+        >;
+      },
+
+      /**
+       * `deleteMany`, qualified: the batch count. Zero matches is `Ok({ count:
+       * 0 })` — never {@link RecordNotFound} — but deleting a still-referenced
+       * parent is a modeled {@link ForeignKeyViolation}.
+       */
+      tryDeleteMany<T, A = Record<string, never>>(
+        this: T,
+        args?: Prisma.Exact<A, Prisma.Args<T, "deleteMany">>,
+      ): AsyncResult<Prisma.Result<T, A, "deleteMany">, DeleteManyError> {
+        return query(this, "deleteMany", args) as AsyncResult<
+          Prisma.Result<T, A, "deleteMany">,
+          DeleteManyError
         >;
       },
 

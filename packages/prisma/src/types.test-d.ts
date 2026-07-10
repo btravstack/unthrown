@@ -33,6 +33,23 @@ const created = db.user.tryCreate({ data: { email: "a@example.com" } });
 const fetched = db.user.tryFindUniqueOrThrow({ where: { id: 1 } });
 const maybe = db.user.tryFindUnique({ where: { id: 1 } });
 const counted = db.user.tryCount();
+const first = db.user.tryFindFirst({ select: { id: true } });
+const firstOrThrow = db.user.tryFindFirstOrThrow();
+const upserted = db.user.tryUpsert({
+  where: { id: 1 },
+  create: { email: "a@example.com" },
+  update: { name: "x" },
+});
+const createdMany = db.user.tryCreateMany({ data: [{ email: "a@example.com" }] });
+const createdRows = db.user.tryCreateManyAndReturn({
+  data: [{ email: "a@example.com" }],
+  select: { id: true },
+});
+const updatedMany = db.user.tryUpdateMany({ where: {}, data: { name: "x" } });
+const updatedRows = db.user.tryUpdateManyAndReturn({ data: { name: "x" }, select: { id: true } });
+const deletedMany = db.user.tryDeleteMany();
+const aggregated = db.user.tryAggregate({ _count: true });
+const grouped = db.user.tryGroupBy({ by: ["name"] });
 
 // @ts-expect-error — `email` was not selected; the payload narrowed to `{ id }`.
 selected.map((rows) => rows.map((r) => r.email));
@@ -105,6 +122,32 @@ export type _Assertions = [
     Equal<AsyncErrOf<typeof created>, UniqueConstraintViolation | ForeignKeyViolation | DriverError>
   >,
   Expect<Equal<AsyncErrOf<typeof fetched>, RecordNotFound | DriverError>>,
+  // findFirst: selection narrows, a miss is `null`, and only OrThrow adds P2025
+  Expect<Equal<AsyncOkOf<typeof first>, { id: number } | null>>,
+  Expect<Equal<AsyncErrOf<typeof first>, DriverError>>,
+  Expect<Equal<AsyncErrOf<typeof firstOrThrow>, RecordNotFound | DriverError>>,
+  // upsert never carries RecordNotFound — a miss creates
+  Expect<
+    Equal<
+      AsyncErrOf<typeof upserted>,
+      UniqueConstraintViolation | ForeignKeyViolation | DriverError
+    >
+  >,
+  // the batch mutations: counts / rows, and no P2025 in their unions
+  Expect<Equal<AsyncOkOf<typeof createdMany>["count"], number>>,
+  Expect<Equal<AsyncOkOf<typeof createdRows>, { id: number }[]>>,
+  Expect<
+    Equal<
+      AsyncErrOf<typeof updatedMany>,
+      UniqueConstraintViolation | ForeignKeyViolation | DriverError
+    >
+  >,
+  Expect<Equal<AsyncOkOf<typeof updatedRows>, { id: number }[]>>,
+  Expect<Equal<AsyncErrOf<typeof deletedMany>, ForeignKeyViolation | DriverError>>,
+  // the aggregations are reads: DriverError only
+  Expect<Equal<AsyncErrOf<typeof aggregated>, DriverError>>,
+  Expect<Equal<AsyncErrOf<typeof grouped>, DriverError>>,
+  Expect<Equal<AsyncOkOf<typeof aggregated>["_count"], number>>,
   // pagination: the payload is the narrowed page + meta; the error is read-only
   Expect<Equal<AsyncOkOf<typeof paged>[0][number]["email"], string>>,
   Expect<Equal<AsyncOkOf<typeof paged>[1], CursorPaginationMeta>>,
