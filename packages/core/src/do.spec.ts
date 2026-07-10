@@ -10,7 +10,7 @@ const defectOf = (cause: unknown): Result<number, never> =>
 
 describe("Do / bind / let", () => {
   it("Do() starts an empty object scope", () => {
-    expect(Do().unwrap()).toEqual({});
+    expect(Do().get()).toEqual({});
   });
 
   it("accumulates bound Results and pure lets into a named scope", () => {
@@ -18,7 +18,7 @@ describe("Do / bind / let", () => {
       .bind("a", () => Ok(1))
       .bind("b", ({ a }) => Ok(a + 1))
       .let("c", ({ a, b }) => a + b);
-    expect(r.unwrap()).toEqual({ a: 1, b: 2, c: 3 });
+    expect(r.get()).toEqual({ a: 1, b: 2, c: 3 });
   });
 
   it("short-circuits on the first Err and skips later steps", () => {
@@ -108,7 +108,7 @@ describe("Do / bind / let — async", () => {
       .bind("a", () => fromSafePromise(Promise.resolve(1)))
       .bind("b", ({ a }) => Ok(a + 1)) // a sync Result is accepted too
       .let("c", ({ a, b }) => a + b);
-    expect(r.unwrap()).toEqual({ a: 1, b: 2, c: 3 });
+    expect(r.get()).toEqual({ a: 1, b: 2, c: 3 });
   });
 
   it("short-circuits on an async Err", async () => {

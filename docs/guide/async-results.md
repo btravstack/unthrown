@@ -11,7 +11,7 @@ value or error — directly with `OkAsync` / `ErrAsync`.
 import { fromSafePromise } from "unthrown";
 
 const result = await fromSafePromise(Promise.resolve(1)).map((n) => n + 1);
-result.unwrap(); // => 2
+result.get(); // => 2
 ```
 
 `OkAsync(value)` / `ErrAsync(error)` are the pre-lifted constructors — exactly
@@ -47,9 +47,9 @@ not interchangeable with a raw promise.
 > `Result` you get back.
 
 ::: warning Eliminators still reject on a Defect
-The async eliminators reject when they hit a `Defect`: `await result.unwrap()`
-rethrows the defect's cause, just like the synchronous `unwrap()`. (Like its sync
-form, `unwrap()` is type-gated — it compiles only when the error channel is
+The async eliminators reject when they hit a `Defect`: `await result.get()`
+rethrows the defect's cause, just like the synchronous `get()`. (Like its sync
+form, `get()` is type-gated — it compiles only when the error channel is
 `never` — so in well-typed code an `Err` can't reach it; a `Defect` is the only
 rejection you'll see.) It is the _internal_ promise — the one `await result`
 resolves — that never rejects.
@@ -64,7 +64,7 @@ This is the rule that keeps qualification honest:
 If `.map(async …)` were allowed, a rejection inside that callback would silently
 become a defect — an un-qualified async boundary, exactly what the library exists
 to prevent. So combinator callbacks are synchronous, and the binds (`flatMap`,
-`orElse`, `recoverDefect`) accept a `Result` or an `AsyncResult`, but never a raw
+`flatMapErr`, `recoverDefect`) accept a `Result` or an `AsyncResult`, but never a raw
 promise.
 
 To do more async work, re-enter through a qualified boundary and compose it with

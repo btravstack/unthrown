@@ -23,8 +23,8 @@ the API reference.
 ## By intent
 
 The `→ Result<…>` half of each signature is the tell — it shows how the combinator
-moves the channels: `flatMap` widens `E` to `E | E2`, `recover` empties it to
-`never`, `orElse` widens the value to `T | U`.
+moves the channels: `flatMap` widens `E` to `E | E2`, `recoverErr` empties it to
+`never`, `flatMapErr` widens the value to `T | U`.
 
 | I want to…                                     | use               | signature                                                    | channel |
 | ---------------------------------------------- | ----------------- | ------------------------------------------------------------ | ------- |
@@ -35,8 +35,8 @@ moves the channels: `flatMap` widens `E` to `E | E2`, `recover` empties it to
 | sequence steps into a named scope              | `Do`/`bind`/`let` | `bind(k, (scope) => Result<U, E2>)` → `Result<{…}, E \| E2>` | Ok      |
 | replace the value with a constant              | `as`              | `(value: U)` → `Result<U, E>`                                | Ok      |
 | transform the error                            | `mapErr`          | `(e: E) => E2` → `Result<T, E2>`                             | Err     |
-| try a fallback that returns a `Result`         | `orElse`          | `(e: E) => Result<U, E2>` → `Result<T \| U, E2>`             | Err     |
-| turn an error into a success value             | `recover`         | `(e: E) => U` → `Result<T \| U, never>`                      | Err     |
+| try a fallback that returns a `Result`         | `flatMapErr`      | `(e: E) => Result<U, E2>` → `Result<T \| U, E2>`             | Err     |
+| turn an error into a success value             | `recoverErr`      | `(e: E) => U` → `Result<T \| U, never>`                      | Err     |
 | run a side effect on the error                 | `tapErr`          | `(e: E) => void` → `Result<T, E>`                            | Err     |
 | run a **failable** side effect on the error    | `flatTapErr`      | `(e: E) => Result<unknown, E2>` → `Result<T, E \| E2>`       | Err     |
 | recover from a defect (rare)                   | `recoverDefect`   | `(cause) => Result<U, E2>` → `Result<T \| U, E \| E2>`       | Defect  |
@@ -58,15 +58,15 @@ invariant to remember:
 | `flatMap`               | runs `f` | passes ▸        | passes ▸    | `E \| E2`       |
 | `tap` / `flatTap`       | runs `f` | passes ▸        | passes ▸    | `E` / `E \| E2` |
 | `mapErr`                | passes ▸ | runs `f`        | passes ▸    | `E2`            |
-| `orElse`                | passes ▸ | runs `f`        | passes ▸    | `E2`            |
-| `recover`               | passes ▸ | runs `f` → `Ok` | passes ▸    | `never`         |
+| `flatMapErr`            | passes ▸ | runs `f`        | passes ▸    | `E2`            |
+| `recoverErr`            | passes ▸ | runs `f` → `Ok` | passes ▸    | `never`         |
 | `tapErr` / `flatTapErr` | passes ▸ | runs `f`        | passes ▸    | `E` / `E \| E2` |
 | `recoverDefect`         | passes ▸ | passes ▸        | runs `f`    | `E \| E2`       |
 | `tapDefect`             | passes ▸ | passes ▸        | runs `f`    | `E`             |
 | `match`                 | `ok()`   | `err()`         | `defect()`  | —               |
 
-::: tip `recover`'s `never` under-describes the runtime
-`recover` empties only the **error** channel to `never` — a `Defect` can still be
+::: tip `recoverErr`'s `never` under-describes the runtime
+`recoverErr` empties only the **error** channel to `never` — a `Defect` can still be
 present at runtime and flows past it untouched. See
 [The Defect Channel](./the-defect-channel).
 :::
@@ -82,11 +82,11 @@ exactly three ways:
   that would skip qualification and silently become a defect. Do async work by
   re-entering a boundary and composing it with `flatMap`.
 - **The `Result`-returning combinators accept `Result` _or_ `AsyncResult`.**
-  `flatMap`, `flatTap`, `orElse`, `flatTapErr`, `bind`, and `recoverDefect` take a
+  `flatMap`, `flatTap`, `flatMapErr`, `flatTapErr`, `bind`, and `recoverDefect` take a
   callback returning either, so you can freely mix sync and async steps in one
   chain.
 - **Eliminators return a `Promise`.** `await result.match({ … })` /
-  `await result.unwrap()` — or `await` the `AsyncResult` first to collapse it to a
+  `await result.get()` — or `await` the `AsyncResult` first to collapse it to a
   `Result`, then match synchronously.
 
 Use this table to move between the two:
@@ -164,28 +164,28 @@ otherwise the same effect ends up `tap`ped at one site and `flatTap`ped at
 another, and a reviewer has to guess which one is the bug.
 :::
 
-**`orElse` vs `recover`** — both run on `Err`. `recover` produces a plain success
-value (emptying the error channel to `never`); `orElse` produces another `Result`
+**`flatMapErr` vs `recoverErr`** — both run on `Err`. `recoverErr` produces a plain success
+value (emptying the error channel to `never`); `flatMapErr` produces another `Result`
 (which may still be an `Err`).
 
-**`recover` vs `recoverDefect`** — `recover` handles a modeled `Err`;
+**`recoverErr` vs `recoverDefect`** — `recoverErr` handles a modeled `Err`;
 `recoverDefect` is the **only** combinator that can touch a `Defect`. Neither is
-the other's fallback — a defect flows past `recover` untouched.
+the other's fallback — a defect flows past `recoverErr` untouched.
 
 ## When to leave the pipeline
 
 Reach for an eliminator once you're done chaining:
 
 - `match` — the default at the edge; fold all three channels into one value.
-- `unwrap` / `unwrapErr` — extract; type-gated to compile only when the
-  opposite channel is `never` (`unwrap` needs `Result<T, never>`, `unwrapErr`
+- `get` / `getErr` — extract; type-gated to compile only when the
+  opposite channel is `never` (`get` needs `Result<T, never>`, `getErr`
   needs `Result<never, E>`), and _panicking_ (rethrowing the cause) on a defect.
-- `unwrapOr` / `unwrapOrElse` / `getOrNull` / `getOrUndefined` — recover an `Err`
+- `getOr` / `getOrElse` / `getOrNull` / `getOrUndefined` — recover an `Err`
   to a fallback, but **re-throw a defect** (it's a bug, not an absent value).
 - `getOrThrow` — extract `T`, but **throw the modeled error as-is** on `Err`
   (panicking on a defect). A deliberate escape hatch off errors-as-values: its
   point is to move a literal `throw` behind a method so a `no-throw` lint rule can
-  ban raw throws. Prefer `match` / `recover` / `orElse` when the error can stay a
+  ban raw throws. Prefer `match` / `recoverErr` / `flatMapErr` when the error can stay a
   value.
 
 On an `AsyncResult` every eliminator returns a `Promise` — `await` it (an `Err` or

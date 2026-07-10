@@ -24,7 +24,7 @@ hero:
 features:
   - icon: { src: /icons/target.svg }
     title: Errors as values
-    details: Ordinary errors are returned in a Result<T, E>, not thrown. Only a true defect ever throws — and only at unwrap.
+    details: Ordinary errors are returned in a Result<T, E>, not thrown. Only a true defect ever throws — and only at get().
   - icon: { src: /icons/channels.svg }
     title: A separate defect channel
     details: Unmodeled failures become a Defect — a third runtime state invisible to the type. A bug in a .map can't masquerade as a domain error.

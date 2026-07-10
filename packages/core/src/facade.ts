@@ -41,7 +41,7 @@ import type { AsyncResult as AsyncResultType, Result as ResultType } from "./typ
  * @example
  * ```ts
  * import { Result } from "unthrown";
- * Result.Ok(1).flatMap((n) => Result.Ok(n + 1)).unwrap(); // => 2
+ * Result.Ok(1).flatMap((n) => Result.Ok(n + 1)).get(); // => 2
  * ```
  */
 export const Result = {
@@ -65,7 +65,7 @@ export const Result = {
  *
  * @remarks
  * A `Result` is a discriminated union, so TypeDoc can't list its methods on this
- * alias. Its fluent combinators (`map`, `flatMap`, `match`, `unwrap`, …) are
+ * alias. Its fluent combinators (`map`, `flatMap`, `match`, `get`, …) are
  * documented one per entry on {@link ResultMethods} — the shared method surface
  * every variant carries. For "which one do I reach for?", see the
  * [Choosing a combinator](/guide/choosing-a-combinator) guide.
@@ -100,7 +100,7 @@ export type Result<T, E> = ResultType<T, E>;
  * ```ts
  * import { AsyncResult } from "unthrown";
  * const user = await AsyncResult.fromPromise(fetchUser(id), (c, defect) => defect(c));
- * user.unwrap(); // => the fetched user (on success)
+ * user.get(); // => the fetched user (on success)
  * ```
  */
 export const AsyncResult = {
@@ -119,7 +119,7 @@ export const AsyncResult = {
  *
  * @remarks
  * `AsyncResult` carries the async fluent surface; its combinators (`map`,
- * `flatMap`, `match`, `unwrap`, …) are documented one per entry — with their
+ * `flatMap`, `match`, `get`, …) are documented one per entry — with their
  * async signatures — on {@link AsyncResultMethods}. For "which one do I reach
  * for?", see the [Choosing a combinator](/guide/choosing-a-combinator) guide.
  *

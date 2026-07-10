@@ -25,8 +25,8 @@ describe("Invariant 1: throw inside any combinator becomes a Defect", () => {
     expect(Do().bind("a", t).isDefect()).toBe(true);
     expect(Do().let("a", t).isDefect()).toBe(true);
     expect(Err("e").mapErr(t).isDefect()).toBe(true);
-    expect(Err("e").orElse(t).isDefect()).toBe(true);
-    expect(Err("e").recover(t).isDefect()).toBe(true);
+    expect(Err("e").flatMapErr(t).isDefect()).toBe(true);
+    expect(Err("e").recoverErr(t).isDefect()).toBe(true);
     expect(Err("e").tapErr(t).isDefect()).toBe(true);
     expect(Err("e").flatTapErr(t).isDefect()).toBe(true);
     expect(defectOf(boom).recoverDefect(t).isDefect()).toBe(true);
@@ -46,8 +46,8 @@ describe("Invariant 2: a Defect flows through every method except match() and re
       defectOf(boom).let("a", f),
       defectOf(boom).as(1),
       defectOf(boom).mapErr(f),
-      defectOf(boom).orElse(f),
-      defectOf(boom).recover(f),
+      defectOf(boom).flatMapErr(f),
+      defectOf(boom).recoverErr(f),
       defectOf(boom).tapErr(f),
       defectOf(boom).flatTapErr(f),
     ];
@@ -55,10 +55,10 @@ describe("Invariant 2: a Defect flows through every method except match() and re
     expect(f).not.toHaveBeenCalled();
   });
 
-  it("the recovering eliminators still THROW on a Defect (they recover Err, not a Defect)", () => {
+  it("the recovering eliminators still THROW on a Defect (they recoverErr Err, not a Defect)", () => {
     const d = defectOf(boom);
-    expect(() => d.unwrapOr(0)).toThrow();
-    expect(() => d.unwrapOrElse(() => 0)).toThrow();
+    expect(() => d.getOr(0)).toThrow();
+    expect(() => d.getOrElse(() => 0)).toThrow();
     expect(() => d.getOrNull()).toThrow();
     expect(() => d.getOrUndefined()).toThrow();
   });
@@ -68,17 +68,17 @@ describe("Invariant 2: a Defect flows through every method except match() and re
     expect(
       defectOf(boom)
         .recoverDefect(() => Ok("handled"))
-        .unwrap(),
+        .get(),
     ).toBe("handled");
   });
 });
 
-describe("Invariant 3: unwrap() is asymmetric", () => {
+describe("Invariant 3: get() is asymmetric", () => {
   it("on Err throws an UnwrapError carrying E", () => {
     try {
-      // The Err branch is unreachable in typed code (unwrap needs E = never);
+      // The Err branch is unreachable in typed code (get needs E = never);
       // force it via a cast to exercise the defensive runtime guard.
-      (Err("modeled") as unknown as Result<number, never>).unwrap();
+      (Err("modeled") as unknown as Result<number, never>).get();
       expect.unreachable();
     } catch (e) {
       expect(e).toBeInstanceOf(UnwrapError);
@@ -90,7 +90,7 @@ describe("Invariant 3: unwrap() is asymmetric", () => {
 
   it("on a Defect rethrows the ORIGINAL cause with its original stack", () => {
     try {
-      defectOf(boom).unwrap();
+      defectOf(boom).get();
       expect.unreachable();
     } catch (e) {
       expect(e).toBe(boom); // same instance ⇒ original stack preserved
@@ -99,9 +99,9 @@ describe("Invariant 3: unwrap() is asymmetric", () => {
   });
 });
 
-describe("Invariant 4: recover empties the error channel in the type, not the runtime", () => {
-  it("recover() returns a value whose type is Result<_, never> but may still be a Defect", () => {
-    const recovered = defectOf(boom).recover(() => 1);
+describe("Invariant 4: recoverErr empties the error channel in the type, not the runtime", () => {
+  it("recoverErr() returns a value whose type is Result<_, never> but may still be a Defect", () => {
+    const recovered = defectOf(boom).recoverErr(() => 1);
     // `never` in the type does not mean total — a Defect survives at runtime.
     expect(recovered.isDefect()).toBe(true);
   });
@@ -113,7 +113,7 @@ describe("Invariant 5: an AsyncResult's internal promise never rejects", () => {
     await expect(fromSafePromise(Promise.reject(boom))).resolves.toMatchObject({});
     const okR = await fromSafePromise(Promise.resolve(1));
     const defectR = await fromSafePromise(Promise.reject(boom));
-    expect(okR.unwrap()).toBe(1);
+    expect(okR.get()).toBe(1);
     expect(defectR.isDefect()).toBe(true);
   });
 });

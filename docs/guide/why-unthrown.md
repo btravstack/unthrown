@@ -5,7 +5,7 @@ values**, with a separate **defect channel** for the unexpected.
 
 The name states the concern: ordinary errors are _unthrown_ — returned as
 values, not flung up the stack. Only a true defect ever throws, and only at
-`unwrap`.
+`get`.
 
 ## The problem with throwing
 
@@ -52,7 +52,7 @@ disagreed.
 the type**. `Result<T, E>` exposes only your anticipated errors in `E`. Anything
 unexpected becomes a defect that short-circuits to the edge, where you log it and
 return a 500. A defect can only be observed by `match` or `recoverDefect`; it is
-never silently recovered by `unwrapOr`, `getOrNull`, or `recover`.
+never silently recovered by `getOr`, `getOrNull`, or `recoverErr`.
 
 Two more deliberate choices follow from this:
 

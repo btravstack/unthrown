@@ -22,7 +22,7 @@ const defectOf = (cause: unknown): Result<number, never> =>
 describe("all", () => {
   it("collects a tuple of Ok values, preserving positional types", () => {
     const r = all([Ok(1), Ok("two"), Ok(true)]);
-    expect(r.unwrap()).toEqual([1, "two", true]);
+    expect(r.get()).toEqual([1, "two", true]);
   });
 
   it("returns Ok([]) for an empty tuple, typed as the empty tuple (not never[])", () => {
@@ -30,7 +30,7 @@ describe("all", () => {
     // Compiles only if the empty input keeps tuple typing `Result<[], never>`
     // rather than collapsing to `Result<never[], never>`.
     const empty: Result<[], never> = r;
-    expect(empty.unwrap()).toEqual([]);
+    expect(empty.get()).toEqual([]);
   });
 
   it("short-circuits on the first Err", () => {
@@ -50,7 +50,7 @@ describe("all", () => {
   it("keeps the first Defect when several are present", () => {
     const first = new Error("first");
     const r = all([defectOf(first), defectOf(new Error("second"))]);
-    expect(r.recoverDefect((c) => Ok(c === first)).unwrap()).toBe(true);
+    expect(r.recoverDefect((c) => Ok(c === first)).get()).toBe(true);
   });
 
   it("collapses a dynamic Result[] to Result<T[], E> without a cast", () => {
@@ -70,7 +70,7 @@ describe("allFromDict", () => {
   it("collects a record of Ok values into a record, keyed by name", () => {
     const r = allFromDict({ id: Ok(1), name: Ok("ada"), admin: Ok(true) });
     // Typed `Result<{ id: number; name: string; admin: boolean }, never>`.
-    const value: { id: number; name: string; admin: boolean } = r.unwrap();
+    const value: { id: number; name: string; admin: boolean } = r.get();
     expect(value).toEqual({ id: 1, name: "ada", admin: true });
   });
 
@@ -86,7 +86,7 @@ describe("allFromDict", () => {
   });
 
   it("returns Ok({}) for an empty record", () => {
-    expect(allFromDict({}).unwrap()).toEqual({});
+    expect(allFromDict({}).get()).toEqual({});
   });
 
   it("does not let a `__proto__` key pollute the prototype", () => {
@@ -104,11 +104,11 @@ describe("allAsync", () => {
       fromSafePromise(Promise.resolve("two")),
       fromSafePromise(Promise.resolve(true)),
     ]);
-    expect(r.unwrap()).toEqual([1, "two", true]);
+    expect(r.get()).toEqual([1, "two", true]);
   });
 
   it("returns Ok([]) for an empty input", async () => {
-    expect((await allAsync([])).unwrap()).toEqual([]);
+    expect((await allAsync([])).get()).toEqual([]);
   });
 
   it("short-circuits on the first Err", async () => {
@@ -142,7 +142,7 @@ describe("allAsync", () => {
       fromSafePromise(Promise.resolve(1)),
       fromSafePromise(Promise.resolve(2)),
     ]);
-    expect(r.unwrap()).toEqual([1, 2]);
+    expect(r.get()).toEqual([1, 2]);
   });
 });
 
@@ -152,7 +152,7 @@ describe("allFromDictAsync", () => {
       id: fromSafePromise(Promise.resolve(1)),
       name: fromSafePromise(Promise.resolve("ada")),
     });
-    const value: { id: number; name: string } = r.unwrap();
+    const value: { id: number; name: string } = r.get();
     expect(value).toEqual({ id: 1, name: "ada" });
   });
 
@@ -174,7 +174,7 @@ describe("allFromDictAsync", () => {
   });
 
   it("returns Ok({}) for an empty record", async () => {
-    expect((await allFromDictAsync({})).unwrap()).toEqual({});
+    expect((await allFromDictAsync({})).get()).toEqual({});
   });
 
   it("does not let a `__proto__` key pollute the prototype", async () => {

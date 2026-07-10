@@ -41,7 +41,7 @@ The call site drops its `try`/`catch` for a combinator:
 
 ```ts
 function loadConfig(text: string): Config {
-  return parseConfig(text).unwrapOr(DEFAULT_CONFIG);
+  return parseConfig(text).getOr(DEFAULT_CONFIG);
 }
 ```
 
@@ -91,21 +91,21 @@ user.match({
 
 `Result` composes at whatever boundary you choose to draw it — there's no
 requirement that every function up and down the call stack returns one.
-`unwrap()` exists precisely so you can re-enter throw-land at the edges you
+`get()` exists precisely so you can re-enter throw-land at the edges you
 haven't converted yet, on purpose:
 
 ```ts
 // Only the read is converted. Everything downstream still expects a plain
-// Config, or a thrown error — and that's fine, unwrap() is the deliberate seam.
+// Config, or a thrown error — and that's fine, get() is the deliberate seam.
 function loadConfig(text: string): Config {
-  return parseConfig(text).unwrap(); // throws UnwrapError("invalid_json") on bad input
+  return parseConfig(text).get(); // throws UnwrapError("invalid_json") on bad input
 }
 ```
 
 Convert the parts of the codebase where an untyped failure actually costs you
 something — a boundary you keep getting wrong, a `catch` block that silently
 swallows a bug. Leave the rest throwing until it earns the conversion. A
-`Result` two layers deep in a call chain that's `unwrap()`'d immediately by
+`Result` two layers deep in a call chain that's `get()`'d immediately by
 its only caller isn't buying you anything yet.
 
 ## `try`/`catch` idioms → combinators
@@ -115,7 +115,7 @@ block has a direct combinator equivalent:
 
 | `try`/`catch` idiom       | unthrown combinator                             | Example                                               |
 | ------------------------- | ----------------------------------------------- | ----------------------------------------------------- |
-| catch-and-default         | `unwrapOr(fallback)`                            | `parseConfig(text).unwrapOr(DEFAULT_CONFIG)`          |
+| catch-and-default         | `getOr(fallback)`                               | `parseConfig(text).getOr(DEFAULT_CONFIG)`             |
 | catch-and-rethrow-wrapped | `mapErr(f)`                                     | `parseConfig(text).mapErr((e) => new ConfigError(e))` |
 | catch-log-rethrow         | `tapErr(f)`                                     | `parseConfig(text).tapErr((e) => logger.warn(e))`     |
 | `finally` cleanup         | run before eliminating, or in every `match` arm | see below                                             |
@@ -130,7 +130,7 @@ try {
   return DEFAULT_CONFIG;
 }
 // after
-parseConfig(text).unwrapOr(DEFAULT_CONFIG);
+parseConfig(text).getOr(DEFAULT_CONFIG);
 ```
 
 `catch-and-rethrow-wrapped`:

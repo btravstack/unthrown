@@ -24,8 +24,8 @@ const boom = new Error("boom");
 
 describe("Result facade mirrors the free functions", () => {
   it("exposes the same constructors", () => {
-    expect(Result.Ok(5).unwrap()).toBe(5);
-    expect(Result.Err("e").unwrapErr()).toBe("e");
+    expect(Result.Ok(5).get()).toBe(5);
+    expect(Result.Err("e").getErr()).toBe("e");
     expect(Result.Ok).toBe(Ok);
     expect(Result.Err).toBe(Err);
   });
@@ -52,9 +52,9 @@ describe("Result facade mirrors the free functions", () => {
     expect(Result.Do).toBe(Do);
     expect(Result.all).toBe(all);
     expect(Result.allFromDict).toBe(allFromDict);
-    expect(Result.fromNullable(null, () => "absent").unwrapErr()).toBe("absent");
-    expect(Result.all([Result.Ok(1), Result.Ok(2)]).unwrap()).toEqual([1, 2]);
-    expect(Result.allFromDict({ a: Result.Ok(1) }).unwrap()).toEqual({ a: 1 });
+    expect(Result.fromNullable(null, () => "absent").getErr()).toBe("absent");
+    expect(Result.all([Result.Ok(1), Result.Ok(2)]).get()).toEqual([1, 2]);
+    expect(Result.allFromDict({ a: Result.Ok(1) }).get()).toEqual({ a: 1 });
   });
 
   it("does NOT carry the async entry points (those live on AsyncResult)", () => {
@@ -74,15 +74,15 @@ describe("AsyncResult facade groups the async-producing entry points", () => {
   });
 
   it("constructs and aggregates async results", async () => {
-    expect((await AsyncResult.fromSafePromise(Promise.resolve(3))).unwrap()).toBe(3);
+    expect((await AsyncResult.fromSafePromise(Promise.resolve(3))).get()).toBe(3);
     const both = await AsyncResult.all([
       AsyncResult.fromSafePromise(Promise.resolve(1)),
       AsyncResult.fromSafePromise(Promise.resolve(2)),
     ]);
-    expect(both.unwrap()).toEqual([1, 2]);
+    expect(both.get()).toEqual([1, 2]);
     const dict = await AsyncResult.allFromDict({
       a: AsyncResult.fromSafePromise(Promise.resolve("x")),
     });
-    expect(dict.unwrap()).toEqual({ a: "x" });
+    expect(dict.get()).toEqual({ a: "x" });
   });
 });
