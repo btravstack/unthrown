@@ -5,6 +5,7 @@ import {
   fromNullable,
   fromPromise,
   fromSafePromise,
+  fromSafeThrowable,
   fromThrowable,
   Ok,
   type Result,
@@ -113,6 +114,42 @@ describe("fromThrowable", () => {
     const r: Result<number, "known"> = fn();
     expect(r.isOk()).toBe(true);
     if (r.isOk()) expect(r.value).toBe(1);
+  });
+});
+
+describe("fromSafeThrowable", () => {
+  it("wraps a successful call as Ok and forwards arguments", () => {
+    const add = fromSafeThrowable((a: number, b: number) => a + b);
+    const r = add(2, 3);
+    expect(r.isOk()).toBe(true);
+    if (r.isOk()) expect(r.value).toBe(5);
+  });
+
+  it("turns every throw into a Defect with the original cause — never an Err", () => {
+    const fn = fromSafeThrowable(() => {
+      throw boom;
+    });
+    const r = fn();
+    expect(r.isDefect()).toBe(true);
+    expect(r.isErr()).toBe(false);
+    if (r.isDefect()) expect(r.cause).toBe(boom);
+  });
+
+  it("types the error channel as never (the sync mirror of fromSafePromise)", () => {
+    const fn = fromSafeThrowable((): number => 1);
+    // Compiles only if `E` is `never` — `get()` is gated on Result<T, never>.
+    const r: Result<number, never> = fn();
+    expect(r.get()).toBe(1);
+  });
+
+  it("preserves a non-Error thrown value as the Defect cause", () => {
+    const fn = fromSafeThrowable(() => {
+      // oxlint-disable-next-line no-throw-literal -- the raw-value throw IS the case under test
+      throw "nope";
+    });
+    const r = fn();
+    expect(r.isDefect()).toBe(true);
+    if (r.isDefect()) expect(r.cause).toBe("nope");
   });
 });
 

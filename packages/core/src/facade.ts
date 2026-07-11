@@ -15,6 +15,7 @@ import {
   fromNullable,
   fromPromise,
   fromSafePromise,
+  fromSafeThrowable,
   fromThrowable,
 } from "./interop.js";
 import type { AsyncResult as AsyncResultType, Result as ResultType } from "./types.js";
@@ -23,8 +24,9 @@ import type { AsyncResult as AsyncResultType, Result as ResultType } from "./typ
  * Companion object grouping the **`Result`-producing** entry points under a
  * single, discoverable namespace: {@link Result.Ok}, {@link Result.Err},
  * {@link Result.Do}, {@link Result.fromNullable}, {@link Result.fromThrowable},
- * {@link Result.all}, {@link Result.allFromDict}, {@link Result.isOk},
- * {@link Result.isErr}, {@link Result.isDefect}, {@link Result.isResult}.
+ * {@link Result.fromSafeThrowable}, {@link Result.all},
+ * {@link Result.allFromDict}, {@link Result.isOk}, {@link Result.isErr},
+ * {@link Result.isDefect}, {@link Result.isResult}.
  *
  * @remarks
  * Purely additive sugar — each member **is** the corresponding free function.
@@ -50,6 +52,7 @@ export const Result = {
   Do,
   fromNullable,
   fromThrowable,
+  fromSafeThrowable,
   all,
   allFromDict,
   isOk,
