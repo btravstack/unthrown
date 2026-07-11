@@ -163,20 +163,20 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   unqualified rejection.
 - constructors: `Ok`, `Err` (there is **no** `Defect` constructor — a defect-state
   `Result` arises only at boundaries; the qualify-time `defect` marker helper is
-  injected, not exported. A **deliberate** defect uses `throw`: inside a
-  pipeline, a combinator-callback `throw` IS the sanctioned syntax (the
-  throw → defect invariant is that syntax, not just a safety net); a
-  known-technical precondition throws in a plain helper wrapped once at its
-  origin with `fromSafeThrowable`. A minting helper was weighed and **rejected**
-  in #77 — frictionless minting would let unmodeled-by-laziness failures erode
-  the defect channel's meaning; the friction forces either a modeled `Err` or a
-  throw at the true origin. Documented in the defect-channel guide), plus the
-  **pre-lifted async** constructors `OkAsync` /
+  injected, not exported), plus the **pre-lifted async** constructors `OkAsync` /
   `ErrAsync` — `Ok(v).toAsync()` / `Err(e).toAsync()` without the boilerplate, for
   the synchronous branch of an `AsyncResult`-returning function. They carry the
   `Async` **suffix** the async free functions use (`allAsync`); the `AsyncResult`
   companion aliases them as `AsyncResult.Ok` / `AsyncResult.Err` (suffix dropped,
-  same rule as `AsyncResult.all`)
+  same rule as `AsyncResult.all`). A **deliberate** defect needs no constructor
+  either — the syntax is `throw`: inside a pipeline, a combinator-callback
+  `throw` IS the sanctioned form (the throw → defect invariant is that syntax,
+  not just a safety net); a known-technical precondition throws in a plain
+  helper wrapped once at its origin with `fromSafeThrowable`. A minting helper
+  was weighed and **rejected** in #77 — frictionless minting would let
+  unmodeled-by-laziness failures erode the defect channel's meaning; the
+  friction forces either a modeled `Err` or a throw at the true origin.
+  Documented in the defect-channel guide.
 - interop: `fromNullable`, `fromThrowable`, `fromSafeThrowable` (the sync
   mirror of `fromSafePromise` — every throw a `Defect`, `E = never`, no
   `qualify`; the named form of the `(c, d) => d(c)` boilerplate, an explicit
