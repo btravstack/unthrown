@@ -12,6 +12,11 @@ import "@unthrown/neverthrow";
 import "@unthrown/boxed";
 import "@unthrown/standard-schema";
 import "@unthrown/prisma";
+// @unthrown/orpc deliberately has NO root export (its API is split across
+// `./client` / `./server` / `./extensions/result`), so its dependency is
+// established through a subpath — a bare `import "@unthrown/orpc"` fails at
+// runtime. The `packages` list below still uses the bare package name: the
+// copy reads `node_modules/@unthrown/orpc/docs` directly, not an export.
 import "@unthrown/orpc/client";
 
 import { cp, mkdir, rm } from "node:fs/promises";
