@@ -1,6 +1,6 @@
 {
   "name": "@unthrown/prisma",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Prisma Client extension for unthrown: try-prefixed query methods returning AsyncResult, with per-operation tagged errors",
   "keywords": [
     "database",
