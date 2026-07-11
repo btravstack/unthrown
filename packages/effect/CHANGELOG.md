@@ -1,5 +1,15 @@
 # @unthrown/effect
 
+## 4.1.0
+
+### Patch Changes
+
+- Updated dependencies [09806e1]
+- Updated dependencies [596a62d]
+- Updated dependencies [63e9b88]
+- Updated dependencies [d13ad64]
+  - unthrown@4.1.0
+
 ## 4.0.0
 
 ### Patch Changes

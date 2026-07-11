@@ -1,5 +1,49 @@
 # unthrown
 
+## 4.1.0
+
+### Minor Changes
+
+- 09806e1: Add `fromSafeThrowable` — the synchronous counterpart to `fromSafePromise`:
+  wrap a throwing function asserted not to fail in any modeled way, so every
+  throw becomes a `Defect` and the error channel is `never`, with no `qualify`
+  callback. The explicit, named form of the
+  `fromThrowable(fn, (cause, defect) => defect(cause))` boilerplate. Also
+  exposed as `Result.fromSafeThrowable` on the companion object.
+- 596a62d: Add the `getOrThrow()` eliminator on `Result` / `AsyncResult`. It completes the
+  `getOr…` family (`getOrNull` / `getOrUndefined` / `getOrThrow`): it extracts `T`
+  from any `Result<T, E>` — not type-gated like `get()` — and **throws the
+  modeled error as-is** on `Err` (panicking on a `Defect`, like the rest of the
+  family). On `AsyncResult` it returns a `Promise<T>` that rejects the same way.
+
+  This is a deliberate escape hatch off the errors-as-values model: its purpose is
+  to move a literal `throw` behind a method, so a `no-throw` lint rule can ban raw
+  throws while this one sanctioned extraction remains — the faithful, lint-clean
+  form of `.flatMapErr((e) => { throw e }).get()`. Prefer `match` / `recoverErr` /
+  `flatMapErr` whenever the error can stay a value.
+
+- 63e9b88: Add pre-lifted async constructors `OkAsync` / `ErrAsync` (and the companion
+  aliases `AsyncResult.Ok` / `AsyncResult.Err`) for building an `AsyncResult`
+  directly from a value or error — sparing the repeated `Ok(value).toAsync()` /
+  `Err(error).toAsync()` on the synchronous branch of an `AsyncResult`-returning
+  function. They carry the `Async` suffix the other async free functions use
+  (`allAsync`), which the companion drops (`AsyncResult.Ok`). Closes #75.
+- d13ad64: Rename several operators for channel-suffix consistency, keeping the old names as
+  **deprecated, runtime-identical aliases** (no breaking change; the aliases are
+  slated for removal in a future major):
+
+  - `orElse` → **`flatMapErr`** — it is `flatMap` on the error channel, so it now
+    follows the `…Err` convention (like `mapErr` / `flatTapErr`).
+  - `recover` → **`recoverErr`** — pairs with `recoverDefect`.
+  - The extractor family unifies under `get…`: `unwrap` → **`get`**, `unwrapErr` →
+    **`getErr`**, `unwrapOr` → **`getOr`**, `unwrapOrElse` → **`getOrElse`** (joining
+    the existing `getOrNull` / `getOrUndefined` / `getOrThrow`).
+
+  Both `Result` and `AsyncResult` gain the new names; each deprecated alias just
+  delegates to its replacement (the gated `unwrap`/`unwrapErr` keep their `this`
+  type-gate). Editors will surface the old names with a deprecation strike-through
+  and point at the replacement.
+
 ## 4.0.0
 
 ### Major Changes
