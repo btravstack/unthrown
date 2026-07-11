@@ -10,6 +10,7 @@ export {
   fromNullable,
   fromPromise,
   fromSafePromise,
+  fromSafeThrowable,
   fromThrowable,
 } from "./interop.js";
 export { matchTags, TaggedError } from "./tagged.js";

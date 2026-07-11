@@ -20,6 +20,7 @@ import {
   ErrAsync,
   type ErrView,
   fromPromise,
+  fromSafeThrowable,
   fromThrowable,
   isDefect,
   isErr,
@@ -104,6 +105,12 @@ const throwable = fromThrowable(
   (c, defect) => defect(c),
 );
 type _throwable = Expect<Equal<ReturnType<typeof throwable>, Result<number, never>>>;
+
+// `fromSafeThrowable` needs no qualify at all: E is never, arguments preserved
+const safeThrowable = fromSafeThrowable((s: string, radix: number) => Number.parseInt(s, radix));
+type _safeThrowable = Expect<
+  Equal<typeof safeThrowable, (s: string, radix: number) => Result<number, never>>
+>;
 
 // qualify is mandatory — there is no one-arg boundary
 // @ts-expect-error - the qualify argument is required

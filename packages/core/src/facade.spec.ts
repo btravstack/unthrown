@@ -11,6 +11,7 @@ import {
   fromNullable,
   fromPromise,
   fromSafePromise,
+  fromSafeThrowable,
   fromThrowable,
   isDefect,
   isErr,
@@ -49,6 +50,7 @@ describe("Result facade mirrors the free functions", () => {
   it("exposes the sync interop and aggregate entry points", () => {
     expect(Result.fromNullable).toBe(fromNullable);
     expect(Result.fromThrowable).toBe(fromThrowable);
+    expect(Result.fromSafeThrowable).toBe(fromSafeThrowable);
     expect(Result.Do).toBe(Do);
     expect(Result.all).toBe(all);
     expect(Result.allFromDict).toBe(allFromDict);

@@ -53,7 +53,7 @@ export function fromNullable<T, E>(
  * `qualify`'s return is **subtracted** from `E`, never inferred into it. So a
  * `qualify` that returns *only* `defect(cause)` yields `E = never` (a Defect is
  * out-of-band and must not pollute the error channel); reach for
- * {@link fromSafePromise} when every failure is a Defect.
+ * {@link fromSafeThrowable} when every throw is a Defect.
  *
  * @typeParam A - the wrapped function's argument tuple.
  * @typeParam T - the wrapped function's return type.
@@ -92,6 +92,47 @@ export function fromThrowable<A extends unknown[], T, R>(
       return Ok(fn(...args)) as Result<T, E>;
     } catch (cause) {
       return qualifyToResult<T, E>(cause, triage);
+    }
+  };
+}
+
+/**
+ * Wrap a throwing synchronous function asserted **not** to fail in any modeled
+ * way: any throw becomes a `Defect`.
+ *
+ * @remarks
+ * The synchronous counterpart of {@link fromSafePromise}. Use it only when a
+ * throw genuinely indicates a bug rather than an anticipated outcome — the
+ * error channel is `never`, so there is nothing to triage; there is no
+ * `qualify`. When some throws *are* anticipated, reach for
+ * {@link fromThrowable} and triage them.
+ *
+ * @typeParam A - the wrapped function's argument tuple.
+ * @typeParam T - the wrapped function's return type.
+ * @param fn - the throwing function to wrap.
+ * @returns a function with the same arguments returning `Result<T, never>`.
+ *
+ * @category Interop
+ *
+ * @example
+ * ```ts
+ * import { fromSafeThrowable } from "unthrown";
+ *
+ * // A decode failure here is a bug (the row came from our own schema), so
+ * // every throw is a defect — no throwaway `(cause, defect) => defect(cause)`.
+ * const decode = fromSafeThrowable((row: Row) => userSchema.parse(row));
+ *
+ * decode(row); // => Result<User, never> — a throw becomes a Defect
+ * ```
+ */
+export function fromSafeThrowable<A extends unknown[], T>(
+  fn: (...args: A) => T,
+): (...args: A) => Result<T, never> {
+  return (...args: A): Result<T, never> => {
+    try {
+      return Ok(fn(...args));
+    } catch (cause) {
+      return defectRes<T, never>(cause);
     }
   };
 }
@@ -157,7 +198,8 @@ export function fromPromise<T, R>(
  * @remarks
  * Use this only when a rejection genuinely indicates a bug rather than an
  * anticipated outcome — the error channel is `never`, so there is nothing to
- * triage. (`await`-ing still yields a `Result`; it never throws.)
+ * triage. (`await`-ing still yields a `Result`; it never throws.) The
+ * synchronous counterpart is {@link fromSafeThrowable}.
  *
  * @typeParam T - the resolved value type.
  * @param promise - the promise, or a thunk returning one.

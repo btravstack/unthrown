@@ -169,7 +169,10 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   `Async` **suffix** the async free functions use (`allAsync`); the `AsyncResult`
   companion aliases them as `AsyncResult.Ok` / `AsyncResult.Err` (suffix dropped,
   same rule as `AsyncResult.all`)
-- interop: `fromNullable`, `fromThrowable`, `fromPromise`, `fromSafePromise`
+- interop: `fromNullable`, `fromThrowable`, `fromSafeThrowable` (the sync
+  mirror of `fromSafePromise` — every throw a `Defect`, `E = never`, no
+  `qualify`; the named form of the `(c, d) => d(c)` boilerplate, an explicit
+  "everything here is a defect" decision), `fromPromise`, `fromSafePromise`
 - aggregate: `all` / `allAsync` take a **tuple/array** (a fixed tuple keeps
   positional types; a dynamic `Result<T, E>[]` / `AsyncResult<T, E>[]` collapses
   to `Result<T[], E>` / `AsyncResult<T[], E>`), while `allFromDict` /
@@ -184,7 +187,7 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
 - facade: two companion objects alias the standalone entry points, **grouped by
   what they return** so a static lives in exactly one namespace. `Result.*` holds
   the `Result`-producing ones
-  (`Result.Ok`/`Err`/`Do`/`fromNullable`/`fromThrowable`/`all`/`allFromDict`/`is*`);
+  (`Result.Ok`/`Err`/`Do`/`fromNullable`/`fromThrowable`/`fromSafeThrowable`/`all`/`allFromDict`/`is*`);
   `AsyncResult.*` holds the `AsyncResult`-producing ones
   (`AsyncResult.Ok`/`Err`/`fromPromise`/`fromSafePromise`/`all`/`allFromDict` — the
   pre-lifted constructors and aggregates drop the `Async` suffix the free functions

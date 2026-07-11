@@ -69,7 +69,7 @@ that returns _only_ `defect(cause)` gives `AsyncResult<T, never>`, not
 `AsyncResult<T, Defect>` — a defect stays out-of-band. (When _every_ rejection is
 a defect, reach for `fromSafePromise` below.)
 
-## `fromSafePromise` — when any rejection is a bug
+## `fromSafePromise` / `fromSafeThrowable` — when any failure is a bug
 
 If a promise should never fail in a _modeled_ way — its rejection would be a bug,
 not an anticipated outcome — use `fromSafePromise`. Its error channel is `never`;
@@ -80,6 +80,23 @@ import { fromSafePromise } from "unthrown";
 
 const config = fromSafePromise(loadTrustedConfig());
 ```
+
+`fromSafeThrowable` is the synchronous counterpart, for a throwing function
+whose every throw is a bug — the explicit, named form of the
+`(cause, defect) => defect(cause)` qualify you would otherwise spell out:
+
+```ts
+import { fromSafeThrowable } from "unthrown";
+
+// The row came from our own schema; a decode throw is a bug, not an outcome.
+const decode = fromSafeThrowable((row: Row) => userSchema.parse(row));
+
+decode(row); // Result<User, never> — a throw becomes a defect
+```
+
+Both are deliberate escape hatches from qualification, not shortcuts: reach for
+them only when "everything here is a defect" is a **decision**, and keep
+`fromThrowable` / `fromPromise` wherever some failures are anticipated.
 
 ## The payoff: one handler at the edge
 
