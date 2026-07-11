@@ -111,4 +111,53 @@ Use `tapDefect` to observe a defect's cause (e.g. logging) without changing it.
 Recovering a defect should feel awkward — usually you don't. You let it bubble
 to the edge, log it, and return a 500.
 
+## Producing a defect on purpose
+
+Sometimes a condition is _anticipated_ but still not a domain outcome — a
+required config value is missing, a "can't happen" branch is reached. You want
+the defect channel (the edge's 500), not an `Err` that every caller must
+thread through `E`.
+
+There is deliberately **no** `Defect(...)` constructor for this. The primitive
+already exists — it is `throw`. The throw → defect rule at the top of this page
+is not merely a safety net for accidental bugs; it is the _sanctioned syntax_
+for declaring one:
+
+```ts
+// Inside a pipeline: just throw. The combinator converts it.
+pipeline.tap(() => {
+  if (!config.apiKey) throw new MissingConfigError();
+});
+```
+
+And if you find yourself wanting to _mint_ a defect mid-chain, the failure
+usually happened somewhere earlier — put the boundary at its origin instead:
+
+```ts
+// An ordinary function that throws on a bug — perfectly idiomatic JS.
+function requireConfig(key: string): string {
+  const value = process.env[key];
+  if (value === undefined) throw new MissingConfigError(key);
+  return value;
+}
+
+// Wrapped ONCE at its boundary: every throw is a defect, by decision.
+const readConfig = fromSafeThrowable(requireConfig);
+
+readConfig("API_KEY").toAsync().flatMap(callTheApi);
+```
+
+For the residual case — you hold a cause in hand and need to _start_ a chain in
+defect state — the documented idiom is
+`fromSafeThrowable(() => { throw cause })()` (add `.toAsync()` for an
+`AsyncResult`).
+
+::: info Why no constructor?
+Once minting a defect is one frictionless call, "I don't feel like modeling
+this error" starts flowing into the defect channel — and the discipline that
+makes `E` trustworthy erodes. The friction is a forcing function: either model
+the failure as an `Err`, or throw at its true origin. This was weighed and
+decided in [#77](https://github.com/btravstack/unthrown/issues/77).
+:::
+
 → Continue to [Boundaries & Qualification](./boundaries).
