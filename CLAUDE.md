@@ -278,9 +278,11 @@ library can be "done".
   promise never rejects.
 - **Source layout** (`packages/core/src/`): `types.ts` (public types), `defect.ts`
   (the `Defect` marker), `core.ts` (the `Res`/`AsyncRes` engine + `UnwrapError`),
-  `constructors.ts` (`Ok`/`Err` + guards), `interop.ts` (`from*`/`qualify`/`all`),
-  `facade.ts` (the `Result` object), `tagged.ts` (`TaggedError`/`matchTags`), and
-  `index.ts` (the curated public re-exports — the one place the API is decided).
+  `constructors.ts` (`Ok`/`Err` + guards), `do.ts` (the `Do()` do-notation entry
+  — the `bind`/`let` steps themselves live on the method surface in `core.ts`),
+  `interop.ts` (`from*`/`qualify`/`all`), `facade.ts` (the `Result` object),
+  `tagged.ts` (`TaggedError`/`matchTags`), and `index.ts` (the curated public
+  re-exports — the one place the API is decided).
 
 ## Monorepo layout
 
@@ -406,9 +408,11 @@ channel?**
    a zero-dependency exhaustive fold whose handler object is
    `{ Ok, Defect } & { [K in E["_tag"]]: (e: Extract<E, {_tag: K}>) => R }`.
 3. ✅ **`packages/vitest`** — Done. Custom matchers `toBeOk`, `toBeOkWith`,
-   `toBeErr`, `toBeErrTagged` (optional second arg also matches the tagged
-   error's payload — exact for a plain object, partial for an asymmetric matcher
-   like `expect.objectContaining`), `toBeDefect`, registered via `expect.extend`
+   `toBeErr`, `toBeErrWith` (the error-value mirror of `toBeOkWith` — a deep
+   compare of the `Err` value), `toBeErrTagged` (optional second arg also matches
+   the tagged error's payload — exact for a plain object, partial for an
+   asymmetric matcher like `expect.objectContaining`), `toBeDefect`, registered
+   via `expect.extend`
    and augmenting Vitest's `Matchers` interface. They detect a thenable
    `AsyncResult` and await internally, so a test reads
    `await expect(asyncResult).toBeOk()` (the required `await` is documented loudly
