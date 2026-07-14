@@ -1,12 +1,10 @@
 name: Deploy Documentation
 
 # Publish docs when a version is released (changesets creates a GitHub Release on publish), so the
-# site documents the latest *released* library rather than every commit on main. `workflow_dispatch`
-# is a manual redeploy escape hatch for docs-only fixes between releases.
+# site documents the latest *released* library rather than every commit on main.
 on:
   release:
     types: [published]
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,8 +12,10 @@ permissions:
   id-token: write
 
 concurrency:
+  # A version bump can publish several Releases at once (monorepo); collapse that burst of events
+  # for the same commit into a single Pages deploy — the latest run cancels earlier ones.
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
