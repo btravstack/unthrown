@@ -5,6 +5,13 @@
   --accent: #46b86c;
 }
 
+/* Hero name in the package accent — the BtravStack multi-accent rule: the
+ * canvas stays neutral, the product glows in its own color (AA via
+ * --text-accent, which darkens on light). */
+:root:root {
+  --vp-home-hero-name-color: var(--text-accent);
+}
+
 /* Home-hero background glyph — the project's motif behind the hero (an ok/err
  * railway split). Painted in --accent through a mask, so it always tracks the
  * accent token; the SVG is base64-encoded so no CSS minifier can mangle it. */
@@ -14,12 +21,6 @@
      defined once so the glow and glyph stay anchored to the same column. */
   --btv-col: 1152px;
   --btv-gutter: max(0px, calc((100% - var(--btv-col)) / 2));
-}
-/* Anchor the shared theme's hero glow to the content column instead of the
- * viewport edge, so it doesn't drift into a stray halo by the header on wide
- * screens (it still bleeds ~120px past the content, as before). */
-.VPHome::before {
-  right: calc(var(--btv-gutter) - 120px);
 }
 .VPHome::after {
   content: "";
