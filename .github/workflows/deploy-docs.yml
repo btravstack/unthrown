@@ -1,10 +1,18 @@
 name: Deploy Documentation
 
 # Publish docs when a version is released (changesets creates a GitHub Release on publish), so the
-# site documents the latest *released* library rather than every commit on main.
+# site documents the latest *released* library — and also when the docs themselves change on main
+# (theme bumps, content edits), since those need no library release to be worth shipping.
 on:
   release:
     types: [published]
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/deploy-docs.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
