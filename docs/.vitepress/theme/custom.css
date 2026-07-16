@@ -17,6 +17,7 @@
  * accent token; the SVG is base64-encoded so no CSS minifier can mangle it. */
 .VPHome {
   position: relative;
+  isolation: isolate;
   /* content-column width, and the gutter from the viewport edge in to it —
      defined once so the glow and glyph stay anchored to the same column. */
   --btv-col: 1152px;
@@ -36,7 +37,7 @@
     no-repeat top center / contain;
   opacity: 0.14;
   pointer-events: none;
-  z-index: 0;
+  z-index: -1;
 }
 @media (max-width: 768px) {
   .VPHome::after {
