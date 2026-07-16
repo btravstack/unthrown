@@ -1,26 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="44 44 112 112" width="108" height="108" fill="none">
-  <circle cx="100" cy="100" r="47" stroke="#348A51" stroke-width="9.5" fill="none"/>
-  <g transform="translate(80,68) scale(0.40)"><g transform="rotate(0 50 68)">
-    <!-- springy leaves -->
-    <path d="M46,34 C44,26 44,18 47,10" stroke="#2C8B4E" stroke-width="3.6" stroke-linecap="round" fill="none"/>
-    <path d="M47,10 C40,7 37,-2 43,-6 C50,-10 56,-3 54,3 C53,7 51,9 47,10 Z" fill="#3DAE62"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="46 46 108 108" width="108" height="108" fill="none">
+  <g stroke="#EE9CC4" stroke-width="4" stroke-linecap="round" opacity="0.85">
+    <path d="M66,116 L77,110"/>
+    <path d="M70,127 L84,120"/>
+    <path d="M79,136 L90,130"/>
+  </g>
+  <g transform="translate(73,64) rotate(24 50 62) scale(0.56)">
     <path d="M41,36 C34,31 26,30 21,34 C16,38 19,45 26,45 C32,45 38,41 41,36 Z" fill="#2C8B4E"/>
     <path d="M57,34 C62,27 70,24 76,28 C81,32 78,39 71,40 C65,40 60,37 57,34 Z" fill="#3DAE62"/>
-    
-    <g transform="rotate(-52 16 62)"><rect x="2" y="58" width="20" height="9" rx="4.5" fill="#CE3D80"/></g>
-    <g transform="rotate(52 84 62)"><rect x="78" y="58" width="20" height="9" rx="4.5" fill="#8E1A52"/></g>
-    <!-- chubby body -->
+    <g transform="rotate(-64 16 62)"><rect x="2" y="58" width="20" height="9" rx="4.5" fill="#CE3D80"/></g>
+    <g transform="rotate(64 84 62)"><rect x="78" y="58" width="20" height="9" rx="4.5" fill="#8E1A52"/></g>
     <path d="M50,32 C28,31 14,45 14,62 C14,81 30,98 44,108 C47,111 48,114 50,116 C52,114 53,111 56,108 C70,98 86,81 86,62 C86,45 72,31 50,32 Z" fill="#CE3D80"/>
     <path d="M63,35 C76,41 86,50 86,62 C86,79 73,94 58,106 C69,91 78,76 78,62 C78,51 72,42 63,35 Z" fill="#8E1A52" opacity="0.85"/>
-    <path d="M27,47 C23,53 22,61 24,68" stroke="#EE9CC4" stroke-width="3.4" stroke-linecap="round" fill="none" opacity="0.55"/>
-    <!-- face -->
-    
-    <path d="M32,59 Q38,65 44,59" stroke="#3A0D24" stroke-width="3.4" stroke-linecap="round" fill="none"/>
-    <path d="M57,59 Q63,65 69,59" stroke="#3A0D24" stroke-width="3.4" stroke-linecap="round" fill="none"/>
-    <path d="M41,71 Q50.5,80 60,71" stroke="#3A0D24" stroke-width="3.4" stroke-linecap="round" fill="none"/>
-    <circle cx="29" cy="69" r="4.2" fill="#EE9CC4" opacity="0.75"/>
-    <circle cx="72" cy="69" r="4.2" fill="#EE9CC4" opacity="0.75"/>
-    <!-- curly tail -->
-    <path d="M50,116 C49,121 52,124 49,129 C47,132 44,132 43,130" stroke="#8E1A52" stroke-width="2.8" stroke-linecap="round" fill="none"/>
-  </g></g>
-  <path d="M67,67 L133,133" stroke="#348A51" stroke-width="9.5" stroke-linecap="round"/></svg>
+    <circle cx="38" cy="58" r="5.4" fill="#3A0D24"/>
+    <circle cx="39.8" cy="56.2" r="1.9" fill="#FFFFFF"/>
+    <circle cx="63" cy="58" r="5.4" fill="#3A0D24"/>
+    <circle cx="64.8" cy="56.2" r="1.9" fill="#FFFFFF"/>
+    <circle cx="50.5" cy="74" r="5" stroke="#3A0D24" stroke-width="3" fill="none"/>
+    <circle cx="28" cy="70" r="4.2" fill="#EE9CC4" opacity="0.75"/>
+    <circle cx="73" cy="70" r="4.2" fill="#EE9CC4" opacity="0.75"/>
+    <path d="M50,116 C49,121 52,124 49,129 C47,132 44,132 43,130" stroke="#8E1A52" stroke-width="2.8" stroke-linecap="round" fill="none"/></g>
+  <circle cx="100" cy="100" r="49" stroke="#348A51" stroke-width="6.5" fill="none"/>
+  <path d="M66.5,66.5 L133.5,133.5" stroke="#348A51" stroke-width="6.5" stroke-linecap="round"/></svg>
