@@ -41,10 +41,10 @@ catalog:
   vitepress: 1.6.4
   vitest: 4.1.10
 
-# Force patched versions of vulnerable transitive dependencies. Both advisories
-# below are High severity (they gate CI's `pnpm audit --audit-level=high`) and
-# reach us only through dev/build tooling; the overrides pull each to its first
-# fixed release without disturbing unrelated version lines.
+# Force patched versions of vulnerable transitive dependencies. Every advisory
+# below reaches us only through dev/build tooling (never a published package's
+# runtime deps); the overrides span High and moderate severity. Each selector is
+# version-scoped so only the affected line moves and unrelated lines are untouched.
 overrides:
   # GHSA-3jxr-9vmj-r5cp: brace-expansion ReDoS. Only the 5.x line is present
   # (via typedoc > minimatch); 5.0.7 is the patched release.
@@ -55,9 +55,10 @@ overrides:
   "js-yaml@3": "3.15.0"
   # GHSA-fx2h-pf6j-xcff: vite `server.fs.deny` bypass (dev-server only; the docs
   # ship as static HTML). Reaches us via docs > vitepress > vite. vitepress 1.6.x
-  # pins vite ^5.4.14 and 5.x has no patched release, so pull vite up to 6.4.3
-  # (the first fixed version) — the docs `vitepress build` is verified against it.
-  vite: 6.4.3
+  # pins vite ^5.4.14 and 5.x has no patched release, so lift any pre-6.4.3 vite
+  # to 6.4.3 (the first fixed version) — the docs `vitepress build` is verified
+  # against it. This also drags esbuild up to a patched 0.25.x.
+  "vite@<6.4.3": "6.4.3"
   # GHSA-92pp-h63x-v22m: @hono/node-server request smuggling in the 1.x line,
   # pulled in by the `prisma` CLI's dev server (@prisma/dev). 1.19.13 is the
   # patched 1.x release.
