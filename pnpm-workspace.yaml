@@ -11,7 +11,7 @@ packages:
 
 catalog:
   "@changesets/cli": 2.31.0
-  "@commitlint/cli": 21.2.0
+  "@commitlint/cli": 21.2.1
   "@bloodyowl/boxed": 3.4.0
   "@btravstack/theme": 1.6.1
   "@prisma/adapter-better-sqlite3": 7.8.0
