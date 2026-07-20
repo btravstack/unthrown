@@ -30,9 +30,11 @@ function render(result: SomeResult, stringify: Stringify): string {
   if (isOk(result)) return `Ok(${stringify(result.value)})`;
   if (isErr(result)) return `Err(${stringify(result.error)})`;
   if (isDefect(result)) return `Defect(${stringify(result.cause)})`;
-  /* v8 ignore next -- unreachable: `settle` only calls `render` on a canonical
-     Result, which is always Ok/Err/Defect; kept for return-exhaustiveness. */
+  // Unreachable: `settle` only calls `render` on a canonical Result, which is
+  // always Ok/Err/Defect; kept for return-exhaustiveness.
+  /* v8 ignore start */
   return stringify(result);
+  /* v8 ignore stop */
 }
 
 // The "payload" of a TaggedError: its own enumerable properties minus the
