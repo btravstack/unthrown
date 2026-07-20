@@ -10,36 +10,58 @@ packages:
   - docs
 
 catalog:
+  "@bloodyowl/boxed": 3.4.0
+  "@btravstack/theme": 1.7.0
   "@changesets/cli": 2.31.0
   "@commitlint/cli": 21.2.1
-  "@bloodyowl/boxed": 3.4.0
-  "@btravstack/theme": 1.6.1
+  "@commitlint/config-conventional": 21.2.0
+  "@orpc/client": 2.0.0-beta.15
+  "@orpc/contract": 2.0.0-beta.15
+  "@orpc/server": 2.0.0-beta.15
   "@prisma/adapter-better-sqlite3": 7.8.0
   "@prisma/client": 7.8.0
   "@standard-schema/spec": 1.1.0
-  "@commitlint/config-conventional": 21.2.0
-  "@orpc/client": 2.0.0-beta.14
-  "@orpc/contract": 2.0.0-beta.14
-  "@orpc/server": 2.0.0-beta.14
-  "@types/node": 24.13.2
-  "@vitest/coverage-v8": 4.1.9
+  "@types/node": 26.1.1
+  "@vitest/coverage-v8": 4.1.10
   better-sqlite3: 12.11.1
-  effect: 3.21.4
-  prisma: 7.8.0
-  knip: 6.23.0
-  lefthook: 2.1.9
+  effect: 3.22.0
+  knip: 6.26.0
+  lefthook: 2.1.10
   neverthrow: 8.2.0
-  oxfmt: 0.57.0
-  oxlint: 1.72.0
+  oxfmt: 0.58.0
+  oxlint: 1.73.0
+  prisma: 7.8.0
   ts-pattern: 5.9.0
-  tsdown: 0.22.3
-  tsx: 4.22.4
-  turbo: 2.10.2
-  typedoc: 0.28.19
+  tsdown: 0.22.7
+  tsx: 4.23.1
+  turbo: 2.10.5
+  typedoc: 0.28.20
   typedoc-plugin-markdown: 4.12.0
   typescript: 6.0.3
   vitepress: 1.6.4
-  vitest: 4.1.9
+  vitest: 4.1.10
+
+# Force patched versions of vulnerable transitive dependencies. Both advisories
+# below are High severity (they gate CI's `pnpm audit --audit-level=high`) and
+# reach us only through dev/build tooling; the overrides pull each to its first
+# fixed release without disturbing unrelated version lines.
+overrides:
+  # GHSA-3jxr-9vmj-r5cp: brace-expansion ReDoS. Only the 5.x line is present
+  # (via typedoc > minimatch); 5.0.7 is the patched release.
+  "brace-expansion@5": "5.0.7"
+  # GHSA-52cp-r559-cp3m: js-yaml quadratic-CPU merge keys in the legacy 3.x line
+  # (via @changesets/cli > read-yaml-file). 3.15.0 is the patched 3.x release;
+  # the unaffected 4.x line resolved elsewhere is left untouched.
+  "js-yaml@3": "3.15.0"
+  # GHSA-fx2h-pf6j-xcff: vite `server.fs.deny` bypass (dev-server only; the docs
+  # ship as static HTML). Reaches us via docs > vitepress > vite. vitepress 1.6.x
+  # pins vite ^5.4.14 and 5.x has no patched release, so pull vite up to 6.4.3
+  # (the first fixed version) — the docs `vitepress build` is verified against it.
+  vite: 6.4.3
+  # GHSA-92pp-h63x-v22m: @hono/node-server request smuggling in the 1.x line,
+  # pulled in by the `prisma` CLI's dev server (@prisma/dev). 1.19.13 is the
+  # patched 1.x release.
+  "@hono/node-server@1": "1.19.13"
 
 peerDependencyRules:
   ignoreMissing:
@@ -50,6 +72,7 @@ peerDependencyRules:
     # dev-only dependency of `@unthrown/prisma` (its test-client generation).
     - react
     - react-dom
+    - "@types/react"
 
 allowBuilds:
   # Prisma 7 is engine-less (WASM query compiler); nothing to build or download.
@@ -66,15 +89,5 @@ allowBuilds:
 # dep fails the check instead of slipping in silently.
 minimumReleaseAge: 10080
 minimumReleaseAgeStrict: true
-
-auditConfig:
-  ignoreGhsas:
-    # vite `server.fs.deny` bypass on Windows alternate paths. Reaches us only
-    # through the docs site's dev tooling (docs > vitepress > vite) — a build-time,
-    # docs-only transitive dep. It affects the Vite dev server on Windows, which we
-    # never run in CI or production (the docs site ships as static HTML), and it is
-    # in no published package's runtime dependencies.
-    - GHSA-fx2h-pf6j-xcff
-
 minimumReleaseAgeExclude:
   - "@btravstack/theme"
