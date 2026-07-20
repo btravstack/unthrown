@@ -15,6 +15,9 @@ catalogs:
     '@changesets/cli':
       specifier: 2.31.0
       version: 2.31.0
+    '@commitlint/cli':
+      specifier: 21.2.1
+      version: 21.2.1
     '@commitlint/config-conventional':
       specifier: 21.2.0
       version: 21.2.0
@@ -102,7 +105,7 @@ importers:
         specifier: 'catalog:'
         version: 2.31.0(@types/node@24.13.2)
       '@commitlint/cli':
-        specifier: 21.2.1
+        specifier: 'catalog:'
         version: 21.2.1(@types/node@24.13.2)(conventional-commits-parser@7.1.0)(typescript@6.0.3)
       '@commitlint/config-conventional':
         specifier: 'catalog:'
