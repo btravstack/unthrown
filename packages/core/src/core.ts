@@ -151,6 +151,7 @@ class Res<T, E> {
 
   discard(this: Result<T, E>): Result<void, E> {
     if (this.tag !== "Ok") return passThrough(this);
+    // explicit <void, E>: inference from the argument would land on undefined, not void
     return okRes<void, E>(undefined);
   }
 
