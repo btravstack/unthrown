@@ -59,10 +59,16 @@ overrides:
   # to 6.4.3 (the first fixed version) — the docs `vitepress build` is verified
   # against it. This also drags esbuild up to a patched 0.25.x.
   "vite@<6.4.3": "6.4.3"
-  # GHSA-92pp-h63x-v22m: @hono/node-server request smuggling in the 1.x line,
-  # pulled in by the `prisma` CLI's dev server (@prisma/dev). 1.19.13 is the
-  # patched 1.x release.
-  "@hono/node-server@1": "1.19.13"
+  # GHSA-92pp-h63x-v22m (request smuggling, 1.x) + GHSA-frvp-7c67-39w9 (Windows
+  # path traversal in `serve-static`, <2.0.5) + GHSA-9mqv-5hh9-4cgg (WebSocket
+  # DoS, <=2.0.9): @hono/node-server, pulled in by the `prisma` CLI's dev server
+  # (@prisma/dev). 2.0.10 is the first release patched for all three; the
+  # resolved hono 4.x satisfies its `hono: ^4` peer.
+  "@hono/node-server@<2.0.10": "2.0.10"
+  # GHSA-v2hh-gcrm-f6hx: fast-uri host confusion via literal backslash authority
+  # delimiter. Only the 3.x line is present (via ajv, under commitlint's config
+  # loading and the `prisma` CLI); 3.1.4 is the first patched release.
+  "fast-uri@3": "3.1.4"
 
 peerDependencyRules:
   ignoreMissing:
@@ -92,3 +98,7 @@ minimumReleaseAge: 10080
 minimumReleaseAgeStrict: true
 minimumReleaseAgeExclude:
   - "@btravstack/theme"
+  # Temporary security-patch exception: fast-uri 3.1.4 (the GHSA-v2hh-gcrm-f6hx
+  # fix forced by the override above) is younger than the cutoff. Remove this
+  # entry once 3.1.4 is 7 days old (published 2026-07-19).
+  - fast-uri
