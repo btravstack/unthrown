@@ -149,6 +149,11 @@ class Res<T, E> {
     return okRes(value);
   }
 
+  discard(this: Result<T, E>): Result<void, E> {
+    if (this.tag !== "Ok") return passThrough(this);
+    return okRes<void, E>(undefined);
+  }
+
   mapErr<E2>(this: Result<T, E>, f: (error: E) => E2 & NotThenable<E2>): Result<T, E2> {
     if (this.tag !== "Err") return passThrough(this);
     try {

@@ -45,6 +45,7 @@ describe("Invariant 2: a Defect flows through every method except match() and re
       defectOf(boom).bind("a", f),
       defectOf(boom).let("a", f),
       defectOf(boom).as(1),
+      defectOf(boom).discard(),
       defectOf(boom).mapErr(f),
       defectOf(boom).flatMapErr(f),
       defectOf(boom).recoverErr(f),
