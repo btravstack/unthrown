@@ -6,8 +6,12 @@ import type { AsyncResult, DefectView, ErrView, OkView, Result } from "./types.j
 /**
  * Construct a successful {@link Result}.
  *
+ * With no argument, constructs a `void` success — `Result<void, never>` —
+ * sparing you `Ok(undefined)` and typing the success channel `void`, not
+ * `undefined`.
+ *
  * @typeParam T - the success value type.
- * @param value - the success value to wrap.
+ * @param value - the success value to wrap; omit it for a `void` success.
  *
  * @example
  * ```ts
@@ -15,12 +19,18 @@ import type { AsyncResult, DefectView, ErrView, OkView, Result } from "./types.j
  *
  * Ok(2).map((n) => n + 1); // => Ok(3)
  * Ok(42).get(); // => 42
+ * Ok(); // => a void success: Result<void, never>
  * ```
  *
  * @category Constructors
  */
-export function Ok<T>(value: T): Result<T, never> {
-  return okRes(value);
+export function Ok(): Result<void, never>;
+export function Ok<T>(value: T): Result<T, never>;
+export function Ok<T>(value?: T): Result<T, never> {
+  // `value as T`: the only argument-less path in is the no-arg overload, which
+  // fixes the result type to `void` — exactly what the omitted `undefined`
+  // inhabits. Invisible to callers.
+  return okRes(value as T);
 }
 
 /**
@@ -55,7 +65,7 @@ export function Err<E>(error: E): Result<never, E> {
  * as `AsyncResult.Ok` (the namespace already says "async", so the suffix drops).
  *
  * @typeParam T - the success value type.
- * @param value - the success value to wrap.
+ * @param value - the success value to wrap; omit it for a `void` success.
  *
  * @example
  * ```ts
@@ -65,12 +75,17 @@ export function Err<E>(error: E): Result<never, E> {
  *   if (ids.length === 0) return OkAsync([]); // no more Ok([]).toAsync()
  *   return itemRepository.load(ids);
  * }
+ * OkAsync(); // => a void success: AsyncResult<void, never>
  * ```
  *
  * @category Constructors
  */
-export function OkAsync<T>(value: T): AsyncResult<T, never> {
-  return Ok(value).toAsync();
+export function OkAsync(): AsyncResult<void, never>;
+export function OkAsync<T>(value: T): AsyncResult<T, never>;
+export function OkAsync<T>(value?: T): AsyncResult<T, never> {
+  // Same deliberate cast as `Ok` above: argument-less means the no-arg
+  // overload already fixed the type to `void`.
+  return Ok(value as T).toAsync();
 }
 
 /**

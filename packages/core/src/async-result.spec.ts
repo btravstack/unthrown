@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { type AsyncResult, Err, fromPromise, fromSafePromise, Ok } from "./index.js";
+import { type AsyncResult, Err, fromPromise, fromSafePromise, Ok, OkAsync } from "./index.js";
 
 const boom = new Error("boom");
 const asyncOk = <T>(v: T): AsyncResult<T, never> => Ok(v).toAsync();
@@ -11,6 +11,14 @@ const asyncDefect = (): AsyncResult<number, never> =>
     .map<number>(() => {
       throw boom;
     });
+
+describe("OkAsync() with no argument", () => {
+  it("constructs a void success", async () => {
+    const r = await OkAsync();
+    expect(r.isOk()).toBe(true);
+    expect(r.get()).toBeUndefined();
+  });
+});
 
 describe("AsyncResult is awaitable and never rejects", () => {
   it("await yields a Result for each channel and never throws", async () => {

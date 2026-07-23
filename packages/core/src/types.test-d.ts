@@ -56,6 +56,13 @@ type _okAsync = Expect<Equal<typeof okAsyncV, AsyncResult<number, never>>>;
 const errAsyncV = ErrAsync<string>("e");
 type _errAsync = Expect<Equal<typeof errAsyncV, AsyncResult<never, string>>>;
 
+// no-arg overloads construct a `void` success (not `undefined`); the existing
+// _ok/_okAsync assertions above pin that 1-arg inference is unchanged
+const okVoidV = Ok();
+type _okVoid = Expect<Equal<typeof okVoidV, Result<void, never>>>;
+const okAsyncVoidV = OkAsync();
+type _okAsyncVoid = Expect<Equal<typeof okAsyncVoidV, AsyncResult<void, never>>>;
+
 // --- aggregation: `all` keeps positional tuple types -------------------------
 
 const tuple = all([Ok(1), Ok("x"), Ok(true)]);

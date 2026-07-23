@@ -8,6 +8,13 @@ const defectOf = (cause: unknown): Result<number, never> =>
     throw cause;
   });
 
+describe("Ok() with no argument", () => {
+  it("constructs a void success", () => {
+    expect(Ok().isOk()).toBe(true);
+    expect(Ok().get()).toBeUndefined();
+  });
+});
+
 describe("Result.map", () => {
   it("maps the Ok value", () => {
     expect(
