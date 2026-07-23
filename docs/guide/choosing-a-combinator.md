@@ -26,32 +26,34 @@ The `→ Result<…>` half of each signature is the tell — it shows how the co
 moves the channels: `flatMap` widens `E` to `E | E2`, `recoverErr` empties it to
 `never`, `flatMapErr` widens the value to `T | U`.
 
-| I want to…                                     | use               | signature                                                    | channel |
-| ---------------------------------------------- | ----------------- | ------------------------------------------------------------ | ------- |
-| transform the success value                    | `map`             | `(v: T) => U` → `Result<U, E>`                               | Ok      |
-| chain a `Result`-returning step                | `flatMap`         | `(v: T) => Result<U, E2>` → `Result<U, E \| E2>`             | Ok      |
-| run a side effect, keep the value              | `tap`             | `(v: T) => void` → `Result<T, E>`                            | Ok      |
-| run a **failable** side effect, keep the value | `flatTap`         | `(v: T) => Result<unknown, E2>` → `Result<T, E \| E2>`       | Ok      |
-| sequence steps into a named scope              | `Do`/`bind`/`let` | `bind(k, (scope) => Result<U, E2>)` → `Result<{…}, E \| E2>` | Ok      |
-| replace the value with a constant              | `as`              | `(value: U)` → `Result<U, E>`                                | Ok      |
-| drop the value (success type becomes `void`)   | `discard`         | `()` → `Result<void, E>`                                     | Ok      |
-| transform the error                            | `mapErr`          | `(e: E) => E2` → `Result<T, E2>`                             | Err     |
-| try a fallback that returns a `Result`         | `flatMapErr`      | `(e: E) => Result<U, E2>` → `Result<T \| U, E2>`             | Err     |
-| turn an error into a success value             | `recoverErr`      | `(e: E) => U` → `Result<T \| U, never>`                      | Err     |
-| run a side effect on the error                 | `tapErr`          | `(e: E) => void` → `Result<T, E>`                            | Err     |
-| run a **failable** side effect on the error    | `flatTapErr`      | `(e: E) => Result<unknown, E2>` → `Result<T, E \| E2>`       | Err     |
-| recover from a defect (rare)                   | `recoverDefect`   | `(cause) => Result<U, E2>` → `Result<T \| U, E \| E2>`       | Defect  |
-| observe a defect, e.g. log it                  | `tapDefect`       | `(cause) => void` → `Result<T, E>`                           | Defect  |
-| handle all three channels at the edge          | `match`           | `{ ok, err, defect }` → `R`                                  | all     |
-| combine an array of `Result`s                  | `all`             | `Result<T, E>[]` → `Result<T[], E>`                          | —       |
-| combine a record of `Result`s                  | `allFromDict`     | `{ [k]: Result<T, E> }` → `Result<{ [k]: T }, E>`            | —       |
+| I want to…                                     | use               | signature                                                    | channel      |
+| ---------------------------------------------- | ----------------- | ------------------------------------------------------------ | ------------ |
+| transform the success value                    | `map`             | `(v: T) => U` → `Result<U, E>`                               | Ok           |
+| chain a `Result`-returning step                | `flatMap`         | `(v: T) => Result<U, E2>` → `Result<U, E \| E2>`             | Ok           |
+| run a side effect, keep the value              | `tap`             | `(v: T) => void` → `Result<T, E>`                            | Ok           |
+| run a **failable** side effect, keep the value | `flatTap`         | `(v: T) => Result<unknown, E2>` → `Result<T, E \| E2>`       | Ok           |
+| sequence steps into a named scope              | `Do`/`bind`/`let` | `bind(k, (scope) => Result<U, E2>)` → `Result<{…}, E \| E2>` | Ok           |
+| replace the value with a constant              | `as`              | `(value: U)` → `Result<U, E>`                                | Ok           |
+| drop the value (success type becomes `void`)   | `discard`         | `()` → `Result<void, E>`                                     | Ok           |
+| transform the error                            | `mapErr`          | `(e: E) => E2` → `Result<T, E2>`                             | Err          |
+| try a fallback that returns a `Result`         | `flatMapErr`      | `(e: E) => Result<U, E2>` → `Result<T \| U, E2>`             | Err          |
+| turn an error into a success value             | `recoverErr`      | `(e: E) => U` → `Result<T \| U, never>`                      | Err          |
+| run a side effect on the error                 | `tapErr`          | `(e: E) => void` → `Result<T, E>`                            | Err          |
+| run a **failable** side effect on the error    | `flatTapErr`      | `(e: E) => Result<unknown, E2>` → `Result<T, E \| E2>`       | Err          |
+| recover from a defect (rare)                   | `recoverDefect`   | `(cause) => Result<U, E2>` → `Result<T \| U, E \| E2>`       | Defect       |
+| observe a defect, e.g. log it                  | `tapDefect`       | `(cause) => void` → `Result<T, E>`                           | Defect       |
+| observe **any** failure (error _or_ defect)    | `tapFailure`      | `(f: FailureView<E>) => void` → `Result<T, E>`               | Err + Defect |
+| handle all three channels at the edge          | `match`           | `{ ok, err, defect }` → `R`                                  | all          |
+| combine an array of `Result`s                  | `all`             | `Result<T, E>[]` → `Result<T[], E>`                          | —            |
+| combine a record of `Result`s                  | `allFromDict`     | `{ [k]: Result<T, E> }` → `Result<{ [k]: T }, E>`            | —            |
 
 ## Behavior at a glance
 
 A combinator touches **only its own channel**; the other two flow through
-untouched. This grid is the whole story — notice the `Defect` column is
-"passes ▸" everywhere except `recoverDefect` and `match`, which is the one
-invariant to remember:
+untouched (`tapFailure` is the one combinator whose "own channel" spans both
+failures). This grid is the whole story — notice the `Defect` column is
+"passes ▸" everywhere except `recoverDefect`, the observers (`tapDefect` /
+`tapFailure`), and `match`, which is the one invariant to remember:
 
 | method                  | on `Ok`  | on `Err`        | on `Defect` | resulting `E`   |
 | ----------------------- | -------- | --------------- | ----------- | --------------- |
@@ -64,6 +66,7 @@ invariant to remember:
 | `tapErr` / `flatTapErr` | passes ▸ | runs `f`        | passes ▸    | `E` / `E \| E2` |
 | `recoverDefect`         | passes ▸ | passes ▸        | runs `f`    | `E \| E2`       |
 | `tapDefect`             | passes ▸ | passes ▸        | runs `f`    | `E`             |
+| `tapFailure`            | passes ▸ | runs `f`        | runs `f`    | `E`             |
 | `match`                 | `ok()`   | `err()`         | `defect()`  | —               |
 
 ::: tip `recoverErr`'s `never` under-describes the runtime
@@ -170,8 +173,17 @@ value (emptying the error channel to `never`); `flatMapErr` produces another `Re
 (which may still be an `Err`).
 
 **`recoverErr` vs `recoverDefect`** — `recoverErr` handles a modeled `Err`;
-`recoverDefect` is the **only** combinator that can touch a `Defect`. Neither is
+`recoverDefect` is the only combinator that can **consume** a `Defect`. Neither is
 the other's fallback — a defect flows past `recoverErr` untouched.
+
+**`tapErr` + `tapDefect` vs `tapFailure`** — when the _same_ effect applies to
+both failures (a shared logger, a metric, a rollback trigger), `tapFailure` runs
+it once for either. Its callback receives the discriminated **failure variant**
+(`FailureView<E>`, i.e. `ErrView | DefectView`) rather than a payload — a payload
+union `E | unknown` would collapse to `unknown` — so branch on `failure.tag` when
+you need the typed `error`, or treat it opaquely. It only _observes_: there is
+deliberately no `recoverFailure` — recovering a defect stays a separate, loud
+decision (`recoverDefect`), and handling both channels for good is `match`.
 
 ## When to leave the pipeline
 

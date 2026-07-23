@@ -296,6 +296,32 @@ export type ResultMethods<T, E> = {
   tapDefect<R>(f: (cause: unknown) => R & NotThenable<R>): Result<T, E>;
 
   /**
+   * Run a side effect on **any failure** — `Err` or `Defect` — and pass the
+   * `Result` through unchanged. The one cross-channel observer, for the shared
+   * "it went KO" concern (logging, metrics, rollback) that would otherwise be
+   * duplicated across {@link ResultMethods.tapErr | tapErr} and
+   * {@link ResultMethods.tapDefect | tapDefect}.
+   *
+   * @remarks
+   * `f` receives the narrowed **failure variant** ({@link FailureView}), not a
+   * payload — the payload union `E | unknown` would collapse to `unknown` and
+   * lose `E`'s typing. Branch on `failure.tag` to reach the typed payload
+   * (`"Err"` → `failure.error: E`, `"Defect"` → `failure.cause: unknown`), or
+   * treat it opaquely for a shared logger. Runs on `Err` and `Defect`; `Ok`
+   * passes through. It **observes without consuming**: the failure flows on
+   * unchanged — to also recover, use
+   * {@link ResultMethods.recoverErr | recoverErr} /
+   * {@link ResultMethods.recoverDefect | recoverDefect} (deliberately separate
+   * acts) or {@link ResultMethods.match | match} at the edge. If `f` throws, the
+   * result is a `Defect` whose cause is an `AggregateError` of `[thrown,
+   * original failure]` — observing a failure never destroys it. An async
+   * callback is rejected at compile time ({@link NotThenable}).
+   *
+   * @param f - the side effect over the failure variant (its return value is ignored).
+   */
+  tapFailure<R>(f: (failure: FailureView<E, T>) => R & NotThenable<R>): Result<T, E>;
+
+  /**
    * Exhaustively fold all three runtime states into a single value of type `R`.
    *
    * @remarks
@@ -497,6 +523,31 @@ export type DefectView<T = never, E = never> = ResultMethods<T, E> & {
 };
 
 /**
+ * A failure variant of a {@link Result}: an {@link ErrView} **or** a
+ * {@link DefectView}. This is what a `tapFailure` callback receives — the
+ * discriminated variant rather than a payload, because the payload union
+ * `E | unknown` would collapse to `unknown` and lose `E`'s typing. Branch on
+ * `tag` to narrow (`"Err"` → `.error: E`, `"Defect"` → `.cause: unknown`).
+ *
+ * @remarks
+ * Like {@link ErrView}, the error type comes **first** (`FailureView<E, T>`) —
+ * the error is the payload you are usually here for, and a shared observer can
+ * spell just `FailureView<MyError>`.
+ *
+ * @example
+ * ```ts
+ * const logKo = (f: FailureView<ApiError>) =>
+ *   f.tag === "Err" ? logger.warn(f.error) : logger.error(f.cause);
+ * result.tapFailure(logKo);
+ * ```
+ *
+ * @typeParam E - the modeled error type.
+ * @typeParam T - the success value type (phantom here; a failure carries none).
+ * @category Types
+ */
+export type FailureView<E, T = never> = ErrView<E, T> | DefectView<T, E>;
+
+/**
  * The core type of the library: a computation that has either succeeded with a
  * value of type `T` or failed with a *modeled* error of type `E`.
  *
@@ -696,6 +747,16 @@ export type AsyncResultMethods<T, E> = {
    * callback is rejected at compile time ({@link NotThenable}).
    */
   tapDefect<R>(f: (cause: unknown) => R & NotThenable<R>): AsyncResult<T, E>;
+
+  /**
+   * Asynchronous {@link ResultMethods.tapFailure | tapFailure} — the
+   * cross-channel observer. `f` receives the narrowed failure variant
+   * ({@link FailureView}); if it throws, the result is a `Defect` whose cause
+   * is an `AggregateError` of `[thrown, original failure]` — observing a
+   * failure never destroys it. An async callback is rejected at compile time
+   * ({@link NotThenable}).
+   */
+  tapFailure<R>(f: (failure: FailureView<E, T>) => R & NotThenable<R>): AsyncResult<T, E>;
 
   /**
    * Asynchronous {@link ResultMethods.match | match}. Handlers are synchronous;

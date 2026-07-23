@@ -24,6 +24,7 @@ export type {
   DefectView,
   ErrOf,
   ErrView,
+  FailureView,
   NotThenable,
   OkOf,
   OkView,

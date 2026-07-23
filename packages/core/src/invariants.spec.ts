@@ -31,6 +31,8 @@ describe("Invariant 1: throw inside any combinator becomes a Defect", () => {
     expect(Err("e").flatTapErr(t).isDefect()).toBe(true);
     expect(defectOf(boom).recoverDefect(t).isDefect()).toBe(true);
     expect(defectOf(boom).tapDefect(t).isDefect()).toBe(true);
+    expect(Err("e").tapFailure(t).isDefect()).toBe(true);
+    expect(defectOf(boom).tapFailure(t).isDefect()).toBe(true);
   });
 });
 
@@ -64,13 +66,20 @@ describe("Invariant 2: a Defect flows through every method except match() and re
     expect(() => d.getOrUndefined()).toThrow();
   });
 
-  it("only match() and recoverDefect() observe the Defect", () => {
+  it("only match(), recoverDefect(), and the defect observers see the Defect", () => {
     expect(defectOf(boom).match({ ok: () => "o", err: () => "e", defect: () => "d" })).toBe("d");
     expect(
       defectOf(boom)
         .recoverDefect(() => Ok("handled"))
         .get(),
     ).toBe("handled");
+    // tapDefect / tapFailure observe WITHOUT consuming — the Defect flows on.
+    const observed: string[] = [];
+    const d = defectOf(boom)
+      .tapDefect(() => observed.push("tapDefect"))
+      .tapFailure((f) => observed.push(f.tag));
+    expect(observed).toEqual(["tapDefect", "Defect"]);
+    expect(d.isDefect()).toBe(true);
   });
 });
 

@@ -83,6 +83,8 @@ describe("AsyncResult: a throw in any combinator becomes a Defect", () => {
     expect((await asyncErr("e").flatTapErr(t)).isDefect()).toBe(true);
     expect((await asyncDefect().recoverDefect(t)).isDefect()).toBe(true);
     expect((await asyncDefect().tapDefect(t)).isDefect()).toBe(true);
+    expect((await asyncErr("e").tapFailure(t)).isDefect()).toBe(true);
+    expect((await asyncDefect().tapFailure(t)).isDefect()).toBe(true);
   });
 });
 
@@ -251,6 +253,45 @@ describe("AsyncResult Defect channel", () => {
     const original = new Error("original-bug");
     const thrown = new Error("logger-failed");
     const r = await fromSafePromise(Promise.reject(original)).tapDefect(() => {
+      throw thrown;
+    });
+    expect(r.tag).toBe("Defect");
+    if (r.isDefect()) {
+      expect((r.cause as AggregateError).errors).toEqual([thrown, original]);
+    }
+  });
+});
+
+describe("AsyncResult.tapFailure (the cross-channel observer)", () => {
+  it("runs on Err and on Defect, receiving the failure variant, and passes each through", async () => {
+    const seen: unknown[] = [];
+    const observe = (f: { tag: string }) => seen.push(f.tag);
+    expect((await asyncErr("e").tapFailure(observe)).getErr()).toBe("e");
+    expect((await asyncDefect().tapFailure(observe)).isDefect()).toBe(true);
+    expect(seen).toEqual(["Err", "Defect"]);
+  });
+
+  it("does not run on Ok", async () => {
+    const f = vi.fn();
+    expect((await asyncOk(1).tapFailure(f)).get()).toBe(1);
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("a throwing callback preserves the original error in an AggregateError", async () => {
+    const thrown = new Error("logger-failed");
+    const r = await asyncErr("original").tapFailure(() => {
+      throw thrown;
+    });
+    expect(r.tag).toBe("Defect");
+    if (r.isDefect()) {
+      expect((r.cause as AggregateError).errors).toEqual([thrown, "original"]);
+    }
+  });
+
+  it("a throwing callback preserves the original cause in an AggregateError", async () => {
+    const original = new Error("original-bug");
+    const thrown = new Error("logger-failed");
+    const r = await fromSafePromise(Promise.reject(original)).tapFailure(() => {
       throw thrown;
     });
     expect(r.tag).toBe("Defect");
