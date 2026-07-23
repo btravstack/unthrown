@@ -162,6 +162,19 @@ describe("Result.as", () => {
   });
 });
 
+describe("Result.discard", () => {
+  it("drops the Ok value", () => {
+    expect(Ok(1).discard().get()).toBeUndefined();
+  });
+
+  it("passes Err and Defect through", () => {
+    const r = Err("e").discard();
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toBe("e");
+    expect(defectOf(boom).discard().isDefect()).toBe(true);
+  });
+});
+
 describe("Result.mapErr", () => {
   it("maps the Err value", () => {
     expect(

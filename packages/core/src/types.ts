@@ -161,6 +161,15 @@ export type ResultMethods<T, E> = {
    * @typeParam U - the replacement value type.
    */
   as<U>(value: U): Result<U, E>;
+  /**
+   * Drop the success value, collapsing the success type to `void`.
+   *
+   * The named form of `map(() => undefined)`. Runs only on `Ok` (the value is
+   * replaced with `undefined`); `Err` and `Defect` pass through. Unlike
+   * `as(undefined)` — which produces `Result<undefined, E>` — the success type
+   * is `void`: the value's story ends here.
+   */
+  discard(): Result<void, E>;
 
   /**
    * Transform the modeled error with `f`.
