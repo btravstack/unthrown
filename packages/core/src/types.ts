@@ -630,6 +630,8 @@ export type AsyncResultMethods<T, E> = {
   ): AsyncResult<Bound<T, K, U>, E>;
   /** Asynchronous {@link ResultMethods.as | as}: replaces the value with `value`. */
   as<U>(value: U): AsyncResult<U, E>;
+  /** Asynchronous {@link ResultMethods.discard | discard}: drops the value, collapsing the success type to `void`. */
+  discard(): AsyncResult<void, E>;
 
   /**
    * Asynchronous {@link ResultMethods.mapErr | mapErr}. `f` is synchronous; a
