@@ -1,5 +1,13 @@
 # @unthrown/boxed
 
+## 4.2.0
+
+### Patch Changes
+
+- Updated dependencies [7c5a426]
+- Updated dependencies [bfdc68e]
+  - unthrown@4.2.0
+
 ## 4.1.0
 
 ### Patch Changes
