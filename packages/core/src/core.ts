@@ -598,6 +598,12 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
+  discard(): AsyncResult<void, E> {
+    return new AsyncRes<void, E>(
+      this.promise.then((r) => (r.tag === "Ok" ? okRes<void, E>(undefined) : passThrough(r))),
+    );
+  }
+
   mapErr<E2>(f: (error: E) => E2 & NotThenable<E2>): AsyncResult<T, E2> {
     return new AsyncRes<T, E2>(
       this.promise.then((r) => {

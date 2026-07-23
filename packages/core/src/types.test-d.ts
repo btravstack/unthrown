@@ -152,6 +152,9 @@ type _recovered = Expect<Equal<typeof recovered, Result<number, never>>>;
 const discarded = r1.discard();
 type _discarded = Expect<Equal<typeof discarded, Result<void, "e1">>>;
 
+const discardedAsync = ar.discard();
+type _discardedAsync = Expect<Equal<typeof discardedAsync, AsyncResult<void, "e">>>;
+
 // map changes the value type; mapErr changes the error type
 const mapped = r1.map((n) => `${n}`);
 type _mapped = Expect<Equal<typeof mapped, Result<string, "e1">>>;

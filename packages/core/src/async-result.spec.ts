@@ -136,6 +136,14 @@ describe("AsyncResult success channel", () => {
     if (r.isErr()) expect(r.error).toBe("e");
     expect((await asyncDefect().as("x")).isDefect()).toBe(true);
   });
+
+  it("discard drops the Ok value, and passes Err/Defect through", async () => {
+    expect((await asyncOk(1).discard()).get()).toBeUndefined();
+    const r = await asyncErr("e").discard();
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toBe("e");
+    expect((await asyncDefect().discard()).isDefect()).toBe(true);
+  });
 });
 
 describe("AsyncResult error channel", () => {
