@@ -6,12 +6,11 @@ import type { AsyncResult, DefectView, ErrView, OkView, Result } from "./types.j
 /**
  * Construct a successful {@link Result}.
  *
- * With no argument, constructs a `void` success — `Result<void, never>` —
- * sparing you `Ok(undefined)` and typing the success channel `void`, not
- * `undefined`.
+ * Pass a value to wrap it as `Result<T, never>`, or call with no argument to
+ * construct a `void` success — `Result<void, never>` — sparing you `Ok(undefined)`
+ * and typing the success channel `void`, not `undefined`.
  *
  * @typeParam T - the success value type.
- * @param value - the success value to wrap; omit it for a `void` success.
  *
  * @example
  * ```ts
@@ -57,6 +56,9 @@ export function Err<E>(error: E): Result<never, E> {
  * Construct a successful {@link AsyncResult} from a pure value — the pre-lifted
  * form of {@link Ok}, sparing you `Ok(value).toAsync()`.
  *
+ * Pass a value to wrap it as `AsyncResult<T, never>`, or call with no argument
+ * to construct a `void` success — `AsyncResult<void, never>`.
+ *
  * @remarks
  * Reach for this on the synchronous/early branch of an `AsyncResult`-returning
  * function, so both branches share one return type without a trailing
@@ -65,7 +67,6 @@ export function Err<E>(error: E): Result<never, E> {
  * as `AsyncResult.Ok` (the namespace already says "async", so the suffix drops).
  *
  * @typeParam T - the success value type.
- * @param value - the success value to wrap; omit it for a `void` success.
  *
  * @example
  * ```ts

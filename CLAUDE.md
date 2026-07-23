@@ -162,7 +162,9 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
 - types: `NotThenable<R>` — rejects a `PromiseLike` at the type level, so a
   combinator callback that returns one is a compile error instead of a silently
   unqualified rejection.
-- constructors: `Ok`, `Err` (there is **no** `Defect` constructor — a defect-state
+- constructors: `Ok` (a no-arg overload — `Ok()` — constructs a `void` success,
+  `Result<void, never>`, sparing `Ok(undefined)`; `OkAsync()` mirrors it),
+  `Err` (there is **no** `Defect` constructor — a defect-state
   `Result` arises only at boundaries; the qualify-time `defect` marker helper is
   injected, not exported), plus the **pre-lifted async** constructors `OkAsync` /
   `ErrAsync` — `Ok(v).toAsync()` / `Err(e).toAsync()` without the boilerplate, for
