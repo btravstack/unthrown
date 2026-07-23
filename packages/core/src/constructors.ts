@@ -4,13 +4,25 @@ import { errRes, okRes } from "./core.js";
 import type { AsyncResult, DefectView, ErrView, OkView, Result } from "./types.js";
 
 /**
+ * Construct a successful `void` {@link Result} — `Result<void, never>` —
+ * sparing you `Ok(undefined)` and typing the success channel `void`, not
+ * `undefined`.
+ *
+ * @example
+ * ```ts
+ * import { Ok } from "unthrown";
+ *
+ * Ok(); // => a void success: Result<void, never>
+ * ```
+ *
+ * @category Constructors
+ */
+export function Ok(): Result<void, never>;
+/**
  * Construct a successful {@link Result}.
  *
- * Pass a value to wrap it as `Result<T, never>`, or call with no argument to
- * construct a `void` success — `Result<void, never>` — sparing you `Ok(undefined)`
- * and typing the success channel `void`, not `undefined`.
- *
  * @typeParam T - the success value type.
+ * @param value - the success value to wrap.
  *
  * @example
  * ```ts
@@ -18,12 +30,10 @@ import type { AsyncResult, DefectView, ErrView, OkView, Result } from "./types.j
  *
  * Ok(2).map((n) => n + 1); // => Ok(3)
  * Ok(42).get(); // => 42
- * Ok(); // => a void success: Result<void, never>
  * ```
  *
  * @category Constructors
  */
-export function Ok(): Result<void, never>;
 export function Ok<T>(value: T): Result<T, never>;
 export function Ok<T>(value?: T): Result<T, never> {
   // The only way in with no argument is the no-arg overload, which fixes the
@@ -53,11 +63,23 @@ export function Err<E>(error: E): Result<never, E> {
 }
 
 /**
+ * Construct a successful `void` {@link AsyncResult} — `AsyncResult<void, never>`
+ * — the pre-lifted form of the no-arg {@link Ok}, sparing you
+ * `Ok(undefined).toAsync()`.
+ *
+ * @example
+ * ```ts
+ * import { OkAsync } from "unthrown";
+ *
+ * OkAsync(); // => a void success: AsyncResult<void, never>
+ * ```
+ *
+ * @category Constructors
+ */
+export function OkAsync(): AsyncResult<void, never>;
+/**
  * Construct a successful {@link AsyncResult} from a pure value — the pre-lifted
  * form of {@link Ok}, sparing you `Ok(value).toAsync()`.
- *
- * Pass a value to wrap it as `AsyncResult<T, never>`, or call with no argument
- * to construct a `void` success — `AsyncResult<void, never>`.
  *
  * @remarks
  * Reach for this on the synchronous/early branch of an `AsyncResult`-returning
@@ -67,6 +89,7 @@ export function Err<E>(error: E): Result<never, E> {
  * as `AsyncResult.Ok` (the namespace already says "async", so the suffix drops).
  *
  * @typeParam T - the success value type.
+ * @param value - the success value to wrap.
  *
  * @example
  * ```ts
@@ -76,12 +99,10 @@ export function Err<E>(error: E): Result<never, E> {
  *   if (ids.length === 0) return OkAsync([]); // no more Ok([]).toAsync()
  *   return itemRepository.load(ids);
  * }
- * OkAsync(); // => a void success: AsyncResult<void, never>
  * ```
  *
  * @category Constructors
  */
-export function OkAsync(): AsyncResult<void, never>;
 export function OkAsync<T>(value: T): AsyncResult<T, never>;
 export function OkAsync<T>(value?: T): AsyncResult<T, never> {
   // Same deliberate cast as `Ok` above: argument-less means the no-arg
