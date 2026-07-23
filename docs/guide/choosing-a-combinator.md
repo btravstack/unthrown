@@ -34,6 +34,7 @@ moves the channels: `flatMap` widens `E` to `E | E2`, `recoverErr` empties it to
 | run a **failable** side effect, keep the value | `flatTap`         | `(v: T) => Result<unknown, E2>` → `Result<T, E \| E2>`       | Ok      |
 | sequence steps into a named scope              | `Do`/`bind`/`let` | `bind(k, (scope) => Result<U, E2>)` → `Result<{…}, E \| E2>` | Ok      |
 | replace the value with a constant              | `as`              | `(value: U)` → `Result<U, E>`                                | Ok      |
+| drop the value (success type becomes `void`)   | `discard`         | `()` → `Result<void, E>`                                     | Ok      |
 | transform the error                            | `mapErr`          | `(e: E) => E2` → `Result<T, E2>`                             | Err     |
 | try a fallback that returns a `Result`         | `flatMapErr`      | `(e: E) => Result<U, E2>` → `Result<T \| U, E2>`             | Err     |
 | turn an error into a success value             | `recoverErr`      | `(e: E) => U` → `Result<T \| U, never>`                      | Err     |

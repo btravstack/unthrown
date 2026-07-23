@@ -119,7 +119,8 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
 
 - success: `map`, `flatMap`, `tap`, `flatTap` (a failable `tap` — runs a
   `Result`-returning effect, keeps the original value, threads the effect's
-  error), `as`
+  error), `as`, `discard` (drop the value — the success type collapses to
+  `void`; the named form of `map(() => undefined)`, distinct from `as`)
 - do-notation: `Do()` (entry — `Ok({})`, an empty object scope; capitalised
   because `do` is reserved) plus the methods `bind(name, f)` (sequence a
   `Result`-returning step, binding its value under `name` in an accumulating
