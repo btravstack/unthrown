@@ -399,6 +399,39 @@ describe("Result.tapDefect", () => {
   });
 });
 
+describe("Result.tapFailure (the cross-channel observer)", () => {
+  it("runs on Err, receiving the Err variant, and passes the error through", () => {
+    const seen: string[] = [];
+    const r = Err("e").tapFailure((f) => {
+      if (f.tag === "Err") seen.push(f.error);
+    });
+    expect(seen).toEqual(["e"]);
+    expect(r.getErr()).toBe("e");
+  });
+
+  it("runs on a Defect, receiving the Defect variant, and passes it through", () => {
+    const seen: unknown[] = [];
+    const r = defectOf(boom).tapFailure((f) => {
+      if (f.tag === "Defect") seen.push(f.cause);
+    });
+    expect(seen).toEqual([boom]);
+    expect(r.isDefect()).toBe(true);
+  });
+
+  it("does not run on Ok", () => {
+    const f = vi.fn();
+    expect(Ok(1).tapFailure(f).get()).toBe(1);
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("observes without consuming: the failure is the same frozen instance", () => {
+    const err = Err("e");
+    expect(err.tapFailure(() => "ignored")).toBe(err);
+    const defect = defectOf(boom);
+    expect(defect.tapFailure(() => "ignored")).toBe(defect);
+  });
+});
+
 describe("failure-observer throws preserve the original failure", () => {
   it("tapErr: a throwing callback yields a Defect aggregating [thrown, original]", () => {
     const boom = new Error("boom");
@@ -433,6 +466,29 @@ describe("failure-observer throws preserve the original failure", () => {
     expect(r.tag).toBe("Defect");
     if (r.isDefect()) {
       expect((r.cause as AggregateError).errors).toEqual([boom, "original"]);
+    }
+  });
+
+  it("tapFailure on Err: a throwing callback yields a Defect aggregating [thrown, original error]", () => {
+    const boom = new Error("boom");
+    const r = Err("original").tapFailure(() => {
+      throw boom;
+    });
+    expect(r.tag).toBe("Defect");
+    if (r.isDefect()) {
+      expect((r.cause as AggregateError).errors).toEqual([boom, "original"]);
+    }
+  });
+
+  it("tapFailure on a Defect: a throwing callback yields a Defect aggregating [thrown, original cause]", () => {
+    const original = new Error("original-bug");
+    const boom = new Error("logger-failed");
+    const r = defectOf(original).tapFailure(() => {
+      throw boom;
+    });
+    expect(r.tag).toBe("Defect");
+    if (r.isDefect()) {
+      expect((r.cause as AggregateError).errors).toEqual([boom, original]);
     }
   });
 

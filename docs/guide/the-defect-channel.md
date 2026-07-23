@@ -107,6 +107,11 @@ d.recoverDefect((cause) => (cause instanceof RangeError ? Err("out_of_range") : 
 ```
 
 Use `tapDefect` to observe a defect's cause (e.g. logging) without changing it.
+When the same observation applies to a modeled `Err` too — one logger, one
+rollback trigger for "it went KO" — `tapFailure` runs it on either failure,
+passing the discriminated variant (`ErrView | DefectView`) so you can still
+branch on `tag`. It observes without consuming; there is deliberately no
+`recoverFailure` — recovering a defect stays a separate, loud `recoverDefect`.
 
 Recovering a defect should feel awkward — usually you don't. You let it bubble
 to the edge, log it, and return a 500.

@@ -19,6 +19,7 @@ import {
   Err,
   ErrAsync,
   type ErrView,
+  type FailureView,
   fromPromise,
   fromSafeThrowable,
   fromThrowable,
@@ -338,6 +339,8 @@ new WithMsg({ ticketId: "t1" });
   r.tapErr(async () => {});
   // @ts-expect-error — async tapDefect callback is banned
   r.tapDefect(async () => {});
+  // @ts-expect-error — async tapFailure callback is banned
+  r.tapFailure(async () => {});
   // @ts-expect-error — async let callback is banned
   Ok({}).let("x", async () => 1);
 
@@ -353,6 +356,8 @@ new WithMsg({ ticketId: "t1" });
   ar.tapErr(async () => {});
   // @ts-expect-error — async tapDefect callback is banned (async surface)
   ar.tapDefect(async () => {});
+  // @ts-expect-error — async tapFailure callback is banned (async surface)
+  ar.tapFailure(async () => {});
   const emptyAsync = Ok({}).toAsync();
   // @ts-expect-error — async let callback is banned (async surface)
   emptyAsync.let("x", async () => 1);
@@ -369,6 +374,27 @@ new WithMsg({ ticketId: "t1" });
     err: async (e) => e.length,
     defect: async () => 0,
   });
+}
+
+// --- tapFailure: the callback receives the discriminated failure variant ----
+// (a payload union `E | unknown` would collapse to `unknown`; the variant keeps
+// `E` reachable by narrowing on `tag`)
+
+{
+  const r = Ok(1) as Result<number, "e">;
+  r.tapFailure((f) => {
+    type _IsFailureView = Expect<Equal<typeof f, FailureView<"e", number>>>;
+    if (f.tag === "Err") {
+      type _ErrPayloadTyped = Expect<Equal<typeof f.error, "e">>;
+    } else {
+      type _DefectPayload = Expect<Equal<typeof f.cause, unknown>>;
+    }
+  });
+  const kept = r.tapFailure(() => {});
+  type _TapFailureKeeps = Expect<Equal<typeof kept, Result<number, "e">>>;
+
+  const keptAsync = r.toAsync().tapFailure(() => {});
+  type _TapFailureKeepsAsync = Expect<Equal<typeof keptAsync, AsyncResult<number, "e">>>;
 }
 
 // --- getOr widens: the fallback may be a different type ----

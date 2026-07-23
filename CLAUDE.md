@@ -63,14 +63,16 @@ was planned).
   This is what lets an HTTP adapter do a single `match({ ok, err, defect })`
   with **no surrounding `try/catch`**.
 - **A `Defect` flows through every method untouched EXCEPT `match()`,
-  `recoverDefect()`, and `tapDefect()` (which observes it without consuming
-  it).** Therefore `getOr`, `getOrElse`, `getOrNull`, `getOrUndefined`
-  still **throw** on a `Defect` — they recover the modeled `Err`, never an
-  unmodeled defect (a defect is a bug, not an absent value).
+  `recoverDefect()`, and the observers `tapDefect()` / `tapFailure()` (which
+  observe it without consuming it).** Therefore `getOr`, `getOrElse`,
+  `getOrNull`, `getOrUndefined` still **throw** on a `Defect` — they recover
+  the modeled `Err`, never an unmodeled defect (a defect is a bug, not an
+  absent value).
 - **A failure-observer throw preserves the original failure.** A throw inside
-  `tapErr` / `tapDefect` / `flatTapErr` produces a `Defect` whose cause is an
-  `AggregateError([thrown, original])` — observing a failure never destroys it.
-  (A throw in the success-channel `tap`/`map` keeps the plain thrown cause.)
+  `tapErr` / `tapDefect` / `tapFailure` / `flatTapErr` produces a `Defect` whose
+  cause is an `AggregateError([thrown, original])` — observing a failure never
+  destroys it. (A throw in the success-channel `tap`/`map` keeps the plain
+  thrown cause.)
 - **Thenable callback returns are rejected at compile time.** Every combinator
   callback not already constrained to return a `Result` (`map`, `tap*`, `let`,
   `mapErr`, `recoverErr`) intersects its return with `NotThenable<R>` — an `async`
@@ -132,6 +134,15 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   mirror of `flatTap` — runs a `Result`-returning effect on the error, keeps the
   original error, threads the effect's error)
 - defect: `recoverDefect`, `tapDefect`
+- failure (both KO channels): `tapFailure` — the one cross-channel combinator:
+  runs its observer on `Err` **or** `Defect`, passing the discriminated failure
+  variant (`FailureView<E, T>` = `ErrView | DefectView`; the variant, not a
+  payload, because `E | unknown` would collapse to `unknown` — the callback
+  narrows on `tag`). Observe-only by design: there is deliberately **no**
+  `recoverFailure` (frictionless defect recovery would erode the channel's
+  meaning — recovering stays the separate `recoverDefect`; handling both for
+  good is `match`), and no channel-moving operators (`Err`→`Defect` erases the
+  modeled type; `Defect`→`Err` would put `unknown` in `E`, violating Thesis #1)
 - eliminate: `match`, `get`/`getErr` (type-gated — `get` only compiles on
   `Result<T, never>`, `getErr` only on `Result<never, E>`; use `match` /
   `recoverErr` / `flatMapErr` to empty the opposite channel first), `getOr` (signature
@@ -161,7 +172,8 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   plain `{ tag: "Ok" }` look-alike is not matched), for untyped boundaries.
 - types: `NotThenable<R>` — rejects a `PromiseLike` at the type level, so a
   combinator callback that returns one is a compile error instead of a silently
-  unqualified rejection.
+  unqualified rejection. `FailureView<E, T>` — the exported `ErrView | DefectView`
+  union a `tapFailure` callback receives (error-type-first, like `ErrView`).
 - constructors: `Ok` (a no-arg overload — `Ok()` — constructs a `void` success,
   `Result<void, never>`, sparing `Ok(undefined)`; `OkAsync()` mirrors it),
   `Err` (there is **no** `Defect` constructor — a defect-state

@@ -19,6 +19,7 @@ import type {
   Bound,
   DefectView,
   ErrView,
+  FailureView,
   NotThenable,
   OkView,
   Result,
@@ -232,6 +233,19 @@ class Res<T, E> {
       return this;
     } catch (cause) {
       return observerThrowToDefect(cause, this.cause);
+    }
+  }
+
+  tapFailure<R>(
+    this: Result<T, E>,
+    f: (failure: FailureView<E, T>) => R & NotThenable<R>,
+  ): Result<T, E> {
+    if (this.tag === "Ok") return this;
+    try {
+      f(this);
+      return this;
+    } catch (cause) {
+      return observerThrowToDefect(cause, this.tag === "Err" ? this.error : this.cause);
     }
   }
 
@@ -709,6 +723,20 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
           return r;
         } catch (cause) {
           return observerThrowToDefect<T, E>(cause, r.cause);
+        }
+      }),
+    );
+  }
+
+  tapFailure<R>(f: (failure: FailureView<E, T>) => R & NotThenable<R>): AsyncResult<T, E> {
+    return new AsyncRes<T, E>(
+      this.promise.then((r) => {
+        if (r.tag === "Ok") return r;
+        try {
+          f(r);
+          return r;
+        } catch (cause) {
+          return observerThrowToDefect<T, E>(cause, r.tag === "Err" ? r.error : r.cause);
         }
       }),
     );
