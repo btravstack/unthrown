@@ -11,10 +11,13 @@ packages:
 
 catalog:
   "@bloodyowl/boxed": 3.4.0
+  "@btravstack/commitlint": 0.1.0
+  "@btravstack/oxlint": 0.1.0
   "@btravstack/theme": 1.7.0
+  "@btravstack/tsconfig": 0.1.0
+  "@btravstack/typedoc": 0.1.0
   "@changesets/cli": 2.31.0
   "@commitlint/cli": 21.2.1
-  "@commitlint/config-conventional": 21.2.0
   "@orpc/client": 2.0.0-beta.15
   "@orpc/contract": 2.0.0-beta.15
   "@orpc/server": 2.0.0-beta.15
@@ -98,7 +101,12 @@ allowBuilds:
 minimumReleaseAge: 10080
 minimumReleaseAgeStrict: true
 minimumReleaseAgeExclude:
+  # First-party shared config (@btravstack scope): adopt immediately, skip the delay.
+  - "@btravstack/commitlint"
+  - "@btravstack/oxlint"
   - "@btravstack/theme"
+  - "@btravstack/tsconfig"
+  - "@btravstack/typedoc"
   # Temporary security-patch exception: fast-uri 3.1.4 (the GHSA-v2hh-gcrm-f6hx
   # fix forced by the override above) is younger than the cutoff. Remove this
   # entry once 3.1.4 is 7 days old (published 2026-07-19).

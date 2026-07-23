@@ -19,9 +19,10 @@
     "version": "changeset version"
   },
   "devDependencies": {
+    "@btravstack/commitlint": "catalog:",
+    "@btravstack/oxlint": "catalog:",
     "@changesets/cli": "catalog:",
     "@commitlint/cli": "catalog:",
-    "@commitlint/config-conventional": "catalog:",
     "knip": "catalog:",
     "lefthook": "catalog:",
     "oxfmt": "catalog:",

@@ -11,5 +11,9 @@
   "type": "module",
   "exports": {
     "./base.json": "./base.json"
+  },
+  "dependencies": {
+    "@btravstack/typedoc": "catalog:",
+    "typedoc-plugin-markdown": "catalog:"
   }
 }
