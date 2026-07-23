@@ -148,7 +148,7 @@ type _flatTapErred = Expect<Equal<typeof flatTapErred, Result<number, "e1" | "e2
 const recovered = r1.recoverErr(() => 0);
 type _recovered = Expect<Equal<typeof recovered, Result<number, never>>>;
 
-// discard collapses the success type to `void` (not `undefined`)
+// discard collapses the success type to `void` (not `undefined`) — and the async mirror
 const discarded = r1.discard();
 type _discarded = Expect<Equal<typeof discarded, Result<void, "e1">>>;
 
