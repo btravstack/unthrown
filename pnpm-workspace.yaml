@@ -67,8 +67,9 @@ overrides:
   "@hono/node-server@<2.0.10": "2.0.10"
   # GHSA-v2hh-gcrm-f6hx: fast-uri host confusion via literal backslash authority
   # delimiter. Only the 3.x line is present (via ajv, under commitlint's config
-  # loading and the `prisma` CLI); 3.1.4 is the first patched release.
-  "fast-uri@3": "3.1.4"
+  # loading and the `prisma` CLI); 3.1.4 is the first patched release. Scoped to
+  # the vulnerable range so future patched 3.x releases resolve normally.
+  "fast-uri@<3.1.4": "3.1.4"
 
 peerDependencyRules:
   ignoreMissing:
