@@ -2,9 +2,9 @@
 // through `qualify`, which triages each cause into a modeled `E` or a `Defect`;
 // there is no path that yields `unknown` in `E`.
 
+import { Err, Ok } from "./constructors.js";
 import { AsyncRes, defectRes, errRes, okRes } from "./core.js";
 import { type Defect, defect, isDefectMarker } from "./defect.js";
-import { Err, Ok } from "./constructors.js";
 import type { AsyncErrOf, AsyncOkOf, AsyncResult, ErrOf, OkOf, Result } from "./types.js";
 
 /**

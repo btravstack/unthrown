@@ -9,13 +9,12 @@
 // package README.
 
 import { eslintCompatPlugin } from "@oxlint/plugins";
+import type { Plugin } from "@oxlint/plugins";
 import { defineConfig } from "oxlint";
+import type { OxlintConfig } from "oxlint";
 
 import { noAmbiguousErrorType } from "./rules/no-ambiguous-error-type.js";
 import { preferAsyncResult } from "./rules/prefer-async-result.js";
-
-import type { Plugin } from "@oxlint/plugins";
-import type { OxlintConfig } from "oxlint";
 
 type UnthrownPlugin = Plugin & { recommended: OxlintConfig };
 

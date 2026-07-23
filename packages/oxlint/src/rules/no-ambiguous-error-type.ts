@@ -1,11 +1,10 @@
 import { defineRule } from "@oxlint/plugins";
+import type { ESTree, Scope } from "@oxlint/plugins";
 
 import { getImportSource } from "../helpers/get-import-source.js";
 import { hasTypeArguments } from "../helpers/has-type-arguments.js";
 import { isIdentifierTypeName } from "../helpers/is-identifier-type-name.js";
 import { isLocallyBound } from "../helpers/is-locally-bound.js";
-
-import type { ESTree, Scope } from "@oxlint/plugins";
 
 const MODULE = "unthrown";
 const RESULT_TYPES = ["Result", "AsyncResult"] as const;

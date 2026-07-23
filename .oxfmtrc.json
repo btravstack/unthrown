@@ -6,8 +6,5 @@
     "docs/.vitepress/cache/**",
     "docs/.vitepress/dist/**"
   ],
-  "organizeImports": {
-    "sortImports": true,
-    "separateGroups": true
-  }
+  "sortImports": true
 }
