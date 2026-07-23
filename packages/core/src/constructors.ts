@@ -26,9 +26,9 @@ import type { AsyncResult, DefectView, ErrView, OkView, Result } from "./types.j
 export function Ok(): Result<void, never>;
 export function Ok<T>(value: T): Result<T, never>;
 export function Ok<T>(value?: T): Result<T, never> {
-  // `value as T`: the only argument-less path in is the no-arg overload, which
-  // fixes the result type to `void` — exactly what the omitted `undefined`
-  // inhabits. Invisible to callers.
+  // The only way in with no argument is the no-arg overload, which fixes the
+  // result type to void — exactly what the omitted undefined inhabits.
+  // Invisible to callers.
   return okRes(value as T);
 }
 
