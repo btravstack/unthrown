@@ -15,3 +15,5 @@ concurrency:
 jobs:
   ci:
     uses: btravstack/config/.github/workflows/ci-reusable.yml@workflows-v1
+    with:
+      node-versions: '["", "22.19"]'
