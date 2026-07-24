@@ -15,6 +15,3 @@ concurrency:
 jobs:
   ci:
     uses: btravstack/config/.github/workflows/ci-reusable.yml@workflows-v1
-    with:
-      bundle-size: true
-      test-command: "pnpm test -- --coverage --reporter=default --reporter=github-actions"
