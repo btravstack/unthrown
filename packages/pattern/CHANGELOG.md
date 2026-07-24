@@ -1,5 +1,12 @@
 # @unthrown/pattern
 
+## 4.3.0
+
+### Patch Changes
+
+- Updated dependencies [af0235a]
+  - unthrown@4.3.0
+
 ## 4.2.0
 
 ### Patch Changes
