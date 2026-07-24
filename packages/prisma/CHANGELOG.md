@@ -1,5 +1,15 @@
 # @unthrown/prisma
 
+## 0.1.1
+
+### Patch Changes
+
+- 3b06099: Adopt @btravstack/tsconfig@0.2.0 (verbatimModuleSyntax), @btravstack/oxlint@0.2.1 (consistent-type-imports), and @btravstack/lefthook.
+- 4096713: Remove the local `tools/tsconfig` / `tools/typedoc` packages and consume the published `@btravstack/tsconfig` / `@btravstack/typedoc` config directly (every package now extends `@btravstack/*` and takes it from the catalog).
+- Updated dependencies [3b06099]
+- Updated dependencies [4096713]
+  - unthrown@4.3.1
+
 ## 0.1.0
 
 ### Minor Changes

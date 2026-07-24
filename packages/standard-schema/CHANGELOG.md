@@ -1,5 +1,13 @@
 # @unthrown/standard-schema
 
+## 4.3.1
+
+### Patch Changes
+
+- Updated dependencies [3b06099]
+- Updated dependencies [4096713]
+  - unthrown@4.3.1
+
 ## 4.3.0
 
 ### Patch Changes
