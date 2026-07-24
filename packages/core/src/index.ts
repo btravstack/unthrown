@@ -24,6 +24,7 @@ export type {
   DefectView,
   ErrOf,
   ErrTriage,
+  ErrTriagePartial,
   ErrView,
   FailureView,
   NotThenable,

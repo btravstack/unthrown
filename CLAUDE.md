@@ -61,14 +61,25 @@ was planned).
    branch (receiving the full union), visible and greppable at the call site;
    an untagged or mixed `E` _must_ use it (for a fully untagged `E`,
    `{ Else: f }` is the only form — the triage-era spelling of the old
-   single-callback). The **observers** (`tapErr`, `flatTapErr`, `tapDefect`,
-   `tapFailure`) keep a single callback: observing a union uniformly cannot
-   strand a future tag; only consuming one can. The outgoing types are the
-   union of the branch returns, so a branch that `throw`s (return type
-   `never`) both converts its tag to a `Defect` and subtracts it from `E`.
-   Eliminators (`match`, `getOrElse`, `matchTags`) are exempt — they sit at the
-   edge, where exhaustiveness is either total (`match`/`matchTags`) or the
-   value is being surrendered anyway.
+   single-callback). Each transformer branch also receives the **injected
+   `defect` helper** as its second argument — the same injection `qualify`
+   gets (Thesis #3), and the sanctioned deliberate `Err`→`Defect` form
+   (`DriverError: (e, defect) => defect(e.cause)`); the outgoing types are the
+   union of the branch returns **with the `Defect` arm subtracted**
+   (`Exclude<TriageReturns<H>, Defect>`, exactly the boundary inference), so a
+   defect branch — or a throwing one, the safety net — contributes nothing.
+   The error **observers** (`tapErr`, `flatTapErr`) take the **partial** form
+   (`ErrTriagePartial<E, R>`: every branch optional, `Else` included) — a tag
+   without a branch is simply not observed and flows through, so partiality
+   cannot mis-route; their branches do NOT receive `defect` (an observer's
+   return never replaces the error, and withholding the helper keeps the
+   marker unconstructible there). One object shape either way: exhaustive when
+   you consume, partial when you observe. `tapDefect` / `tapFailure` keep
+   single callbacks — their payloads carry no tags to triage (a defect's cause
+   is `unknown`; `tapFailure` discriminates on channel, not tag). Eliminators
+   (`match`, `getOrElse`, `matchTags`) are exempt — they sit at the edge,
+   where exhaustiveness is either total (`match`/`matchTags`) or the value is
+   being surrendered anyway.
 
 ## Load-bearing runtime invariants (tests must guard these)
 
@@ -96,9 +107,10 @@ was planned).
   destroys it. (A throw in the success-channel `tap`/`map` keeps the plain
   thrown cause.)
 - **Thenable callback returns are rejected at compile time.** Every combinator
-  callback not already constrained to return a `Result` (`map`, `tap*`, `let`)
-  intersects its return with `NotThenable<R>`; the triage combinators (`mapErr`,
-  `recoverErr`) apply the union-wide `NoThenables` to the union of their branch
+  callback not already constrained to return a `Result` (`map`, `tap`, `let`,
+  `tapDefect`, `tapFailure`) intersects its return with `NotThenable<R>`; the
+  triage combinators (`mapErr`, `recoverErr`, `tapErr`) apply the union-wide
+  `NoThenables` to the union of their branch
   returns (`Extract`-based, so one async branch can't hide in a non-thenable
   union; an `any`-returning branch, e.g. a test mock, is tolerated) — an `async`
   callback/branch is a compile error, because its rejection would bypass
@@ -165,8 +177,9 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   `Else`'s parameter is deliberately the full `E`, not the unhandled rest
   (sound, simpler inference). The **observers** `tapErr`, `flatTapErr` (the
   error-channel mirror of `flatTap` — runs a `Result`-returning effect on the
-  error, keeps the original error, threads the effect's error) keep single
-  callbacks
+  error, keeps the original error, threads the effect's error) take the
+  partial `ErrTriagePartial<E, R>` — no exhaustiveness, no `defect`, an
+  unobserved tag flows through with no effect
 - defect: `recoverDefect`, `tapDefect`
 - failure (both KO channels): `tapFailure` — the one cross-channel combinator:
   runs its observer on `Err` **or** `Defect`, passing the discriminated failure
@@ -226,14 +239,16 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   `Async` **suffix** the async free functions use (`allAsync`); the `AsyncResult`
   companion aliases them as `AsyncResult.Ok` / `AsyncResult.Err` (suffix dropped,
   same rule as `AsyncResult.all`). A **deliberate** defect needs no constructor
-  either — the syntax is `throw`: inside a pipeline, a combinator-callback
-  `throw` IS the sanctioned form (the throw → defect invariant is that syntax,
-  not just a safety net); a known-technical precondition throws in a plain
-  helper wrapped once at its origin with `fromSafeThrowable`. A minting helper
-  was weighed and **rejected** in #77 — frictionless minting would let
-  unmodeled-by-laziness failures erode the defect channel's meaning; the
-  friction forces either a modeled `Err` or a throw at the true origin.
-  Documented in the defect-channel guide.
+  either — the `defect` helper is **injected wherever a triage decision is
+  made, and nowhere else**: `qualify` at a boundary (Thesis #3) and the
+  transformer branches of the triage object (Thesis #5). Elsewhere the syntax
+  is `throw` (the throw → defect invariant is the safety net; a
+  known-technical precondition throws in a plain helper wrapped once at its
+  origin with `fromSafeThrowable`). A public minting helper was weighed and
+  **rejected** in #77 — frictionless minting would let unmodeled-by-laziness
+  failures erode the defect channel's meaning; scoping the injection to triage
+  sites keeps that friction (the exhaustiveness IS the friction) while staying
+  lint-clean under a `no-throw` rule. Documented in the defect-channel guide.
 - interop: `fromNullable`, `fromThrowable`, `fromSafeThrowable` (the sync
   mirror of `fromSafePromise` — every throw a `Defect`, `E = never`, no
   `qualify`; the named form of the `(c, d) => d(c)` boilerplate, an explicit
@@ -338,7 +353,13 @@ library can be "done".
   `AsyncOkOf`/`AsyncErrOf` infer through the `Awaitable` `then` channel only
   (`R extends Awaitable<infer Res>`), NOT `R extends AsyncResult<infer T, …>` —
   structural inference over the whole method surface would pick up junk
-  candidates from the triage return types.
+  candidates from the triage return types. `TriageKeysOk` also rejects a bare
+  function as the handlers argument — a callback would structurally satisfy
+  the all-optional partial shape (its `keyof` is `never`) and then silently
+  observe nothing at runtime. The observers call their branch WITHOUT the
+  `defect` helper — the marker's `unique symbol` is unconstructible without
+  it, which is what makes a marker masquerading as an effect `Result`
+  impossible even for a JS caller.
 - "Check before you access" is enforced by the union: `result.value` only
   type-checks on the `Ok` variant. `AsyncRes` operates purely on the public
   `Result` union (wraps a `Promise<Result>`, branches on `r.tag`), never on `Res`

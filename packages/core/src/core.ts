@@ -14,18 +14,21 @@
 // The only other casts are the builders' construction (`as OkView`/…) and the
 // `bind`/`let` scope merge (a computed key can't be spelled at the type level).
 
+import { type Defect, defect, isDefectMarker } from "./defect.js";
 import type {
   AsyncResult,
   Bound,
   DefectView,
   ErrOf,
   ErrTriage,
+  ErrTriagePartial,
   ErrView,
   FailureView,
   NotThenable,
   OkOf,
   OkView,
   Result,
+  TriageOut,
   TriageReturns,
 } from "./types.js";
 
@@ -163,12 +166,14 @@ class Res<T, E> {
   mapErr<H extends ErrTriage<E, unknown>>(
     this: Result<T, E>,
     handlers: H,
-  ): Result<T, TriageReturns<H>> {
+  ): Result<T, TriageOut<H>> {
     if (this.tag !== "Err") return passThrough(this);
     const handler = triageHandlerFor(handlers, this.error);
     if (!handler) return defectRes(this.error);
     try {
-      return errRes(handler(this.error) as TriageReturns<H>);
+      const out = handler(this.error, defect);
+      if (isDefectMarker(out)) return defectRes(out.cause);
+      return errRes(out as TriageOut<H>);
     } catch (cause) {
       return defectRes(cause);
     }
@@ -182,7 +187,9 @@ class Res<T, E> {
     const handler = triageHandlerFor(handlers, this.error);
     if (!handler) return defectRes(this.error);
     try {
-      return handler(this.error) as Result<OkOf<TriageReturns<H>>, ErrOf<TriageReturns<H>>>;
+      const out = handler(this.error, defect);
+      if (isDefectMarker(out)) return defectRes(out.cause);
+      return out as Result<OkOf<TriageReturns<H>>, ErrOf<TriageReturns<H>>>;
     } catch (cause) {
       return defectRes(cause);
     }
@@ -191,31 +198,42 @@ class Res<T, E> {
   recoverErr<H extends ErrTriage<E, unknown>>(
     this: Result<T, E>,
     handlers: H,
-  ): Result<T | TriageReturns<H>, never> {
+  ): Result<T | TriageOut<H>, never> {
     if (this.tag !== "Err") return passThrough(this);
     const handler = triageHandlerFor(handlers, this.error);
     if (!handler) return defectRes(this.error);
     try {
-      return okRes(handler(this.error) as TriageReturns<H>);
+      const out = handler(this.error, defect);
+      if (isDefectMarker(out)) return defectRes(out.cause);
+      return okRes(out as TriageOut<H>);
     } catch (cause) {
       return defectRes(cause);
     }
   }
 
-  tapErr<R>(this: Result<T, E>, f: (error: E) => R & NotThenable<R>): Result<T, E> {
+  tapErr<H extends ErrTriagePartial<E, unknown>>(this: Result<T, E>, handlers: H): Result<T, E> {
     if (this.tag !== "Err") return this;
+    const handler = triageHandlerFor(handlers, this.error);
+    // Partial observation: a tag without a branch is simply not observed.
+    if (!handler) return this;
     try {
-      f(this.error);
+      handler(this.error);
       return this;
     } catch (cause) {
       return observerThrowToDefect(cause, this.error);
     }
   }
 
-  flatTapErr<E2>(this: Result<T, E>, f: (error: E) => Result<unknown, E2>): Result<T, E | E2> {
+  flatTapErr<H extends ErrTriagePartial<E, Result<unknown, unknown>>>(
+    this: Result<T, E>,
+    handlers: H,
+  ): Result<T, E | ErrOf<TriageReturns<H>>> {
     if (this.tag !== "Err") return this;
+    const handler = triageHandlerFor(handlers, this.error);
+    // Partial observation: a tag without a branch is simply not observed.
+    if (!handler) return this;
     try {
-      const r = f(this.error);
+      const r = handler(this.error) as Result<unknown, unknown>;
       // Keep the original error on the effect's success; an Err/Defect threads through.
       return r.tag === "Ok" ? this : passThrough(r);
     } catch (cause) {
@@ -470,7 +488,7 @@ function passThrough<T, E>(self: Result<unknown, unknown>): Result<T, E> {
 function triageHandlerFor(
   handlers: unknown,
   error: unknown,
-): ((error: unknown) => unknown) | undefined {
+): ((error: unknown, defect?: (cause: unknown) => Defect) => unknown) | undefined {
   const triage = handlers as Record<string, unknown>;
   const tag =
     typeof error === "object" && error !== null && "_tag" in error
@@ -478,7 +496,9 @@ function triageHandlerFor(
       : undefined;
   const handler =
     typeof tag === "string" && Object.hasOwn(triage, tag) ? triage[tag] : triage["Else"];
-  return typeof handler === "function" ? (handler as (error: unknown) => unknown) : undefined;
+  return typeof handler === "function"
+    ? (handler as (error: unknown, defect?: (cause: unknown) => Defect) => unknown)
+    : undefined;
 }
 
 /**
@@ -666,7 +686,9 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
         const handler = triageHandlerFor(handlers, r.error);
         if (!handler) return defectRes(r.error);
         try {
-          return errRes<T, never>(handler(r.error) as never);
+          const out = handler(r.error, defect);
+          if (isDefectMarker(out)) return defectRes<T, never>(out.cause);
+          return errRes<T, never>(out as never);
         } catch (cause) {
           return defectRes(cause);
         }
@@ -683,8 +705,11 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
         const handler = triageHandlerFor(handlers, r.error);
         if (!handler) return defectRes(r.error);
         try {
-          const out = handler(r.error) as Result<unknown, unknown> | AsyncResult<unknown, unknown>;
-          return (await out) as Result<T, never>;
+          const out = handler(r.error, defect);
+          if (isDefectMarker(out)) return defectRes<T, never>(out.cause);
+          return (await (out as
+            | Result<unknown, unknown>
+            | AsyncResult<unknown, unknown>)) as Result<T, never>;
         } catch (cause) {
           return defectRes(cause);
         }
@@ -699,7 +724,9 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
         const handler = triageHandlerFor(handlers, r.error);
         if (!handler) return defectRes(r.error);
         try {
-          return okRes<T, never>(handler(r.error) as T);
+          const out = handler(r.error, defect);
+          if (isDefectMarker(out)) return defectRes<T, never>(out.cause);
+          return okRes<T, never>(out as T);
         } catch (cause) {
           return defectRes(cause);
         }
@@ -707,12 +734,14 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  tapErr<R>(f: (error: E) => R & NotThenable<R>): AsyncResult<T, E> {
+  tapErr(handlers: ErrTriagePartial<E, unknown>): AsyncResult<T, E> {
     return new AsyncRes<T, E>(
       this.promise.then((r) => {
         if (r.tag !== "Err") return r;
+        const handler = triageHandlerFor(handlers, r.error);
+        if (!handler) return r;
         try {
-          f(r.error);
+          handler(r.error);
           return r;
         } catch (cause) {
           return observerThrowToDefect<T, E>(cause, r.error);
@@ -721,15 +750,19 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  flatTapErr<E2>(
-    f: (error: E) => Result<unknown, E2> | AsyncResult<unknown, E2>,
-  ): AsyncResult<T, E | E2> {
-    return new AsyncRes<T, E | E2>(
+  flatTapErr(
+    handlers: ErrTriagePartial<E, Result<unknown, unknown> | AsyncResult<unknown, unknown>>,
+  ): AsyncResult<T, E> {
+    return new AsyncRes<T, E>(
       this.promise.then(async (r) => {
         if (r.tag !== "Err") return passThrough(r);
+        const handler = triageHandlerFor(handlers, r.error);
+        if (!handler) return r;
         try {
-          const inner = await f(r.error);
-          // Keep the original error on success; an Err/Defect from `f` wins.
+          const inner = await (handler(r.error) as
+            | Result<unknown, unknown>
+            | AsyncResult<unknown, unknown>);
+          // Keep the original error on success; an Err/Defect from the effect wins.
           return inner.tag === "Ok" ? passThrough(r) : passThrough(inner);
         } catch (cause) {
           return observerThrowToDefect(cause, r.error);

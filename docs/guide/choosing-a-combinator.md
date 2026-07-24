@@ -29,26 +29,26 @@ moves the channels: `flatMap` widens `E` to `E | E2`, `recoverErr` empties it to
 (e) => …, Else: (e) => … }`) rather than a single callback; the signatures below
 abbreviate it as `{ …tags }`.
 
-| I want to…                                     | use               | signature                                                    | channel      |
-| ---------------------------------------------- | ----------------- | ------------------------------------------------------------ | ------------ |
-| transform the success value                    | `map`             | `(v: T) => U` → `Result<U, E>`                               | Ok           |
-| chain a `Result`-returning step                | `flatMap`         | `(v: T) => Result<U, E2>` → `Result<U, E \| E2>`             | Ok           |
-| run a side effect, keep the value              | `tap`             | `(v: T) => void` → `Result<T, E>`                            | Ok           |
-| run a **failable** side effect, keep the value | `flatTap`         | `(v: T) => Result<unknown, E2>` → `Result<T, E \| E2>`       | Ok           |
-| sequence steps into a named scope              | `Do`/`bind`/`let` | `bind(k, (scope) => Result<U, E2>)` → `Result<{…}, E \| E2>` | Ok           |
-| replace the value with a constant              | `as`              | `(value: U)` → `Result<U, E>`                                | Ok           |
-| drop the value (success type becomes `void`)   | `discard`         | `()` → `Result<void, E>`                                     | Ok           |
-| transform the error (triaged by tag)           | `mapErr`          | `{ …tags: (e) => E2 }` → `Result<T, E2>`                     | Err          |
-| try a fallback that returns a `Result`         | `flatMapErr`      | `{ …tags: (e) => Result<U, E2> }` → `Result<T \| U, E2>`     | Err          |
-| turn an error into a success value             | `recoverErr`      | `{ …tags: (e) => U }` → `Result<T \| U, never>`              | Err          |
-| run a side effect on the error                 | `tapErr`          | `(e: E) => void` → `Result<T, E>`                            | Err          |
-| run a **failable** side effect on the error    | `flatTapErr`      | `(e: E) => Result<unknown, E2>` → `Result<T, E \| E2>`       | Err          |
-| recover from a defect (rare)                   | `recoverDefect`   | `(cause) => Result<U, E2>` → `Result<T \| U, E \| E2>`       | Defect       |
-| observe a defect, e.g. log it                  | `tapDefect`       | `(cause) => void` → `Result<T, E>`                           | Defect       |
-| observe **any** failure (error _or_ defect)    | `tapFailure`      | `(f: FailureView<E>) => void` → `Result<T, E>`               | Err + Defect |
-| handle all three channels at the edge          | `match`           | `{ ok, err, defect }` → `R`                                  | all          |
-| combine an array of `Result`s                  | `all`             | `Result<T, E>[]` → `Result<T[], E>`                          | —            |
-| combine a record of `Result`s                  | `allFromDict`     | `{ [k]: Result<T, E> }` → `Result<{ [k]: T }, E>`            | —            |
+| I want to…                                     | use               | signature                                                       | channel      |
+| ---------------------------------------------- | ----------------- | --------------------------------------------------------------- | ------------ |
+| transform the success value                    | `map`             | `(v: T) => U` → `Result<U, E>`                                  | Ok           |
+| chain a `Result`-returning step                | `flatMap`         | `(v: T) => Result<U, E2>` → `Result<U, E \| E2>`                | Ok           |
+| run a side effect, keep the value              | `tap`             | `(v: T) => void` → `Result<T, E>`                               | Ok           |
+| run a **failable** side effect, keep the value | `flatTap`         | `(v: T) => Result<unknown, E2>` → `Result<T, E \| E2>`          | Ok           |
+| sequence steps into a named scope              | `Do`/`bind`/`let` | `bind(k, (scope) => Result<U, E2>)` → `Result<{…}, E \| E2>`    | Ok           |
+| replace the value with a constant              | `as`              | `(value: U)` → `Result<U, E>`                                   | Ok           |
+| drop the value (success type becomes `void`)   | `discard`         | `()` → `Result<void, E>`                                        | Ok           |
+| transform the error (triaged by tag)           | `mapErr`          | `{ …tags: (e) => E2 }` → `Result<T, E2>`                        | Err          |
+| try a fallback that returns a `Result`         | `flatMapErr`      | `{ …tags: (e) => Result<U, E2> }` → `Result<T \| U, E2>`        | Err          |
+| turn an error into a success value             | `recoverErr`      | `{ …tags: (e) => U }` → `Result<T \| U, never>`                 | Err          |
+| run a side effect on the error (by tag)        | `tapErr`          | `{ …tags?: (e) => void }` → `Result<T, E>`                      | Err          |
+| run a **failable** side effect on the error    | `flatTapErr`      | `{ …tags?: (e) => Result<unknown, E2> }` → `Result<T, E \| E2>` | Err          |
+| recover from a defect (rare)                   | `recoverDefect`   | `(cause) => Result<U, E2>` → `Result<T \| U, E \| E2>`          | Defect       |
+| observe a defect, e.g. log it                  | `tapDefect`       | `(cause) => void` → `Result<T, E>`                              | Defect       |
+| observe **any** failure (error _or_ defect)    | `tapFailure`      | `(f: FailureView<E>) => void` → `Result<T, E>`                  | Err + Defect |
+| handle all three channels at the edge          | `match`           | `{ ok, err, defect }` → `R`                                     | all          |
+| combine an array of `Result`s                  | `all`             | `Result<T, E>[]` → `Result<T[], E>`                             | —            |
+| combine a record of `Result`s                  | `allFromDict`     | `{ [k]: Result<T, E> }` → `Result<{ [k]: T }, E>`               | —            |
 
 ## Behavior at a glance
 
@@ -66,7 +66,7 @@ failures). This grid is the whole story — notice the `Defect` column is
 | `mapErr`                | passes ▸ | runs a branch | passes ▸    | `E2`            |
 | `flatMapErr`            | passes ▸ | runs a branch | passes ▸    | `E2`            |
 | `recoverErr`            | passes ▸ | branch → `Ok` | passes ▸    | `never`         |
-| `tapErr` / `flatTapErr` | passes ▸ | runs `f`      | passes ▸    | `E` / `E \| E2` |
+| `tapErr` / `flatTapErr` | passes ▸ | runs a branch | passes ▸    | `E` / `E \| E2` |
 | `recoverDefect`         | passes ▸ | passes ▸      | runs `f`    | `E \| E2`       |
 | `tapDefect`             | passes ▸ | passes ▸      | runs `f`    | `E`             |
 | `tapFailure`            | passes ▸ | runs `f`      | runs `f`    | `E`             |
@@ -88,18 +88,20 @@ surfaces every site that consumes the channel:
 ```ts
 db.reading.tryFindUniqueOrThrow({ where: { id } }).mapErr({
   RecordNotFound: () => new ReadingNotFoundException(id),
-  DriverError: (e) => {
-    throw e.cause; // deliberate defect — and the tag leaves the outgoing E
-  },
+  DriverError: (e, defect) => defect(e.cause), // deliberate defect — the tag leaves E
 });
 ```
 
 The rules, in order of how often you'll meet them:
 
 - **Each branch receives its narrowed variant** (`RecordNotFound` above, not the
-  union), and the outgoing type is the **union of what the branches return** — a
-  branch that `throw`s contributes nothing (its return type is `never`), so
-  converting a tag to a defect also subtracts it from `E`.
+  union) **and the injected `defect` helper** — the same second argument
+  `qualify` gets at a boundary, and the sanctioned way to deliberately convert
+  a tag to a defect. The outgoing type is the union of what the branches return
+  with the `Defect` arm subtracted (the boundary's `Exclude<R, Defect>`
+  inference), so defecting a tag also removes it from `E`. A branch that
+  `throw`s still becomes a defect (the safety-net invariant), but `defect(...)`
+  is the lint-clean, expression-position form.
 - **`Else` is the explicit escape hatch.** A subset of tag branches plus
   `Else: (e) => …` (receiving the full union) compiles; the blanket handling is
   visible and greppable at the call site instead of hiding in a fallthrough.
@@ -110,11 +112,16 @@ The rules, in order of how often you'll meet them:
   keeps the blanket decision explicit. A **mixed** union (tagged and untagged
   members) also requires `Else`, since no set of tag branches can cover the
   untagged part.
-- **Observers are exempt.** `tapErr`, `tapDefect`, `tapFailure`, and
-  `flatTapErr` keep their single callback: observing a union uniformly (a log
-  line, a metric) can't strand a future tag — only _transforming or recovering_
-  one can. That is the whole split: **you may observe a union uniformly; you may
-  not consume it without triage.**
+- **Observers take the same object, partially.** `tapErr` and `flatTapErr` take
+  the _partial_ triage form: every branch optional, `Else` included — a tag
+  without a branch is simply not observed and flows through, so partiality
+  can't mis-route anything. Uniform logging is `tapErr({ Else: (e) => log(e) })`;
+  per-tag observation (`tapErr({ Conflict: alert })`) needs no manual `_tag`
+  narrowing. Their branches do **not** receive `defect` — an observer's return
+  never replaces the error. (`tapDefect` / `tapFailure` keep single callbacks:
+  their payloads carry no tags to triage — a defect's cause is `unknown`, and
+  `tapFailure` discriminates on channel, not tag.) The rule: **exhaustive when
+  you consume, partial when you observe — one object shape either way.**
 - **An unmodeled tag becomes a `Defect`.** At runtime, an error whose `_tag` has
   no branch and no `Else` (only reachable outside the typed contract — a widened
   cast, a JS caller) is a bug by definition and lands in the defect channel,

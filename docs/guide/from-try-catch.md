@@ -117,7 +117,7 @@ block has a direct combinator equivalent:
 | ------------------------- | ----------------------------------------------- | --------------------------------------------------------------- |
 | catch-and-default         | `getOr(fallback)`                               | `parseConfig(text).getOr(DEFAULT_CONFIG)`                       |
 | catch-and-rethrow-wrapped | `mapErr({ … })`                                 | `parseConfig(text).mapErr({ Else: (e) => new ConfigError(e) })` |
-| catch-log-rethrow         | `tapErr(f)`                                     | `parseConfig(text).tapErr((e) => logger.warn(e))`               |
+| catch-log-rethrow         | `tapErr({ … })`                                 | `parseConfig(text).tapErr({ Else: (e) => logger.warn(e) })`     |
 | `finally` cleanup         | run before eliminating, or in every `match` arm | see below                                                       |
 
 `catch-and-default`:
@@ -157,7 +157,7 @@ try {
   throw cause;
 }
 // after — logs, keeps the original error, still propagates as an Err
-parseConfig(text).tapErr((e) => logger.warn("bad config", e));
+parseConfig(text).tapErr({ Else: (e) => logger.warn("bad config", e) });
 ```
 
 `finally` has no combinator counterpart, because a `Result` pipeline has no

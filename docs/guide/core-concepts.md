@@ -26,10 +26,10 @@ Every `Result` shares one method surface, grouped by the channel it touches:
 - **success** (runs on `Ok`): `map`, `flatMap`, `tap`, `flatTap`, `as`, `discard`
 - **do-notation** (runs on `Ok`): `bind`, `let` — accumulate a named scope; see
   [Do Notation](./do-notation)
-- **error** (runs on `Err`): `mapErr`, `flatMapErr`, `recoverErr` — the
-  transformers, which take a per-tag **triage object** (see
-  [Choosing a combinator](./choosing-a-combinator#triaging-the-error-channel)) —
-  plus the observers `tapErr`, `flatTapErr`
+- **error** (runs on `Err`): `mapErr`, `flatMapErr`, `recoverErr`, `tapErr`,
+  `flatTapErr` — all take a per-tag **triage object** (exhaustive for the
+  transformers, partial for the observers; see
+  [Choosing a combinator](./choosing-a-combinator#triaging-the-error-channel))
 - **defect** (the only door to a `Defect`): `recoverDefect`, `tapDefect`
 - **eliminate**: `match`, `get`, `getErr`, `getOr`, `getOrElse`,
   `getOrNull`, `getOrUndefined`
