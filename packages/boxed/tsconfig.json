@@ -2,7 +2,10 @@
   "extends": "@btravstack/tsconfig/base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    // @btravstack/tsconfig@0.2.0 dropped `types: ["node"]` from the base;
+    // re-declare it here for the Node globals used in source/tests.
+    "types": ["node"]
   },
   "include": ["src/**/*"]
 }
