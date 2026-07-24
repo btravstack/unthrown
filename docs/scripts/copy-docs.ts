@@ -5,7 +5,6 @@
 // turbo build ordering (`^build:docs` runs before this script). Keep them in
 // sync with the `packages` list.
 import "unthrown";
-import "@unthrown/pattern";
 import "@unthrown/vitest";
 import "@unthrown/effect";
 import "@unthrown/neverthrow";
@@ -29,7 +28,6 @@ const nodeModulesDir = join(here, "..", "node_modules");
 const packages: ReadonlyArray<{ readonly pkg: string; readonly out: string }> = [
   { pkg: "unthrown", out: "core" },
   { pkg: "@unthrown/vitest", out: "vitest" },
-  { pkg: "@unthrown/pattern", out: "pattern" },
   { pkg: "@unthrown/effect", out: "effect" },
   { pkg: "@unthrown/neverthrow", out: "neverthrow" },
   { pkg: "@unthrown/boxed", out: "boxed" },

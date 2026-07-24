@@ -13,8 +13,6 @@ This reference is generated from the source with
   `matchTags`).
 - [**@unthrown/vitest**](./vitest/) — custom Vitest matchers (`toBeOk`,
   `toBeOkWith`, `toBeErr`, `toBeErrTagged`, `toBeDefect`).
-- [**@unthrown/pattern**](./pattern/) — thin `ts-pattern` sugar for the
-  natively-matchable `Result` (`P.Ok`/`P.Err`/`P.Defect`, `tag`).
 - [**@unthrown/effect**](./effect/) — bijective `Result ↔ Exit` bridges
   (Effect has a genuine defect channel, `Cause.die`), plus `toEither` with a
   mandatory `onDefect`.

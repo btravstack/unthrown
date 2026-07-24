@@ -36,8 +36,8 @@ defect that short-circuits to the edge, where you log it and return a 500.
 - 🛂 **Qualification at every boundary** — `fromPromise` / `fromThrowable` force
   you to triage each failure into a modeled error or a defect; no path yields
   `unknown` in `E`.
-- 🪶 **Small and done-able** — zero runtime dependencies, ESM-first, dual
-  CJS/ESM, fully typed.
+- 🪶 **Small and done-able** — one tiny runtime dependency (`ts-pattern`, which
+  powers the exhaustive error matchers), ESM-first, dual CJS/ESM, fully typed.
 
 See [Why unthrown?](https://btravstack.github.io/unthrown/guide/why-unthrown) for
 the comparison with `neverthrow`, `boxed`, and `effect`.
@@ -80,18 +80,17 @@ defect, so the edge of your program needs a single `match` and no `try`/`catch`.
 
 ## Packages
 
-| Package                                                   | Description                                                                                    |
-| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| [`unthrown`](./packages/core)                             | The core `Result` / `AsyncResult`, interop, `TaggedError`, `matchTags`. Zero runtime deps.     |
-| [`@unthrown/vitest`](./packages/vitest)                   | Vitest matchers: `toBeOk`, `toBeOkWith`, `toBeErr`, `toBeErrTagged`, `toBeDefect`.             |
-| [`@unthrown/pattern`](./packages/pattern)                 | Thin `ts-pattern` sugar for the natively-matchable `Result`: `P.Ok`/`P.Err`/`P.Defect`, `tag`. |
-| [`@unthrown/effect`](./packages/effect)                   | Effect interop: `Result ↔ Exit` (bijection), `Either`, `Effect`.                               |
-| [`@unthrown/neverthrow`](./packages/neverthrow)           | neverthrow interop: `Result ↔ Result`, `AsyncResult ↔ ResultAsync`.                            |
-| [`@unthrown/boxed`](./packages/boxed)                     | Boxed interop: `Result ↔ Result`, `AsyncResult ↔ Future<Result>`.                              |
-| [`@unthrown/prisma`](./packages/prisma)                   | Prisma Client extension: `try*` query methods returning `AsyncResult`, per-operation errors.   |
-| [`@unthrown/orpc`](./packages/orpc)                       | oRPC (v2) bridge: `Result`-returning handlers, `AsyncResult` client, typed errors end-to-end.  |
-| [`@unthrown/standard-schema`](./packages/standard-schema) | `fromSchema` / `fromSchemaAsync`: any Standard Schema validator into a `Result`.               |
-| [`@unthrown/oxlint`](./packages/oxlint)                   | oxlint plugin: `no-ambiguous-error-type`, `prefer-async-result`.                               |
+| Package                                                   | Description                                                                                        |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| [`unthrown`](./packages/core)                             | The core `Result` / `AsyncResult`, interop, `TaggedError`, `matchTags`, ts-pattern error matching. |
+| [`@unthrown/vitest`](./packages/vitest)                   | Vitest matchers: `toBeOk`, `toBeOkWith`, `toBeErr`, `toBeErrTagged`, `toBeDefect`.                 |
+| [`@unthrown/effect`](./packages/effect)                   | Effect interop: `Result ↔ Exit` (bijection), `Either`, `Effect`.                                   |
+| [`@unthrown/neverthrow`](./packages/neverthrow)           | neverthrow interop: `Result ↔ Result`, `AsyncResult ↔ ResultAsync`.                                |
+| [`@unthrown/boxed`](./packages/boxed)                     | Boxed interop: `Result ↔ Result`, `AsyncResult ↔ Future<Result>`.                                  |
+| [`@unthrown/prisma`](./packages/prisma)                   | Prisma Client extension: `try*` query methods returning `AsyncResult`, per-operation errors.       |
+| [`@unthrown/orpc`](./packages/orpc)                       | oRPC (v2) bridge: `Result`-returning handlers, `AsyncResult` client, typed errors end-to-end.      |
+| [`@unthrown/standard-schema`](./packages/standard-schema) | `fromSchema` / `fromSchemaAsync`: any Standard Schema validator into a `Result`.                   |
+| [`@unthrown/oxlint`](./packages/oxlint)                   | oxlint plugin: `no-ambiguous-error-type`, `prefer-async-result`.                                   |
 
 ## Contributing
 

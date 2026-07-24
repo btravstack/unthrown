@@ -53,62 +53,65 @@ was planned).
    runs). Keeping `message` off the payload is deliberate — contextual detail
    lives in typed fields, defined per error type, never baked into a per-call
    string.
-5. **The error channel is triaged, never blanket-handled.** The error
-   **transformers** (`mapErr`, `flatMapErr`, `recoverErr`) take a **triage
-   object** (`ErrTriage<E, R>`), not a single callback: one branch per `_tag`,
-   exhaustive at compile time — so adding a tag to `E` breaks every site that
-   consumes the channel. The object has **no fallthrough branch**: the
-   explicit opt-out of exhaustiveness is the separate, greppable
-   **`mergeTags(fn)`** wrapper (one uniform handler for every tag), which is
-   also the only form for an untagged or mixed `E` — `mapErr(mergeTags(f))` is
-   the triage-era spelling of the old single-callback. There is deliberately
-   no partial-with-fallback middle ground; a union that treats several tags
-   identically writes each branch explicitly (a new tag must be a compile
-   error, never silently absorbed). Each transformer branch also receives the **injected
-   `defect` helper** as its second argument — the same injection `qualify`
-   gets (Thesis #3), and the sanctioned deliberate `Err`→`Defect` form
-   (`DriverError: (e, defect) => defect(e.cause)`); the outgoing types are the
-   union of the branch returns **with the `Defect` arm subtracted**
-   (`Exclude<TriageReturns<H>, Defect>`, exactly the boundary inference), so a
+5. **The error channel is matched exhaustively, never blanket-handled.** The
+   error combinators (`mapErr`, `flatMapErr`, `recoverErr`, `tapErr`,
+   `flatTapErr`) do not take a single callback: their callback receives a
+   **ts-pattern match builder** over the error (`match(error)`, typed
+   `ErrMatcher<E>`) plus the injected `defect` helper, and **returns the
+   un-terminated builder** — the combinator calls `.exhaustive()` itself. So a
+   match that misses a case **does not compile** (there is no `.exhaustive()`
+   to forget, and no `.otherwise()` to smuggle in a fallback), and enriching
+   `E` — a new tag, a new `code` — is a compile error at _every_ consuming
+   site until each is handled. This is the payoff of errors-as-values: the
+   values cannot be silently dropped. ts-pattern matches by structure, so this
+   works on any discriminant (`_tag`, `code`, guards, grouped patterns), not
+   only `TaggedError`. `P._` is the deliberate catch-all (the uniform "handle
+   everything else" branch, replacing the old single callback). Each branch
+   receives the narrowed variant and the **injected `defect` helper** — the
+   same injection `qualify` gets (Thesis #3), the sanctioned deliberate
+   `Err`→`Defect` form (`.with(tag("DriverError"), (e) => defect(e.cause))`);
+   the outgoing type is the builder's output **with the `Defect` arm
+   subtracted** (`Exclude<O, Defect>`, exactly the boundary inference), so a
    defect branch — or a throwing one, the safety net — contributes nothing.
-   The error **observers** (`tapErr`, `flatTapErr`) take the **partial** form
-   (`ErrTriagePartial<E, R>`: every branch optional) or `mergeTags` — a tag
-   without a branch is simply not observed and flows through, so partiality
-   cannot mis-route; their branches do NOT receive `defect` (an observer's
-   return never replaces the error, and withholding the helper keeps the
-   marker unconstructible there). One object shape either way: exhaustive when
-   you consume, partial when you observe. `tapDefect` / `tapFailure` keep
-   single callbacks — their payloads carry no tags to triage (a defect's cause
-   is `unknown`; `tapFailure` discriminates on channel, not tag). Eliminators
-   (`match`, `getOrElse`, `matchTags`) are exempt — they sit at the edge,
-   where exhaustiveness is either total (`match`/`matchTags`) or the value is
-   being surrendered anyway.
+   The **observers** (`tapErr`, `flatTapErr`) take the same exhaustive builder
+   (the error passes through unchanged); a branch that returns a raw
+   `Promise`/`AsyncResult` is rejected only where the combinator awaits it
+   (`flatMapErr`/`flatTapErr`, via the builder-output constraint) — the
+   non-awaiting `mapErr`/`recoverErr`/`tapErr` run the branch synchronously,
+   so an async branch is a visible Promise-valued result, not a rejection
+   bypass. `tapDefect` / `tapFailure` keep single callbacks — their payloads
+   carry no discriminant to match (a defect's cause is `unknown`; `tapFailure`
+   splits on channel, not tag). Eliminators (`match`, `getOrElse`, `matchTags`)
+   are exempt — they sit at the edge, where exhaustiveness is either total
+   (`match`/`matchTags`) or the value is being surrendered anyway. **Core
+   depends on `ts-pattern`** (a light, types-heavy, dual-copy-safe library —
+   its matcher protocol keys off a global `Symbol.for`), re-exporting `match`
+   and `P` so the matcher is first-class in one import.
 
 ## Load-bearing runtime invariants (tests must guard these)
 
-- **Throw → defect.** Any value thrown by a callback (or triage branch) inside
+- **Throw → defect.** Any value thrown by a callback (or match branch) inside
   a combinator (`map`, `flatMap`, `flatTap`, `bind`, `let`, `mapErr`, `flatMapErr`,
   `recoverErr`, `tap*`, `flatTapErr`, `recoverDefect`) is caught and converted to a
   `Defect`. Nothing escapes a pipeline as a raw throw.
   This is what lets an HTTP adapter do a single `match({ ok, err, defect })`
   with **no surrounding `try/catch`**.
-- **An unmodeled tag becomes a `Defect`.** In the transforming triage
-  combinators, an `Err` whose `_tag` has no branch (with an object triage;
-  reachable only outside the typed
-  contract — a widened cast, a JS caller) becomes a `Defect` carrying that
-  error as its cause, mirroring `matchTags`; the branch lookup is
-  own-property-only (`Object.hasOwn`), so a rogue tag (`"constructor"`) cannot
-  resolve through the prototype chain.
-- **The empty object is accepted by a transformer ONLY where it is
-  exhaustive.** `mapErr`/`flatMapErr`/`recoverErr` accept an object iff the set
-  of uncovered cases is empty — so `mapErr({})` compiles _only_ on `E = never`
-  (zero cases, vacuously exhaustive) and is a **compile error** on any non-empty
-  `E`, including a non-`_tag` (e.g. `code`-discriminated) union, where the
-  unsatisfiable message-key of `ErrTriage` forces `mergeTags`. There is no path
-  where a case slips past a transformer uncovered without a compile error. The
-  `{}` is legal on the **observers** (`tapErr`/`flatTapErr`), but observing zero
-  cases does not consume the error — it passes through with `E` intact (this is
-  a _type-level_ invariant, guarded in `types.test-d.ts`, not a runtime one).
+- **A non-exhaustive error match becomes a `Defect`.** In the error
+  combinators, the callback returns a ts-pattern builder and the combinator
+  runs `.run()` (which executes `.exhaustive()`). For well-typed callers the
+  match is exhaustive by construction; a value that slips past the types (a
+  widened cast, a JS caller) with no matching case throws ts-pattern's
+  `NonExhaustiveError`, which the throw-to-defect net turns into a `Defect` —
+  an unmodeled failure, mirroring `matchTags`.
+- **Exhaustiveness is type-enforced, with no forgettable step.** `mapErr` /
+  `flatMapErr` / `recoverErr` / `tapErr` / `flatTapErr` require the callback to
+  return an `ExhaustiveMatch` — `.exhaustive` is typed callable only when
+  ts-pattern has narrowed the input to `never` (all cases covered); a
+  non-exhaustive builder types `.exhaustive` as `NonExhaustiveError` and fails
+  the constraint at the call site. There is no path where a case slips past an
+  error combinator uncovered without a compile error, and no `.exhaustive()` /
+  `.otherwise()` for a caller to reach (the combinator owns termination). This
+  is a _type-level_ invariant, guarded in `types.test-d.ts`.
 - **A `Defect` flows through every method untouched EXCEPT `match()`,
   `recoverDefect()`, and the observers `tapDefect()` / `tapFailure()` (which
   observe it without consuming it).** Therefore `getOr`, `getOrElse`,
@@ -181,20 +184,19 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   pure value). On `AsyncResult`, `bind`'s `f` may return a `Result` or an
   `AsyncResult`. A throw in either becomes a `Defect`; `Err`/`Defect`
   short-circuits/passes through. To go async, lift with `toAsync()`.
-- error: the **transformers** `mapErr`, `flatMapErr`, `recoverErr` take the
-  Thesis-#5 **triage object** — generic in the inferred handler map `H`
-  (`H extends ErrTriage<E, …>`, validated by `TriageKeysOk` against typo'd
-  keys, since constraint-checking bypasses excess-property freshness), with the
-  outgoing types computed from `TriageReturns<H>` (mapErr: the union itself;
-  flatMapErr: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on the async
-  surface — over it; recoverErr: `T | TriageReturns<H>` with `E = never`).
-  Each also carries a `mergeTags` **overload** (declared BEFORE the object
-  overload — contextual inference of the merged callback's parameter depends
-  on that order). The **observers** `tapErr`, `flatTapErr` (the
-  error-channel mirror of `flatTap` — runs a `Result`-returning effect on the
-  error, keeps the original error, threads the effect's error) take the
-  partial `ErrTriagePartial<E, R>` — no exhaustiveness, no `defect`, an
-  unobserved tag flows through with no effect
+- error: `mapErr`, `flatMapErr`, `recoverErr`, `tapErr`, `flatTapErr` all take
+  the Thesis-#5 **ts-pattern matcher callback** `(m: ErrMatcher<E>, defect) => M`
+  where `M extends ExhaustiveMatch<…>` (the callback returns the un-terminated
+  builder; the combinator runs `.run()`). Outgoing types are computed from the
+  builder output `MatchOut<M>` — mapErr: `MatchErrOut<M>` (= `Exclude<MatchOut,
+Defect>`); flatMapErr: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on the
+  async surface — over it; recoverErr: `T | MatchErrOut<M>` with `E = never`.
+  `flatTapErr` is the exception: it infers a plain `E2` from the builder output
+  and returns `E | E2` (the `MatchOut<M>` shape unioned with the class `E`
+  defeats variance measurement of the intersection `AsyncResult` — see internal
+  design). The `defect` helper is passed to every branch (the deliberate
+  `Err`→`Defect`); `tapErr`/`flatTapErr` keep the same exhaustive builder (the
+  error passes through), the error-channel mirror of `tap`/`flatTap`
 - defect: `recoverDefect`, `tapDefect`
 - failure (both KO channels): `tapFailure` — the one cross-channel combinator:
   runs its observer on `Err` **or** `Defect`, passing the discriminated failure
@@ -216,7 +218,7 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   any `Result<T, E>` and **throws the modeled `error` as-is** on `Err` (and
   panics on a `Defect`, like the rest of the family). It exists so a `no-throw`
   lint rule can ban raw `throw` while this one sanctioned extraction remains — the
-  faithful, lint-clean form of `.flatMapErr((e) => { throw e }).get()`; it is
+  faithful, lint-clean form of `.flatMapErr((m) => m.with(P._, (e) => { throw e })).get()`; it is
   **off the errors-as-values thesis** by design, so reach for `match` / `recoverErr`
   / `flatMapErr` whenever the error can stay a value
 - deprecated aliases: the extractor family was unified under `get…`; the old
@@ -225,8 +227,13 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   `unwrapOrElse` → `getOrElse`. Each alias just delegates to its replacement (the
   gated `unwrap`/`unwrapErr` keep their `this` gate); slated for removal in a
   future major. The error-channel aliases `orElse`/`recover` were **removed** in
-  the triage major — their signatures broke anyway, so keeping them bought no
+  the matcher major — their signatures broke anyway, so keeping them bought no
   migration path.
+- ts-pattern re-exports: `match` and `P` are re-exported from `ts-pattern` (core
+  depends on it), and `tag(t)` (the `{ _tag: t }` pattern, narrowing to the
+  variant + payload) lives in `tagged.ts`. These make the error matcher, and
+  matching a whole `Result` (`match(r).with(P.…)`), first-class in one import —
+  the former `@unthrown/pattern` package, now folded in.
 - guards: methods `isOk`/`isErr`/`isDefect` **and** standalone
   `isOk`/`isErr`/`isDefect` both narrow (to `OkView`/`ErrView`/`DefectView`) — the
   methods are `this is …` type predicates, so `if (r.isErr()) r.error` compiles.
@@ -237,17 +244,16 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   combinator callback that returns one is a compile error instead of a silently
   unqualified rejection. `FailureView<E, T>` — the exported `ErrView | DefectView`
   union a `tapFailure` callback receives (error-type-first, like `ErrView`).
-  `ErrTriage<E, R>` — the triage object (documented; the supporting
-  `TriageReturns`/`TriageKeysOk`/`NoThenables` are exported for the d.ts but not
-  re-exported from `index.ts`). It is deliberately a **plain union of two
-  mapped-type forms with no top-level conditionals**: the exhaustive form's
-  untagged-members gate is a conditional _mapped key_ (resolving to a required
-  an unsatisfiable message-key when untagged members exist, to no key
-  otherwise) — a top-level conditional would defeat the variance verification
-  below. `mergeTags` lives in `defect.ts` with the other markers
-  (`MergedTriage` is a `unique symbol`-branded wrapper; `isMergedTriage` is
-  the runtime guard); observers reject a `Defect`-producing merged handler via
-  `NoDefects`.
+  `ErrMatcher<E>` — the ts-pattern builder over the error (`ReturnType<typeof
+match<E>>`, so ts-pattern's non-exported `Match` type is never imported).
+  The supporting `ExhaustiveMatch`/`MatchOut`/`MatchErrOut` are exported for the
+  d.ts but not re-exported from `index.ts`. `ExhaustiveMatch<O>` requires
+  `.exhaustive` to be _callable_ (ts-pattern types it as `NonExhaustiveError` on
+  a non-exhaustive builder) and carries the output via `run: () => O`, from which
+  `MatchOut`/`MatchErrOut` extract. Note `ErrMatcher<E>` must appear only as a
+  callback **parameter** type (contravariant), never combined with the class `E`
+  in a covariant return — ts-pattern's `Match` is invariant in its input, which
+  would poison `E` inference (why `flatTapErr` infers a plain `E2` instead).
 - constructors: `Ok` (a no-arg overload — `Ok()` — constructs a `void` success,
   `Result<void, never>`, sparing `Ok(undefined)`; `OkAsync()` mirrors it),
   `Err` (there is **no** `Defect` constructor — a defect-state
@@ -260,7 +266,7 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   same rule as `AsyncResult.all`). A **deliberate** defect needs no constructor
   either — the `defect` helper is **injected wherever a triage decision is
   made, and nowhere else**: `qualify` at a boundary (Thesis #3) and the
-  transformer branches of the triage object (Thesis #5). Elsewhere the syntax
+  error-match branches (Thesis #5). Elsewhere the syntax
   is `throw` (the throw → defect invariant is the safety net; a
   known-technical precondition throws in a plain helper wrapped once at its
   origin with `fromSafeThrowable`). A public minting helper was weighed and
@@ -323,9 +329,8 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   message is set per subclass with `override message = "…"`, never as a payload
   field), `matchTags(result, handlers)` (an exhaustive `{ Ok, Defect } &
 per-tag` fold; has an async overload resolving to `Promise<R>`), and
-  `mergeTags(fn)` (the explicit uniform-triage wrapper of Thesis #5 — the
-  branded `MergedTriage<E, R>` the error combinators accept in place of the
-  per-tag object); see the `TaggedError` convention in Thesis #4.
+  `tag(t)` (the `{ _tag: t }` ts-pattern pattern, for use in the error matchers
+  and in `match(result)`); see the `TaggedError` convention in Thesis #4.
 
 Deliberately **excluded** for now: **generator** do-notation (`gen`/`yield*`
 "safeTry" style — the fluent `Do`/`bind`/`let` above covers sequential code
@@ -352,36 +357,36 @@ library can be "done".
   would allocate a fresh object on every short-circuit. The only other casts are
   the `bind`/`let` scope merge (a computed key widens to an index signature, so it
   can't be spelled at the type level), the builder construction noted above, and
-  the triage internals noted below.
+  the error-matcher internals noted below.
 - **`ResultMethods` / `AsyncResultMethods` / `Awaitable` carry `out` variance
   annotations, and they must verify.** `Result<T, E>`'s covariance in both
   params is what lets generic engine and user code widen (`Result<U, E2>` →
-  `Result<U, E | E2>`); with the triage signatures, TypeScript can no longer
+  `Result<U, E | E2>`); with the matcher signatures, TypeScript can no longer
   _measure_ that covariance structurally across unresolved type parameters, so
   the declared `out` fast-path carries it. TS **verifies** the annotations
-  (TS2636 if unprovable), which is why `ErrTriage` must stay free of top-level
-  conditionals (see the types bullet in the public surface). Only aliases whose
-  body is directly an object type may be annotated — the unions/intersections
-  (`Result`, the views, `AsyncResult`) inherit the fast path through them.
-- **Triage runtime and its two deliberate loosenings.** All six triage methods
-  dispatch through one `triageHandlerFor` helper (own-property tag lookup, then
-  the `mergeTags` wrapper's uniform handler, else `undefined` → transformers
-  mint the unmodeled-tag `Defect`, observers pass through unobserved).
-  `Res`'s triage methods keep the precise generic-`H` signatures with a cast per
-  branch result; `AsyncRes`'s three are typed **loosely** (`never` channels,
-  bivariantly compatible) because TS cannot unify the generic triage signatures
-  across the class/`implements` boundary — the public `AsyncResultMethods`
-  re-imposes the precision, the same pattern as `unwrap`'s re-imposed gate.
-  `AsyncOkOf`/`AsyncErrOf` infer through the `Awaitable` `then` channel only
-  (`R extends Awaitable<infer Res>`), NOT `R extends AsyncResult<infer T, …>` —
-  structural inference over the whole method surface would pick up junk
-  candidates from the triage return types. `TriageKeysOk` also rejects a bare
-  function as the handlers argument — a callback would structurally satisfy
-  the all-optional partial shape (its `keyof` is `never`) and then silently
-  observe nothing at runtime. The observers call their branch WITHOUT the
-  `defect` helper — the marker's `unique symbol` is unconstructible without
-  it, which is what makes a marker masquerading as an effect `Result`
-  impossible even for a JS caller.
+  (TS2636 if unprovable). Only aliases whose body is directly an object type may
+  be annotated — the unions/intersections (`Result`, the views, `AsyncResult`)
+  inherit the fast path through them. **`ErrMatcher<E>` (ts-pattern's `Match`,
+  invariant in its input) must stay in a callback parameter position only**: it
+  is contravariant there and harmless, but unioning an `M`-derived output with
+  the class `E` in a covariant return re-invaded `E`'s variance and collapsed
+  inference (`combine<T,E>(rs: AsyncResult<T,E>[])` inferring `unknown`) — which
+  is exactly why `flatTapErr` infers a plain `E2` from the builder output and
+  returns `E | E2` rather than `E | ErrOf<MatchOut<M>>`.
+- **Error-matcher runtime.** All five error methods dispatch through one
+  `runMatch` helper: `f(match(error), defect).run()` — build `match(error)`,
+  hand it (plus `defect`) to the callback, and `.run()` the returned builder
+  (which executes `.exhaustive()`). Type-forced exhaustive for well-typed
+  callers; a value slipping past the types throws `NonExhaustiveError`, which the
+  caller's `try/catch` turns into a `Defect`. `Res`'s methods keep the precise
+  generic-`M` signatures; `AsyncRes`'s five are typed **loosely** (`never`
+  channels, bivariantly compatible) because TS cannot unify the generic matcher
+  signatures across the class/`implements` boundary — the public
+  `AsyncResultMethods` re-imposes the precision, the same pattern as `unwrap`'s
+  re-imposed gate. `AsyncOkOf`/`AsyncErrOf` infer through the `Awaitable` `then`
+  channel only (`R extends Awaitable<infer Res>`), NOT `R extends
+AsyncResult<infer T, …>` — structural inference over the whole method surface
+  would pick up junk candidates.
 - "Check before you access" is enforced by the union: `result.value` only
   type-checks on the `Ok` variant. `AsyncRes` operates purely on the public
   `Result` union (wraps a `Promise<Result>`, branches on `r.tag`), never on `Res`
@@ -400,17 +405,18 @@ library can be "done".
   defensively, but the type advertises no rejection channel — because the internal
   promise never rejects.
 - **Source layout** (`packages/core/src/`): `types.ts` (public types), `defect.ts`
-  (the `Defect` marker + the `mergeTags`/`MergedTriage` merged-triage marker), `core.ts` (the `Res`/`AsyncRes` engine + `UnwrapError`),
+  (the `Defect` marker), `core.ts` (the `Res`/`AsyncRes` engine + `UnwrapError`),
   `constructors.ts` (`Ok`/`Err` + guards), `do.ts` (the `Do()` do-notation entry
   — the `bind`/`let` steps themselves live on the method surface in `core.ts`),
   `interop.ts` (`from*`/`qualify`/`all`), `facade.ts` (the `Result` object),
-  `tagged.ts` (`TaggedError`/`matchTags`), and `index.ts` (the curated public
-  re-exports — the one place the API is decided).
+  `tagged.ts` (`TaggedError`/`matchTags`/`tag`), and `index.ts` (the curated
+  public re-exports, including `match`/`P` from `ts-pattern` — the one place the
+  API is decided).
 
 ## Monorepo layout
 
-- `packages/core` → `unthrown` (zero runtime dependencies)
-- `packages/pattern` → `@unthrown/pattern` (peerDep `ts-pattern`)
+- `packages/core` → `unthrown` (one runtime dependency: `ts-pattern`, which
+  powers the exhaustive error matchers and is re-exported as `match`/`P`)
 - `packages/vitest` → `@unthrown/vitest` (peerDep `vitest`)
 - `packages/effect` → `@unthrown/effect` (peerDep `effect`)
 - `packages/neverthrow` → `@unthrown/neverthrow` (peerDep `neverthrow`)
@@ -488,8 +494,9 @@ library can be "done".
 - `docs` → `@unthrown/docs`, the VitePress site (guide + TypeDoc-generated API
   reference); deployed to GitHub Pages by `deploy-docs.yml`
 
-Never pull `ts-pattern`, `vitest`, or any interop peer (`effect`, `neverthrow`,
-`@bloodyowl/boxed`, `@orpc/*`) into core.
+Core depends on `ts-pattern` (it powers the error matchers). Never pull
+`vitest` or any interop peer (`effect`, `neverthrow`, `@bloodyowl/boxed`,
+`@orpc/*`) into core.
 
 Every satellite package depends on core via `workspace:^` (an exact pin would
 create a dual-copy hazard with the `instanceof`-based `isResult`); for the same
@@ -540,12 +547,12 @@ channel?**
    `AsyncResult` and await internally, so a test reads
    `await expect(asyncResult).toBeOk()` (the required `await` is documented loudly
    — a forgotten one passes silently).
-4. ✅ **`packages/pattern`** — Done. Because `Result` is a discriminated union
-   (Thesis #1 / Public surface), `ts-pattern` matches it natively — this package
-   is thin sugar: pattern constructors `P.Ok`/`P.Err`/`P.Defect` (returning the
-   `{ tag: … }` object patterns) plus `tag(t)` (the `{ _tag: t }` pattern,
-   narrowing to the variant + payload). Kept small — the power is ts-pattern's;
-   `matchTags` covers the everyday exhaustive case.
+4. ✅ **ts-pattern integration** — Done. `ts-pattern` is a core dependency: it
+   powers the exhaustive error matchers (Thesis #5) and is re-exported as
+   `match`/`P`, plus `tag(t)` (the `{ _tag: t }` pattern). Because `Result` is a
+   discriminated union (Thesis #1), `match(result).with(P.…)` also matches a
+   whole `Result` natively. (The former standalone `@unthrown/pattern` package
+   was folded into core when the dependency was taken.)
 
 Also shipped: a root `README` + `LICENSE`, per-package READMEs, and the VitePress
 docs site (guide + generated API reference). Both the npm packages and the
@@ -572,12 +579,11 @@ configured outside the repo).
   type-level behaviour the runtime can't (the conditional `all`/`allFromDict`
   shapes, `Exclude<R, Defect>` boundary inference, `flatTap`/`recoverErr` channel
   widening, the `this is …` guard narrowing, `matchTags` exhaustiveness, and the
-  `ErrTriage` semantics — per-tag narrowing, defect/throw-branch subtraction,
-  `mergeTags` forms and inference, missing-tag/unknown-key/async-branch/
-  bare-callback rejection, `NoDefects` on merged observers,
-  untagged/mixed/`never` `E`, and the empty-object guarantee — `mapErr({})`
-  compiles only on `E = never`, is rejected on a non-empty or
-  `code`-discriminated `E`, and is a pass-through on an observer) with a
+  error-matcher semantics — narrowing, defect/throw-branch subtraction,
+  `P._` catch-all, grouped patterns, `code`-discriminated and untagged unions,
+  forced exhaustiveness (a missing case does not compile), the `E`-inference
+  regression guard (`combine` still infers), and the `flatMapErr`/`flatTapErr`
+  async-branch rejection) with a
   `Expect<Equal<…>>` helper plus `@ts-expect-error` for must-not-compile cases.
   They are checked by `tsc` via `tsconfig.test-d.json` (which relaxes
   `noUnusedLocals`), folded into the package's `typecheck` script — so a typing
@@ -586,4 +592,5 @@ configured outside the repo).
 - Public API carries full **TSDoc**; `pnpm --filter <pkg> build:docs` must stay
   typedoc-warning-free.
 - One concept = one name. Resist convenience aliases.
-- The core has **no runtime dependencies**. This is a feature; protect it.
+- The core has **one runtime dependency, `ts-pattern`** (it powers the error
+  matchers and is re-exported). Add no others — protect that minimalism.

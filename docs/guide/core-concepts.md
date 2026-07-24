@@ -27,8 +27,9 @@ Every `Result` shares one method surface, grouped by the channel it touches:
 - **do-notation** (runs on `Ok`): `bind`, `let` — accumulate a named scope; see
   [Do Notation](./do-notation)
 - **error** (runs on `Err`): `mapErr`, `flatMapErr`, `recoverErr`, `tapErr`,
-  `flatTapErr` — all take a per-tag **triage object** (exhaustive for the
-  transformers, partial for the observers; see
+  `flatTapErr` — all take an **exhaustive ts-pattern matcher** over the error, so
+  every case is handled explicitly and a new error type is a compile error at
+  every consuming site (see
   [Choosing a combinator](./choosing-a-combinator#triaging-the-error-channel))
 - **defect** (the only door to a `Defect`): `recoverDefect`, `tapDefect`
 - **eliminate**: `match`, `get`, `getErr`, `getOr`, `getOrElse`,
@@ -40,7 +41,7 @@ through untouched:
 ```ts
 Ok(2).map((n) => n + 1); // => Ok(3)
 Err("e").map((n) => n + 1); // => Err("e") — callback skipped
-Ok(2).mapErr(mergeTags((e) => `${e}!`)); // => Ok(2) — branch skipped
+Ok(2).mapErr((m) => m.with(P._, (e) => `${e}!`)); // => Ok(2) — matcher skipped
 ```
 
 `tap` and `flatTap` both run a side effect and keep the original value — the

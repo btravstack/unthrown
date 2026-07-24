@@ -5,7 +5,6 @@
   "fixed": [
     [
       "unthrown",
-      "@unthrown/pattern",
       "@unthrown/vitest",
       "@unthrown/effect",
       "@unthrown/neverthrow",

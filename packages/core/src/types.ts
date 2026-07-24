@@ -1,6 +1,8 @@
 // unthrown — public type surface. Pure types, no runtime.
 
-import type { Defect, MergedTriage } from "./defect.js";
+import type { match } from "ts-pattern";
+
+import type { Defect } from "./defect.js";
 
 /**
  * Flatten an intersection into a single object literal so accumulated `bind` /
@@ -41,172 +43,51 @@ export type NotThenable<R> = [R] extends [PromiseLike<unknown>]
   : unknown;
 
 /**
- * The union-wide counterpart of {@link NotThenable}: rejects a thenable
- * **member** of `R`. A triage object's result type is the union of every
- * branch's return, so a single async branch would hide inside a non-thenable
- * union — `Extract` finds it where `[R] extends [PromiseLike]` would not.
- *
- * @typeParam R - the union of the triage branches' return types.
- * @internal
- */
-export type NoThenables<R> = 0 extends 1 & R
-  ? unknown // an `any` return (e.g. a test mock) is not evidence of a thenable
-  : [Extract<R, PromiseLike<unknown>>] extends [never]
-    ? unknown
-    : "unthrown: combinator callbacks are synchronous — lift async work with fromPromise and compose with flatMap";
-
-/**
- * Rejects a `Defect`-producing merged handler on an **observer** — observation
- * never consumes the error, so there is nothing a `Defect` marker could
- * replace. Resolves to a no-op `unknown` when `R` carries no `Defect` arm.
- *
- * @typeParam R - the merged handler's inferred return type.
- * @internal
- */
-export type NoDefects<R> = 0 extends 1 & R
-  ? unknown // an `any` return (e.g. a test mock) is not evidence of a Defect
-  : [Extract<R, Defect>] extends [never]
-    ? unknown
-    : "unthrown: an observer cannot convert an error to a Defect — do that in a transformer (mapErr / flatMapErr) instead";
-
-/**
- * The `_tag` discriminants of the tagged members of an error union (untagged
- * members contribute nothing).
- *
- * @internal
- */
-type ErrTagsOf<E> = E extends { _tag: string } ? E["_tag"] : never;
-
-/**
- * The union of an inferred triage object's branch return types — what the
- * error-transforming combinators compute their outgoing types from. A branch
- * that `throw`s has return type `never` and contributes nothing.
- *
- * @typeParam H - the inferred triage object type.
- * @internal
- */
-export type TriageReturns<H> = {
-  [K in keyof H]: H[K] extends (...args: never[]) => infer R ? R : never;
-}[keyof H];
-
-/**
- * The outgoing type a triage object produces: the union of the branch returns
- * with the `Defect` arm **subtracted** — the same `Exclude<R, Defect>`
- * inference as the boundary `qualify` (Thesis #3). A branch that returns
- * `defect(cause)` (or throws) contributes nothing to the modeled channel.
- *
- * @typeParam H - the inferred triage object type.
- * @internal
- */
-export type TriageOut<H> = Exclude<TriageReturns<H>, Defect>;
-
-/**
- * Rejects a triage key that is not an error `_tag` of `E` — inference from
- * the object literal bypasses excess-property freshness, so a typo'd tag
- * would otherwise be silently unreachable. Resolves to a no-op
- * `unknown` when every key is known, and to an explanatory string-literal type
- * (naming the offending keys) otherwise.
- *
- * @typeParam E - the error union being triaged.
- * @typeParam H - the inferred triage object type.
- * @internal
- */
-export type TriageKeysOk<E, H> = H extends (...args: never[]) => unknown
-  ? // a bare function would structurally satisfy the all-optional partial shape
-    // (its keyof is never) and then silently observe nothing at runtime
-    "unthrown: triage takes an object of per-tag branches, not a callback — for uniform handling wrap it: mergeTags(callback)"
-  : [Exclude<keyof H, ErrTagsOf<E>>] extends [never]
-    ? unknown
-    : `unthrown: unknown triage key(s): ${Exclude<keyof H, ErrTagsOf<E>> &
-        string} — every branch must match an error _tag (uniform handling is mergeTags(fn))`;
-
-/**
- * The **triage object** the error-transforming combinators
- * ({@link ResultMethods.mapErr | mapErr}, {@link ResultMethods.flatMapErr | flatMapErr},
- * {@link ResultMethods.recoverErr | recoverErr}) require: one branch per error
- * `_tag`, exhaustive by construction. The explicit opt-out is the separate
- * {@link mergeTags} wrapper — never a branch inside the object.
+ * The ts-pattern match builder over an error union `E`, as produced by
+ * `match(error)`. This is what an error combinator's callback receives — chain
+ * `.with(pattern, handler)` on it; the combinator itself calls `.exhaustive()`,
+ * so the callback returns the **un-terminated** builder.
  *
  * @remarks
- * The object form is **exhaustive, full stop**: one branch for every tag in
- * `E`, available only when every member of `E` carries a `_tag`. Miss a tag
- * and it will not compile — adding a new error tag to `E` surfaces every
- * triage site. There is deliberately no fallthrough branch inside the object;
- * the explicit opt-out of exhaustiveness is the separate, greppable
- * {@link mergeTags} wrapper (also the only form for an untagged or mixed `E`,
- * where per-tag triage is impossible).
+ * Named via `ReturnType<typeof match<E>>` so the internal ts-pattern `Match`
+ * type (not part of ts-pattern's public exports) never has to be imported.
  *
- * Each branch receives the narrowed variant for its tag **and the injected
- * `defect` helper** as its second argument — the same injection `qualify`
- * receives at a boundary (Thesis #3), and the sanctioned way to deliberately
- * convert a tag to a `Defect`: `DriverError: (e, defect) => defect(e.cause)`.
- * The combinator's result type is the **union of the branch returns with the
- * `Defect` arm subtracted** (`Exclude<R, Defect>`, exactly the boundary
- * inference) — so a defect branch contributes nothing to the modeled channel.
- * A branch that `throw`s still becomes a `Defect` too (the safety-net
- * invariant; its `never` return likewise contributes nothing), but prefer the
- * lint-clean `defect(...)` return.
- *
- * At runtime, an error whose `_tag` has no branch (possible only outside the
- * typed contract — a widened cast, a JS caller) becomes a `Defect` carrying
- * that error as its cause: an unmodeled tag is an unmodeled failure.
- *
- * @typeParam E - the error union being triaged.
- * @typeParam R - what every branch returns (inferred as the union of the
- * branch returns).
- *
- * @example
- * ```ts
- * result.mapErr({
- *   RecordNotFound: () => new NotFoundException(id),
- *   DriverError: (e, defect) => defect(e.cause), // deliberate defect; leaves E
- * });
- * // uniform handling is the separate, explicit wrapper — not a branch:
- * result.mapErr(mergeTags((e) => new WrappedError({ cause: e })));
- * ```
- *
+ * @typeParam E - the error union being matched.
  * @category Types
  */
-export type ErrTriage<E, R> = {
-  readonly [K in ErrTagsOf<E>]: (
-    error: Extract<E, { _tag: K }>,
-    defect: (cause: unknown) => Defect,
-  ) => R | Defect;
-} & {
-  // when `E` has untagged members no set of tag branches can cover them, so
-  // this conditional key makes the object form unsatisfiable (it resolves to
-  // no key at all when `E` is fully tagged) — the message IS the key
-  readonly [K in [Exclude<E, { _tag: string }>] extends [never]
-    ? never
-    : "unthrown: this error union has untagged members — per-tag triage cannot cover them; use mergeTags(fn)"]: never;
+export type ErrMatcher<E> = ReturnType<typeof match<E>>;
+
+/**
+ * The shape an error-combinator callback must return: an **exhaustive**
+ * ts-pattern builder. `exhaustive` is required to be *callable* — on a builder
+ * that hasn't covered every case ts-pattern types it as a `NonExhaustiveError`
+ * (not a function), so a non-exhaustive chain fails to satisfy this and errors
+ * at the call site. `run` carries the output type.
+ *
+ * @typeParam O - the union of the branch return types (the builder's output).
+ * @internal
+ */
+export type ExhaustiveMatch<O> = {
+  exhaustive: (...args: never[]) => unknown;
+  run: () => O;
 };
 
 /**
- * The **partial triage object** the error observers
- * ({@link ResultMethods.tapErr | tapErr}, {@link ResultMethods.flatTapErr | flatTapErr})
- * take — the same per-tag shape as {@link ErrTriage}, with **every branch
- * optional**.
+ * The output of an `ExhaustiveMatch` — the union of its branch returns.
  *
- * @remarks
- * Observation is inherently partial-safe: a tag without a branch is simply not
- * observed and flows through unchanged, so nothing can be mis-routed by a
- * missing branch — which is why exhaustiveness is not required here, while the
- * transformers ({@link ErrTriage}) do require it. Per-tag observation needs no
- * manual `_tag` narrowing (`tapErr({ Conflict: alert })`); uniform observation
- * is the explicit {@link mergeTags} wrapper
- * (`tapErr(mergeTags((e) => log(e)))`). Branches do **not** receive the
- * injected `defect` helper — an observer's return never replaces the error
- * (`tapErr` ignores it; `flatTapErr` only threads a *new* effect failure), so
- * there is nothing for a `Defect` marker to replace.
- *
- * @typeParam E - the error union being observed.
- * @typeParam R - what a branch returns.
- *
- * @category Types
+ * @internal
  */
-export type ErrTriagePartial<E, R> = {
-  readonly [K in ErrTagsOf<E>]?: (error: Extract<E, { _tag: K }>) => R;
-};
+export type MatchOut<M> = M extends ExhaustiveMatch<infer O> ? O : never;
+
+/**
+ * The outgoing modeled-error type a transforming match produces: the builder's
+ * output with the `Defect` arm **subtracted** (`Exclude<O, Defect>`, the same
+ * inference as the boundary `qualify`, Thesis #3). A branch that returns
+ * `defect(cause)` therefore contributes nothing to the modeled channel.
+ *
+ * @internal
+ */
+export type MatchErrOut<M> = Exclude<MatchOut<M>, Defect>;
 
 /**
  * The fluent method surface every {@link Result} variant carries — the
@@ -342,157 +223,104 @@ export type ResultMethods<out T, out E> = {
   discard(): Result<void, E>;
 
   /**
-   * Transform the modeled error, **triaging it by tag** — one branch per
-   * `_tag`, exhaustive unless an explicit `Else` branch is present
-   * ({@link ErrTriage}).
+   * Transform the modeled error by **matching it exhaustively** with ts-pattern.
    *
-   * Runs the matching branch only on `Err`; `Ok` passes through and a `Defect`
-   * is **never** touched. The outgoing error type is the union of the branch
-   * returns — a branch that throws (becoming a `Defect`) contributes nothing.
-   * An error whose tag has no branch and no `Else` (unreachable through
-   * well-typed code) becomes a `Defect` carrying it. An async branch is
-   * rejected at compile time ({@link NotThenable}).
+   * @remarks
+   * The callback receives `match(error)` (an {@link ErrMatcher}) and the
+   * injected `defect` helper. Chain `.with(pattern, handler)` and **return the
+   * un-terminated builder** — `mapErr` calls `.exhaustive()` itself, so a
+   * missing case is a compile error at the call site (there is no `.exhaustive()`
+   * to forget, and no way to slip in `.otherwise()`). The outgoing error type is
+   * the union of the branch returns with the `Defect` arm subtracted
+   * (`Exclude<O, Defect>`) — a branch returning `defect(cause)` converts that case
+   * to a `Defect` and drops it from `E`. Runs only on `Err`; `Ok` and `Defect`
+   * pass through. A branch that throws also becomes a `Defect`.
    *
-   * @typeParam H - the inferred triage object type (the outgoing error type is
-   * the union of its branch returns).
-   * @param handlers - the triage object: per-tag branches, each mapping its
-   * error to a new one (or `Else` for the deliberate blanket case).
+   * `.with(P._, …)` is the deliberate uniform/catch-all (it makes the match
+   * exhaustive). Match on anything ts-pattern supports — `_tag`, `code`,
+   * structural shape, guards, or grouped patterns `.with(a, b, handler)`.
+   *
+   * @typeParam M - the exhaustive builder the callback returns.
+   * @param f - builds the match over the error (returns the un-terminated builder).
    */
-  /**
-   * {@link mergeTags} overload of {@link ResultMethods.mapErr | mapErr}: one
-   * explicit uniform handler for every tag (and the only form for an untagged
-   * or mixed `E`). The handler receives the injected `defect` helper; the
-   * `Defect` arm of its return is subtracted from the outgoing error type.
-   */
-  mapErr<R>(handlers: MergedTriage<E, R> & NoThenables<R>): Result<T, Exclude<R, Defect>>;
-  mapErr<H extends ErrTriage<E, unknown>>(
-    handlers: H & TriageKeysOk<E, H> & NoThenables<TriageReturns<H>>,
-  ): Result<T, TriageOut<H>>;
+  mapErr<M extends ExhaustiveMatch<unknown>>(
+    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+  ): Result<T, MatchErrOut<M>>;
 
   /**
    * Sequence from an `Err` by producing another `Result` — the error-channel
-   * mirror of {@link ResultMethods.flatMap | flatMap}, **triaging the error by
-   * tag** ({@link ErrTriage}: exhaustive unless `Else` is present).
+   * mirror of {@link ResultMethods.flatMap | flatMap}, **matching the error
+   * exhaustively** ({@link ErrMatcher}; the combinator calls `.exhaustive()`).
    *
-   * Runs the matching branch only on `Err`; `Ok` and `Defect` pass through. If
-   * a branch throws, the throw becomes a `Defect`; an unhandled tag
-   * (unreachable through well-typed code) becomes a `Defect` carrying the
-   * error. To keep a tag's error as-is, re-emit it: `Tag: (e) => Err(e)`.
+   * Each branch returns a `Result`; the outgoing channels are the unions of the
+   * branch-returned `Result`s' channels. A branch may return `defect(cause)`.
+   * Runs only on `Err`; `Ok` and `Defect` pass through.
    *
-   * @typeParam H - the inferred triage object type; the result's channels are
-   * the unions of the branch-returned `Result`s' channels (via {@link OkOf} /
-   * {@link ErrOf}).
-   * @param handlers - the triage object: per-tag branches, each producing a
-   * fallback `Result` from its error.
+   * @typeParam M - the exhaustive builder the callback returns.
+   * @param f - builds the match; each branch produces a fallback `Result`.
    */
-  /**
-   * {@link mergeTags} overload of {@link ResultMethods.flatMapErr | flatMapErr}:
-   * one explicit uniform handler producing a fallback `Result` (or
-   * `defect(cause)`) for every tag.
-   */
-  flatMapErr<R extends Result<unknown, unknown> | Defect>(
-    handlers: MergedTriage<E, R>,
-  ): Result<T | OkOf<R>, ErrOf<R>>;
-  flatMapErr<H extends ErrTriage<E, Result<unknown, unknown>>>(
-    handlers: H & TriageKeysOk<E, H>,
-  ): Result<T | OkOf<TriageReturns<H>>, ErrOf<TriageReturns<H>>>;
+  flatMapErr<M extends ExhaustiveMatch<Result<unknown, unknown> | Defect>>(
+    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+  ): Result<T | OkOf<MatchOut<M>>, ErrOf<MatchOut<M>>>;
 
   /**
    * Recover from an `Err` by producing a success value, emptying the error
-   * channel — **triaging the error by tag** ({@link ErrTriage}: exhaustive
-   * unless `Else` is present). Pairs with
-   * {@link ResultMethods.recoverDefect | recoverDefect}.
+   * channel — **matching the error exhaustively** ({@link ErrMatcher}). Pairs
+   * with {@link ResultMethods.recoverDefect | recoverDefect}.
    *
    * @remarks
    * The result type is `Result<T | U, never>`, but `never` describes only the
-   * **error** channel — a `Defect` can still be present at runtime, so do not
-   * read `never` as "total". Runs the matching branch only on `Err`; `Ok` and
-   * `Defect` pass through. If a branch throws, the throw becomes a `Defect`;
-   * so does an unhandled tag (unreachable through well-typed code). An async
-   * branch is rejected at compile time ({@link NotThenable}).
+   * **error** channel — a `Defect` can still be present at runtime. A branch may
+   * return `defect(cause)` (which stays a `Defect`, not a recovery). Runs only on
+   * `Err`; `Ok` and `Defect` pass through.
    *
-   * @typeParam H - the inferred triage object type (the recovered success type
-   * is the union of its branch returns).
-   * @param handlers - the triage object: per-tag branches, each producing a
-   * success value from its error.
+   * @typeParam M - the exhaustive builder the callback returns.
+   * @param f - builds the match; each branch produces a success value.
    */
-  /**
-   * {@link mergeTags} overload of {@link ResultMethods.recoverErr | recoverErr}:
-   * one explicit uniform recovery for every tag (a `defect(cause)` return
-   * stays a `Defect`, not a recovery).
-   */
-  recoverErr<R>(
-    handlers: MergedTriage<E, R> & NoThenables<R>,
-  ): Result<T | Exclude<R, Defect>, never>;
-  recoverErr<H extends ErrTriage<E, unknown>>(
-    handlers: H & TriageKeysOk<E, H> & NoThenables<TriageReturns<H>>,
-  ): Result<T | TriageOut<H>, never>;
+  recoverErr<M extends ExhaustiveMatch<unknown>>(
+    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+  ): Result<T | MatchErrOut<M>, never>;
 
   /**
-   * Run a side effect on the error — **observed by tag** through a *partial*
-   * triage object ({@link ErrTriagePartial}: every branch optional, `Else`
-   * included) — and pass the `Result` through unchanged.
-   *
-   * Runs the matching branch only on `Err`; a tag without a branch is simply
-   * not observed. Uniform observation is `{ Else: (e) => log(e) }`. If a
-   * branch throws, the result is a `Defect` whose cause is an `AggregateError`
-   * of `[thrown, original failure]` — observing a failure never destroys it.
-   * An async branch is rejected at compile time ({@link NotThenable}).
+   * Run a side effect on the error — **matched exhaustively** ({@link ErrMatcher})
+   * — and pass the `Result` through unchanged.
    *
    * @remarks
-   * As with {@link ResultMethods.tap | tap}, a branch's return value is
-   * ignored — a failable `Result`-returning effect belongs in
-   * {@link ResultMethods.flatTapErr | flatTapErr}; an `AsyncResult`-returning
-   * one needs the chain lifted with {@link ResultMethods.toAsync | toAsync}
-   * first (the async {@link AsyncResultMethods.flatTapErr | flatTapErr}
-   * accepts both).
+   * The callback builds a match whose branches run side effects; their return
+   * values are ignored and the original `Err` flows through. Exhaustive like the
+   * transformers (use `.with(P._, …)` for a catch-all). If a branch throws, the
+   * result is a `Defect` whose cause is an `AggregateError` of `[thrown, original
+   * failure]` — observing a failure never destroys it. A failable
+   * `Result`-returning effect belongs in
+   * {@link ResultMethods.flatTapErr | flatTapErr}.
    *
-   * @typeParam H - the inferred partial triage object type.
-   * @param handlers - per-tag side-effect branches (returns are ignored).
+   * @param f - builds the match; branch returns are ignored.
    */
-  /**
-   * {@link mergeTags} overload of {@link ResultMethods.tapErr | tapErr}:
-   * observe every error uniformly (`tapErr(mergeTags((e) => log(e)))`). A
-   * `Defect`-producing handler is rejected — observation never consumes.
-   */
-  tapErr<R>(handlers: MergedTriage<E, R> & NoThenables<R> & NoDefects<R>): Result<T, E>;
-  tapErr<H extends ErrTriagePartial<E, unknown>>(
-    handlers: H & TriageKeysOk<E, H> & NoThenables<TriageReturns<H>>,
+  tapErr(
+    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
   ): Result<T, E>;
 
   /**
    * Run a **failable** side effect on the error, keeping the original error but
-   * threading the effect's own error.
+   * threading the effect's own error — **matched exhaustively**
+   * ({@link ErrMatcher}).
    *
    * @remarks
-   * The error-channel mirror of {@link ResultMethods.flatTap | flatTap}: `f`
-   * returns a `Result`, but its **success value is discarded** — on the effect's
-   * `Ok` the original `Err` flows through unchanged, while an `Err` (or `Defect`)
-   * from `f` short-circuits and threads its error (`Result<T, E | E2>`). Runs only
-   * on `Err`; `Ok` and `Defect` pass through. If `f` throws, the result is a
-   * `Defect` whose cause is an `AggregateError` of `[thrown, original failure]` —
-   * observing a failure never destroys it. Use it for a failable effect _during_
-   * error handling (e.g. writing the error to an audit log that may itself fail).
+   * The error-channel mirror of {@link ResultMethods.flatTap | flatTap}: each
+   * branch returns a `Result` whose **success value is discarded** — on the
+   * effect's `Ok` the original `Err` flows through, while an `Err`/`Defect` from a
+   * branch short-circuits and threads its error. If a branch throws, the result
+   * is a `Defect` aggregating `[thrown, original failure]`.
    *
-   * Like `tapErr`, it takes a *partial* triage object
-   * ({@link ErrTriagePartial}) — a tag without a branch is not observed.
-   *
-   * @typeParam H - the inferred partial triage object type; the threaded error
-   * type is the union of the branch-returned `Result`s' error channels.
-   * @param handlers - per-tag failable side-effect branches; each `Ok` value is
-   * ignored.
+   * @typeParam M - the exhaustive builder the callback returns.
+   * @param f - builds the match; each branch is a failable effect (its `Ok` is ignored).
    */
-  /**
-   * {@link mergeTags} overload of {@link ResultMethods.flatTapErr | flatTapErr}:
-   * run one explicit uniform failable effect for every tag (its `Ok` value is
-   * ignored; its failure threads).
-   */
-  flatTapErr<R extends Result<unknown, unknown>>(
-    handlers: MergedTriage<E, R>,
-  ): Result<T, E | ErrOf<R>>;
-  flatTapErr<H extends ErrTriagePartial<E, Result<unknown, unknown>>>(
-    handlers: H & TriageKeysOk<E, H>,
-  ): Result<T, E | ErrOf<TriageReturns<H>>>;
+  flatTapErr<E2>(
+    f: (
+      m: ErrMatcher<E>,
+      defect: (cause: unknown) => Defect,
+    ) => ExhaustiveMatch<Result<unknown, E2>>,
+  ): Result<T, E | E2>;
 
   /**
    * Recover from a `Defect` — the **only** combinator that can touch one.
@@ -909,46 +737,35 @@ export type AsyncResultMethods<out T, out E> = {
   discard(): AsyncResult<void, E>;
 
   /**
-   * Asynchronous {@link ResultMethods.mapErr | mapErr} — the same triage
-   * object ({@link ErrTriage}). Branches are synchronous; a throw becomes a
-   * `Defect`. An async branch is rejected at compile time
-   * ({@link NotThenable}).
+   * Asynchronous {@link ResultMethods.mapErr | mapErr} — the same exhaustive
+   * {@link ErrMatcher} form; the combinator calls `.exhaustive()`.
    */
-  /** {@link mergeTags} overload — see the sync {@link ResultMethods.mapErr | mapErr}. */
-  mapErr<R>(handlers: MergedTriage<E, R> & NoThenables<R>): AsyncResult<T, Exclude<R, Defect>>;
-  mapErr<H extends ErrTriage<E, unknown>>(
-    handlers: H & TriageKeysOk<E, H> & NoThenables<TriageReturns<H>>,
-  ): AsyncResult<T, TriageOut<H>>;
+  mapErr<M extends ExhaustiveMatch<unknown>>(
+    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+  ): AsyncResult<T, MatchErrOut<M>>;
 
   /**
    * Asynchronous {@link ResultMethods.flatMapErr | flatMapErr} — the same
-   * triage object ({@link ErrTriage}). Unlike the sync form, a branch may
+   * exhaustive {@link ErrMatcher} form. Unlike the sync form, a branch may
    * return a `Result` **or** an `AsyncResult`.
    */
-  /** {@link mergeTags} overload — see the sync {@link ResultMethods.flatMapErr | flatMapErr}. */
-  flatMapErr<R extends Result<unknown, unknown> | AsyncResult<unknown, unknown> | Defect>(
-    handlers: MergedTriage<E, R>,
-  ): AsyncResult<T | OkOf<R> | AsyncOkOf<R>, ErrOf<R> | AsyncErrOf<R>>;
-  flatMapErr<H extends ErrTriage<E, Result<unknown, unknown> | AsyncResult<unknown, unknown>>>(
-    handlers: H & TriageKeysOk<E, H>,
+  flatMapErr<
+    M extends ExhaustiveMatch<Result<unknown, unknown> | AsyncResult<unknown, unknown> | Defect>,
+  >(
+    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
   ): AsyncResult<
-    T | OkOf<TriageReturns<H>> | AsyncOkOf<TriageReturns<H>>,
-    ErrOf<TriageReturns<H>> | AsyncErrOf<TriageReturns<H>>
+    T | OkOf<MatchOut<M>> | AsyncOkOf<MatchOut<M>>,
+    ErrOf<MatchOut<M>> | AsyncErrOf<MatchOut<M>>
   >;
 
   /**
    * Asynchronous {@link ResultMethods.recoverErr | recoverErr} — the same
-   * triage object ({@link ErrTriage}). Branches are synchronous; a throw
-   * becomes a `Defect`. An async branch is rejected at compile time
-   * ({@link NotThenable}).
+   * exhaustive {@link ErrMatcher} form. Branches are synchronous; a throw
+   * becomes a `Defect`.
    */
-  /** {@link mergeTags} overload — see the sync {@link ResultMethods.recoverErr | recoverErr}. */
-  recoverErr<R>(
-    handlers: MergedTriage<E, R> & NoThenables<R>,
-  ): AsyncResult<T | Exclude<R, Defect>, never>;
-  recoverErr<H extends ErrTriage<E, unknown>>(
-    handlers: H & TriageKeysOk<E, H> & NoThenables<TriageReturns<H>>,
-  ): AsyncResult<T | TriageOut<H>, never>;
+  recoverErr<M extends ExhaustiveMatch<unknown>>(
+    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+  ): AsyncResult<T | MatchErrOut<M>, never>;
 
   /**
    * Asynchronous {@link ResultMethods.tapErr | tapErr}. `f` is synchronous; if it
@@ -959,10 +776,8 @@ export type AsyncResultMethods<out T, out E> = {
    * too — a failable effect belongs in
    * {@link AsyncResultMethods.flatTapErr | flatTapErr}.
    */
-  /** {@link mergeTags} overload — see the sync {@link ResultMethods.tapErr | tapErr}. */
-  tapErr<R>(handlers: MergedTriage<E, R> & NoThenables<R> & NoDefects<R>): AsyncResult<T, E>;
-  tapErr<H extends ErrTriagePartial<E, unknown>>(
-    handlers: H & TriageKeysOk<E, H> & NoThenables<TriageReturns<H>>,
+  tapErr(
+    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
   ): AsyncResult<T, E>;
 
   /**
@@ -973,15 +788,12 @@ export type AsyncResultMethods<out T, out E> = {
    * an `AggregateError` of `[thrown, original failure]` — observing a failure
    * never destroys it.
    */
-  /** {@link mergeTags} overload — see the sync {@link ResultMethods.flatTapErr | flatTapErr}. */
-  flatTapErr<R extends Result<unknown, unknown> | AsyncResult<unknown, unknown>>(
-    handlers: MergedTriage<E, R>,
-  ): AsyncResult<T, E | ErrOf<R> | AsyncErrOf<R>>;
-  flatTapErr<
-    H extends ErrTriagePartial<E, Result<unknown, unknown> | AsyncResult<unknown, unknown>>,
-  >(
-    handlers: H & TriageKeysOk<E, H>,
-  ): AsyncResult<T, E | ErrOf<TriageReturns<H>> | AsyncErrOf<TriageReturns<H>>>;
+  flatTapErr<E2>(
+    f: (
+      m: ErrMatcher<E>,
+      defect: (cause: unknown) => Defect,
+    ) => ExhaustiveMatch<Result<unknown, E2> | AsyncResult<unknown, E2>>,
+  ): AsyncResult<T, E | E2>;
 
   /**
    * Asynchronous {@link ResultMethods.recoverDefect | recoverDefect}. `f` may

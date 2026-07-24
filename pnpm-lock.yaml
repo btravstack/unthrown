@@ -165,9 +165,6 @@ importers:
       '@unthrown/orpc':
         specifier: workspace:*
         version: link:../packages/orpc
-      '@unthrown/pattern':
-        specifier: workspace:*
-        version: link:../packages/pattern
       '@unthrown/prisma':
         specifier: workspace:*
         version: link:../packages/prisma
@@ -232,6 +229,10 @@ importers:
         version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
 
   packages/core:
+    dependencies:
+      ts-pattern:
+        specifier: 'catalog:'
+        version: 5.9.0
     devDependencies:
       '@btravstack/tsconfig':
         specifier: 'catalog:'
@@ -402,43 +403,6 @@ importers:
       tsdown:
         specifier: 'catalog:'
         version: 0.22.7(oxc-resolver@11.21.3)(tsx@4.23.1)(typescript@6.0.3)
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
-
-  packages/pattern:
-    dependencies:
-      unthrown:
-        specifier: workspace:^
-        version: link:../core
-    devDependencies:
-      '@btravstack/tsconfig':
-        specifier: 'catalog:'
-        version: 0.2.0
-      '@btravstack/typedoc':
-        specifier: 'catalog:'
-        version: 0.1.0(typedoc-plugin-markdown@4.12.0(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3))
-      '@types/node':
-        specifier: 'catalog:'
-        version: 26.1.1
-      '@vitest/coverage-v8':
-        specifier: 'catalog:'
-        version: 4.1.10(vitest@4.1.10)
-      ts-pattern:
-        specifier: 'catalog:'
-        version: 5.9.0
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.22.7(oxc-resolver@11.21.3)(tsx@4.23.1)(typescript@6.0.3)
-      typedoc:
-        specifier: 'catalog:'
-        version: 0.28.20(typescript@6.0.3)
-      typedoc-plugin-markdown:
-        specifier: 'catalog:'
-        version: 4.12.0(typedoc@0.28.20(typescript@6.0.3))
       typescript:
         specifier: 'catalog:'
         version: 6.0.3

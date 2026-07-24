@@ -1,6 +1,10 @@
+// ts-pattern powers the error-matching combinators (`mapErr`/`flatMapErr`/…),
+// and is re-exported so `P` (wildcards, `P.union`, guards) and `match` (for
+// eliminating a `Result` directly) are available from one import.
+export { match, P } from "ts-pattern";
+
 export { Err, ErrAsync, isDefect, isErr, isOk, Ok, OkAsync } from "./constructors.js";
 export { isResult, UnwrapError } from "./core.js";
-export { mergeTags } from "./defect.js";
 export { Do } from "./do.js";
 export { AsyncResult, Result } from "./facade.js";
 export {
@@ -14,9 +18,8 @@ export {
   fromSafeThrowable,
   fromThrowable,
 } from "./interop.js";
-export { matchTags, TaggedError } from "./tagged.js";
+export { matchTags, tag, TaggedError } from "./tagged.js";
 
-export type { MergedTriage } from "./defect.js";
 export type { TaggedErrorConstructor, TaggedErrorInstance, TagHandlers } from "./tagged.js";
 export type {
   AsyncErrOf,
@@ -24,9 +27,8 @@ export type {
   AsyncResultMethods,
   Awaitable,
   DefectView,
+  ErrMatcher,
   ErrOf,
-  ErrTriage,
-  ErrTriagePartial,
   ErrView,
   FailureView,
   NotThenable,

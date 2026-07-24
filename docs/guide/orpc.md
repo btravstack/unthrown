@@ -41,7 +41,7 @@ your service layer keeps speaking `Result`, and the endpoint stops needing to
 unwrap it into throws:
 
 ```ts
-import { mergeTags } from "unthrown";
+import { P } from "unthrown";
 import { handlerResult } from "@unthrown/orpc/server";
 import { os } from "@orpc/server";
 import * as z from "zod";
@@ -51,7 +51,7 @@ const find = os
   .errors({ NOT_FOUND: {} })
   .handler(
     handlerResult(({ input, errors }) =>
-      repo.findPlanet(input.id).mapErr(mergeTags(() => errors.NOT_FOUND())),
+      repo.findPlanet(input.id).mapErr((m) => m.with(P._, () => errors.NOT_FOUND())),
     ),
   );
 ```
@@ -92,14 +92,14 @@ side-effectful import (the packaging `@orpc/experimental-effect` uses for
 `.effect()`):
 
 ```ts
-import { mergeTags } from "unthrown";
+import { P } from "unthrown";
 import "@unthrown/orpc/extensions/result";
 
 const find = os
   .input(z.object({ id: z.string() }))
   .errors({ NOT_FOUND: {} })
   .result(({ input, errors }) =>
-    repo.findPlanet(input.id).mapErr(mergeTags(() => errors.NOT_FOUND())),
+    repo.findPlanet(input.id).mapErr((m) => m.with(P._, () => errors.NOT_FOUND())),
   );
 ```
 
@@ -167,6 +167,8 @@ Both halves compose into one error vocabulary across layers — a
 consumes it, all in `Result`:
 
 ```ts
+import { tag } from "unthrown";
+
 // server — the one mapErr is the whole edge, and it is exhaustive: every
 // domain error is explicitly given a client-facing code or explicitly declared
 // not the client's business (a 500). A new P-code in the union becomes a
@@ -176,11 +178,17 @@ const createUser = os
   .errors({ EMAIL_TAKEN: {} })
   .handler(
     handlerResult(({ input, errors }) =>
-      db.user.tryCreate({ data: input }).mapErr({
-        UniqueConstraintViolation: () => errors.EMAIL_TAKEN(),
-        ForeignKeyViolation: (e) => new ORPCError("INTERNAL_SERVER_ERROR", { cause: e }),
-        DriverError: (e) => new ORPCError("INTERNAL_SERVER_ERROR", { cause: e }),
-      }),
+      db.user
+        .tryCreate({ data: input })
+        .mapErr((m) =>
+          m
+            .with(tag("UniqueConstraintViolation"), () => errors.EMAIL_TAKEN())
+            .with(
+              tag("ForeignKeyViolation"),
+              tag("DriverError"),
+              (e) => new ORPCError("INTERNAL_SERVER_ERROR", { cause: e }),
+            ),
+        ),
     ),
   );
 

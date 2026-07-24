@@ -53,6 +53,9 @@
     "test:types": "tsc --noEmit -p tsconfig.test-d.json",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test-d.json"
   },
+  "dependencies": {
+    "ts-pattern": "catalog:"
+  },
   "devDependencies": {
     "@btravstack/tsconfig": "catalog:",
     "@btravstack/typedoc": "catalog:",

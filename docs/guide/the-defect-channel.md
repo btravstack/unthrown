@@ -35,8 +35,8 @@ const d = Ok(1).map(() => {
 });
 
 d.map((n) => n + 1); // still a Defect — callback skipped
-d.mapErr(mergeTags((e) => e)); // still a Defect — branch skipped
-d.recoverErr(mergeTags(() => 0)); // still a Defect — see below
+d.mapErr((m) => m.with(P._, (e) => e)); // still a Defect — matcher skipped
+d.recoverErr((m) => m.with(P._, () => 0)); // still a Defect — see below
 ```
 
 That last line is the crucial one.
@@ -48,7 +48,7 @@ That last line is the crucial one.
 runtime:
 
 ```ts
-const recovered = d.recoverErr(mergeTags(() => 99));
+const recovered = d.recoverErr((m) => m.with(P._, () => 99));
 // type: Result<number, never>
 recovered.isDefect(); // => true — `never` does NOT mean "total"
 ```

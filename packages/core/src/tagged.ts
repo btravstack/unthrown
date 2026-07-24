@@ -218,3 +218,27 @@ export function matchTags<T, E extends { _tag: string }, R>(
   // the call while the public overloads keep the return type correct.
   return (result as Result<T, E>).match({ ok: handlers.Ok, err: onErr, defect: handlers.Defect });
 }
+
+/**
+ * A `ts-pattern` pattern matching any value whose `_tag` equals `value` — a
+ * {@link TaggedError}, or any discriminated member. Equivalent to the object
+ * pattern `{ _tag: value }`, but reads better inside an error-matching
+ * combinator and narrows to the matching variant, payload included.
+ *
+ * @typeParam Tag - the string literal tag to match.
+ * @param value - the `_tag` to match.
+ *
+ * @category Tagged errors
+ *
+ * @example
+ * ```ts
+ * result.mapErr((m) =>
+ *   m
+ *     .with(tag("NotFound"), () => new NotFoundException())
+ *     .with(tag("Conflict"), (e) => new ConflictException(e.key)),
+ * );
+ * ```
+ */
+export function tag<const Tag extends string>(value: Tag): { _tag: Tag } {
+  return { _tag: value };
+}

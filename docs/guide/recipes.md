@@ -140,7 +140,7 @@ exception:
 import { Hono } from "hono";
 import { z } from "zod";
 import { fromSchema } from "@unthrown/standard-schema";
-import { matchTags, mergeTags, TaggedError, type AsyncResult } from "unthrown";
+import { matchTags, P, TaggedError, type AsyncResult } from "unthrown";
 
 class InvalidId extends TaggedError("InvalidId") {}
 
@@ -156,7 +156,7 @@ const app = new Hono();
 
 app.get("/users/:id", (c) => {
   const user = parseId(c.req.param("id"))
-    .mapErr(mergeTags(() => new InvalidId()))
+    .mapErr((m) => m.with(P._, () => new InvalidId()))
     .toAsync()
     .flatMap((id) => userRepo.findById(id));
   // AsyncResult<User, InvalidId | NotFound>
