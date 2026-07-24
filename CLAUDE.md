@@ -123,15 +123,17 @@ was planned).
   cause is an `AggregateError([thrown, original])` — observing a failure never
   destroys it. (A throw in the success-channel `tap`/`map` keeps the plain
   thrown cause.)
-- **Thenable callback returns are rejected at compile time.** Every combinator
-  callback not already constrained to return a `Result` (`map`, `tap`, `let`,
-  `tapDefect`, `tapFailure`) intersects its return with `NotThenable<R>`; the
-  triage combinators (`mapErr`, `recoverErr`, `tapErr`) apply the union-wide
-  `NoThenables` to the union of their branch
-  returns (`Extract`-based, so one async branch can't hide in a non-thenable
-  union; an `any`-returning branch, e.g. a test mock, is tolerated) — an `async`
-  callback/branch is a compile error, because its rejection would bypass
-  qualification. `match` handlers are deliberately exempt (edge elimination).
+- **Thenable callback returns are rejected at compile time — where a rejection
+  could actually bypass qualification.** Every combinator callback not already
+  constrained to return a `Result` (`map`, `tap`, `let`, `tapDefect`,
+  `tapFailure`) intersects its return with `NotThenable<R>`, so an `async`
+  callback is a compile error. Among the error-matcher combinators, only the
+  **awaiting** ones — `flatMapErr` / `flatTapErr` — reject an async branch, via
+  their builder-output constraint (an awaited rejection would bypass
+  qualification). The **non-awaiting** `mapErr` / `recoverErr` / `tapErr` run
+  the matched branch **synchronously with no await**, so an async branch is
+  merely a visible `Promise`-valued result, not a rejection bypass — they do
+  not ban it. `match` handlers are deliberately exempt (edge elimination).
 - **Result instances are frozen.** `okRes`/`errRes`/`defectRes` return
   `Object.freeze`d objects, so a variant cannot be forged by mutation; the
   `readonly` types are real at runtime.
