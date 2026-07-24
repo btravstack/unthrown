@@ -79,8 +79,8 @@ describe("AsyncResult: a throw in any combinator becomes a Defect", () => {
     expect((await asyncErr("e").mapErr({ Else: t })).isDefect()).toBe(true);
     expect((await asyncErr("e").flatMapErr({ Else: t })).isDefect()).toBe(true);
     expect((await asyncErr("e").recoverErr({ Else: t })).isDefect()).toBe(true);
-    expect((await asyncErr("e").tapErr(t)).isDefect()).toBe(true);
-    expect((await asyncErr("e").flatTapErr(t)).isDefect()).toBe(true);
+    expect((await asyncErr("e").tapErr({ Else: t })).isDefect()).toBe(true);
+    expect((await asyncErr("e").flatTapErr({ Else: t })).isDefect()).toBe(true);
     expect((await asyncDefect().recoverDefect(t)).isDefect()).toBe(true);
     expect((await asyncDefect().tapDefect(t)).isDefect()).toBe(true);
     expect((await asyncErr("e").tapFailure(t)).isDefect()).toBe(true);
@@ -176,38 +176,57 @@ describe("AsyncResult error channel", () => {
     expect((await asyncErr("e").recoverErr({ Else: () => 1 })).get()).toBe(1);
   });
 
+  it("a triage branch returning the injected defect(cause) becomes a Defect on every transformer", async () => {
+    const boom2 = new Error("boom2");
+    expect((await asyncErr("e").mapErr({ Else: (_e, defect) => defect(boom2) })).isDefect()).toBe(
+      true,
+    );
+    expect(
+      (await asyncErr("e").flatMapErr({ Else: (_e, defect) => defect(boom2) })).isDefect(),
+    ).toBe(true);
+    expect(
+      (await asyncErr("e").recoverErr({ Else: (_e, defect) => defect(boom2) })).isDefect(),
+    ).toBe(true);
+  });
+
   it("tapErr runs the side effect and preserves the error", async () => {
     const seen: string[] = [];
-    const r = await asyncErr("e").tapErr((s) => seen.push(s));
+    const r = await asyncErr("e").tapErr({ Else: (s) => seen.push(s) });
     expect(seen).toEqual(["e"]);
     expect(r.getErr()).toBe("e");
   });
 
   it("flatTapErr keeps the original error when the effect succeeds", async () => {
-    const r = await asyncErr("e").flatTapErr(() => Ok("ignored"));
+    const r = await asyncErr("e").flatTapErr({ Else: () => Ok("ignored") });
     expect(r.getErr()).toBe("e");
   });
 
   it("flatTapErr threads the effect's Err", async () => {
-    expect((await asyncErr("e").flatTapErr(() => Err("log_failed"))).getErr()).toBe("log_failed");
+    expect((await asyncErr("e").flatTapErr({ Else: () => Err("log_failed") })).getErr()).toBe(
+      "log_failed",
+    );
   });
 
   it("flatTapErr composes an async effect via a qualified boundary, keeping the error", async () => {
-    const r = await asyncErr("e").flatTapErr(() => fromSafePromise(Promise.resolve("logged")));
+    const r = await asyncErr("e").flatTapErr({
+      Else: () => fromSafePromise(Promise.resolve("logged")),
+    });
     expect(r.getErr()).toBe("e");
   });
 
   it("flatTapErr does not run the effect on Ok or Defect", async () => {
     const f = vi.fn(() => Ok(1));
-    expect((await asyncOk(1).flatTapErr(f)).get()).toBe(1);
-    expect((await asyncDefect().flatTapErr(f)).isDefect()).toBe(true);
+    expect((await asyncOk(1).flatTapErr({ Else: f })).get()).toBe(1);
+    expect((await asyncDefect().flatTapErr({ Else: f })).isDefect()).toBe(true);
     expect(f).not.toHaveBeenCalled();
   });
 
   it("tapErr: a throwing callback preserves the original error in an AggregateError", async () => {
     const thrown = new Error("boom");
-    const r = await asyncErr("original").tapErr(() => {
-      throw thrown;
+    const r = await asyncErr("original").tapErr({
+      Else: () => {
+        throw thrown;
+      },
     });
     expect(r.tag).toBe("Defect");
     if (r.isDefect()) {
@@ -218,8 +237,10 @@ describe("AsyncResult error channel", () => {
 
   it("flatTapErr: a throwing callback preserves the original error in an AggregateError", async () => {
     const thrown = new Error("boom");
-    const r = await asyncErr("original").flatTapErr(() => {
-      throw thrown;
+    const r = await asyncErr("original").flatTapErr({
+      Else: () => {
+        throw thrown;
+      },
     });
     expect(r.tag).toBe("Defect");
     if (r.isDefect()) {

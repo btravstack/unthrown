@@ -257,6 +257,26 @@ describe("Result.mapErr", () => {
         .isDefect(),
     ).toBe(true);
   });
+
+  it("a branch returning the injected defect(cause) becomes a Defect carrying that cause", () => {
+    const r = errA(7).mapErr({
+      A: (e) => `a:${e.a}`,
+      B: (_e, defect) => defect(boom),
+    });
+    expect(r.isDefect()).toBe(false); // an A error takes the mapped branch
+    const d = Err<TagA | TagB>({ _tag: "B", b: "x" }).mapErr({
+      A: (e) => `a:${e.a}`,
+      B: (_e, defect) => defect(boom),
+    });
+    expect(d.isDefect()).toBe(true);
+    if (d.isDefect()) expect(d.cause).toBe(boom);
+  });
+
+  it("the Else branch also receives the injected defect helper", () => {
+    const d = Err("e").mapErr({ Else: (e, defect) => defect(e) });
+    expect(d.isDefect()).toBe(true);
+    if (d.isDefect()) expect(d.cause).toBe("e");
+  });
 });
 
 describe("Result.flatMapErr", () => {
@@ -316,6 +336,12 @@ describe("Result.flatMapErr", () => {
         .isDefect(),
     ).toBe(true);
   });
+
+  it("a branch returning the injected defect(cause) becomes a Defect", () => {
+    const d = Err("e").flatMapErr({ Else: (_e, defect) => defect(boom) });
+    expect(d.isDefect()).toBe(true);
+    if (d.isDefect()) expect(d.cause).toBe(boom);
+  });
 });
 
 describe("Result.recoverErr", () => {
@@ -364,57 +390,86 @@ describe("Result.recoverErr", () => {
         .isDefect(),
     ).toBe(true);
   });
+
+  it("a branch returning the injected defect(cause) becomes a Defect (not a recovery)", () => {
+    const d = Err("e").recoverErr({ Else: (_e, defect) => defect(boom) });
+    expect(d.isDefect()).toBe(true);
+    if (d.isDefect()) expect(d.cause).toBe(boom);
+  });
 });
 
 describe("Result.tapErr", () => {
   it("runs the side effect on Err and returns the same error", () => {
     const seen: string[] = [];
-    const r = Err("e").tapErr((s) => seen.push(s));
+    const r = Err("e").tapErr({ Else: (s) => seen.push(s) });
     expect(seen).toEqual(["e"]);
     expect(r.getErr()).toBe("e");
   });
 
   it("does not run on Ok or Defect", () => {
     const f = vi.fn();
-    expect(Ok(1).tapErr(f).get()).toBe(1);
-    expect(defectOf(boom).tapErr(f).isDefect()).toBe(true);
+    expect(Ok(1).tapErr({ Else: f }).get()).toBe(1);
+    expect(defectOf(boom).tapErr({ Else: f }).isDefect()).toBe(true);
     expect(f).not.toHaveBeenCalled();
+  });
+});
+
+describe("Result.tapErr (per-tag partial observation)", () => {
+  it("runs only the matching tag branch; an unobserved tag flows through untouched", () => {
+    const seenA: number[] = [];
+    const observedA = errA(7).tapErr({ A: (e) => seenA.push(e.a) });
+    expect(seenA).toEqual([7]);
+    expect(observedA.isErr()).toBe(true);
+
+    const seenB: string[] = [];
+    const unobserved = errA(7).tapErr({ B: (e) => seenB.push(e.b) });
+    expect(seenB).toEqual([]);
+    expect(unobserved.isErr() && unobserved.error).toEqual({ _tag: "A", a: 7 });
+  });
+
+  it("observing nothing is a no-op", () => {
+    const r = errA(7).tapErr({});
+    expect(r.isErr() && r.error).toEqual({ _tag: "A", a: 7 });
   });
 });
 
 describe("Result.flatTapErr", () => {
   it("runs the failable effect on Err and keeps the original error on success", () => {
     const seen: string[] = [];
-    const r = Err("e").flatTapErr((s) => {
-      seen.push(s);
-      return Ok("ignored");
+    const r = Err("e").flatTapErr({
+      Else: (s) => {
+        seen.push(s);
+        return Ok("ignored");
+      },
     });
     expect(seen).toEqual(["e"]);
     expect(r.getErr()).toBe("e"); // original error preserved
   });
 
   it("threads the effect's Err", () => {
-    const r = Err("e").flatTapErr(() => Err("log_failed"));
+    const r = Err("e").flatTapErr({ Else: () => Err("log_failed") });
     expect(r.getErr()).toBe("log_failed");
   });
 
   it("propagates a Defect from the effect", () => {
-    const r = Err("e").flatTapErr(() => defectOf(boom));
+    const r = Err("e").flatTapErr({ Else: () => defectOf(boom) });
     expect(r.isDefect()).toBe(true);
   });
 
   it("does not run on Ok or Defect", () => {
     const f = vi.fn(() => Ok(1));
-    expect(Ok(1).flatTapErr(f).get()).toBe(1);
-    expect(defectOf(boom).flatTapErr(f).isDefect()).toBe(true);
+    expect(Ok(1).flatTapErr({ Else: f }).get()).toBe(1);
+    expect(defectOf(boom).flatTapErr({ Else: f }).isDefect()).toBe(true);
     expect(f).not.toHaveBeenCalled();
   });
 
   it("converts a throw into a Defect", () => {
     expect(
       Err("e")
-        .flatTapErr(() => {
-          throw boom;
+        .flatTapErr({
+          Else: () => {
+            throw boom;
+          },
         })
         .isDefect(),
     ).toBe(true);
@@ -510,8 +565,10 @@ describe("Result.tapFailure (the cross-channel observer)", () => {
 describe("failure-observer throws preserve the original failure", () => {
   it("tapErr: a throwing callback yields a Defect aggregating [thrown, original]", () => {
     const boom = new Error("boom");
-    const r = Err("original").tapErr(() => {
-      throw boom;
+    const r = Err("original").tapErr({
+      Else: () => {
+        throw boom;
+      },
     });
     expect(r.tag).toBe("Defect");
     if (r.isDefect()) {
@@ -535,8 +592,10 @@ describe("failure-observer throws preserve the original failure", () => {
 
   it("flatTapErr: a throwing callback yields a Defect aggregating [thrown, original]", () => {
     const boom = new Error("boom");
-    const r = Err("original").flatTapErr(() => {
-      throw boom;
+    const r = Err("original").flatTapErr({
+      Else: () => {
+        throw boom;
+      },
     });
     expect(r.tag).toBe("Defect");
     if (r.isDefect()) {

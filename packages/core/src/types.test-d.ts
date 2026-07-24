@@ -148,8 +148,9 @@ type _errViewNarrow = Expect<
 const flatTapped = r1.flatTap(() => Err<"e2">("e2"));
 type _flatTapped = Expect<Equal<typeof flatTapped, Result<number, "e1" | "e2">>>;
 
-// flatTapErr KEEPS the value type and widens the error channel (error-side mirror)
-const flatTapErred = r1.flatTapErr(() => Err<"e2">("e2"));
+// flatTapErr KEEPS the value type and widens the error channel (error-side mirror);
+// as an observer it takes the *partial* triage object
+const flatTapErred = r1.flatTapErr({ Else: () => Err<"e2">("e2") });
 type _flatTapErred = Expect<Equal<typeof flatTapErred, Result<number, "e1" | "e2">>>;
 
 // recoverErr empties the error channel (to `never`)
@@ -335,8 +336,8 @@ new WithMsg({ ticketId: "t1" });
   r.mapErr({ Else: async (e) => e });
   // @ts-expect-error — an async recoverErr branch is banned
   r.recoverErr({ Else: async () => 0 });
-  // @ts-expect-error — async tapErr callback is banned
-  r.tapErr(async () => {});
+  // @ts-expect-error — async tapErr branch is banned
+  r.tapErr({ Else: async () => {} });
   // @ts-expect-error — async tapDefect callback is banned
   r.tapDefect(async () => {});
   // @ts-expect-error — async tapFailure callback is banned
@@ -352,8 +353,8 @@ new WithMsg({ ticketId: "t1" });
   ar.mapErr({ Else: async (e) => e });
   // @ts-expect-error — an async recoverErr branch is banned (async surface)
   ar.recoverErr({ Else: async () => 0 });
-  // @ts-expect-error — async tapErr callback is banned (async surface)
-  ar.tapErr(async () => {});
+  // @ts-expect-error — an async tapErr branch is banned (async surface)
+  ar.tapErr({ Else: async () => {} });
   // @ts-expect-error — async tapDefect callback is banned (async surface)
   ar.tapDefect(async () => {});
   // @ts-expect-error — async tapFailure callback is banned (async surface)
@@ -447,6 +448,33 @@ new WithMsg({ ticketId: "t1" });
   });
   type _ThrowDrops = Expect<Equal<ErrOf<typeof thrown>, Mapped>>;
 
+  // the sanctioned deliberate-defect form: the injected `defect` helper — its
+  // Defect arm is subtracted from the outgoing union (Exclude<R, Defect>, the
+  // same inference as a qualify boundary)
+  const defected = r.mapErr({
+    NotFound: () => new Mapped(),
+    Conflict: (e, defect) => defect(e.key),
+  });
+  type _DefectDrops = Expect<Equal<ErrOf<typeof defected>, Mapped>>;
+
+  // a defect-only triage empties the channel entirely
+  const allDefected = r.mapErr({ Else: (e, defect) => defect(e) });
+  type _AllDefected = Expect<Equal<typeof allDefected, Result<number, never>>>;
+
+  // flatMapErr: a defect branch contributes to neither channel
+  const flatDefected = r.flatMapErr({
+    NotFound: (e) => Ok(e.id),
+    Conflict: (e, defect) => defect(e.key),
+  });
+  type _FlatDefected = Expect<Equal<typeof flatDefected, Result<number | string, never>>>;
+
+  // recoverErr: a defect branch does not widen the recovered success type
+  const recDefected = r.recoverErr({
+    NotFound: (e) => e.id,
+    Conflict: (e, defect) => defect(e.key),
+  });
+  type _RecDefected = Expect<Equal<typeof recDefected, Result<number | string, never>>>;
+
   // partial + Else: the blanket branch receives the full union
   const blanket = r.mapErr({
     NotFound: () => new Mapped(),
@@ -473,6 +501,20 @@ new WithMsg({ ticketId: "t1" });
   // recoverErr: recovers per tag, unioning the recovered values; E empties
   const rec = r.recoverErr({ NotFound: (e) => e.id, Conflict: () => 0 });
   type _Rec = Expect<Equal<typeof rec, Result<number | string | 0, never>>>;
+
+  // observers take the PARTIAL triage: any subset of tags, no Else required —
+  // an unobserved tag flows through, so nothing can be mis-routed
+  const observed = r.tapErr({ NotFound: (e) => void e.id });
+  type _Observed = Expect<Equal<typeof observed, Result<number, NotFound | Conflict>>>;
+  r.tapErr({}); // observing nothing is legal
+  const flatObserved = r.flatTapErr({ Conflict: () => Err("audit-failed" as const) });
+  type _FlatObserved = Expect<
+    Equal<typeof flatObserved, Result<number, NotFound | Conflict | "audit-failed">>
+  >;
+  // @ts-expect-error — a bare callback is not a triage object (wrap it in Else)
+  r.tapErr((e) => e);
+  // @ts-expect-error — unknown keys are still rejected on observers
+  r.tapErr({ Gone: (e: never) => e });
 
   // async surface mirrors the triage object; branches may return AsyncResults
   const ar = r.toAsync();

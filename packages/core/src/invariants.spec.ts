@@ -27,8 +27,8 @@ describe("Invariant 1: throw inside any combinator becomes a Defect", () => {
     expect(Err("e").mapErr({ Else: t }).isDefect()).toBe(true);
     expect(Err("e").flatMapErr({ Else: t }).isDefect()).toBe(true);
     expect(Err("e").recoverErr({ Else: t }).isDefect()).toBe(true);
-    expect(Err("e").tapErr(t).isDefect()).toBe(true);
-    expect(Err("e").flatTapErr(t).isDefect()).toBe(true);
+    expect(Err("e").tapErr({ Else: t }).isDefect()).toBe(true);
+    expect(Err("e").flatTapErr({ Else: t }).isDefect()).toBe(true);
     expect(defectOf(boom).recoverDefect(t).isDefect()).toBe(true);
     expect(defectOf(boom).tapDefect(t).isDefect()).toBe(true);
     expect(Err("e").tapFailure(t).isDefect()).toBe(true);
@@ -51,8 +51,8 @@ describe("Invariant 2: a Defect flows through every method except match() and re
       defectOf(boom).mapErr({ Else: f }),
       defectOf(boom).flatMapErr({ Else: f }),
       defectOf(boom).recoverErr({ Else: f }),
-      defectOf(boom).tapErr(f),
-      defectOf(boom).flatTapErr(f),
+      defectOf(boom).tapErr({ Else: f }),
+      defectOf(boom).flatTapErr({ Else: f }),
     ];
     for (const r of passesThrough) expect(r.isDefect()).toBe(true);
     expect(f).not.toHaveBeenCalled();
