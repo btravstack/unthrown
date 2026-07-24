@@ -6,7 +6,10 @@
     // The generated test client (src/generated, gitignored) imports its own
     // files with explicit `.ts` extensions; `noEmit` in the base config makes
     // this legal.
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    // @btravstack/tsconfig@0.2.0 dropped `types: ["node"]` from the base;
+    // re-declare it here for the Node globals used in source/tests.
+    "types": ["node"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "src/generated"]

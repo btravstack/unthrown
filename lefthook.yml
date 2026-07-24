@@ -1,33 +1,15 @@
+# Shared hooks come from @btravstack/lefthook (format + lint + commit-msg).
+extends:
+  - node_modules/@btravstack/lefthook/lefthook.yml
+
 pre-commit:
-  parallel: true
   commands:
     format:
-      # `*.x` (not `**/*.x`): lefthook's `*` spans `/`, so this matches files at
-      # ANY depth including the repo root. `**/*.x` requires a leading directory,
-      # so root files (`CLAUDE.md`, `README.md`, root `*.json`) silently never
-      # matched and were never formatted on commit.
-      glob: "*.{ts,tsx,js,jsx,json,yaml,yml,md}"
-      # Mirror oxfmt's `ignorePatterns` (generated docs/api + vitepress output):
-      # handing oxfmt ONLY ignored files makes it exit non-zero, which would fail
-      # a commit touching only those. Excluding them here skips the step instead.
       exclude:
         - "pnpm-lock.yaml"
         - "docs/api/*"
         - "docs/.vitepress/cache/*"
         - "docs/.vitepress/dist/*"
-      run: pnpm oxfmt {staged_files}
-      stage_fixed: true
     lint:
-      glob: "*.{ts,tsx,js,jsx}"
-      # Mirror oxlint's `ignorePatterns` (type-only test files): handing oxlint
-      # ONLY ignored files makes it exit non-zero ("No files found to lint"),
-      # which would fail a commit touching only those. Exclude them here so the
-      # step is skipped instead.
       exclude:
         - "*.test-d.ts"
-      run: pnpm oxlint {staged_files}
-
-commit-msg:
-  commands:
-    commitlint:
-      run: pnpm exec commitlint --edit {1}
