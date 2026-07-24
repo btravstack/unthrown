@@ -50,7 +50,7 @@ const find = os
   .errors({ NOT_FOUND: {} })
   .handler(
     handlerResult(({ input, errors }) =>
-      repo.findPlanet(input.id).mapErr(() => errors.NOT_FOUND()),
+      repo.findPlanet(input.id).mapErr({ Else: () => errors.NOT_FOUND() }),
     ),
   );
 ```
@@ -96,7 +96,9 @@ import "@unthrown/orpc/extensions/result";
 const find = os
   .input(z.object({ id: z.string() }))
   .errors({ NOT_FOUND: {} })
-  .result(({ input, errors }) => repo.findPlanet(input.id).mapErr(() => errors.NOT_FOUND()));
+  .result(({ input, errors }) =>
+    repo.findPlanet(input.id).mapErr({ Else: () => errors.NOT_FOUND() }),
+  );
 ```
 
 It is available on every builder state (`os`, after `.use`, `.input`,
@@ -170,13 +172,10 @@ const createUser = os
   .errors({ EMAIL_TAKEN: {} })
   .handler(
     handlerResult(({ input, errors }) =>
-      db.user
-        .tryCreate({ data: input })
-        .mapErr((e) =>
-          e._tag === "UniqueConstraintViolation"
-            ? errors.EMAIL_TAKEN()
-            : new ORPCError("INTERNAL_SERVER_ERROR", { cause: e }),
-        ),
+      db.user.tryCreate({ data: input }).mapErr({
+        UniqueConstraintViolation: () => errors.EMAIL_TAKEN(),
+        Else: (e) => new ORPCError("INTERNAL_SERVER_ERROR", { cause: e }),
+      }),
     ),
   );
 

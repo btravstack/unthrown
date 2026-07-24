@@ -18,11 +18,15 @@ import type {
   AsyncResult,
   Bound,
   DefectView,
+  ErrOf,
+  ErrTriage,
   ErrView,
   FailureView,
   NotThenable,
+  OkOf,
   OkView,
   Result,
+  TriageReturns,
 } from "./types.js";
 
 /**
@@ -156,41 +160,46 @@ class Res<T, E> {
     return okRes<void, E>(undefined);
   }
 
-  mapErr<E2>(this: Result<T, E>, f: (error: E) => E2 & NotThenable<E2>): Result<T, E2> {
+  mapErr<H extends ErrTriage<E, unknown>>(
+    this: Result<T, E>,
+    handlers: H,
+  ): Result<T, TriageReturns<H>> {
     if (this.tag !== "Err") return passThrough(this);
+    const handler = triageHandlerFor(handlers, this.error);
+    if (!handler) return defectRes(this.error);
     try {
-      return errRes(f(this.error));
+      return errRes(handler(this.error) as TriageReturns<H>);
     } catch (cause) {
       return defectRes(cause);
     }
   }
 
-  flatMapErr<U, E2>(this: Result<T, E>, f: (error: E) => Result<U, E2>): Result<T | U, E2> {
+  flatMapErr<H extends ErrTriage<E, Result<unknown, unknown>>>(
+    this: Result<T, E>,
+    handlers: H,
+  ): Result<T | OkOf<TriageReturns<H>>, ErrOf<TriageReturns<H>>> {
     if (this.tag !== "Err") return passThrough(this);
+    const handler = triageHandlerFor(handlers, this.error);
+    if (!handler) return defectRes(this.error);
     try {
-      return f(this.error);
+      return handler(this.error) as Result<OkOf<TriageReturns<H>>, ErrOf<TriageReturns<H>>>;
     } catch (cause) {
       return defectRes(cause);
     }
   }
 
-  /** @deprecated Use {@link Res.flatMapErr}. */
-  orElse<U, E2>(this: Result<T, E>, f: (error: E) => Result<U, E2>): Result<T | U, E2> {
-    return this.flatMapErr(f);
-  }
-
-  recoverErr<U>(this: Result<T, E>, f: (error: E) => U & NotThenable<U>): Result<T | U, never> {
+  recoverErr<H extends ErrTriage<E, unknown>>(
+    this: Result<T, E>,
+    handlers: H,
+  ): Result<T | TriageReturns<H>, never> {
     if (this.tag !== "Err") return passThrough(this);
+    const handler = triageHandlerFor(handlers, this.error);
+    if (!handler) return defectRes(this.error);
     try {
-      return okRes(f(this.error));
+      return okRes(handler(this.error) as TriageReturns<H>);
     } catch (cause) {
       return defectRes(cause);
     }
-  }
-
-  /** @deprecated Use {@link Res.recoverErr}. */
-  recover<U>(this: Result<T, E>, f: (error: E) => U & NotThenable<U>): Result<T | U, never> {
-    return this.recoverErr(f);
   }
 
   tapErr<R>(this: Result<T, E>, f: (error: E) => R & NotThenable<R>): Result<T, E> {
@@ -450,6 +459,29 @@ function passThrough<T, E>(self: Result<unknown, unknown>): Result<T, E> {
 }
 
 /**
+ * Select the triage branch for an error: its `_tag`'s own-property handler if
+ * present, otherwise the `Else` branch, otherwise `undefined` (the caller mints
+ * a Defect — an unmodeled tag is an unmodeled failure, mirroring `matchTags`).
+ * `Object.hasOwn` guards against a rogue tag (e.g. `"constructor"`) resolving
+ * through the prototype chain to an unrelated `Object.prototype` member.
+ *
+ * @internal
+ */
+function triageHandlerFor(
+  handlers: unknown,
+  error: unknown,
+): ((error: unknown) => unknown) | undefined {
+  const triage = handlers as Record<string, unknown>;
+  const tag =
+    typeof error === "object" && error !== null && "_tag" in error
+      ? (error as { _tag: unknown })._tag
+      : undefined;
+  const handler =
+    typeof tag === "string" && Object.hasOwn(triage, tag) ? triage[tag] : triage["Else"];
+  return typeof handler === "function" ? (handler as (error: unknown) => unknown) : undefined;
+}
+
+/**
  * A throw inside a *failure observer* (`tapErr` / `tapDefect` / `flatTapErr`)
  * must not destroy the failure being observed — that is the exact place (e.g. a
  * failing error-logger) where losing the underlying failure hurts most. The
@@ -619,12 +651,22 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  mapErr<E2>(f: (error: E) => E2 & NotThenable<E2>): AsyncResult<T, E2> {
-    return new AsyncRes<T, E2>(
+  // The precise generic-H triage signatures live on the public surface
+  // (`AsyncResultMethods`); TypeScript cannot unify them across the
+  // class/interface boundary (relating the two generic signatures infers `H`
+  // from the guarded parameter and then fails to equate
+  // `TriageReturns<H & guards>` with `TriageReturns<H>`), so these three
+  // implementations are typed loosely — `never` error channels keep the
+  // returns bivariantly compatible — and the interface re-imposes the
+  // precision, mirroring how `unwrap`'s gate is re-imposed in `types.ts`.
+  mapErr(handlers: ErrTriage<E, unknown>): AsyncResult<T, never> {
+    return new AsyncRes<T, never>(
       this.promise.then((r) => {
         if (r.tag !== "Err") return passThrough(r);
+        const handler = triageHandlerFor(handlers, r.error);
+        if (!handler) return defectRes(r.error);
         try {
-          return errRes(f(r.error));
+          return errRes<T, never>(handler(r.error) as never);
         } catch (cause) {
           return defectRes(cause);
         }
@@ -632,12 +674,17 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  flatMapErr<U, E2>(f: (error: E) => Result<U, E2> | AsyncResult<U, E2>): AsyncResult<T | U, E2> {
-    return new AsyncRes<T | U, E2>(
+  flatMapErr(
+    handlers: ErrTriage<E, Result<unknown, unknown> | AsyncResult<unknown, unknown>>,
+  ): AsyncResult<T, never> {
+    return new AsyncRes<T, never>(
       this.promise.then(async (r) => {
         if (r.tag !== "Err") return passThrough(r);
+        const handler = triageHandlerFor(handlers, r.error);
+        if (!handler) return defectRes(r.error);
         try {
-          return await f(r.error);
+          const out = handler(r.error) as Result<unknown, unknown> | AsyncResult<unknown, unknown>;
+          return (await out) as Result<T, never>;
         } catch (cause) {
           return defectRes(cause);
         }
@@ -645,27 +692,19 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  /** @deprecated Use {@link AsyncRes.flatMapErr}. */
-  orElse<U, E2>(f: (error: E) => Result<U, E2> | AsyncResult<U, E2>): AsyncResult<T | U, E2> {
-    return this.flatMapErr(f);
-  }
-
-  recoverErr<U>(f: (error: E) => U & NotThenable<U>): AsyncResult<T | U, never> {
-    return new AsyncRes<T | U, never>(
+  recoverErr(handlers: ErrTriage<E, unknown>): AsyncResult<T, never> {
+    return new AsyncRes<T, never>(
       this.promise.then((r) => {
         if (r.tag !== "Err") return passThrough(r);
+        const handler = triageHandlerFor(handlers, r.error);
+        if (!handler) return defectRes(r.error);
         try {
-          return okRes<T | U, never>(f(r.error));
+          return okRes<T, never>(handler(r.error) as T);
         } catch (cause) {
           return defectRes(cause);
         }
       }),
     );
-  }
-
-  /** @deprecated Use {@link AsyncRes.recoverErr}. */
-  recover<U>(f: (error: E) => U & NotThenable<U>): AsyncResult<T | U, never> {
-    return this.recoverErr(f);
   }
 
   tapErr<R>(f: (error: E) => R & NotThenable<R>): AsyncResult<T, E> {

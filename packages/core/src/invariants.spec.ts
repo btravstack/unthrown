@@ -24,9 +24,9 @@ describe("Invariant 1: throw inside any combinator becomes a Defect", () => {
     expect(Ok(1).flatTap(t).isDefect()).toBe(true);
     expect(Do().bind("a", t).isDefect()).toBe(true);
     expect(Do().let("a", t).isDefect()).toBe(true);
-    expect(Err("e").mapErr(t).isDefect()).toBe(true);
-    expect(Err("e").flatMapErr(t).isDefect()).toBe(true);
-    expect(Err("e").recoverErr(t).isDefect()).toBe(true);
+    expect(Err("e").mapErr({ Else: t }).isDefect()).toBe(true);
+    expect(Err("e").flatMapErr({ Else: t }).isDefect()).toBe(true);
+    expect(Err("e").recoverErr({ Else: t }).isDefect()).toBe(true);
     expect(Err("e").tapErr(t).isDefect()).toBe(true);
     expect(Err("e").flatTapErr(t).isDefect()).toBe(true);
     expect(defectOf(boom).recoverDefect(t).isDefect()).toBe(true);
@@ -48,9 +48,9 @@ describe("Invariant 2: a Defect flows through every method except match() and re
       defectOf(boom).let("a", f),
       defectOf(boom).as(1),
       defectOf(boom).discard(),
-      defectOf(boom).mapErr(f),
-      defectOf(boom).flatMapErr(f),
-      defectOf(boom).recoverErr(f),
+      defectOf(boom).mapErr({ Else: f }),
+      defectOf(boom).flatMapErr({ Else: f }),
+      defectOf(boom).recoverErr({ Else: f }),
       defectOf(boom).tapErr(f),
       defectOf(boom).flatTapErr(f),
     ];
@@ -111,7 +111,7 @@ describe("Invariant 3: get() is asymmetric", () => {
 
 describe("Invariant 4: recoverErr empties the error channel in the type, not the runtime", () => {
   it("recoverErr() returns a value whose type is Result<_, never> but may still be a Defect", () => {
-    const recovered = defectOf(boom).recoverErr(() => 1);
+    const recovered = defectOf(boom).recoverErr({ Else: () => 1 });
     // `never` in the type does not mean total — a Defect survives at runtime.
     expect(recovered.isDefect()).toBe(true);
   });

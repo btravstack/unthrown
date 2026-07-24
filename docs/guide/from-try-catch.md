@@ -113,12 +113,12 @@ its only caller isn't buying you anything yet.
 Once you've wrapped a boundary, most of what you used to do inside a `catch`
 block has a direct combinator equivalent:
 
-| `try`/`catch` idiom       | unthrown combinator                             | Example                                               |
-| ------------------------- | ----------------------------------------------- | ----------------------------------------------------- |
-| catch-and-default         | `getOr(fallback)`                               | `parseConfig(text).getOr(DEFAULT_CONFIG)`             |
-| catch-and-rethrow-wrapped | `mapErr(f)`                                     | `parseConfig(text).mapErr((e) => new ConfigError(e))` |
-| catch-log-rethrow         | `tapErr(f)`                                     | `parseConfig(text).tapErr((e) => logger.warn(e))`     |
-| `finally` cleanup         | run before eliminating, or in every `match` arm | see below                                             |
+| `try`/`catch` idiom       | unthrown combinator                             | Example                                                         |
+| ------------------------- | ----------------------------------------------- | --------------------------------------------------------------- |
+| catch-and-default         | `getOr(fallback)`                               | `parseConfig(text).getOr(DEFAULT_CONFIG)`                       |
+| catch-and-rethrow-wrapped | `mapErr({ … })`                                 | `parseConfig(text).mapErr({ Else: (e) => new ConfigError(e) })` |
+| catch-log-rethrow         | `tapErr(f)`                                     | `parseConfig(text).tapErr((e) => logger.warn(e))`               |
+| `finally` cleanup         | run before eliminating, or in every `match` arm | see below                                                       |
 
 `catch-and-default`:
 
@@ -143,7 +143,7 @@ try {
   throw new ConfigError(cause);
 }
 // after — ConfigError becomes a modeled Err, not a throw
-parseConfig(text).mapErr((e) => new ConfigError(e));
+parseConfig(text).mapErr({ Else: (e) => new ConfigError(e) });
 ```
 
 `catch-log-rethrow`:

@@ -182,34 +182,77 @@ describe("Result.discard", () => {
   });
 });
 
+type TagA = { _tag: "A"; a: number };
+type TagB = { _tag: "B"; b: string };
+const errA = (a: number): Result<never, TagA | TagB> => Err<TagA | TagB>({ _tag: "A", a });
+
 describe("Result.mapErr", () => {
-  it("maps the Err value", () => {
+  it("maps the Err value through the Else branch (untagged error)", () => {
     expect(
       Err("e")
-        .mapErr((s) => `${s}!`)
+        .mapErr({ Else: (s) => `${s}!` })
         .getErr(),
     ).toBe("e!");
   });
 
-  it("passes Ok through and does not call the callback", () => {
+  it("dispatches a tagged error to its tag's branch", () => {
+    const r = errA(7).mapErr({
+      A: (e) => `a:${e.a}`,
+      B: (e) => `b:${e.b}`,
+    });
+    expect(r.getErr()).toBe("a:7");
+  });
+
+  it("falls back to Else for a tag without a branch", () => {
+    const r = errA(7).mapErr({
+      B: (e) => `b:${e.b}`,
+      Else: (e) => `else:${e._tag}`,
+    });
+    expect(r.getErr()).toBe("else:A");
+  });
+
+  it("prefers the tag branch over Else when both are present", () => {
+    const r = errA(7).mapErr({
+      A: (e) => `a:${e.a}`,
+      Else: () => "else",
+    });
+    expect(r.getErr()).toBe("a:7");
+  });
+
+  it("turns an unhandled tag (outside the typed contract) into a Defect carrying the error", () => {
+    const smuggled = Err({ _tag: "C", c: true }) as unknown as Result<never, TagA>;
+    const r = smuggled.mapErr({ A: (e) => e.a });
+    expect(r.isDefect()).toBe(true);
+    if (r.isDefect()) expect(r.cause).toEqual({ _tag: "C", c: true });
+  });
+
+  it("does not resolve a rogue tag through the prototype chain", () => {
+    const smuggled = Err({ _tag: "toString" }) as unknown as Result<never, TagA>;
+    const r = smuggled.mapErr({ A: (e) => e.a });
+    expect(r.isDefect()).toBe(true);
+  });
+
+  it("passes Ok through and does not call any branch", () => {
     const f = vi.fn();
-    const r = Ok(1).mapErr(f);
+    const r = Ok(1).mapErr({ Else: f });
     expect(r.isOk()).toBe(true);
     if (r.isOk()) expect(r.value).toBe(1);
     expect(f).not.toHaveBeenCalled();
   });
 
-  it("passes a Defect through and does not call the callback", () => {
+  it("passes a Defect through and does not call any branch", () => {
     const f = vi.fn();
-    expect(defectOf(boom).mapErr(f).isDefect()).toBe(true);
+    expect(defectOf(boom).mapErr({ Else: f }).isDefect()).toBe(true);
     expect(f).not.toHaveBeenCalled();
   });
 
   it("converts a throw into a Defect", () => {
     expect(
       Err("e")
-        .mapErr(() => {
-          throw boom;
+        .mapErr({
+          Else: () => {
+            throw boom;
+          },
         })
         .isDefect(),
     ).toBe(true);
@@ -220,7 +263,7 @@ describe("Result.flatMapErr", () => {
   it("recovers an Err into an Ok", () => {
     expect(
       Err("e")
-        .flatMapErr(() => Ok(99))
+        .flatMapErr({ Else: () => Ok(99) })
         .get(),
     ).toBe(99);
   });
@@ -228,30 +271,47 @@ describe("Result.flatMapErr", () => {
   it("recovers an Err into another Err", () => {
     expect(
       Err("e")
-        .flatMapErr(() => Err("e2"))
+        .flatMapErr({ Else: () => Err("e2") })
         .getErr(),
     ).toBe("e2");
   });
 
-  it("passes Ok through and does not call the callback", () => {
+  it("dispatches per tag — one branch recovers, another re-emits", () => {
+    const triage = {
+      A: (e: TagA) => Ok(e.a),
+      B: (e: TagB) => Err(e),
+    };
+    expect(errA(7).flatMapErr(triage).getOr(-1)).toBe(7);
+    const reEmitted = Err<TagA | TagB>({ _tag: "B", b: "x" }).flatMapErr(triage);
+    expect(reEmitted.isErr() && reEmitted.error).toEqual({ _tag: "B", b: "x" });
+  });
+
+  it("passes Ok through and does not call any branch", () => {
     const f = vi.fn();
-    const r = Ok(1).flatMapErr(f);
+    const r = Ok(1).flatMapErr({ Else: f });
     expect(r.isOk()).toBe(true);
     if (r.isOk()) expect(r.value).toBe(1);
     expect(f).not.toHaveBeenCalled();
   });
 
-  it("passes a Defect through and does not call the callback", () => {
+  it("passes a Defect through and does not call any branch", () => {
     const f = vi.fn();
-    expect(defectOf(boom).flatMapErr(f).isDefect()).toBe(true);
+    expect(defectOf(boom).flatMapErr({ Else: f }).isDefect()).toBe(true);
     expect(f).not.toHaveBeenCalled();
+  });
+
+  it("turns an unhandled tag (outside the typed contract) into a Defect carrying the error", () => {
+    const smuggled = Err({ _tag: "C" }) as unknown as Result<never, TagA>;
+    expect(smuggled.flatMapErr({ A: (e) => Ok(e.a) }).isDefect()).toBe(true);
   });
 
   it("converts a throw into a Defect", () => {
     expect(
       Err("e")
-        .flatMapErr(() => {
-          throw boom;
+        .flatMapErr({
+          Else: () => {
+            throw boom;
+          },
         })
         .isDefect(),
     ).toBe(true);
@@ -262,29 +322,44 @@ describe("Result.recoverErr", () => {
   it("turns an Err into an Ok", () => {
     expect(
       Err("e")
-        .recoverErr(() => 7)
+        .recoverErr({ Else: () => 7 })
         .get(),
     ).toBe(7);
   });
 
-  it("passes Ok through and does not call the callback", () => {
+  it("dispatches per tag and unions the recovered values", () => {
+    expect(
+      errA(7)
+        .recoverErr({ A: (e) => e.a, B: (e) => e.b })
+        .get(),
+    ).toBe(7);
+  });
+
+  it("passes Ok through and does not call any branch", () => {
     const f = vi.fn();
-    expect(Ok(1).recoverErr(f).get()).toBe(1);
+    expect(Ok(1).recoverErr({ Else: f }).get()).toBe(1);
     expect(f).not.toHaveBeenCalled();
   });
 
   it("does NOT recover a Defect — `never` empties only the error channel", () => {
     const f = vi.fn();
-    const recovered = defectOf(boom).recoverErr(f);
+    const recovered = defectOf(boom).recoverErr({ Else: f });
     expect(f).not.toHaveBeenCalled();
     expect(recovered.isDefect()).toBe(true);
+  });
+
+  it("turns an unhandled tag (outside the typed contract) into a Defect carrying the error", () => {
+    const smuggled = Err({ _tag: "C" }) as unknown as Result<never, TagA>;
+    expect(smuggled.recoverErr({ A: (e) => e.a }).isDefect()).toBe(true);
   });
 
   it("converts a throw into a Defect", () => {
     expect(
       Err("e")
-        .recoverErr(() => {
-          throw boom;
+        .recoverErr({
+          Else: () => {
+            throw boom;
+          },
         })
         .isDefect(),
     ).toBe(true);

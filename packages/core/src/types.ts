@@ -39,6 +39,126 @@ export type NotThenable<R> = [R] extends [PromiseLike<unknown>]
   : unknown;
 
 /**
+ * The union-wide counterpart of {@link NotThenable}: rejects a thenable
+ * **member** of `R`. A triage object's result type is the union of every
+ * branch's return, so a single async branch would hide inside a non-thenable
+ * union — `Extract` finds it where `[R] extends [PromiseLike]` would not.
+ *
+ * @typeParam R - the union of the triage branches' return types.
+ * @internal
+ */
+export type NoThenables<R> = 0 extends 1 & R
+  ? unknown // an `any` return (e.g. a test mock) is not evidence of a thenable
+  : [Extract<R, PromiseLike<unknown>>] extends [never]
+    ? unknown
+    : "unthrown: combinator callbacks are synchronous — lift async work with fromPromise and compose with flatMap";
+
+/**
+ * The `_tag` discriminants of the tagged members of an error union (untagged
+ * members contribute nothing).
+ *
+ * @internal
+ */
+type ErrTagsOf<E> = E extends { _tag: string } ? E["_tag"] : never;
+
+/**
+ * The union of an inferred triage object's branch return types — what the
+ * error-transforming combinators compute their outgoing types from. A branch
+ * that `throw`s has return type `never` and contributes nothing.
+ *
+ * @typeParam H - the inferred triage object type.
+ * @internal
+ */
+export type TriageReturns<H> = {
+  [K in keyof H]: H[K] extends (...args: never[]) => infer R ? R : never;
+}[keyof H];
+
+/**
+ * Rejects a triage key that is neither an error `_tag` of `E` nor `Else` —
+ * inference from the object literal bypasses excess-property freshness, so a
+ * typo'd tag would otherwise be silently unreachable. Resolves to a no-op
+ * `unknown` when every key is known, and to an explanatory string-literal type
+ * (naming the offending keys) otherwise.
+ *
+ * @typeParam E - the error union being triaged.
+ * @typeParam H - the inferred triage object type.
+ * @internal
+ */
+export type TriageKeysOk<E, H> = [Exclude<keyof H, ErrTagsOf<E> | "Else">] extends [never]
+  ? unknown
+  : `unthrown: unknown triage key(s): ${Exclude<keyof H, ErrTagsOf<E> | "Else"> &
+      string} — a branch must match an error _tag, or be Else`;
+
+/**
+ * The **triage object** the error-transforming combinators
+ * ({@link ResultMethods.mapErr | mapErr}, {@link ResultMethods.flatMapErr | flatMapErr},
+ * {@link ResultMethods.recoverErr | recoverErr}) require: one branch per error
+ * `_tag`, exhaustive by construction — with `Else` as the **explicit**,
+ * reserved escape hatch for deliberate blanket handling.
+ *
+ * @remarks
+ * Two forms are accepted:
+ *
+ * - **Exhaustive** — one branch for every tag in `E`, no `Else`. Available only
+ *   when every member of `E` carries a `_tag`. Miss a tag and it will not
+ *   compile — adding a new error tag to `E` surfaces every triage site.
+ * - **Partial + `Else`** — any subset of tag branches plus an `Else` branch
+ *   receiving the full error union. The blanket handling is thereby *visible*
+ *   (and greppable/lintable) at the call site. An `E` with untagged members
+ *   (no `_tag` discriminant) **must** use this form — for a fully untagged `E`
+ *   it degenerates to `{ Else: (error) => … }`, the triage-era spelling of the
+ *   old single-callback form.
+ *
+ * Each branch receives the narrowed variant for its tag. The combinator's
+ * result type is inferred from the **union of the branch returns** — a branch
+ * that `throw`s has return type `never` and contributes nothing, so
+ * `{ DriverError: (e) => { throw e.cause; } }` deliberately converts that tag
+ * to a `Defect` *and* subtracts it from the outgoing error type. `Else`'s
+ * parameter is deliberately the full `E` (not the unhandled rest) — sound,
+ * though wider than the values it can receive at runtime.
+ *
+ * At runtime, an error whose `_tag` has no branch and no `Else` (possible only
+ * outside the typed contract — a widened cast, a JS caller) becomes a `Defect`
+ * carrying that error as its cause: an unmodeled tag is an unmodeled failure.
+ * The `Else` key is reserved for the blanket branch — don't name an error tag
+ * `"Else"` (an error carrying that tag routes to the blanket branch;
+ * `TaggedError`'s `options.name` can keep a display name while the tag is
+ * renamed).
+ *
+ * @typeParam E - the error union being triaged.
+ * @typeParam R - what every branch returns (inferred as the union of the
+ * branch returns).
+ *
+ * @example
+ * ```ts
+ * result.mapErr({
+ *   RecordNotFound: () => new NotFoundException(id),
+ *   DriverError: (e) => { throw e.cause; }, // deliberate defect; leaves E
+ * });
+ * // partial, with the blanket branch made explicit:
+ * result.mapErr({
+ *   RecordNotFound: () => new NotFoundException(id),
+ *   Else: (e) => e, // pass the rest through (typed as the full union)
+ * });
+ * ```
+ *
+ * @category Types
+ */
+export type ErrTriage<E, R> =
+  | ({ readonly [K in ErrTagsOf<E>]: (error: Extract<E, { _tag: K }>) => R } & {
+      // when `E` has untagged members no set of tag branches can cover them,
+      // so this conditional key makes `Else` *required* even in the
+      // otherwise-exhaustive form (it resolves to no key at all when `E` is
+      // fully tagged)
+      readonly [K in [Exclude<E, { _tag: string }>] extends [never] ? never : "Else"]: (
+        error: E,
+      ) => R;
+    })
+  | ({ readonly [K in ErrTagsOf<E>]?: (error: Extract<E, { _tag: K }>) => R } & {
+      readonly Else: (error: E) => R;
+    });
+
+/**
  * The fluent method surface every {@link Result} variant carries — the
  * combinators (`map`, `flatMap`, `mapErr`, `match`, `get`, …), documented one
  * per entry below. Factored out so the three variants ({@link OkView},
@@ -54,7 +174,7 @@ export type NotThenable<R> = [R] extends [PromiseLike<unknown>]
  * @typeParam E - the modeled error type.
  * @category Methods
  */
-export type ResultMethods<T, E> = {
+export type ResultMethods<out T, out E> = {
   /**
    * Transform the success value with `f`.
    *
@@ -172,66 +292,66 @@ export type ResultMethods<T, E> = {
   discard(): Result<void, E>;
 
   /**
-   * Transform the modeled error with `f`.
+   * Transform the modeled error, **triaging it by tag** — one branch per
+   * `_tag`, exhaustive unless an explicit `Else` branch is present
+   * ({@link ErrTriage}).
    *
-   * Runs `f` only on `Err`; `Ok` passes through and a `Defect` is **never**
-   * touched. If `f` throws, the throw becomes a `Defect`. An async callback is
+   * Runs the matching branch only on `Err`; `Ok` passes through and a `Defect`
+   * is **never** touched. The outgoing error type is the union of the branch
+   * returns — a branch that throws (becoming a `Defect`) contributes nothing.
+   * An error whose tag has no branch and no `Else` (unreachable through
+   * well-typed code) becomes a `Defect` carrying it. An async branch is
    * rejected at compile time ({@link NotThenable}).
    *
-   * @typeParam E2 - the mapped error type.
-   * @param f - maps the current error to a new one.
+   * @typeParam H - the inferred triage object type (the outgoing error type is
+   * the union of its branch returns).
+   * @param handlers - the triage object: per-tag branches, each mapping its
+   * error to a new one (or `Else` for the deliberate blanket case).
    */
-  mapErr<E2>(f: (error: E) => E2 & NotThenable<E2>): Result<T, E2>;
+  mapErr<H extends ErrTriage<E, unknown>>(
+    handlers: H & TriageKeysOk<E, H> & NoThenables<TriageReturns<H>>,
+  ): Result<T, TriageReturns<H>>;
   /**
    * Sequence from an `Err` by producing another `Result` — the error-channel
-   * mirror of {@link ResultMethods.flatMap | flatMap}.
+   * mirror of {@link ResultMethods.flatMap | flatMap}, **triaging the error by
+   * tag** ({@link ErrTriage}: exhaustive unless `Else` is present).
    *
-   * Runs `f` only on `Err`; `Ok` and `Defect` pass through. If `f` throws, the
-   * throw becomes a `Defect`.
+   * Runs the matching branch only on `Err`; `Ok` and `Defect` pass through. If
+   * a branch throws, the throw becomes a `Defect`; an unhandled tag
+   * (unreachable through well-typed code) becomes a `Defect` carrying the
+   * error. To keep a tag's error as-is, re-emit it: `Tag: (e) => Err(e)`.
    *
-   * @typeParam U - an alternative success type `f` may produce.
-   * @typeParam E2 - the error type `f` may produce instead.
-   * @param f - produces a fallback `Result` from the current error.
+   * @typeParam H - the inferred triage object type; the result's channels are
+   * the unions of the branch-returned `Result`s' channels (via {@link OkOf} /
+   * {@link ErrOf}).
+   * @param handlers - the triage object: per-tag branches, each producing a
+   * fallback `Result` from its error.
    */
-  flatMapErr<U, E2>(f: (error: E) => Result<U, E2>): Result<T | U, E2>;
-  /**
-   * Sequence from an `Err` by producing another `Result`.
-   *
-   * @deprecated Renamed to {@link ResultMethods.flatMapErr | flatMapErr} — it is
-   * `flatMap` on the error channel, so it now follows the `…Err` convention. This
-   * alias will be removed in a future major.
-   *
-   * @typeParam U - an alternative success type `f` may produce.
-   * @typeParam E2 - the error type `f` may produce instead.
-   * @param f - produces a fallback `Result` from the current error.
-   */
-  orElse<U, E2>(f: (error: E) => Result<U, E2>): Result<T | U, E2>;
+  flatMapErr<H extends ErrTriage<E, Result<unknown, unknown>>>(
+    handlers: H & TriageKeysOk<E, H>,
+  ): Result<T | OkOf<TriageReturns<H>>, ErrOf<TriageReturns<H>>>;
   /**
    * Recover from an `Err` by producing a success value, emptying the error
-   * channel. Pairs with {@link ResultMethods.recoverDefect | recoverDefect}.
+   * channel — **triaging the error by tag** ({@link ErrTriage}: exhaustive
+   * unless `Else` is present). Pairs with
+   * {@link ResultMethods.recoverDefect | recoverDefect}.
    *
    * @remarks
    * The result type is `Result<T | U, never>`, but `never` describes only the
    * **error** channel — a `Defect` can still be present at runtime, so do not
-   * read `never` as "total". Runs `f` only on `Err`; `Ok` and `Defect` pass
-   * through. If `f` throws, the throw becomes a `Defect`. An async callback is
-   * rejected at compile time ({@link NotThenable}).
+   * read `never` as "total". Runs the matching branch only on `Err`; `Ok` and
+   * `Defect` pass through. If a branch throws, the throw becomes a `Defect`;
+   * so does an unhandled tag (unreachable through well-typed code). An async
+   * branch is rejected at compile time ({@link NotThenable}).
    *
-   * @typeParam U - the recovered success type.
-   * @param f - produces a success value from the current error.
+   * @typeParam H - the inferred triage object type (the recovered success type
+   * is the union of its branch returns).
+   * @param handlers - the triage object: per-tag branches, each producing a
+   * success value from its error.
    */
-  recoverErr<U>(f: (error: E) => U & NotThenable<U>): Result<T | U, never>;
-  /**
-   * Recover from an `Err` by producing a success value.
-   *
-   * @deprecated Renamed to {@link ResultMethods.recoverErr | recoverErr} — it now
-   * pairs with {@link ResultMethods.recoverDefect | recoverDefect} and follows the
-   * `…Err` convention. This alias will be removed in a future major.
-   *
-   * @typeParam U - the recovered success type.
-   * @param f - produces a success value from the current error.
-   */
-  recover<U>(f: (error: E) => U & NotThenable<U>): Result<T | U, never>;
+  recoverErr<H extends ErrTriage<E, unknown>>(
+    handlers: H & TriageKeysOk<E, H> & NoThenables<TriageReturns<H>>,
+  ): Result<T | TriageReturns<H>, never>;
   /**
    * Run a side effect on the error and pass the `Result` through unchanged.
    *
@@ -604,7 +724,7 @@ export type Result<T, E> = OkView<T, E> | ErrView<E, T> | DefectView<T, E>;
  *
  * @category Types
  */
-export type Awaitable<T> = {
+export type Awaitable<out T> = {
   then<R = T>(onfulfilled?: ((value: T) => R | PromiseLike<R>) | null): PromiseLike<R>;
 };
 
@@ -628,7 +748,7 @@ export type Awaitable<T> = {
  * @typeParam E - the modeled error type.
  * @category Methods
  */
-export type AsyncResultMethods<T, E> = {
+export type AsyncResultMethods<out T, out E> = {
   /**
    * Asynchronous {@link ResultMethods.map | map}: transforms the success value
    * with `f`. `f` is synchronous; a throw becomes a `Defect`. An async callback
@@ -685,32 +805,34 @@ export type AsyncResultMethods<T, E> = {
   discard(): AsyncResult<void, E>;
 
   /**
-   * Asynchronous {@link ResultMethods.mapErr | mapErr}. `f` is synchronous; a
-   * throw becomes a `Defect`. An async callback is rejected at compile time
+   * Asynchronous {@link ResultMethods.mapErr | mapErr} — the same triage
+   * object ({@link ErrTriage}). Branches are synchronous; a throw becomes a
+   * `Defect`. An async branch is rejected at compile time
    * ({@link NotThenable}).
    */
-  mapErr<E2>(f: (error: E) => E2 & NotThenable<E2>): AsyncResult<T, E2>;
+  mapErr<H extends ErrTriage<E, unknown>>(
+    handlers: H & TriageKeysOk<E, H> & NoThenables<TriageReturns<H>>,
+  ): AsyncResult<T, TriageReturns<H>>;
   /**
-   * Asynchronous {@link ResultMethods.flatMapErr | flatMapErr}. `f` may return a
-   * `Result` or an `AsyncResult`.
+   * Asynchronous {@link ResultMethods.flatMapErr | flatMapErr} — the same
+   * triage object ({@link ErrTriage}). Unlike the sync form, a branch may
+   * return a `Result` **or** an `AsyncResult`.
    */
-  flatMapErr<U, E2>(f: (error: E) => Result<U, E2> | AsyncResult<U, E2>): AsyncResult<T | U, E2>;
+  flatMapErr<H extends ErrTriage<E, Result<unknown, unknown> | AsyncResult<unknown, unknown>>>(
+    handlers: H & TriageKeysOk<E, H>,
+  ): AsyncResult<
+    T | OkOf<TriageReturns<H>> | AsyncOkOf<TriageReturns<H>>,
+    ErrOf<TriageReturns<H>> | AsyncErrOf<TriageReturns<H>>
+  >;
   /**
-   * @deprecated Renamed to {@link AsyncResultMethods.flatMapErr | flatMapErr}.
-   * This alias will be removed in a future major.
+   * Asynchronous {@link ResultMethods.recoverErr | recoverErr} — the same
+   * triage object ({@link ErrTriage}). Branches are synchronous; a throw
+   * becomes a `Defect`. An async branch is rejected at compile time
+   * ({@link NotThenable}).
    */
-  orElse<U, E2>(f: (error: E) => Result<U, E2> | AsyncResult<U, E2>): AsyncResult<T | U, E2>;
-  /**
-   * Asynchronous {@link ResultMethods.recoverErr | recoverErr}. `f` is
-   * synchronous; a throw becomes a `Defect`. An async callback is rejected at
-   * compile time ({@link NotThenable}).
-   */
-  recoverErr<U>(f: (error: E) => U & NotThenable<U>): AsyncResult<T | U, never>;
-  /**
-   * @deprecated Renamed to {@link AsyncResultMethods.recoverErr | recoverErr}.
-   * This alias will be removed in a future major.
-   */
-  recover<U>(f: (error: E) => U & NotThenable<U>): AsyncResult<T | U, never>;
+  recoverErr<H extends ErrTriage<E, unknown>>(
+    handlers: H & TriageKeysOk<E, H> & NoThenables<TriageReturns<H>>,
+  ): AsyncResult<T | TriageReturns<H>, never>;
   /**
    * Asynchronous {@link ResultMethods.tapErr | tapErr}. `f` is synchronous; if it
    * throws, the result is a `Defect` whose cause is an `AggregateError` of
@@ -881,7 +1003,7 @@ export type ErrOf<R> = R extends { readonly tag: "Err"; readonly error: infer E 
  *
  * @category Types
  */
-export type AsyncOkOf<R> = R extends AsyncResult<infer T, unknown> ? T : never;
+export type AsyncOkOf<R> = R extends Awaitable<infer Res> ? OkOf<Res> : never;
 /**
  * Extract the error type `E` from an {@link AsyncResult} type — the async
  * counterpart of {@link ErrOf}.
@@ -895,4 +1017,4 @@ export type AsyncOkOf<R> = R extends AsyncResult<infer T, unknown> ? T : never;
  *
  * @category Types
  */
-export type AsyncErrOf<R> = R extends AsyncResult<unknown, infer E> ? E : never;
+export type AsyncErrOf<R> = R extends Awaitable<infer Res> ? ErrOf<Res> : never;
