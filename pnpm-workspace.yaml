@@ -49,9 +49,10 @@ catalog:
 # runtime deps); the overrides span High and moderate severity. Each selector is
 # version-scoped so only the affected line moves and unrelated lines are untouched.
 overrides:
-  # GHSA-3jxr-9vmj-r5cp: brace-expansion ReDoS. Only the 5.x line is present
-  # (via typedoc > minimatch); 5.0.7 is the patched release.
-  "brace-expansion@5": "5.0.7"
+  # GHSA-3jxr-9vmj-r5cp (ReDoS) + GHSA-mh99-v99m-4gvg (DoS via unbounded
+  # expansion length). Only the 5.x line is present (via typedoc > minimatch);
+  # 5.0.8 is the first release patched for both.
+  "brace-expansion@5": "5.0.8"
   # GHSA-52cp-r559-cp3m: js-yaml quadratic-CPU merge keys in the legacy 3.x line
   # (via @changesets/cli > read-yaml-file). 3.15.0 is the patched 3.x release;
   # the unaffected 4.x line resolved elsewhere is left untouched.
@@ -112,3 +113,7 @@ minimumReleaseAgeExclude:
   # fix forced by the override above) is younger than the cutoff. Remove this
   # entry once 3.1.4 is 7 days old (published 2026-07-19).
   - fast-uri
+  # Temporary security-patch exception: brace-expansion 5.0.8 (the
+  # GHSA-mh99-v99m-4gvg fix forced by the override above) is younger than the
+  # cutoff. Remove this entry once 5.0.8 is 7 days old (published 2026-07-23).
+  - brace-expansion
