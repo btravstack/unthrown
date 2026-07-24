@@ -131,6 +131,33 @@ The rules, in order of how often you'll meet them:
   cast, a JS caller) is a bug by definition and lands in the defect channel,
   mirroring `matchTags`.
 
+::: tip You can't accidentally skip a case — even with `{}`
+A **transformer** (`mapErr` / `flatMapErr` / `recoverErr`) accepts an object
+_only_ when the set of uncovered cases is empty. So `mapErr({})` compiles in
+exactly one situation: `E = never` (there are literally no errors to handle —
+vacuously exhaustive). On any non-empty `E` the empty object is a compile error,
+including a `code`-discriminated union (the oRPC shape), where there are no
+`_tag` keys to fill and you are pushed to `mergeTags`:
+
+```ts
+declare const coded: Result<number, { code: "NOT_FOUND" } | { code: "FORBIDDEN" }>;
+
+coded.mapErr({}); // ❌ compile error — non-empty channel, nothing covered
+coded.mapErr(mergeTags((e) => translate(e.code))); // ✅ the explicit uniform path
+
+declare const empty: Result<number, never>;
+empty.mapErr({}); // ✅ E = never — no cases, so `{}` is exhaustive
+```
+
+There is no third path where a case slips through a transformer uncovered without
+a compile error.
+
+The `{}` on an **observer** (`tapErr({})`) _is_ allowed — but observing zero
+cases is not the same as handling them: the error is **not consumed**, it flows
+on unchanged (the return type still carries the full `E`) to be handled by a
+transformer downstream.
+:::
+
 For eliminating at the edge (folding `Ok`/`Err`/`Defect` to a plain value) the
 per-tag fold stays [`matchTags`](./tagged-errors); the triage object is the same
 idea kept _inside_ the pipeline.

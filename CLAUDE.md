@@ -99,6 +99,16 @@ was planned).
   error as its cause, mirroring `matchTags`; the branch lookup is
   own-property-only (`Object.hasOwn`), so a rogue tag (`"constructor"`) cannot
   resolve through the prototype chain.
+- **The empty object is accepted by a transformer ONLY where it is
+  exhaustive.** `mapErr`/`flatMapErr`/`recoverErr` accept an object iff the set
+  of uncovered cases is empty — so `mapErr({})` compiles _only_ on `E = never`
+  (zero cases, vacuously exhaustive) and is a **compile error** on any non-empty
+  `E`, including a non-`_tag` (e.g. `code`-discriminated) union, where the
+  unsatisfiable message-key of `ErrTriage` forces `mergeTags`. There is no path
+  where a case slips past a transformer uncovered without a compile error. The
+  `{}` is legal on the **observers** (`tapErr`/`flatTapErr`), but observing zero
+  cases does not consume the error — it passes through with `E` intact (this is
+  a _type-level_ invariant, guarded in `types.test-d.ts`, not a runtime one).
 - **A `Defect` flows through every method untouched EXCEPT `match()`,
   `recoverDefect()`, and the observers `tapDefect()` / `tapFailure()` (which
   observe it without consuming it).** Therefore `getOr`, `getOrElse`,
@@ -565,7 +575,9 @@ configured outside the repo).
   `ErrTriage` semantics — per-tag narrowing, defect/throw-branch subtraction,
   `mergeTags` forms and inference, missing-tag/unknown-key/async-branch/
   bare-callback rejection, `NoDefects` on merged observers,
-  untagged/mixed/`never` `E`) with a
+  untagged/mixed/`never` `E`, and the empty-object guarantee — `mapErr({})`
+  compiles only on `E = never`, is rejected on a non-empty or
+  `code`-discriminated `E`, and is a pass-through on an observer) with a
   `Expect<Equal<…>>` helper plus `@ts-expect-error` for must-not-compile cases.
   They are checked by `tsc` via `tsconfig.test-d.json` (which relaxes
   `noUnusedLocals`), folded into the package's `typecheck` script — so a typing

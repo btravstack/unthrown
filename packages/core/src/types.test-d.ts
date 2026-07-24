@@ -552,8 +552,36 @@ new WithMsg({ ticketId: "t1" });
   const mixedMerged = mixed.mapErr(mergeTags((e) => e));
   type _MixedMerged = Expect<Equal<ErrOf<typeof mixedMerged>, Tagged | string>>;
 
-  // an empty channel needs no branches at all
+  // an empty channel needs no branches at all — `{}` is vacuously exhaustive
   const empty = Ok(1) as Result<number, never>;
   const still = empty.mapErr({});
   type _Still = Expect<Equal<typeof still, Result<number, never>>>;
+}
+
+// --- the empty-object triage is accepted ONLY where it is exhaustive ----------
+// A transformer accepts `{}` (or any partial object) iff the set of uncovered
+// cases is empty: either `E = never` (no cases) or every `_tag` is covered.
+// There is no third path where a case slips by uncovered without a compile
+// error — including a `code`-discriminated (non-`_tag`) union, the orpc shape.
+
+{
+  // a union discriminated by `code`, NOT `_tag` (e.g. ORPCError) — has no tags
+  type CodeErr = { code: "NOT_FOUND"; x: 1 } | { code: "FORBIDDEN"; y: 2 };
+  const coded = Ok(1) as Result<number, CodeErr>;
+
+  // @ts-expect-error — `{}` is NOT vacuously exhaustive here: the channel is
+  // non-empty and has no `_tag` keys to fill, so per-tag triage is impossible
+  coded.mapErr({});
+  // @ts-expect-error — spelling `code` keys does not help: triage keys off `_tag`
+  coded.mapErr({ NOT_FOUND: () => 1, FORBIDDEN: () => 0 });
+
+  // mergeTags is the sanctioned (and only) path for a non-`_tag` union
+  const merged = coded.mapErr(mergeTags((e) => e.code.length));
+  type _Merged = Expect<Equal<ErrOf<typeof merged>, number>>;
+
+  // an OBSERVER accepts `{}` — but observing nothing does NOT consume the error:
+  // the error type is unchanged, so `CodeErr` still flows on to be handled later.
+  // Observing zero cases is sound; it is not the same as transforming zero cases.
+  const observed = coded.tapErr({});
+  type _Observed = Expect<Equal<typeof observed, Result<number, CodeErr>>>;
 }
