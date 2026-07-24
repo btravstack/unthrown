@@ -6,7 +6,6 @@ strictPeerDependencies: true
 
 packages:
   - packages/*
-  - tools/*
   - docs
 
 catalog:

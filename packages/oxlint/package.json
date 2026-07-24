@@ -53,8 +53,8 @@
     "@oxlint/plugins": "^1.73.0"
   },
   "devDependencies": {
+    "@btravstack/tsconfig": "catalog:",
     "@types/node": "catalog:",
-    "@unthrown/tsconfig": "workspace:*",
     "@vitest/coverage-v8": "catalog:",
     "oxlint": "catalog:",
     "tsdown": "catalog:",

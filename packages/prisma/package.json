@@ -56,11 +56,11 @@
     "unthrown": "workspace:^"
   },
   "devDependencies": {
+    "@btravstack/tsconfig": "catalog:",
+    "@btravstack/typedoc": "catalog:",
     "@prisma/adapter-better-sqlite3": "catalog:",
     "@prisma/client": "catalog:",
     "@types/node": "catalog:",
-    "@unthrown/tsconfig": "workspace:*",
-    "@unthrown/typedoc": "workspace:*",
     "@unthrown/vitest": "workspace:*",
     "@vitest/coverage-v8": "catalog:",
     "better-sqlite3": "catalog:",
