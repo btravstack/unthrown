@@ -73,12 +73,12 @@
     "unthrown": "workspace:^"
   },
   "devDependencies": {
+    "@btravstack/tsconfig": "catalog:",
+    "@btravstack/typedoc": "catalog:",
     "@orpc/client": "catalog:",
     "@orpc/contract": "catalog:",
     "@orpc/server": "catalog:",
     "@types/node": "catalog:",
-    "@unthrown/tsconfig": "workspace:*",
-    "@unthrown/typedoc": "workspace:*",
     "@unthrown/vitest": "workspace:*",
     "@vitest/coverage-v8": "catalog:",
     "tsdown": "catalog:",

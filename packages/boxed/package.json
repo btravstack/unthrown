@@ -55,9 +55,9 @@
   },
   "devDependencies": {
     "@bloodyowl/boxed": "catalog:",
+    "@btravstack/tsconfig": "catalog:",
+    "@btravstack/typedoc": "catalog:",
     "@types/node": "catalog:",
-    "@unthrown/tsconfig": "workspace:*",
-    "@unthrown/typedoc": "workspace:*",
     "@vitest/coverage-v8": "catalog:",
     "tsdown": "catalog:",
     "typedoc": "catalog:",

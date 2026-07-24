@@ -197,15 +197,15 @@ importers:
       '@bloodyowl/boxed':
         specifier: 'catalog:'
         version: 3.4.0(typescript@6.0.3)
+      '@btravstack/tsconfig':
+        specifier: 'catalog:'
+        version: 0.1.0
+      '@btravstack/typedoc':
+        specifier: 'catalog:'
+        version: 0.1.0(typedoc-plugin-markdown@4.12.0(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3))
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.1
-      '@unthrown/tsconfig':
-        specifier: workspace:*
-        version: link:../../tools/tsconfig
-      '@unthrown/typedoc':
-        specifier: workspace:*
-        version: link:../../tools/typedoc
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.10(vitest@4.1.10)
@@ -227,15 +227,15 @@ importers:
 
   packages/core:
     devDependencies:
+      '@btravstack/tsconfig':
+        specifier: 'catalog:'
+        version: 0.1.0
+      '@btravstack/typedoc':
+        specifier: 'catalog:'
+        version: 0.1.0(typedoc-plugin-markdown@4.12.0(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3))
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.1
-      '@unthrown/tsconfig':
-        specifier: workspace:*
-        version: link:../../tools/tsconfig
-      '@unthrown/typedoc':
-        specifier: workspace:*
-        version: link:../../tools/typedoc
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.10(vitest@4.1.10)
@@ -261,15 +261,15 @@ importers:
         specifier: workspace:^
         version: link:../core
     devDependencies:
+      '@btravstack/tsconfig':
+        specifier: 'catalog:'
+        version: 0.1.0
+      '@btravstack/typedoc':
+        specifier: 'catalog:'
+        version: 0.1.0(typedoc-plugin-markdown@4.12.0(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3))
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.1
-      '@unthrown/tsconfig':
-        specifier: workspace:*
-        version: link:../../tools/tsconfig
-      '@unthrown/typedoc':
-        specifier: workspace:*
-        version: link:../../tools/typedoc
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.10(vitest@4.1.10)
@@ -298,15 +298,15 @@ importers:
         specifier: workspace:^
         version: link:../core
     devDependencies:
+      '@btravstack/tsconfig':
+        specifier: 'catalog:'
+        version: 0.1.0
+      '@btravstack/typedoc':
+        specifier: 'catalog:'
+        version: 0.1.0(typedoc-plugin-markdown@4.12.0(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3))
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.1
-      '@unthrown/tsconfig':
-        specifier: workspace:*
-        version: link:../../tools/tsconfig
-      '@unthrown/typedoc':
-        specifier: workspace:*
-        version: link:../../tools/typedoc
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.10(vitest@4.1.10)
@@ -335,6 +335,12 @@ importers:
         specifier: workspace:^
         version: link:../core
     devDependencies:
+      '@btravstack/tsconfig':
+        specifier: 'catalog:'
+        version: 0.1.0
+      '@btravstack/typedoc':
+        specifier: 'catalog:'
+        version: 0.1.0(typedoc-plugin-markdown@4.12.0(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3))
       '@orpc/client':
         specifier: 'catalog:'
         version: 2.0.0-beta.15
@@ -347,12 +353,6 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.1
-      '@unthrown/tsconfig':
-        specifier: workspace:*
-        version: link:../../tools/tsconfig
-      '@unthrown/typedoc':
-        specifier: workspace:*
-        version: link:../../tools/typedoc
       '@unthrown/vitest':
         specifier: workspace:*
         version: link:../vitest
@@ -381,12 +381,12 @@ importers:
         specifier: ^1.73.0
         version: 1.73.0
     devDependencies:
+      '@btravstack/tsconfig':
+        specifier: 'catalog:'
+        version: 0.1.0
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.1
-      '@unthrown/tsconfig':
-        specifier: workspace:*
-        version: link:../../tools/tsconfig
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.10(vitest@4.1.10)
@@ -409,15 +409,15 @@ importers:
         specifier: workspace:^
         version: link:../core
     devDependencies:
+      '@btravstack/tsconfig':
+        specifier: 'catalog:'
+        version: 0.1.0
+      '@btravstack/typedoc':
+        specifier: 'catalog:'
+        version: 0.1.0(typedoc-plugin-markdown@4.12.0(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3))
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.1
-      '@unthrown/tsconfig':
-        specifier: workspace:*
-        version: link:../../tools/tsconfig
-      '@unthrown/typedoc':
-        specifier: workspace:*
-        version: link:../../tools/typedoc
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.10(vitest@4.1.10)
@@ -446,6 +446,12 @@ importers:
         specifier: workspace:^
         version: link:../core
     devDependencies:
+      '@btravstack/tsconfig':
+        specifier: 'catalog:'
+        version: 0.1.0
+      '@btravstack/typedoc':
+        specifier: 'catalog:'
+        version: 0.1.0(typedoc-plugin-markdown@4.12.0(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3))
       '@prisma/adapter-better-sqlite3':
         specifier: 'catalog:'
         version: 7.8.0
@@ -455,12 +461,6 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.1
-      '@unthrown/tsconfig':
-        specifier: workspace:*
-        version: link:../../tools/tsconfig
-      '@unthrown/typedoc':
-        specifier: workspace:*
-        version: link:../../tools/typedoc
       '@unthrown/vitest':
         specifier: workspace:*
         version: link:../vitest
@@ -498,15 +498,15 @@ importers:
         specifier: workspace:^
         version: link:../core
     devDependencies:
+      '@btravstack/tsconfig':
+        specifier: 'catalog:'
+        version: 0.1.0
+      '@btravstack/typedoc':
+        specifier: 'catalog:'
+        version: 0.1.0(typedoc-plugin-markdown@4.12.0(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3))
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.1
-      '@unthrown/tsconfig':
-        specifier: workspace:*
-        version: link:../../tools/tsconfig
-      '@unthrown/typedoc':
-        specifier: workspace:*
-        version: link:../../tools/typedoc
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.10(vitest@4.1.10)
@@ -528,15 +528,15 @@ importers:
 
   packages/vitest:
     devDependencies:
+      '@btravstack/tsconfig':
+        specifier: 'catalog:'
+        version: 0.1.0
+      '@btravstack/typedoc':
+        specifier: 'catalog:'
+        version: 0.1.0(typedoc-plugin-markdown@4.12.0(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3))
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.1
-      '@unthrown/tsconfig':
-        specifier: workspace:*
-        version: link:../../tools/tsconfig
-      '@unthrown/typedoc':
-        specifier: workspace:*
-        version: link:../../tools/typedoc
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.10(vitest@4.1.10)
@@ -558,21 +558,6 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
-
-  tools/tsconfig:
-    dependencies:
-      '@btravstack/tsconfig':
-        specifier: 'catalog:'
-        version: 0.1.0
-
-  tools/typedoc:
-    dependencies:
-      '@btravstack/typedoc':
-        specifier: 'catalog:'
-        version: 0.1.0(typedoc-plugin-markdown@4.12.0(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3))
-      typedoc-plugin-markdown:
-        specifier: 'catalog:'
-        version: 4.12.0(typedoc@0.28.20(typescript@6.0.3))
 
 packages:
 

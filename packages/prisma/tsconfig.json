@@ -1,5 +1,5 @@
 {
-  "extends": "@unthrown/tsconfig/base.json",
+  "extends": "@btravstack/tsconfig/base.json",
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",

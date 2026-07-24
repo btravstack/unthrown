@@ -1,5 +1,5 @@
 {
-  "extends": "@unthrown/typedoc/base.json",
+  "extends": "@btravstack/typedoc/base.json",
   "entryPoints": ["src/index.ts"],
   "out": "docs"
 }

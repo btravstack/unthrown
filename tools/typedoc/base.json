@@ -1,4 +1,0 @@
-{
-  "$schema": "https://typedoc.org/schema.json",
-  "extends": "@btravstack/typedoc/base.json"
-}
