@@ -5,7 +5,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { Do, Err, fromSafePromise, mergeTags, Ok, type Result, UnwrapError } from "./index.js";
+import { Do, Err, fromSafePromise, Ok, P, type Result, UnwrapError } from "./index.js";
 
 const boom = new Error("boom");
 const defectOf = (cause: unknown): Result<number, never> =>
@@ -24,11 +24,31 @@ describe("Invariant 1: throw inside any combinator becomes a Defect", () => {
     expect(Ok(1).flatTap(t).isDefect()).toBe(true);
     expect(Do().bind("a", t).isDefect()).toBe(true);
     expect(Do().let("a", t).isDefect()).toBe(true);
-    expect(Err("e").mapErr(mergeTags(t)).isDefect()).toBe(true);
-    expect(Err("e").flatMapErr(mergeTags(t)).isDefect()).toBe(true);
-    expect(Err("e").recoverErr(mergeTags(t)).isDefect()).toBe(true);
-    expect(Err("e").tapErr(mergeTags(t)).isDefect()).toBe(true);
-    expect(Err("e").flatTapErr(mergeTags(t)).isDefect()).toBe(true);
+    expect(
+      Err("e")
+        .mapErr((m) => m.with(P._, t))
+        .isDefect(),
+    ).toBe(true);
+    expect(
+      Err("e")
+        .flatMapErr((m) => m.with(P._, t))
+        .isDefect(),
+    ).toBe(true);
+    expect(
+      Err("e")
+        .recoverErr((m) => m.with(P._, t))
+        .isDefect(),
+    ).toBe(true);
+    expect(
+      Err("e")
+        .tapErr((m) => m.with(P._, t))
+        .isDefect(),
+    ).toBe(true);
+    expect(
+      Err("e")
+        .flatTapErr((m) => m.with(P._, t))
+        .isDefect(),
+    ).toBe(true);
     expect(defectOf(boom).recoverDefect(t).isDefect()).toBe(true);
     expect(defectOf(boom).tapDefect(t).isDefect()).toBe(true);
     expect(Err("e").tapFailure(t).isDefect()).toBe(true);
@@ -48,11 +68,11 @@ describe("Invariant 2: a Defect flows through every method except match() and re
       defectOf(boom).let("a", f),
       defectOf(boom).as(1),
       defectOf(boom).discard(),
-      defectOf(boom).mapErr(mergeTags(f)),
-      defectOf(boom).flatMapErr(mergeTags(f)),
-      defectOf(boom).recoverErr(mergeTags(f)),
-      defectOf(boom).tapErr(mergeTags(f)),
-      defectOf(boom).flatTapErr(mergeTags(f)),
+      defectOf(boom).mapErr((m) => m.with(P._, f)),
+      defectOf(boom).flatMapErr((m) => m.with(P._, f)),
+      defectOf(boom).recoverErr((m) => m.with(P._, f)),
+      defectOf(boom).tapErr((m) => m.with(P._, f)),
+      defectOf(boom).flatTapErr((m) => m.with(P._, f)),
     ];
     for (const r of passesThrough) expect(r.isDefect()).toBe(true);
     expect(f).not.toHaveBeenCalled();
@@ -111,7 +131,7 @@ describe("Invariant 3: get() is asymmetric", () => {
 
 describe("Invariant 4: recoverErr empties the error channel in the type, not the runtime", () => {
   it("recoverErr() returns a value whose type is Result<_, never> but may still be a Defect", () => {
-    const recovered = defectOf(boom).recoverErr(mergeTags(() => 1));
+    const recovered = defectOf(boom).recoverErr((m) => m.with(P._, () => 1));
     // `never` in the type does not mean total — a Defect survives at runtime.
     expect(recovered.isDefect()).toBe(true);
   });

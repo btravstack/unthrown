@@ -14,28 +14,24 @@
 // The only other casts are the builders' construction (`as OkView`/…) and the
 // `bind`/`let` scope merge (a computed key can't be spelled at the type level).
 
-import {
-  type Defect,
-  defect,
-  isDefectMarker,
-  isMergedTriage,
-  type MergedTriage,
-} from "./defect.js";
+import { match } from "ts-pattern";
+
+import { type Defect, defect, isDefectMarker } from "./defect.js";
 import type {
   AsyncResult,
   Bound,
   DefectView,
+  ErrMatcher,
   ErrOf,
-  ErrTriage,
-  ErrTriagePartial,
   ErrView,
+  ExhaustiveMatch,
   FailureView,
+  MatchErrOut,
+  MatchOut,
   NotThenable,
   OkOf,
   OkView,
   Result,
-  TriageOut,
-  TriageReturns,
 } from "./types.js";
 
 /**
@@ -169,82 +165,68 @@ class Res<T, E> {
     return okRes<void, E>(undefined);
   }
 
-  mapErr<H extends ErrTriage<E, unknown> | MergedTriage<E, unknown>>(
+  mapErr<M extends ExhaustiveMatch<unknown>>(
     this: Result<T, E>,
-    handlers: H,
-  ): Result<T, TriageOut<H>> {
+    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+  ): Result<T, MatchErrOut<M>> {
     if (this.tag !== "Err") return passThrough(this);
-    const handler = triageHandlerFor(handlers, this.error);
-    if (!handler) return defectRes(this.error);
     try {
-      const out = handler(this.error, defect);
+      const out = runMatch(f, this.error);
       if (isDefectMarker(out)) return defectRes(out.cause);
-      return errRes(out as TriageOut<H>);
+      return errRes(out as MatchErrOut<M>);
     } catch (cause) {
       return defectRes(cause);
     }
   }
 
-  flatMapErr<
-    H extends
-      | ErrTriage<E, Result<unknown, unknown>>
-      | MergedTriage<E, Result<unknown, unknown> | Defect>,
-  >(this: Result<T, E>, handlers: H): Result<T | OkOf<TriageReturns<H>>, ErrOf<TriageReturns<H>>> {
+  flatMapErr<M extends ExhaustiveMatch<Result<unknown, unknown> | Defect>>(
+    this: Result<T, E>,
+    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+  ): Result<T | OkOf<MatchOut<M>>, ErrOf<MatchOut<M>>> {
     if (this.tag !== "Err") return passThrough(this);
-    const handler = triageHandlerFor(handlers, this.error);
-    if (!handler) return defectRes(this.error);
     try {
-      const out = handler(this.error, defect);
+      const out = runMatch(f, this.error);
       if (isDefectMarker(out)) return defectRes(out.cause);
-      return out as Result<OkOf<TriageReturns<H>>, ErrOf<TriageReturns<H>>>;
+      return out as Result<OkOf<MatchOut<M>>, ErrOf<MatchOut<M>>>;
     } catch (cause) {
       return defectRes(cause);
     }
   }
 
-  recoverErr<H extends ErrTriage<E, unknown> | MergedTriage<E, unknown>>(
+  recoverErr<M extends ExhaustiveMatch<unknown>>(
     this: Result<T, E>,
-    handlers: H,
-  ): Result<T | TriageOut<H>, never> {
+    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+  ): Result<T | MatchErrOut<M>, never> {
     if (this.tag !== "Err") return passThrough(this);
-    const handler = triageHandlerFor(handlers, this.error);
-    if (!handler) return defectRes(this.error);
     try {
-      const out = handler(this.error, defect);
+      const out = runMatch(f, this.error);
       if (isDefectMarker(out)) return defectRes(out.cause);
-      return okRes(out as TriageOut<H>);
+      return okRes(out as MatchErrOut<M>);
     } catch (cause) {
       return defectRes(cause);
     }
   }
 
-  tapErr<H extends ErrTriagePartial<E, unknown> | MergedTriage<E, unknown>>(
+  tapErr(
     this: Result<T, E>,
-    handlers: H,
+    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
   ): Result<T, E> {
     if (this.tag !== "Err") return this;
-    const handler = triageHandlerFor(handlers, this.error);
-    // Partial observation: a tag without a branch is simply not observed.
-    if (!handler) return this;
     try {
-      handler(this.error);
+      runMatch(f, this.error);
       return this;
     } catch (cause) {
       return observerThrowToDefect(cause, this.error);
     }
   }
 
-  flatTapErr<
-    H extends
-      | ErrTriagePartial<E, Result<unknown, unknown>>
-      | MergedTriage<E, Result<unknown, unknown>>,
-  >(this: Result<T, E>, handlers: H): Result<T, E | ErrOf<TriageReturns<H>>> {
+  flatTapErr<M extends ExhaustiveMatch<Result<unknown, unknown>>>(
+    this: Result<T, E>,
+    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+  ): Result<T, E | ErrOf<MatchOut<M>>> {
     if (this.tag !== "Err") return this;
-    const handler = triageHandlerFor(handlers, this.error);
-    // Partial observation: a tag without a branch is simply not observed.
-    if (!handler) return this;
     try {
-      const r = handler(this.error) as Result<unknown, unknown>;
+      const r = runMatch(f, this.error) as Result<unknown, unknown>;
       // Keep the original error on the effect's success; an Err/Defect threads through.
       return r.tag === "Ok" ? this : passThrough(r);
     } catch (cause) {
@@ -488,31 +470,20 @@ function passThrough<T, E>(self: Result<unknown, unknown>): Result<T, E> {
 }
 
 /**
- * Select the triage branch for an error: its `_tag`'s own-property handler if
- * present, otherwise the `Else` branch, otherwise `undefined` (the caller mints
- * a Defect — an unmodeled tag is an unmodeled failure, mirroring `matchTags`).
- * `Object.hasOwn` guards against a rogue tag (e.g. `"constructor"`) resolving
- * through the prototype chain to an unrelated `Object.prototype` member.
+ * Drive an error-combinator callback: build `match(error)`, hand it (plus the
+ * injected `defect`) to the callback, and `.run()` the returned exhaustive
+ * builder to its output. `.run()` executes `.exhaustive()` — type-forced
+ * exhaustive, so it always matches for well-typed callers; a value that slips
+ * through the types (a widened cast, a JS caller) throws `NonExhaustiveError`,
+ * which the caller's `try/catch` turns into a `Defect` — an unmodeled failure.
  *
  * @internal
  */
-function triageHandlerFor(
-  handlers: unknown,
-  error: unknown,
-): ((error: unknown, defect?: (cause: unknown) => Defect) => unknown) | undefined {
-  if (isMergedTriage(handlers)) {
-    // The explicit uniform form: one handler for every error, tagged or not.
-    return handlers.handler as (error: unknown, defect?: (cause: unknown) => Defect) => unknown;
-  }
-  const triage = handlers as Record<string, unknown>;
-  const tag =
-    typeof error === "object" && error !== null && "_tag" in error
-      ? (error as { _tag: unknown })._tag
-      : undefined;
-  const handler = typeof tag === "string" && Object.hasOwn(triage, tag) ? triage[tag] : undefined;
-  return typeof handler === "function"
-    ? (handler as (error: unknown, defect?: (cause: unknown) => Defect) => unknown)
-    : undefined;
+function runMatch<E>(
+  f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => { run: () => unknown },
+  error: E,
+): unknown {
+  return f(match(error) as ErrMatcher<E>, defect).run();
 }
 
 /**
@@ -685,22 +656,21 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  // The precise generic-H triage signatures live on the public surface
+  // The precise generic-M matcher signatures live on the public surface
   // (`AsyncResultMethods`); TypeScript cannot unify them across the
-  // class/interface boundary (relating the two generic signatures infers `H`
-  // from the guarded parameter and then fails to equate
-  // `TriageReturns<H & guards>` with `TriageReturns<H>`), so these three
-  // implementations are typed loosely — `never` error channels keep the
-  // returns bivariantly compatible — and the interface re-imposes the
-  // precision, mirroring how `unwrap`'s gate is re-imposed in `types.ts`.
-  mapErr(handlers: ErrTriage<E, unknown> | MergedTriage<E, unknown>): AsyncResult<T, never> {
+  // class/`implements` boundary (relating the two generic signatures fails to
+  // equate `MatchErrOut<M>` on each side), so these implementations are typed
+  // loosely — `never` error channels keep the returns bivariantly compatible —
+  // and the interface re-imposes the precision, mirroring how `unwrap`'s gate
+  // is re-imposed in `types.ts`.
+  mapErr(
+    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
+  ): AsyncResult<T, never> {
     return new AsyncRes<T, never>(
       this.promise.then((r) => {
         if (r.tag !== "Err") return passThrough(r);
-        const handler = triageHandlerFor(handlers, r.error);
-        if (!handler) return defectRes(r.error);
         try {
-          const out = handler(r.error, defect);
+          const out = runMatch(f, r.error);
           if (isDefectMarker(out)) return defectRes<T, never>(out.cause);
           return errRes<T, never>(out as never);
         } catch (cause) {
@@ -711,17 +681,16 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   }
 
   flatMapErr(
-    handlers:
-      | ErrTriage<E, Result<unknown, unknown> | AsyncResult<unknown, unknown>>
-      | MergedTriage<E, unknown>,
+    f: (
+      m: ErrMatcher<E>,
+      defect: (cause: unknown) => Defect,
+    ) => ExhaustiveMatch<Result<unknown, unknown> | AsyncResult<unknown, unknown> | Defect>,
   ): AsyncResult<T, never> {
     return new AsyncRes<T, never>(
       this.promise.then(async (r) => {
         if (r.tag !== "Err") return passThrough(r);
-        const handler = triageHandlerFor(handlers, r.error);
-        if (!handler) return defectRes(r.error);
         try {
-          const out = handler(r.error, defect);
+          const out = runMatch(f, r.error);
           if (isDefectMarker(out)) return defectRes<T, never>(out.cause);
           return (await (out as
             | Result<unknown, unknown>
@@ -733,14 +702,14 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  recoverErr(handlers: ErrTriage<E, unknown> | MergedTriage<E, unknown>): AsyncResult<T, never> {
+  recoverErr(
+    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
+  ): AsyncResult<T, never> {
     return new AsyncRes<T, never>(
       this.promise.then((r) => {
         if (r.tag !== "Err") return passThrough(r);
-        const handler = triageHandlerFor(handlers, r.error);
-        if (!handler) return defectRes(r.error);
         try {
-          const out = handler(r.error, defect);
+          const out = runMatch(f, r.error);
           if (isDefectMarker(out)) return defectRes<T, never>(out.cause);
           return okRes<T, never>(out as T);
         } catch (cause) {
@@ -750,14 +719,14 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  tapErr(handlers: ErrTriagePartial<E, unknown> | MergedTriage<E, unknown>): AsyncResult<T, E> {
+  tapErr(
+    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
+  ): AsyncResult<T, E> {
     return new AsyncRes<T, E>(
       this.promise.then((r) => {
         if (r.tag !== "Err") return r;
-        const handler = triageHandlerFor(handlers, r.error);
-        if (!handler) return r;
         try {
-          handler(r.error);
+          runMatch(f, r.error);
           return r;
         } catch (cause) {
           return observerThrowToDefect<T, E>(cause, r.error);
@@ -767,17 +736,16 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   }
 
   flatTapErr(
-    handlers:
-      | ErrTriagePartial<E, Result<unknown, unknown> | AsyncResult<unknown, unknown>>
-      | MergedTriage<E, unknown>,
+    f: (
+      m: ErrMatcher<E>,
+      defect: (cause: unknown) => Defect,
+    ) => ExhaustiveMatch<Result<unknown, unknown> | AsyncResult<unknown, unknown>>,
   ): AsyncResult<T, E> {
     return new AsyncRes<T, E>(
       this.promise.then(async (r) => {
         if (r.tag !== "Err") return passThrough(r);
-        const handler = triageHandlerFor(handlers, r.error);
-        if (!handler) return r;
         try {
-          const inner = await (handler(r.error) as
+          const inner = await (runMatch(f, r.error) as
             | Result<unknown, unknown>
             | AsyncResult<unknown, unknown>);
           // Keep the original error on success; an Err/Defect from the effect wins.

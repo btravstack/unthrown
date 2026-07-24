@@ -11,7 +11,7 @@
 //     .input(z.object({ id: z.string() }))
 //     .errors({ NOT_FOUND: {} })
 //     .result(({ input, errors }) =>
-//       repo.findPlanet(input.id).mapErr(mergeTags(() => errors.NOT_FOUND())),
+//       repo.findPlanet(input.id).mapErr((m) => m.with(P._, () => errors.NOT_FOUND())),
 //     );
 //
 // This registration is a genuine import-time side effect — the one entry

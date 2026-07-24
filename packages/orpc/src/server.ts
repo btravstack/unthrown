@@ -65,7 +65,7 @@ export type ResultHandler<
  *
  * @example
  * ```ts
- * import { mergeTags } from "unthrown";
+ * import { P } from "unthrown";
  * import { handlerResult } from "@unthrown/orpc/server";
  *
  * const find = os
@@ -73,7 +73,7 @@ export type ResultHandler<
  *   .errors({ NOT_FOUND: {} })
  *   .handler(
  *     handlerResult(({ input, errors }) =>
- *       repo.findPlanet(input.id).mapErr(mergeTags(() => errors.NOT_FOUND())),
+ *       repo.findPlanet(input.id).mapErr((m) => m.with(P._, () => errors.NOT_FOUND())),
  *     ),
  *   );
  * ```
