@@ -22,6 +22,10 @@
     "Props",
     "AllOk",
     "ResultRecord",
-    "AsyncResultRecord"
+    "AsyncResultRecord",
+    "NoThenables",
+    "TriageKeysOk",
+    "TriageReturns",
+    "ErrTagsOf"
   ]
 }

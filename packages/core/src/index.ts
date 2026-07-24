@@ -23,6 +23,7 @@ export type {
   Awaitable,
   DefectView,
   ErrOf,
+  ErrTriage,
   ErrView,
   FailureView,
   NotThenable,

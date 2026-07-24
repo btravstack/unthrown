@@ -76,9 +76,9 @@ describe("AsyncResult: a throw in any combinator becomes a Defect", () => {
     expect((await asyncOk(1).flatMap(t)).isDefect()).toBe(true);
     expect((await asyncOk(1).tap(t)).isDefect()).toBe(true);
     expect((await asyncOk(1).flatTap(t)).isDefect()).toBe(true);
-    expect((await asyncErr("e").mapErr(t)).isDefect()).toBe(true);
-    expect((await asyncErr("e").flatMapErr(t)).isDefect()).toBe(true);
-    expect((await asyncErr("e").recoverErr(t)).isDefect()).toBe(true);
+    expect((await asyncErr("e").mapErr({ Else: t })).isDefect()).toBe(true);
+    expect((await asyncErr("e").flatMapErr({ Else: t })).isDefect()).toBe(true);
+    expect((await asyncErr("e").recoverErr({ Else: t })).isDefect()).toBe(true);
     expect((await asyncErr("e").tapErr(t)).isDefect()).toBe(true);
     expect((await asyncErr("e").flatTapErr(t)).isDefect()).toBe(true);
     expect((await asyncDefect().recoverDefect(t)).isDefect()).toBe(true);
@@ -158,22 +158,22 @@ describe("AsyncResult success channel", () => {
 
 describe("AsyncResult error channel", () => {
   it("mapErr transforms the Err", async () => {
-    expect((await asyncErr("e").mapErr((s) => `${s}!`)).getErr()).toBe("e!");
+    expect((await asyncErr("e").mapErr({ Else: (s) => `${s}!` })).getErr()).toBe("e!");
   });
 
   it("flatMapErr recovers an Err", async () => {
-    expect((await asyncErr("e").flatMapErr(() => Ok(9))).get()).toBe(9);
+    expect((await asyncErr("e").flatMapErr({ Else: () => Ok(9) })).get()).toBe(9);
   });
 
   it("flatMapErr composes async recovery via a qualified boundary", async () => {
-    const r = await asyncErr<string>("e").flatMapErr(() =>
-      fromSafePromise(Promise.resolve("recovered")),
-    );
+    const r = await asyncErr<string>("e").flatMapErr({
+      Else: () => fromSafePromise(Promise.resolve("recovered")),
+    });
     expect(r.get()).toBe("recovered");
   });
 
   it("recoverErr turns an Err into an Ok", async () => {
-    expect((await asyncErr("e").recoverErr(() => 1)).get()).toBe(1);
+    expect((await asyncErr("e").recoverErr({ Else: () => 1 })).get()).toBe(1);
   });
 
   it("tapErr runs the side effect and preserves the error", async () => {
@@ -232,8 +232,8 @@ describe("AsyncResult Defect channel", () => {
   it("a Defect flows through the success and error combinators untouched", async () => {
     const f = vi.fn();
     expect((await asyncDefect().map(f)).isDefect()).toBe(true);
-    expect((await asyncDefect().mapErr(f)).isDefect()).toBe(true);
-    expect((await asyncDefect().recoverErr(f)).isDefect()).toBe(true);
+    expect((await asyncDefect().mapErr({ Else: f })).isDefect()).toBe(true);
+    expect((await asyncDefect().recoverErr({ Else: f })).isDefect()).toBe(true);
     expect(f).not.toHaveBeenCalled();
   });
 

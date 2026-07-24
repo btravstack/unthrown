@@ -24,7 +24,10 @@ the API reference.
 
 The `→ Result<…>` half of each signature is the tell — it shows how the combinator
 moves the channels: `flatMap` widens `E` to `E | E2`, `recoverErr` empties it to
-`never`, `flatMapErr` widens the value to `T | U`.
+`never`, `flatMapErr` widens the value to `T | U`. The three error
+**transformers** take a [triage object](#triaging-the-error-channel) (`{ Tag:
+(e) => …, Else: (e) => … }`) rather than a single callback; the signatures below
+abbreviate it as `{ …tags }`.
 
 | I want to…                                     | use               | signature                                                    | channel      |
 | ---------------------------------------------- | ----------------- | ------------------------------------------------------------ | ------------ |
@@ -35,9 +38,9 @@ moves the channels: `flatMap` widens `E` to `E | E2`, `recoverErr` empties it to
 | sequence steps into a named scope              | `Do`/`bind`/`let` | `bind(k, (scope) => Result<U, E2>)` → `Result<{…}, E \| E2>` | Ok           |
 | replace the value with a constant              | `as`              | `(value: U)` → `Result<U, E>`                                | Ok           |
 | drop the value (success type becomes `void`)   | `discard`         | `()` → `Result<void, E>`                                     | Ok           |
-| transform the error                            | `mapErr`          | `(e: E) => E2` → `Result<T, E2>`                             | Err          |
-| try a fallback that returns a `Result`         | `flatMapErr`      | `(e: E) => Result<U, E2>` → `Result<T \| U, E2>`             | Err          |
-| turn an error into a success value             | `recoverErr`      | `(e: E) => U` → `Result<T \| U, never>`                      | Err          |
+| transform the error (triaged by tag)           | `mapErr`          | `{ …tags: (e) => E2 }` → `Result<T, E2>`                     | Err          |
+| try a fallback that returns a `Result`         | `flatMapErr`      | `{ …tags: (e) => Result<U, E2> }` → `Result<T \| U, E2>`     | Err          |
+| turn an error into a success value             | `recoverErr`      | `{ …tags: (e) => U }` → `Result<T \| U, never>`              | Err          |
 | run a side effect on the error                 | `tapErr`          | `(e: E) => void` → `Result<T, E>`                            | Err          |
 | run a **failable** side effect on the error    | `flatTapErr`      | `(e: E) => Result<unknown, E2>` → `Result<T, E \| E2>`       | Err          |
 | recover from a defect (rare)                   | `recoverDefect`   | `(cause) => Result<U, E2>` → `Result<T \| U, E \| E2>`       | Defect       |
@@ -55,25 +58,71 @@ failures). This grid is the whole story — notice the `Defect` column is
 "passes ▸" everywhere except `recoverDefect`, the observers (`tapDefect` /
 `tapFailure`), and `match`, which is the one invariant to remember:
 
-| method                  | on `Ok`  | on `Err`        | on `Defect` | resulting `E`   |
-| ----------------------- | -------- | --------------- | ----------- | --------------- |
-| `map`                   | runs `f` | passes ▸        | passes ▸    | `E`             |
-| `flatMap`               | runs `f` | passes ▸        | passes ▸    | `E \| E2`       |
-| `tap` / `flatTap`       | runs `f` | passes ▸        | passes ▸    | `E` / `E \| E2` |
-| `mapErr`                | passes ▸ | runs `f`        | passes ▸    | `E2`            |
-| `flatMapErr`            | passes ▸ | runs `f`        | passes ▸    | `E2`            |
-| `recoverErr`            | passes ▸ | runs `f` → `Ok` | passes ▸    | `never`         |
-| `tapErr` / `flatTapErr` | passes ▸ | runs `f`        | passes ▸    | `E` / `E \| E2` |
-| `recoverDefect`         | passes ▸ | passes ▸        | runs `f`    | `E \| E2`       |
-| `tapDefect`             | passes ▸ | passes ▸        | runs `f`    | `E`             |
-| `tapFailure`            | passes ▸ | runs `f`        | runs `f`    | `E`             |
-| `match`                 | `ok()`   | `err()`         | `defect()`  | —               |
+| method                  | on `Ok`  | on `Err`      | on `Defect` | resulting `E`   |
+| ----------------------- | -------- | ------------- | ----------- | --------------- |
+| `map`                   | runs `f` | passes ▸      | passes ▸    | `E`             |
+| `flatMap`               | runs `f` | passes ▸      | passes ▸    | `E \| E2`       |
+| `tap` / `flatTap`       | runs `f` | passes ▸      | passes ▸    | `E` / `E \| E2` |
+| `mapErr`                | passes ▸ | runs a branch | passes ▸    | `E2`            |
+| `flatMapErr`            | passes ▸ | runs a branch | passes ▸    | `E2`            |
+| `recoverErr`            | passes ▸ | branch → `Ok` | passes ▸    | `never`         |
+| `tapErr` / `flatTapErr` | passes ▸ | runs `f`      | passes ▸    | `E` / `E \| E2` |
+| `recoverDefect`         | passes ▸ | passes ▸      | runs `f`    | `E \| E2`       |
+| `tapDefect`             | passes ▸ | passes ▸      | runs `f`    | `E`             |
+| `tapFailure`            | passes ▸ | runs `f`      | runs `f`    | `E`             |
+| `match`                 | `ok()`   | `err()`       | `defect()`  | —               |
 
 ::: tip `recoverErr`'s `never` under-describes the runtime
 `recoverErr` empties only the **error** channel to `never` — a `Defect` can still be
 present at runtime and flows past it untouched. See
 [The Defect Channel](./the-defect-channel).
 :::
+
+## Triaging the error channel
+
+The error **transformers** — `mapErr`, `flatMapErr`, `recoverErr` — do not take
+a single callback. They take a **triage object**: one branch per error `_tag`,
+checked for exhaustiveness at compile time, so adding a new error tag to `E`
+surfaces every site that consumes the channel:
+
+```ts
+db.reading.tryFindUniqueOrThrow({ where: { id } }).mapErr({
+  RecordNotFound: () => new ReadingNotFoundException(id),
+  DriverError: (e) => {
+    throw e.cause; // deliberate defect — and the tag leaves the outgoing E
+  },
+});
+```
+
+The rules, in order of how often you'll meet them:
+
+- **Each branch receives its narrowed variant** (`RecordNotFound` above, not the
+  union), and the outgoing type is the **union of what the branches return** — a
+  branch that `throw`s contributes nothing (its return type is `never`), so
+  converting a tag to a defect also subtracts it from `E`.
+- **`Else` is the explicit escape hatch.** A subset of tag branches plus
+  `Else: (e) => …` (receiving the full union) compiles; the blanket handling is
+  visible and greppable at the call site instead of hiding in a fallthrough.
+  `Else` is a reserved key — don't name an error tag `"Else"`.
+- **An untagged `E` uses the `Else`-only form.** `{ Else: (e) => … }` is the
+  triage-era spelling of the old single-callback `mapErr(f)` — for an `E`
+  without `_tag`s (raw validation issues, a string) it is the only form, and it
+  keeps the blanket decision explicit. A **mixed** union (tagged and untagged
+  members) also requires `Else`, since no set of tag branches can cover the
+  untagged part.
+- **Observers are exempt.** `tapErr`, `tapDefect`, `tapFailure`, and
+  `flatTapErr` keep their single callback: observing a union uniformly (a log
+  line, a metric) can't strand a future tag — only _transforming or recovering_
+  one can. That is the whole split: **you may observe a union uniformly; you may
+  not consume it without triage.**
+- **An unmodeled tag becomes a `Defect`.** At runtime, an error whose `_tag` has
+  no branch and no `Else` (only reachable outside the typed contract — a widened
+  cast, a JS caller) is a bug by definition and lands in the defect channel,
+  mirroring `matchTags`.
+
+For eliminating at the edge (folding `Ok`/`Err`/`Defect` to a plain value) the
+per-tag fold stays [`matchTags`](./tagged-errors); the triage object is the same
+idea kept _inside_ the pipeline.
 
 ## Result and AsyncResult
 

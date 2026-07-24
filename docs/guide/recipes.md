@@ -131,7 +131,7 @@ const status = matchTags(result, {
 A complete route, no `try`/`catch` anywhere: `fromSchema` validates the path
 param, `flatMap` feeds the parsed id into a repository call that returns its
 own `AsyncResult`, and `matchTags` folds every tag straight to a status code.
-A throw in `mapErr`'s callback or inside the repository call is caught by that
+A throw in a `mapErr` branch or inside the repository call is caught by that
 combinator and becomes a `Defect` — the same containment as recipe 1 — so a
 bug in any pipeline step surfaces as the `Defect` arm's 500, never an unhandled
 exception:
@@ -156,7 +156,7 @@ const app = new Hono();
 
 app.get("/users/:id", (c) => {
   const user = parseId(c.req.param("id"))
-    .mapErr(() => new InvalidId())
+    .mapErr({ Else: () => new InvalidId() })
     .toAsync()
     .flatMap((id) => userRepo.findById(id));
   // AsyncResult<User, InvalidId | NotFound>
