@@ -26,6 +26,7 @@
     "NoThenables",
     "TriageKeysOk",
     "TriageReturns",
-    "ErrTagsOf"
+    "ErrTagsOf",
+    "NoDefects"
   ]
 }

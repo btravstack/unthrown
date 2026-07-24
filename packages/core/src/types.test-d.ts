@@ -28,6 +28,7 @@ import {
   isOk,
   isResult,
   matchTags,
+  mergeTags,
   Ok,
   OkAsync,
   type OkOf,
@@ -150,11 +151,11 @@ type _flatTapped = Expect<Equal<typeof flatTapped, Result<number, "e1" | "e2">>>
 
 // flatTapErr KEEPS the value type and widens the error channel (error-side mirror);
 // as an observer it takes the *partial* triage object
-const flatTapErred = r1.flatTapErr({ Else: () => Err<"e2">("e2") });
+const flatTapErred = r1.flatTapErr(mergeTags(() => Err<"e2">("e2")));
 type _flatTapErred = Expect<Equal<typeof flatTapErred, Result<number, "e1" | "e2">>>;
 
 // recoverErr empties the error channel (to `never`)
-const recovered = r1.recoverErr({ Else: () => 0 });
+const recovered = r1.recoverErr(mergeTags(() => 0));
 type _recovered = Expect<Equal<typeof recovered, Result<number, never>>>;
 
 // discard collapses the success type to `void` (not `undefined`) — and the async mirror
@@ -167,7 +168,7 @@ type _discardedAsync = Expect<Equal<typeof discardedAsync, AsyncResult<void, "e"
 // map changes the value type; mapErr changes the error type
 const mapped = r1.map((n) => `${n}`);
 type _mapped = Expect<Equal<typeof mapped, Result<string, "e1">>>;
-const errMapped = r1.mapErr({ Else: () => 0 as const });
+const errMapped = r1.mapErr(mergeTags(() => 0 as const));
 type _errMapped = Expect<Equal<typeof errMapped, Result<number, 0>>>;
 
 // --- do-notation: bind/let accumulate a named scope, errors union ------------
@@ -333,11 +334,11 @@ new WithMsg({ ticketId: "t1" });
   // @ts-expect-error — async map callback is banned (sync surface)
   r.map(async (n) => n + 1);
   // @ts-expect-error — an async mapErr branch is banned
-  r.mapErr({ Else: async (e) => e });
+  r.mapErr(mergeTags(async (e) => e));
   // @ts-expect-error — an async recoverErr branch is banned
-  r.recoverErr({ Else: async () => 0 });
+  r.recoverErr(mergeTags(async () => 0));
   // @ts-expect-error — async tapErr branch is banned
-  r.tapErr({ Else: async () => {} });
+  r.tapErr(mergeTags(async () => {}));
   // @ts-expect-error — async tapDefect callback is banned
   r.tapDefect(async () => {});
   // @ts-expect-error — async tapFailure callback is banned
@@ -350,11 +351,11 @@ new WithMsg({ ticketId: "t1" });
   // @ts-expect-error — async map callback is banned (async surface)
   ar.map(async (n) => n + 1);
   // @ts-expect-error — an async mapErr branch is banned (async surface)
-  ar.mapErr({ Else: async (e) => e });
+  ar.mapErr(mergeTags(async (e) => e));
   // @ts-expect-error — an async recoverErr branch is banned (async surface)
-  ar.recoverErr({ Else: async () => 0 });
+  ar.recoverErr(mergeTags(async () => 0));
   // @ts-expect-error — an async tapErr branch is banned (async surface)
-  ar.tapErr({ Else: async () => {} });
+  ar.tapErr(mergeTags(async () => {}));
   // @ts-expect-error — async tapDefect callback is banned (async surface)
   ar.tapDefect(async () => {});
   // @ts-expect-error — async tapFailure callback is banned (async surface)
@@ -366,7 +367,7 @@ new WithMsg({ ticketId: "t1" });
   // Synchronous callbacks still infer exactly as before.
   const mapped = r.map((n) => n + 1);
   type _MapKeeps = Expect<Equal<typeof mapped, Result<number, "e">>>;
-  const recovered = r.recoverErr({ Else: (e) => e.length });
+  const recovered = r.recoverErr(mergeTags((e) => e.length));
   type _RecoverKeeps = Expect<Equal<typeof recovered, Result<number, never>>>;
 
   // match handlers may still be async (edge elimination is not a combinator).
@@ -415,7 +416,7 @@ new WithMsg({ ticketId: "t1" });
 }
 
 // --- error triage: mapErr/flatMapErr/recoverErr take an exhaustive per-tag ----
-// --- object (ErrTriage); Else is the explicit blanket escape hatch ----
+// --- object (ErrTriage); mergeTags is the explicit uniform escape hatch ----
 
 {
   class NotFound extends TaggedError("NotFound")<{ id: string }> {}
@@ -458,7 +459,7 @@ new WithMsg({ ticketId: "t1" });
   type _DefectDrops = Expect<Equal<ErrOf<typeof defected>, Mapped>>;
 
   // a defect-only triage empties the channel entirely
-  const allDefected = r.mapErr({ Else: (e, defect) => defect(e) });
+  const allDefected = r.mapErr(mergeTags((e, defect) => defect(e)));
   type _AllDefected = Expect<Equal<typeof allDefected, Result<number, never>>>;
 
   // flatMapErr: a defect branch contributes to neither channel
@@ -475,20 +476,24 @@ new WithMsg({ ticketId: "t1" });
   });
   type _RecDefected = Expect<Equal<typeof recDefected, Result<number | string, never>>>;
 
-  // partial + Else: the blanket branch receives the full union
-  const blanket = r.mapErr({
-    NotFound: () => new Mapped(),
-    Else: (e) => {
-      type _ElseParam = Expect<Equal<typeof e, NotFound | Conflict>>;
+  // mergeTags: the uniform handler receives the full union
+  const merged = r.mapErr(
+    mergeTags((e) => {
+      type _MergedParam = Expect<Equal<typeof e, NotFound | Conflict>>;
       return e;
-    },
-  });
-  type _Blanket = Expect<Equal<ErrOf<typeof blanket>, Mapped | NotFound | Conflict>>;
+    }),
+  );
+  type _Merged = Expect<Equal<ErrOf<typeof merged>, NotFound | Conflict>>;
 
-  // @ts-expect-error — missing a tag branch with no Else must not compile
+  // there is no partial-with-fallback: a subset of tags plus anything else
+  // must not compile — the opt-out is mergeTags, never a branch
+  // @ts-expect-error — "Else" is not a branch; the triage object is exhaustive
+  r.mapErr({ NotFound: () => new Mapped(), Else: (e: NotFound | Conflict) => e });
+
+  // @ts-expect-error — missing a tag branch must not compile
   r.mapErr({ NotFound: (e) => e });
 
-  // @ts-expect-error — a key that is neither a tag nor Else must not compile
+  // @ts-expect-error — a key that is not a tag must not compile
   r.mapErr({ NotFound: (e) => e, Conflict: (e) => e, Gone: (e: never) => e });
 
   // flatMapErr: channels are the unions of the branch-returned Results' channels
@@ -502,7 +507,7 @@ new WithMsg({ ticketId: "t1" });
   const rec = r.recoverErr({ NotFound: (e) => e.id, Conflict: () => 0 });
   type _Rec = Expect<Equal<typeof rec, Result<number | string | 0, never>>>;
 
-  // observers take the PARTIAL triage: any subset of tags, no Else required —
+  // observers take the PARTIAL triage: any subset of tags —
   // an unobserved tag flows through, so nothing can be mis-routed
   const observed = r.tapErr({ NotFound: (e) => void e.id });
   type _Observed = Expect<Equal<typeof observed, Result<number, NotFound | Conflict>>>;
@@ -511,7 +516,12 @@ new WithMsg({ ticketId: "t1" });
   type _FlatObserved = Expect<
     Equal<typeof flatObserved, Result<number, NotFound | Conflict | "audit-failed">>
   >;
-  // @ts-expect-error — a bare callback is not a triage object (wrap it in Else)
+  // merged observation: uniform, error type unchanged
+  const mergedObserved = r.tapErr(mergeTags((e) => void e));
+  type _MergedObserved = Expect<Equal<typeof mergedObserved, Result<number, NotFound | Conflict>>>;
+  // @ts-expect-error — a merged observer cannot produce a Defect (NoDefects)
+  r.tapErr(mergeTags((e, defect) => defect(e)));
+  // @ts-expect-error — a bare callback is not a triage object (use mergeTags)
   r.tapErr((e) => e);
   // @ts-expect-error — unknown keys are still rejected on observers
   r.tapErr({ Gone: (e: never) => e });
@@ -525,12 +535,12 @@ new WithMsg({ ticketId: "t1" });
   type _AFlat = Expect<Equal<typeof aflat, AsyncResult<number | string, Mapped>>>;
 }
 
-// --- error triage: an untagged (or mixed) E requires the Else form ----
+// --- error triage: an untagged (or mixed) E requires mergeTags ----
 
 {
   const untagged = Ok(1) as Result<number, string>;
-  // the Else-only form is the triage-era single-callback
-  const mapped = untagged.mapErr({ Else: (e) => e.length });
+  // mergeTags is the only form for an untagged E — the uniform decision is explicit
+  const mapped = untagged.mapErr(mergeTags((e) => e.length));
   type _Mapped = Expect<Equal<ErrOf<typeof mapped>, number>>;
   // @ts-expect-error — an empty triage cannot cover a non-empty untagged channel
   untagged.mapErr({});
@@ -539,8 +549,8 @@ new WithMsg({ ticketId: "t1" });
   const mixed = Ok(1) as Result<number, Tagged | string>;
   // @ts-expect-error — the untagged members are unreachable by tag branches
   mixed.mapErr({ Tagged: (e) => e });
-  const mixedMapped = mixed.mapErr({ Tagged: (e) => e, Else: (e) => e });
-  type _MixedElse = Expect<Equal<ErrOf<typeof mixedMapped>, Tagged | string>>;
+  const mixedMerged = mixed.mapErr(mergeTags((e) => e));
+  type _MixedMerged = Expect<Equal<ErrOf<typeof mixedMerged>, Tagged | string>>;
 
   // an empty channel needs no branches at all
   const empty = Ok(1) as Result<number, never>;

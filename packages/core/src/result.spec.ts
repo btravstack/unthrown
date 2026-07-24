@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { Err, Ok, type Result } from "./index.js";
+import { Err, mergeTags, Ok, type Result } from "./index.js";
 
 const boom = new Error("boom");
 const defectOf = (cause: unknown): Result<number, never> =>
@@ -187,10 +187,10 @@ type TagB = { _tag: "B"; b: string };
 const errA = (a: number): Result<never, TagA | TagB> => Err<TagA | TagB>({ _tag: "A", a });
 
 describe("Result.mapErr", () => {
-  it("maps the Err value through the Else branch (untagged error)", () => {
+  it("maps an untagged Err through a merged handler", () => {
     expect(
       Err("e")
-        .mapErr({ Else: (s) => `${s}!` })
+        .mapErr(mergeTags((s) => `${s}!`))
         .getErr(),
     ).toBe("e!");
   });
@@ -203,20 +203,15 @@ describe("Result.mapErr", () => {
     expect(r.getErr()).toBe("a:7");
   });
 
-  it("falls back to Else for a tag without a branch", () => {
-    const r = errA(7).mapErr({
-      B: (e) => `b:${e.b}`,
-      Else: (e) => `else:${e._tag}`,
-    });
-    expect(r.getErr()).toBe("else:A");
+  it("mergeTags handles every tag uniformly — the explicit opt-out of exhaustiveness", () => {
+    const r = errA(7).mapErr(mergeTags((e) => `merged:${e._tag}`));
+    expect(r.getErr()).toBe("merged:A");
   });
 
-  it("prefers the tag branch over Else when both are present", () => {
-    const r = errA(7).mapErr({
-      A: (e) => `a:${e.a}`,
-      Else: () => "else",
-    });
-    expect(r.getErr()).toBe("a:7");
+  it('a tag literally named "Else" is an ordinary tag (no reserved keys)', () => {
+    type TagElse = { _tag: "Else"; x: number };
+    const r = Err<TagElse>({ _tag: "Else", x: 1 }).mapErr({ Else: (e) => e.x });
+    expect(r.getErr()).toBe(1);
   });
 
   it("turns an unhandled tag (outside the typed contract) into a Defect carrying the error", () => {
@@ -234,7 +229,7 @@ describe("Result.mapErr", () => {
 
   it("passes Ok through and does not call any branch", () => {
     const f = vi.fn();
-    const r = Ok(1).mapErr({ Else: f });
+    const r = Ok(1).mapErr(mergeTags(f));
     expect(r.isOk()).toBe(true);
     if (r.isOk()) expect(r.value).toBe(1);
     expect(f).not.toHaveBeenCalled();
@@ -242,18 +237,18 @@ describe("Result.mapErr", () => {
 
   it("passes a Defect through and does not call any branch", () => {
     const f = vi.fn();
-    expect(defectOf(boom).mapErr({ Else: f }).isDefect()).toBe(true);
+    expect(defectOf(boom).mapErr(mergeTags(f)).isDefect()).toBe(true);
     expect(f).not.toHaveBeenCalled();
   });
 
   it("converts a throw into a Defect", () => {
     expect(
       Err("e")
-        .mapErr({
-          Else: () => {
+        .mapErr(
+          mergeTags(() => {
             throw boom;
-          },
-        })
+          }),
+        )
         .isDefect(),
     ).toBe(true);
   });
@@ -272,8 +267,8 @@ describe("Result.mapErr", () => {
     if (d.isDefect()) expect(d.cause).toBe(boom);
   });
 
-  it("the Else branch also receives the injected defect helper", () => {
-    const d = Err("e").mapErr({ Else: (e, defect) => defect(e) });
+  it("a merged handler also receives the injected defect helper", () => {
+    const d = Err("e").mapErr(mergeTags((e, defect) => defect(e)));
     expect(d.isDefect()).toBe(true);
     if (d.isDefect()) expect(d.cause).toBe("e");
   });
@@ -283,7 +278,7 @@ describe("Result.flatMapErr", () => {
   it("recovers an Err into an Ok", () => {
     expect(
       Err("e")
-        .flatMapErr({ Else: () => Ok(99) })
+        .flatMapErr(mergeTags(() => Ok(99)))
         .get(),
     ).toBe(99);
   });
@@ -291,7 +286,7 @@ describe("Result.flatMapErr", () => {
   it("recovers an Err into another Err", () => {
     expect(
       Err("e")
-        .flatMapErr({ Else: () => Err("e2") })
+        .flatMapErr(mergeTags(() => Err("e2")))
         .getErr(),
     ).toBe("e2");
   });
@@ -308,7 +303,7 @@ describe("Result.flatMapErr", () => {
 
   it("passes Ok through and does not call any branch", () => {
     const f = vi.fn();
-    const r = Ok(1).flatMapErr({ Else: f });
+    const r = Ok(1).flatMapErr(mergeTags(f));
     expect(r.isOk()).toBe(true);
     if (r.isOk()) expect(r.value).toBe(1);
     expect(f).not.toHaveBeenCalled();
@@ -316,7 +311,7 @@ describe("Result.flatMapErr", () => {
 
   it("passes a Defect through and does not call any branch", () => {
     const f = vi.fn();
-    expect(defectOf(boom).flatMapErr({ Else: f }).isDefect()).toBe(true);
+    expect(defectOf(boom).flatMapErr(mergeTags(f)).isDefect()).toBe(true);
     expect(f).not.toHaveBeenCalled();
   });
 
@@ -328,17 +323,17 @@ describe("Result.flatMapErr", () => {
   it("converts a throw into a Defect", () => {
     expect(
       Err("e")
-        .flatMapErr({
-          Else: () => {
+        .flatMapErr(
+          mergeTags(() => {
             throw boom;
-          },
-        })
+          }),
+        )
         .isDefect(),
     ).toBe(true);
   });
 
   it("a branch returning the injected defect(cause) becomes a Defect", () => {
-    const d = Err("e").flatMapErr({ Else: (_e, defect) => defect(boom) });
+    const d = Err("e").flatMapErr(mergeTags((_e, defect) => defect(boom)));
     expect(d.isDefect()).toBe(true);
     if (d.isDefect()) expect(d.cause).toBe(boom);
   });
@@ -348,7 +343,7 @@ describe("Result.recoverErr", () => {
   it("turns an Err into an Ok", () => {
     expect(
       Err("e")
-        .recoverErr({ Else: () => 7 })
+        .recoverErr(mergeTags(() => 7))
         .get(),
     ).toBe(7);
   });
@@ -363,13 +358,13 @@ describe("Result.recoverErr", () => {
 
   it("passes Ok through and does not call any branch", () => {
     const f = vi.fn();
-    expect(Ok(1).recoverErr({ Else: f }).get()).toBe(1);
+    expect(Ok(1).recoverErr(mergeTags(f)).get()).toBe(1);
     expect(f).not.toHaveBeenCalled();
   });
 
   it("does NOT recover a Defect — `never` empties only the error channel", () => {
     const f = vi.fn();
-    const recovered = defectOf(boom).recoverErr({ Else: f });
+    const recovered = defectOf(boom).recoverErr(mergeTags(f));
     expect(f).not.toHaveBeenCalled();
     expect(recovered.isDefect()).toBe(true);
   });
@@ -382,17 +377,17 @@ describe("Result.recoverErr", () => {
   it("converts a throw into a Defect", () => {
     expect(
       Err("e")
-        .recoverErr({
-          Else: () => {
+        .recoverErr(
+          mergeTags(() => {
             throw boom;
-          },
-        })
+          }),
+        )
         .isDefect(),
     ).toBe(true);
   });
 
   it("a branch returning the injected defect(cause) becomes a Defect (not a recovery)", () => {
-    const d = Err("e").recoverErr({ Else: (_e, defect) => defect(boom) });
+    const d = Err("e").recoverErr(mergeTags((_e, defect) => defect(boom)));
     expect(d.isDefect()).toBe(true);
     if (d.isDefect()) expect(d.cause).toBe(boom);
   });
@@ -401,15 +396,15 @@ describe("Result.recoverErr", () => {
 describe("Result.tapErr", () => {
   it("runs the side effect on Err and returns the same error", () => {
     const seen: string[] = [];
-    const r = Err("e").tapErr({ Else: (s) => seen.push(s) });
+    const r = Err("e").tapErr(mergeTags((s) => seen.push(s)));
     expect(seen).toEqual(["e"]);
     expect(r.getErr()).toBe("e");
   });
 
   it("does not run on Ok or Defect", () => {
     const f = vi.fn();
-    expect(Ok(1).tapErr({ Else: f }).get()).toBe(1);
-    expect(defectOf(boom).tapErr({ Else: f }).isDefect()).toBe(true);
+    expect(Ok(1).tapErr(mergeTags(f)).get()).toBe(1);
+    expect(defectOf(boom).tapErr(mergeTags(f)).isDefect()).toBe(true);
     expect(f).not.toHaveBeenCalled();
   });
 });
@@ -436,41 +431,41 @@ describe("Result.tapErr (per-tag partial observation)", () => {
 describe("Result.flatTapErr", () => {
   it("runs the failable effect on Err and keeps the original error on success", () => {
     const seen: string[] = [];
-    const r = Err("e").flatTapErr({
-      Else: (s) => {
+    const r = Err("e").flatTapErr(
+      mergeTags((s) => {
         seen.push(s);
         return Ok("ignored");
-      },
-    });
+      }),
+    );
     expect(seen).toEqual(["e"]);
     expect(r.getErr()).toBe("e"); // original error preserved
   });
 
   it("threads the effect's Err", () => {
-    const r = Err("e").flatTapErr({ Else: () => Err("log_failed") });
+    const r = Err("e").flatTapErr(mergeTags(() => Err("log_failed")));
     expect(r.getErr()).toBe("log_failed");
   });
 
   it("propagates a Defect from the effect", () => {
-    const r = Err("e").flatTapErr({ Else: () => defectOf(boom) });
+    const r = Err("e").flatTapErr(mergeTags(() => defectOf(boom)));
     expect(r.isDefect()).toBe(true);
   });
 
   it("does not run on Ok or Defect", () => {
     const f = vi.fn(() => Ok(1));
-    expect(Ok(1).flatTapErr({ Else: f }).get()).toBe(1);
-    expect(defectOf(boom).flatTapErr({ Else: f }).isDefect()).toBe(true);
+    expect(Ok(1).flatTapErr(mergeTags(f)).get()).toBe(1);
+    expect(defectOf(boom).flatTapErr(mergeTags(f)).isDefect()).toBe(true);
     expect(f).not.toHaveBeenCalled();
   });
 
   it("converts a throw into a Defect", () => {
     expect(
       Err("e")
-        .flatTapErr({
-          Else: () => {
+        .flatTapErr(
+          mergeTags(() => {
             throw boom;
-          },
-        })
+          }),
+        )
         .isDefect(),
     ).toBe(true);
   });
@@ -565,11 +560,11 @@ describe("Result.tapFailure (the cross-channel observer)", () => {
 describe("failure-observer throws preserve the original failure", () => {
   it("tapErr: a throwing callback yields a Defect aggregating [thrown, original]", () => {
     const boom = new Error("boom");
-    const r = Err("original").tapErr({
-      Else: () => {
+    const r = Err("original").tapErr(
+      mergeTags(() => {
         throw boom;
-      },
-    });
+      }),
+    );
     expect(r.tag).toBe("Defect");
     if (r.isDefect()) {
       expect(r.cause).toBeInstanceOf(AggregateError);
@@ -592,11 +587,11 @@ describe("failure-observer throws preserve the original failure", () => {
 
   it("flatTapErr: a throwing callback yields a Defect aggregating [thrown, original]", () => {
     const boom = new Error("boom");
-    const r = Err("original").flatTapErr({
-      Else: () => {
+    const r = Err("original").flatTapErr(
+      mergeTags(() => {
         throw boom;
-      },
-    });
+      }),
+    );
     expect(r.tag).toBe("Defect");
     if (r.isDefect()) {
       expect((r.cause as AggregateError).errors).toEqual([boom, "original"]);

@@ -1,6 +1,6 @@
 // unthrown — public type surface. Pure types, no runtime.
 
-import type { Defect } from "./defect.js";
+import type { Defect, MergedTriage } from "./defect.js";
 
 /**
  * Flatten an intersection into a single object literal so accumulated `bind` /
@@ -56,6 +56,20 @@ export type NoThenables<R> = 0 extends 1 & R
     : "unthrown: combinator callbacks are synchronous — lift async work with fromPromise and compose with flatMap";
 
 /**
+ * Rejects a `Defect`-producing merged handler on an **observer** — observation
+ * never consumes the error, so there is nothing a `Defect` marker could
+ * replace. Resolves to a no-op `unknown` when `R` carries no `Defect` arm.
+ *
+ * @typeParam R - the merged handler's inferred return type.
+ * @internal
+ */
+export type NoDefects<R> = 0 extends 1 & R
+  ? unknown // an `any` return (e.g. a test mock) is not evidence of a Defect
+  : [Extract<R, Defect>] extends [never]
+    ? unknown
+    : "unthrown: an observer cannot convert an error to a Defect — do that in a transformer (mapErr / flatMapErr) instead";
+
+/**
  * The `_tag` discriminants of the tagged members of an error union (untagged
  * members contribute nothing).
  *
@@ -87,9 +101,9 @@ export type TriageReturns<H> = {
 export type TriageOut<H> = Exclude<TriageReturns<H>, Defect>;
 
 /**
- * Rejects a triage key that is neither an error `_tag` of `E` nor `Else` —
- * inference from the object literal bypasses excess-property freshness, so a
- * typo'd tag would otherwise be silently unreachable. Resolves to a no-op
+ * Rejects a triage key that is not an error `_tag` of `E` — inference from
+ * the object literal bypasses excess-property freshness, so a typo'd tag
+ * would otherwise be silently unreachable. Resolves to a no-op
  * `unknown` when every key is known, and to an explanatory string-literal type
  * (naming the offending keys) otherwise.
  *
@@ -100,31 +114,27 @@ export type TriageOut<H> = Exclude<TriageReturns<H>, Defect>;
 export type TriageKeysOk<E, H> = H extends (...args: never[]) => unknown
   ? // a bare function would structurally satisfy the all-optional partial shape
     // (its keyof is never) and then silently observe nothing at runtime
-    "unthrown: triage takes an object of per-tag branches, not a callback — wrap it: { Else: callback }"
-  : [Exclude<keyof H, ErrTagsOf<E> | "Else">] extends [never]
+    "unthrown: triage takes an object of per-tag branches, not a callback — for uniform handling wrap it: mergeTags(callback)"
+  : [Exclude<keyof H, ErrTagsOf<E>>] extends [never]
     ? unknown
-    : `unthrown: unknown triage key(s): ${Exclude<keyof H, ErrTagsOf<E> | "Else"> &
-        string} — a branch must match an error _tag, or be Else`;
+    : `unthrown: unknown triage key(s): ${Exclude<keyof H, ErrTagsOf<E>> &
+        string} — every branch must match an error _tag (uniform handling is mergeTags(fn))`;
 
 /**
  * The **triage object** the error-transforming combinators
  * ({@link ResultMethods.mapErr | mapErr}, {@link ResultMethods.flatMapErr | flatMapErr},
  * {@link ResultMethods.recoverErr | recoverErr}) require: one branch per error
- * `_tag`, exhaustive by construction — with `Else` as the **explicit**,
- * reserved escape hatch for deliberate blanket handling.
+ * `_tag`, exhaustive by construction. The explicit opt-out is the separate
+ * {@link mergeTags} wrapper — never a branch inside the object.
  *
  * @remarks
- * Two forms are accepted:
- *
- * - **Exhaustive** — one branch for every tag in `E`, no `Else`. Available only
- *   when every member of `E` carries a `_tag`. Miss a tag and it will not
- *   compile — adding a new error tag to `E` surfaces every triage site.
- * - **Partial + `Else`** — any subset of tag branches plus an `Else` branch
- *   receiving the full error union. The blanket handling is thereby *visible*
- *   (and greppable/lintable) at the call site. An `E` with untagged members
- *   (no `_tag` discriminant) **must** use this form — for a fully untagged `E`
- *   it degenerates to `{ Else: (error) => … }`, the triage-era spelling of the
- *   old single-callback form.
+ * The object form is **exhaustive, full stop**: one branch for every tag in
+ * `E`, available only when every member of `E` carries a `_tag`. Miss a tag
+ * and it will not compile — adding a new error tag to `E` surfaces every
+ * triage site. There is deliberately no fallthrough branch inside the object;
+ * the explicit opt-out of exhaustiveness is the separate, greppable
+ * {@link mergeTags} wrapper (also the only form for an untagged or mixed `E`,
+ * where per-tag triage is impossible).
  *
  * Each branch receives the narrowed variant for its tag **and the injected
  * `defect` helper** as its second argument — the same injection `qualify`
@@ -135,17 +145,11 @@ export type TriageKeysOk<E, H> = H extends (...args: never[]) => unknown
  * inference) — so a defect branch contributes nothing to the modeled channel.
  * A branch that `throw`s still becomes a `Defect` too (the safety-net
  * invariant; its `never` return likewise contributes nothing), but prefer the
- * lint-clean `defect(...)` return. `Else`'s parameter is deliberately the full
- * `E` (not the unhandled rest) — sound, though wider than the values it can
- * receive at runtime.
+ * lint-clean `defect(...)` return.
  *
- * At runtime, an error whose `_tag` has no branch and no `Else` (possible only
- * outside the typed contract — a widened cast, a JS caller) becomes a `Defect`
- * carrying that error as its cause: an unmodeled tag is an unmodeled failure.
- * The `Else` key is reserved for the blanket branch — don't name an error tag
- * `"Else"` (an error carrying that tag routes to the blanket branch;
- * `TaggedError`'s `options.name` can keep a display name while the tag is
- * renamed).
+ * At runtime, an error whose `_tag` has no branch (possible only outside the
+ * typed contract — a widened cast, a JS caller) becomes a `Defect` carrying
+ * that error as its cause: an unmodeled tag is an unmodeled failure.
  *
  * @typeParam E - the error union being triaged.
  * @typeParam R - what every branch returns (inferred as the union of the
@@ -157,56 +161,43 @@ export type TriageKeysOk<E, H> = H extends (...args: never[]) => unknown
  *   RecordNotFound: () => new NotFoundException(id),
  *   DriverError: (e, defect) => defect(e.cause), // deliberate defect; leaves E
  * });
- * // partial, with the blanket branch made explicit:
- * result.mapErr({
- *   RecordNotFound: () => new NotFoundException(id),
- *   Else: (e) => e, // pass the rest through (typed as the full union)
- * });
+ * // uniform handling is the separate, explicit wrapper — not a branch:
+ * result.mapErr(mergeTags((e) => new WrappedError({ cause: e })));
  * ```
  *
  * @category Types
  */
-export type ErrTriage<E, R> =
-  | ({
-      readonly [K in ErrTagsOf<E>]: (
-        error: Extract<E, { _tag: K }>,
-        defect: (cause: unknown) => Defect,
-      ) => R | Defect;
-    } & {
-      // when `E` has untagged members no set of tag branches can cover them,
-      // so this conditional key makes `Else` *required* even in the
-      // otherwise-exhaustive form (it resolves to no key at all when `E` is
-      // fully tagged)
-      readonly [K in [Exclude<E, { _tag: string }>] extends [never] ? never : "Else"]: (
-        error: E,
-        defect: (cause: unknown) => Defect,
-      ) => R | Defect;
-    })
-  | ({
-      readonly [K in ErrTagsOf<E>]?: (
-        error: Extract<E, { _tag: K }>,
-        defect: (cause: unknown) => Defect,
-      ) => R | Defect;
-    } & {
-      readonly Else: (error: E, defect: (cause: unknown) => Defect) => R | Defect;
-    });
+export type ErrTriage<E, R> = {
+  readonly [K in ErrTagsOf<E>]: (
+    error: Extract<E, { _tag: K }>,
+    defect: (cause: unknown) => Defect,
+  ) => R | Defect;
+} & {
+  // when `E` has untagged members no set of tag branches can cover them, so
+  // this conditional key makes the object form unsatisfiable (it resolves to
+  // no key at all when `E` is fully tagged) — the message IS the key
+  readonly [K in [Exclude<E, { _tag: string }>] extends [never]
+    ? never
+    : "unthrown: this error union has untagged members — per-tag triage cannot cover them; use mergeTags(fn)"]: never;
+};
 
 /**
  * The **partial triage object** the error observers
  * ({@link ResultMethods.tapErr | tapErr}, {@link ResultMethods.flatTapErr | flatTapErr})
  * take — the same per-tag shape as {@link ErrTriage}, with **every branch
- * optional** (`Else` included).
+ * optional**.
  *
  * @remarks
  * Observation is inherently partial-safe: a tag without a branch is simply not
  * observed and flows through unchanged, so nothing can be mis-routed by a
  * missing branch — which is why exhaustiveness is not required here, while the
- * transformers ({@link ErrTriage}) do require it. Uniform observation is the
- * `Else`-only form (`tapErr({ Else: (e) => log(e) })`); per-tag observation
- * needs no manual `_tag` narrowing (`tapErr({ Conflict: alert })`). Branches do
- * **not** receive the injected `defect` helper — an observer's return never
- * replaces the error (`tapErr` ignores it; `flatTapErr` only threads a *new*
- * effect failure), so there is nothing for a `Defect` marker to replace.
+ * transformers ({@link ErrTriage}) do require it. Per-tag observation needs no
+ * manual `_tag` narrowing (`tapErr({ Conflict: alert })`); uniform observation
+ * is the explicit {@link mergeTags} wrapper
+ * (`tapErr(mergeTags((e) => log(e)))`). Branches do **not** receive the
+ * injected `defect` helper — an observer's return never replaces the error
+ * (`tapErr` ignores it; `flatTapErr` only threads a *new* effect failure), so
+ * there is nothing for a `Defect` marker to replace.
  *
  * @typeParam E - the error union being observed.
  * @typeParam R - what a branch returns.
@@ -215,8 +206,6 @@ export type ErrTriage<E, R> =
  */
 export type ErrTriagePartial<E, R> = {
   readonly [K in ErrTagsOf<E>]?: (error: Extract<E, { _tag: K }>) => R;
-} & {
-  readonly Else?: (error: E) => R;
 };
 
 /**
@@ -369,9 +358,17 @@ export type ResultMethods<out T, out E> = {
    * @param handlers - the triage object: per-tag branches, each mapping its
    * error to a new one (or `Else` for the deliberate blanket case).
    */
+  /**
+   * {@link mergeTags} overload of {@link ResultMethods.mapErr | mapErr}: one
+   * explicit uniform handler for every tag (and the only form for an untagged
+   * or mixed `E`). The handler receives the injected `defect` helper; the
+   * `Defect` arm of its return is subtracted from the outgoing error type.
+   */
+  mapErr<R>(handlers: MergedTriage<E, R> & NoThenables<R>): Result<T, Exclude<R, Defect>>;
   mapErr<H extends ErrTriage<E, unknown>>(
     handlers: H & TriageKeysOk<E, H> & NoThenables<TriageReturns<H>>,
   ): Result<T, TriageOut<H>>;
+
   /**
    * Sequence from an `Err` by producing another `Result` — the error-channel
    * mirror of {@link ResultMethods.flatMap | flatMap}, **triaging the error by
@@ -388,9 +385,18 @@ export type ResultMethods<out T, out E> = {
    * @param handlers - the triage object: per-tag branches, each producing a
    * fallback `Result` from its error.
    */
+  /**
+   * {@link mergeTags} overload of {@link ResultMethods.flatMapErr | flatMapErr}:
+   * one explicit uniform handler producing a fallback `Result` (or
+   * `defect(cause)`) for every tag.
+   */
+  flatMapErr<R extends Result<unknown, unknown> | Defect>(
+    handlers: MergedTriage<E, R>,
+  ): Result<T | OkOf<R>, ErrOf<R>>;
   flatMapErr<H extends ErrTriage<E, Result<unknown, unknown>>>(
     handlers: H & TriageKeysOk<E, H>,
   ): Result<T | OkOf<TriageReturns<H>>, ErrOf<TriageReturns<H>>>;
+
   /**
    * Recover from an `Err` by producing a success value, emptying the error
    * channel — **triaging the error by tag** ({@link ErrTriage}: exhaustive
@@ -410,9 +416,18 @@ export type ResultMethods<out T, out E> = {
    * @param handlers - the triage object: per-tag branches, each producing a
    * success value from its error.
    */
+  /**
+   * {@link mergeTags} overload of {@link ResultMethods.recoverErr | recoverErr}:
+   * one explicit uniform recovery for every tag (a `defect(cause)` return
+   * stays a `Defect`, not a recovery).
+   */
+  recoverErr<R>(
+    handlers: MergedTriage<E, R> & NoThenables<R>,
+  ): Result<T | Exclude<R, Defect>, never>;
   recoverErr<H extends ErrTriage<E, unknown>>(
     handlers: H & TriageKeysOk<E, H> & NoThenables<TriageReturns<H>>,
   ): Result<T | TriageOut<H>, never>;
+
   /**
    * Run a side effect on the error — **observed by tag** through a *partial*
    * triage object ({@link ErrTriagePartial}: every branch optional, `Else`
@@ -435,9 +450,16 @@ export type ResultMethods<out T, out E> = {
    * @typeParam H - the inferred partial triage object type.
    * @param handlers - per-tag side-effect branches (returns are ignored).
    */
+  /**
+   * {@link mergeTags} overload of {@link ResultMethods.tapErr | tapErr}:
+   * observe every error uniformly (`tapErr(mergeTags((e) => log(e)))`). A
+   * `Defect`-producing handler is rejected — observation never consumes.
+   */
+  tapErr<R>(handlers: MergedTriage<E, R> & NoThenables<R> & NoDefects<R>): Result<T, E>;
   tapErr<H extends ErrTriagePartial<E, unknown>>(
     handlers: H & TriageKeysOk<E, H> & NoThenables<TriageReturns<H>>,
   ): Result<T, E>;
+
   /**
    * Run a **failable** side effect on the error, keeping the original error but
    * threading the effect's own error.
@@ -460,6 +482,14 @@ export type ResultMethods<out T, out E> = {
    * @param handlers - per-tag failable side-effect branches; each `Ok` value is
    * ignored.
    */
+  /**
+   * {@link mergeTags} overload of {@link ResultMethods.flatTapErr | flatTapErr}:
+   * run one explicit uniform failable effect for every tag (its `Ok` value is
+   * ignored; its failure threads).
+   */
+  flatTapErr<R extends Result<unknown, unknown>>(
+    handlers: MergedTriage<E, R>,
+  ): Result<T, E | ErrOf<R>>;
   flatTapErr<H extends ErrTriagePartial<E, Result<unknown, unknown>>>(
     handlers: H & TriageKeysOk<E, H>,
   ): Result<T, E | ErrOf<TriageReturns<H>>>;
@@ -884,29 +914,42 @@ export type AsyncResultMethods<out T, out E> = {
    * `Defect`. An async branch is rejected at compile time
    * ({@link NotThenable}).
    */
+  /** {@link mergeTags} overload — see the sync {@link ResultMethods.mapErr | mapErr}. */
+  mapErr<R>(handlers: MergedTriage<E, R> & NoThenables<R>): AsyncResult<T, Exclude<R, Defect>>;
   mapErr<H extends ErrTriage<E, unknown>>(
     handlers: H & TriageKeysOk<E, H> & NoThenables<TriageReturns<H>>,
   ): AsyncResult<T, TriageOut<H>>;
+
   /**
    * Asynchronous {@link ResultMethods.flatMapErr | flatMapErr} — the same
    * triage object ({@link ErrTriage}). Unlike the sync form, a branch may
    * return a `Result` **or** an `AsyncResult`.
    */
+  /** {@link mergeTags} overload — see the sync {@link ResultMethods.flatMapErr | flatMapErr}. */
+  flatMapErr<R extends Result<unknown, unknown> | AsyncResult<unknown, unknown> | Defect>(
+    handlers: MergedTriage<E, R>,
+  ): AsyncResult<T | OkOf<R> | AsyncOkOf<R>, ErrOf<R> | AsyncErrOf<R>>;
   flatMapErr<H extends ErrTriage<E, Result<unknown, unknown> | AsyncResult<unknown, unknown>>>(
     handlers: H & TriageKeysOk<E, H>,
   ): AsyncResult<
     T | OkOf<TriageReturns<H>> | AsyncOkOf<TriageReturns<H>>,
     ErrOf<TriageReturns<H>> | AsyncErrOf<TriageReturns<H>>
   >;
+
   /**
    * Asynchronous {@link ResultMethods.recoverErr | recoverErr} — the same
    * triage object ({@link ErrTriage}). Branches are synchronous; a throw
    * becomes a `Defect`. An async branch is rejected at compile time
    * ({@link NotThenable}).
    */
+  /** {@link mergeTags} overload — see the sync {@link ResultMethods.recoverErr | recoverErr}. */
+  recoverErr<R>(
+    handlers: MergedTriage<E, R> & NoThenables<R>,
+  ): AsyncResult<T | Exclude<R, Defect>, never>;
   recoverErr<H extends ErrTriage<E, unknown>>(
     handlers: H & TriageKeysOk<E, H> & NoThenables<TriageReturns<H>>,
   ): AsyncResult<T | TriageOut<H>, never>;
+
   /**
    * Asynchronous {@link ResultMethods.tapErr | tapErr}. `f` is synchronous; if it
    * throws, the result is a `Defect` whose cause is an `AggregateError` of
@@ -916,9 +959,12 @@ export type AsyncResultMethods<out T, out E> = {
    * too — a failable effect belongs in
    * {@link AsyncResultMethods.flatTapErr | flatTapErr}.
    */
+  /** {@link mergeTags} overload — see the sync {@link ResultMethods.tapErr | tapErr}. */
+  tapErr<R>(handlers: MergedTriage<E, R> & NoThenables<R> & NoDefects<R>): AsyncResult<T, E>;
   tapErr<H extends ErrTriagePartial<E, unknown>>(
     handlers: H & TriageKeysOk<E, H> & NoThenables<TriageReturns<H>>,
   ): AsyncResult<T, E>;
+
   /**
    * Asynchronous {@link ResultMethods.flatTapErr | flatTapErr} — the
    * error-channel mirror of `flatTap`. `f` may return a `Result` **or** an
@@ -927,6 +973,10 @@ export type AsyncResultMethods<out T, out E> = {
    * an `AggregateError` of `[thrown, original failure]` — observing a failure
    * never destroys it.
    */
+  /** {@link mergeTags} overload — see the sync {@link ResultMethods.flatTapErr | flatTapErr}. */
+  flatTapErr<R extends Result<unknown, unknown> | AsyncResult<unknown, unknown>>(
+    handlers: MergedTriage<E, R>,
+  ): AsyncResult<T, E | ErrOf<R> | AsyncErrOf<R>>;
   flatTapErr<
     H extends ErrTriagePartial<E, Result<unknown, unknown> | AsyncResult<unknown, unknown>>,
   >(

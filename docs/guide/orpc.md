@@ -41,6 +41,7 @@ your service layer keeps speaking `Result`, and the endpoint stops needing to
 unwrap it into throws:
 
 ```ts
+import { mergeTags } from "unthrown";
 import { handlerResult } from "@unthrown/orpc/server";
 import { os } from "@orpc/server";
 import * as z from "zod";
@@ -50,7 +51,7 @@ const find = os
   .errors({ NOT_FOUND: {} })
   .handler(
     handlerResult(({ input, errors }) =>
-      repo.findPlanet(input.id).mapErr({ Else: () => errors.NOT_FOUND() }),
+      repo.findPlanet(input.id).mapErr(mergeTags(() => errors.NOT_FOUND())),
     ),
   );
 ```
@@ -91,13 +92,14 @@ side-effectful import (the packaging `@orpc/experimental-effect` uses for
 `.effect()`):
 
 ```ts
+import { mergeTags } from "unthrown";
 import "@unthrown/orpc/extensions/result";
 
 const find = os
   .input(z.object({ id: z.string() }))
   .errors({ NOT_FOUND: {} })
   .result(({ input, errors }) =>
-    repo.findPlanet(input.id).mapErr({ Else: () => errors.NOT_FOUND() }),
+    repo.findPlanet(input.id).mapErr(mergeTags(() => errors.NOT_FOUND())),
   );
 ```
 
@@ -165,8 +167,10 @@ Both halves compose into one error vocabulary across layers — a
 consumes it, all in `Result`:
 
 ```ts
-// server — the one mapErr is the whole edge: each domain error is either given
-// a client-facing code or declared not the client's business (a 500).
+// server — the one mapErr is the whole edge, and it is exhaustive: every
+// domain error is explicitly given a client-facing code or explicitly declared
+// not the client's business (a 500). A new P-code in the union becomes a
+// compile error here, never a silent 500.
 const createUser = os
   .input(z.object({ email: z.string() }))
   .errors({ EMAIL_TAKEN: {} })
@@ -174,7 +178,8 @@ const createUser = os
     handlerResult(({ input, errors }) =>
       db.user.tryCreate({ data: input }).mapErr({
         UniqueConstraintViolation: () => errors.EMAIL_TAKEN(),
-        Else: (e) => new ORPCError("INTERNAL_SERVER_ERROR", { cause: e }),
+        ForeignKeyViolation: (e) => new ORPCError("INTERNAL_SERVER_ERROR", { cause: e }),
+        DriverError: (e) => new ORPCError("INTERNAL_SERVER_ERROR", { cause: e }),
       }),
     ),
   );
