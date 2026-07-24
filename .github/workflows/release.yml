@@ -13,6 +13,10 @@ concurrency: ${{ github.workflow }}-${{ github.ref }}
 jobs:
   release:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    uses: btravstack/config/.github/workflows/release-reusable.yml@main
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    uses: btravstack/config/.github/workflows/release-reusable.yml@workflows-v1
     secrets:
       RELEASE_PAT: ${{ secrets.RELEASE_PAT }}

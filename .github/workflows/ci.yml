@@ -14,28 +14,7 @@ concurrency:
 
 jobs:
   ci:
-    uses: btravstack/config/.github/workflows/ci-reusable.yml@main
+    uses: btravstack/config/.github/workflows/ci-reusable.yml@workflows-v1
     with:
+      bundle-size: true
       test-command: "pnpm test -- --coverage --reporter=default --reporter=github-actions"
-
-  bundle-size:
-    name: Bundle Size
-    needs: ci
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
-      - run: pnpm build
-      - name: Report bundle sizes
-        run: |
-          echo "## Bundle Sizes" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Package | Size |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|------|" >> $GITHUB_STEP_SUMMARY
-          for pkg in packages/*/dist; do
-            if [ -d "$pkg" ]; then
-              size=$(du -sh "$pkg" 2>/dev/null | cut -f1)
-              name=$(basename $(dirname "$pkg"))
-              echo "| $name | $size |" >> $GITHUB_STEP_SUMMARY
-            fi
-          done
