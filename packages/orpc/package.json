@@ -1,6 +1,6 @@
 {
   "name": "@unthrown/orpc",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "oRPC integration for unthrown: Result-returning procedure handlers and an AsyncResult client, with end-to-end typed errors",
   "keywords": [
     "errors-as-values",
