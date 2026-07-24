@@ -24,10 +24,10 @@ the API reference.
 
 The `→ Result<…>` half of each signature is the tell — it shows how the combinator
 moves the channels: `flatMap` widens `E` to `E | E2`, `recoverErr` empties it to
-`never`, `flatMapErr` widens the value to `T | U`. The three error
-**transformers** take a [triage object](#triaging-the-error-channel) (`{ Tag:
-(e) => …, Else: (e) => … }`) rather than a single callback; the signatures below
-abbreviate it as `{ …tags }`.
+`never`, `flatMapErr` widens the value to `T | U`. The error combinators take a
+[triage object](#triaging-the-error-channel) (`{ Tag: (e) => …, … }`) — or the
+explicit uniform wrapper `mergeTags(fn)` — rather than a single callback; the
+signatures below abbreviate the object as `{ …tags }`.
 
 | I want to…                                     | use               | signature                                                       | channel      |
 | ---------------------------------------------- | ----------------- | --------------------------------------------------------------- | ------------ |
@@ -102,20 +102,24 @@ The rules, in order of how often you'll meet them:
   inference), so defecting a tag also removes it from `E`. A branch that
   `throw`s still becomes a defect (the safety-net invariant), but `defect(...)`
   is the lint-clean, expression-position form.
-- **`Else` is the explicit escape hatch.** A subset of tag branches plus
-  `Else: (e) => …` (receiving the full union) compiles; the blanket handling is
-  visible and greppable at the call site instead of hiding in a fallthrough.
-  `Else` is a reserved key — don't name an error tag `"Else"`.
-- **An untagged `E` uses the `Else`-only form.** `{ Else: (e) => … }` is the
+- **`mergeTags(fn)` is the explicit escape hatch — a wrapper, not a branch.**
+  The triage object itself has **no fallthrough**: it is exhaustive, full stop.
+  Uniform handling is a separate, greppable call —
+  `mapErr(mergeTags((e) => wrap(e)))` — so opting out of exhaustiveness is
+  visible at the call site and auditable across a codebase. There is no
+  partial-with-fallback middle ground: a wide union that treats several tags
+  identically writes each branch explicitly (sharing a helper), which is the
+  point — a new tag is a compile error, never silently absorbed.
+- **An untagged `E` uses `mergeTags` only.** `mapErr(mergeTags(f))` is the
   triage-era spelling of the old single-callback `mapErr(f)` — for an `E`
-  without `_tag`s (raw validation issues, a string) it is the only form, and it
-  keeps the blanket decision explicit. A **mixed** union (tagged and untagged
-  members) also requires `Else`, since no set of tag branches can cover the
-  untagged part.
+  without `_tag`s (raw validation issues, a string) per-tag triage is
+  impossible, so the uniform decision is made explicit. A **mixed** union
+  (tagged and untagged members) is the same: the object form is rejected
+  outright.
 - **Observers take the same object, partially.** `tapErr` and `flatTapErr` take
-  the _partial_ triage form: every branch optional, `Else` included — a tag
-  without a branch is simply not observed and flows through, so partiality
-  can't mis-route anything. Uniform logging is `tapErr({ Else: (e) => log(e) })`;
+  the _partial_ triage form: every branch optional — a tag without a branch is
+  simply not observed and flows through, so partiality can't mis-route
+  anything. Uniform logging is `tapErr(mergeTags((e) => log(e)))`;
   per-tag observation (`tapErr({ Conflict: alert })`) needs no manual `_tag`
   narrowing. Their branches do **not** receive `defect` — an observer's return
   never replaces the error. (`tapDefect` / `tapFailure` keep single callbacks:
@@ -123,7 +127,7 @@ The rules, in order of how often you'll meet them:
   `tapFailure` discriminates on channel, not tag.) The rule: **exhaustive when
   you consume, partial when you observe — one object shape either way.**
 - **An unmodeled tag becomes a `Defect`.** At runtime, an error whose `_tag` has
-  no branch and no `Else` (only reachable outside the typed contract — a widened
+  no branch in a transforming triage (only reachable outside the typed contract — a widened
   cast, a JS caller) is a bug by definition and lands in the defect channel,
   mirroring `matchTags`.
 

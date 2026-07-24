@@ -14,7 +14,13 @@
 // The only other casts are the builders' construction (`as OkView`/…) and the
 // `bind`/`let` scope merge (a computed key can't be spelled at the type level).
 
-import { type Defect, defect, isDefectMarker } from "./defect.js";
+import {
+  type Defect,
+  defect,
+  isDefectMarker,
+  isMergedTriage,
+  type MergedTriage,
+} from "./defect.js";
 import type {
   AsyncResult,
   Bound,
@@ -163,7 +169,7 @@ class Res<T, E> {
     return okRes<void, E>(undefined);
   }
 
-  mapErr<H extends ErrTriage<E, unknown>>(
+  mapErr<H extends ErrTriage<E, unknown> | MergedTriage<E, unknown>>(
     this: Result<T, E>,
     handlers: H,
   ): Result<T, TriageOut<H>> {
@@ -179,10 +185,11 @@ class Res<T, E> {
     }
   }
 
-  flatMapErr<H extends ErrTriage<E, Result<unknown, unknown>>>(
-    this: Result<T, E>,
-    handlers: H,
-  ): Result<T | OkOf<TriageReturns<H>>, ErrOf<TriageReturns<H>>> {
+  flatMapErr<
+    H extends
+      | ErrTriage<E, Result<unknown, unknown>>
+      | MergedTriage<E, Result<unknown, unknown> | Defect>,
+  >(this: Result<T, E>, handlers: H): Result<T | OkOf<TriageReturns<H>>, ErrOf<TriageReturns<H>>> {
     if (this.tag !== "Err") return passThrough(this);
     const handler = triageHandlerFor(handlers, this.error);
     if (!handler) return defectRes(this.error);
@@ -195,7 +202,7 @@ class Res<T, E> {
     }
   }
 
-  recoverErr<H extends ErrTriage<E, unknown>>(
+  recoverErr<H extends ErrTriage<E, unknown> | MergedTriage<E, unknown>>(
     this: Result<T, E>,
     handlers: H,
   ): Result<T | TriageOut<H>, never> {
@@ -211,7 +218,10 @@ class Res<T, E> {
     }
   }
 
-  tapErr<H extends ErrTriagePartial<E, unknown>>(this: Result<T, E>, handlers: H): Result<T, E> {
+  tapErr<H extends ErrTriagePartial<E, unknown> | MergedTriage<E, unknown>>(
+    this: Result<T, E>,
+    handlers: H,
+  ): Result<T, E> {
     if (this.tag !== "Err") return this;
     const handler = triageHandlerFor(handlers, this.error);
     // Partial observation: a tag without a branch is simply not observed.
@@ -224,10 +234,11 @@ class Res<T, E> {
     }
   }
 
-  flatTapErr<H extends ErrTriagePartial<E, Result<unknown, unknown>>>(
-    this: Result<T, E>,
-    handlers: H,
-  ): Result<T, E | ErrOf<TriageReturns<H>>> {
+  flatTapErr<
+    H extends
+      | ErrTriagePartial<E, Result<unknown, unknown>>
+      | MergedTriage<E, Result<unknown, unknown>>,
+  >(this: Result<T, E>, handlers: H): Result<T, E | ErrOf<TriageReturns<H>>> {
     if (this.tag !== "Err") return this;
     const handler = triageHandlerFor(handlers, this.error);
     // Partial observation: a tag without a branch is simply not observed.
@@ -489,13 +500,16 @@ function triageHandlerFor(
   handlers: unknown,
   error: unknown,
 ): ((error: unknown, defect?: (cause: unknown) => Defect) => unknown) | undefined {
+  if (isMergedTriage(handlers)) {
+    // The explicit uniform form: one handler for every error, tagged or not.
+    return handlers.handler as (error: unknown, defect?: (cause: unknown) => Defect) => unknown;
+  }
   const triage = handlers as Record<string, unknown>;
   const tag =
     typeof error === "object" && error !== null && "_tag" in error
       ? (error as { _tag: unknown })._tag
       : undefined;
-  const handler =
-    typeof tag === "string" && Object.hasOwn(triage, tag) ? triage[tag] : triage["Else"];
+  const handler = typeof tag === "string" && Object.hasOwn(triage, tag) ? triage[tag] : undefined;
   return typeof handler === "function"
     ? (handler as (error: unknown, defect?: (cause: unknown) => Defect) => unknown)
     : undefined;
@@ -679,7 +693,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   // implementations are typed loosely — `never` error channels keep the
   // returns bivariantly compatible — and the interface re-imposes the
   // precision, mirroring how `unwrap`'s gate is re-imposed in `types.ts`.
-  mapErr(handlers: ErrTriage<E, unknown>): AsyncResult<T, never> {
+  mapErr(handlers: ErrTriage<E, unknown> | MergedTriage<E, unknown>): AsyncResult<T, never> {
     return new AsyncRes<T, never>(
       this.promise.then((r) => {
         if (r.tag !== "Err") return passThrough(r);
@@ -697,7 +711,9 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   }
 
   flatMapErr(
-    handlers: ErrTriage<E, Result<unknown, unknown> | AsyncResult<unknown, unknown>>,
+    handlers:
+      | ErrTriage<E, Result<unknown, unknown> | AsyncResult<unknown, unknown>>
+      | MergedTriage<E, unknown>,
   ): AsyncResult<T, never> {
     return new AsyncRes<T, never>(
       this.promise.then(async (r) => {
@@ -717,7 +733,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  recoverErr(handlers: ErrTriage<E, unknown>): AsyncResult<T, never> {
+  recoverErr(handlers: ErrTriage<E, unknown> | MergedTriage<E, unknown>): AsyncResult<T, never> {
     return new AsyncRes<T, never>(
       this.promise.then((r) => {
         if (r.tag !== "Err") return passThrough(r);
@@ -734,7 +750,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  tapErr(handlers: ErrTriagePartial<E, unknown>): AsyncResult<T, E> {
+  tapErr(handlers: ErrTriagePartial<E, unknown> | MergedTriage<E, unknown>): AsyncResult<T, E> {
     return new AsyncRes<T, E>(
       this.promise.then((r) => {
         if (r.tag !== "Err") return r;
@@ -751,7 +767,9 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   }
 
   flatTapErr(
-    handlers: ErrTriagePartial<E, Result<unknown, unknown> | AsyncResult<unknown, unknown>>,
+    handlers:
+      | ErrTriagePartial<E, Result<unknown, unknown> | AsyncResult<unknown, unknown>>
+      | MergedTriage<E, unknown>,
   ): AsyncResult<T, E> {
     return new AsyncRes<T, E>(
       this.promise.then(async (r) => {

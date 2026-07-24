@@ -8,22 +8,22 @@ search-and-replace.
 
 ## API mapping
 
-| neverthrow                           | unthrown                     | Notes                                                               |
-| ------------------------------------ | ---------------------------- | ------------------------------------------------------------------- |
-| `ok(v)` / `err(e)`                   | `Ok(v)` / `Err(e)`           | constructors are capitalized                                        |
-| `result.andThen(f)`                  | `result.flatMap(f)`          | one name per concept                                                |
-| `result.map(f)`                      | same                         | callbacks must be synchronous                                       |
-| `result.mapErr(f)`                   | `result.mapErr({ … })`       | a per-tag triage object — `{ Else: f }` is the blanket form         |
-| `result.orElse(f)`                   | `result.flatMapErr({ … })`   | `flatMap` on the error channel; takes a per-tag triage object       |
-| `result.match(okFn, errFn)`          | `match({ ok, err, defect })` | the third channel is new — see below                                |
-| `result.unwrapOr(v)`                 | `result.getOr(v)`            | still throws on a Defect (a bug is not an absent value)             |
-| `ResultAsync`                        | `AsyncResult`                | `await` collapses it to a `Result`; it never rejects                |
-| `ResultAsync.fromPromise(p, mapErr)` | `fromPromise(p, qualify)`    | `qualify` must return `E` **or** `defect(cause)` — triage is forced |
-| `ResultAsync.fromSafePromise(p)`     | `fromSafePromise(p)`         | a rejection becomes a `Defect`, not an `Err`                        |
-| `Result.combine([...])`              | `all([...])`                 | any `Defect` dominates                                              |
-| `Result.combineWithAllErrors`        | —                            | error accumulation is deliberately excluded                         |
-| `safeTry(function* …)`               | `Do().bind(…).let(…)`        | see [Do Notation](./do-notation#why-not-a-generator-safetry-gen)    |
-| `fromThrowable(fn, mapErr)`          | `fromThrowable(fn, qualify)` | same idea, plus the defect arm                                      |
+| neverthrow                           | unthrown                     | Notes                                                                |
+| ------------------------------------ | ---------------------------- | -------------------------------------------------------------------- |
+| `ok(v)` / `err(e)`                   | `Ok(v)` / `Err(e)`           | constructors are capitalized                                         |
+| `result.andThen(f)`                  | `result.flatMap(f)`          | one name per concept                                                 |
+| `result.map(f)`                      | same                         | callbacks must be synchronous                                        |
+| `result.mapErr(f)`                   | `result.mapErr({ … })`       | a per-tag triage object — `mapErr(mergeTags(f))` is the uniform form |
+| `result.orElse(f)`                   | `result.flatMapErr({ … })`   | `flatMap` on the error channel; takes a per-tag triage object        |
+| `result.match(okFn, errFn)`          | `match({ ok, err, defect })` | the third channel is new — see below                                 |
+| `result.unwrapOr(v)`                 | `result.getOr(v)`            | still throws on a Defect (a bug is not an absent value)              |
+| `ResultAsync`                        | `AsyncResult`                | `await` collapses it to a `Result`; it never rejects                 |
+| `ResultAsync.fromPromise(p, mapErr)` | `fromPromise(p, qualify)`    | `qualify` must return `E` **or** `defect(cause)` — triage is forced  |
+| `ResultAsync.fromSafePromise(p)`     | `fromSafePromise(p)`         | a rejection becomes a `Defect`, not an `Err`                         |
+| `Result.combine([...])`              | `all([...])`                 | any `Defect` dominates                                               |
+| `Result.combineWithAllErrors`        | —                            | error accumulation is deliberately excluded                          |
+| `safeTry(function* …)`               | `Do().bind(…).let(…)`        | see [Do Notation](./do-notation#why-not-a-generator-safetry-gen)     |
+| `fromThrowable(fn, mapErr)`          | `fromThrowable(fn, qualify)` | same idea, plus the defect arm                                       |
 
 Most rows are a rename. `andThen` → `flatMap` is unthrown's one-name-per-concept
 rule (`flatMap` is what the operation actually is — no `chain`, no `bind` outside

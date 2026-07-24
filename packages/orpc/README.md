@@ -29,6 +29,7 @@ second error concept in between.
 ## Server — `handlerResult` / `.result()`
 
 ```ts
+import { mergeTags } from "unthrown";
 import { handlerResult } from "@unthrown/orpc/server";
 
 const find = os
@@ -36,7 +37,7 @@ const find = os
   .errors({ NOT_FOUND: {} })
   .handler(
     handlerResult(({ input, errors }) =>
-      repo.findPlanet(input.id).mapErr({ Else: () => errors.NOT_FOUND() }),
+      repo.findPlanet(input.id).mapErr(mergeTags(() => errors.NOT_FOUND())),
     ),
   );
 ```
@@ -47,13 +48,14 @@ inferable; a `Defect` rethrows its cause and stays a defect. A handler may also
 be written as `.result(...)` directly, by opting into the builder extension:
 
 ```ts
+import { mergeTags } from "unthrown";
 import "@unthrown/orpc/extensions/result";
 
 const find = os
   .input(z.object({ id: z.string() }))
   .errors({ NOT_FOUND: {} })
   .result(({ input, errors }) =>
-    repo.findPlanet(input.id).mapErr({ Else: () => errors.NOT_FOUND() }),
+    repo.findPlanet(input.id).mapErr(mergeTags(() => errors.NOT_FOUND())),
   );
 ```
 

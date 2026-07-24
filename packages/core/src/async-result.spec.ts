@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { type AsyncResult, Err, fromPromise, fromSafePromise, Ok, OkAsync } from "./index.js";
+import {
+  type AsyncResult,
+  Err,
+  fromPromise,
+  fromSafePromise,
+  mergeTags,
+  Ok,
+  OkAsync,
+} from "./index.js";
 
 const boom = new Error("boom");
 const asyncOk = <T>(v: T): AsyncResult<T, never> => Ok(v).toAsync();
@@ -76,11 +84,11 @@ describe("AsyncResult: a throw in any combinator becomes a Defect", () => {
     expect((await asyncOk(1).flatMap(t)).isDefect()).toBe(true);
     expect((await asyncOk(1).tap(t)).isDefect()).toBe(true);
     expect((await asyncOk(1).flatTap(t)).isDefect()).toBe(true);
-    expect((await asyncErr("e").mapErr({ Else: t })).isDefect()).toBe(true);
-    expect((await asyncErr("e").flatMapErr({ Else: t })).isDefect()).toBe(true);
-    expect((await asyncErr("e").recoverErr({ Else: t })).isDefect()).toBe(true);
-    expect((await asyncErr("e").tapErr({ Else: t })).isDefect()).toBe(true);
-    expect((await asyncErr("e").flatTapErr({ Else: t })).isDefect()).toBe(true);
+    expect((await asyncErr("e").mapErr(mergeTags(t))).isDefect()).toBe(true);
+    expect((await asyncErr("e").flatMapErr(mergeTags(t))).isDefect()).toBe(true);
+    expect((await asyncErr("e").recoverErr(mergeTags(t))).isDefect()).toBe(true);
+    expect((await asyncErr("e").tapErr(mergeTags(t))).isDefect()).toBe(true);
+    expect((await asyncErr("e").flatTapErr(mergeTags(t))).isDefect()).toBe(true);
     expect((await asyncDefect().recoverDefect(t)).isDefect()).toBe(true);
     expect((await asyncDefect().tapDefect(t)).isDefect()).toBe(true);
     expect((await asyncErr("e").tapFailure(t)).isDefect()).toBe(true);
@@ -158,76 +166,76 @@ describe("AsyncResult success channel", () => {
 
 describe("AsyncResult error channel", () => {
   it("mapErr transforms the Err", async () => {
-    expect((await asyncErr("e").mapErr({ Else: (s) => `${s}!` })).getErr()).toBe("e!");
+    expect((await asyncErr("e").mapErr(mergeTags((s) => `${s}!`))).getErr()).toBe("e!");
   });
 
   it("flatMapErr recovers an Err", async () => {
-    expect((await asyncErr("e").flatMapErr({ Else: () => Ok(9) })).get()).toBe(9);
+    expect((await asyncErr("e").flatMapErr(mergeTags(() => Ok(9)))).get()).toBe(9);
   });
 
   it("flatMapErr composes async recovery via a qualified boundary", async () => {
-    const r = await asyncErr<string>("e").flatMapErr({
-      Else: () => fromSafePromise(Promise.resolve("recovered")),
-    });
+    const r = await asyncErr<string>("e").flatMapErr(
+      mergeTags(() => fromSafePromise(Promise.resolve("recovered"))),
+    );
     expect(r.get()).toBe("recovered");
   });
 
   it("recoverErr turns an Err into an Ok", async () => {
-    expect((await asyncErr("e").recoverErr({ Else: () => 1 })).get()).toBe(1);
+    expect((await asyncErr("e").recoverErr(mergeTags(() => 1))).get()).toBe(1);
   });
 
   it("a triage branch returning the injected defect(cause) becomes a Defect on every transformer", async () => {
     const boom2 = new Error("boom2");
-    expect((await asyncErr("e").mapErr({ Else: (_e, defect) => defect(boom2) })).isDefect()).toBe(
+    expect((await asyncErr("e").mapErr(mergeTags((_e, defect) => defect(boom2)))).isDefect()).toBe(
       true,
     );
     expect(
-      (await asyncErr("e").flatMapErr({ Else: (_e, defect) => defect(boom2) })).isDefect(),
+      (await asyncErr("e").flatMapErr(mergeTags((_e, defect) => defect(boom2)))).isDefect(),
     ).toBe(true);
     expect(
-      (await asyncErr("e").recoverErr({ Else: (_e, defect) => defect(boom2) })).isDefect(),
+      (await asyncErr("e").recoverErr(mergeTags((_e, defect) => defect(boom2)))).isDefect(),
     ).toBe(true);
   });
 
   it("tapErr runs the side effect and preserves the error", async () => {
     const seen: string[] = [];
-    const r = await asyncErr("e").tapErr({ Else: (s) => seen.push(s) });
+    const r = await asyncErr("e").tapErr(mergeTags((s) => seen.push(s)));
     expect(seen).toEqual(["e"]);
     expect(r.getErr()).toBe("e");
   });
 
   it("flatTapErr keeps the original error when the effect succeeds", async () => {
-    const r = await asyncErr("e").flatTapErr({ Else: () => Ok("ignored") });
+    const r = await asyncErr("e").flatTapErr(mergeTags(() => Ok("ignored")));
     expect(r.getErr()).toBe("e");
   });
 
   it("flatTapErr threads the effect's Err", async () => {
-    expect((await asyncErr("e").flatTapErr({ Else: () => Err("log_failed") })).getErr()).toBe(
+    expect((await asyncErr("e").flatTapErr(mergeTags(() => Err("log_failed")))).getErr()).toBe(
       "log_failed",
     );
   });
 
   it("flatTapErr composes an async effect via a qualified boundary, keeping the error", async () => {
-    const r = await asyncErr("e").flatTapErr({
-      Else: () => fromSafePromise(Promise.resolve("logged")),
-    });
+    const r = await asyncErr("e").flatTapErr(
+      mergeTags(() => fromSafePromise(Promise.resolve("logged"))),
+    );
     expect(r.getErr()).toBe("e");
   });
 
   it("flatTapErr does not run the effect on Ok or Defect", async () => {
     const f = vi.fn(() => Ok(1));
-    expect((await asyncOk(1).flatTapErr({ Else: f })).get()).toBe(1);
-    expect((await asyncDefect().flatTapErr({ Else: f })).isDefect()).toBe(true);
+    expect((await asyncOk(1).flatTapErr(mergeTags(f))).get()).toBe(1);
+    expect((await asyncDefect().flatTapErr(mergeTags(f))).isDefect()).toBe(true);
     expect(f).not.toHaveBeenCalled();
   });
 
   it("tapErr: a throwing callback preserves the original error in an AggregateError", async () => {
     const thrown = new Error("boom");
-    const r = await asyncErr("original").tapErr({
-      Else: () => {
+    const r = await asyncErr("original").tapErr(
+      mergeTags(() => {
         throw thrown;
-      },
-    });
+      }),
+    );
     expect(r.tag).toBe("Defect");
     if (r.isDefect()) {
       expect(r.cause).toBeInstanceOf(AggregateError);
@@ -237,11 +245,11 @@ describe("AsyncResult error channel", () => {
 
   it("flatTapErr: a throwing callback preserves the original error in an AggregateError", async () => {
     const thrown = new Error("boom");
-    const r = await asyncErr("original").flatTapErr({
-      Else: () => {
+    const r = await asyncErr("original").flatTapErr(
+      mergeTags(() => {
         throw thrown;
-      },
-    });
+      }),
+    );
     expect(r.tag).toBe("Defect");
     if (r.isDefect()) {
       expect((r.cause as AggregateError).errors).toEqual([thrown, "original"]);
@@ -253,8 +261,8 @@ describe("AsyncResult Defect channel", () => {
   it("a Defect flows through the success and error combinators untouched", async () => {
     const f = vi.fn();
     expect((await asyncDefect().map(f)).isDefect()).toBe(true);
-    expect((await asyncDefect().mapErr({ Else: f })).isDefect()).toBe(true);
-    expect((await asyncDefect().recoverErr({ Else: f })).isDefect()).toBe(true);
+    expect((await asyncDefect().mapErr(mergeTags(f))).isDefect()).toBe(true);
+    expect((await asyncDefect().recoverErr(mergeTags(f))).isDefect()).toBe(true);
     expect(f).not.toHaveBeenCalled();
   });
 

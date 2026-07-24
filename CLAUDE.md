@@ -57,11 +57,14 @@ was planned).
    **transformers** (`mapErr`, `flatMapErr`, `recoverErr`) take a **triage
    object** (`ErrTriage<E, R>`), not a single callback: one branch per `_tag`,
    exhaustive at compile time — so adding a tag to `E` breaks every site that
-   consumes the channel. Deliberate blanket handling is the reserved **`Else`**
-   branch (receiving the full union), visible and greppable at the call site;
-   an untagged or mixed `E` _must_ use it (for a fully untagged `E`,
-   `{ Else: f }` is the only form — the triage-era spelling of the old
-   single-callback). Each transformer branch also receives the **injected
+   consumes the channel. The object has **no fallthrough branch**: the
+   explicit opt-out of exhaustiveness is the separate, greppable
+   **`mergeTags(fn)`** wrapper (one uniform handler for every tag), which is
+   also the only form for an untagged or mixed `E` — `mapErr(mergeTags(f))` is
+   the triage-era spelling of the old single-callback. There is deliberately
+   no partial-with-fallback middle ground; a union that treats several tags
+   identically writes each branch explicitly (a new tag must be a compile
+   error, never silently absorbed). Each transformer branch also receives the **injected
    `defect` helper** as its second argument — the same injection `qualify`
    gets (Thesis #3), and the sanctioned deliberate `Err`→`Defect` form
    (`DriverError: (e, defect) => defect(e.cause)`); the outgoing types are the
@@ -69,7 +72,7 @@ was planned).
    (`Exclude<TriageReturns<H>, Defect>`, exactly the boundary inference), so a
    defect branch — or a throwing one, the safety net — contributes nothing.
    The error **observers** (`tapErr`, `flatTapErr`) take the **partial** form
-   (`ErrTriagePartial<E, R>`: every branch optional, `Else` included) — a tag
+   (`ErrTriagePartial<E, R>`: every branch optional) or `mergeTags` — a tag
    without a branch is simply not observed and flows through, so partiality
    cannot mis-route; their branches do NOT receive `defect` (an observer's
    return never replaces the error, and withholding the helper keeps the
@@ -89,8 +92,9 @@ was planned).
   `Defect`. Nothing escapes a pipeline as a raw throw.
   This is what lets an HTTP adapter do a single `match({ ok, err, defect })`
   with **no surrounding `try/catch`**.
-- **An unmodeled tag becomes a `Defect`.** In the triage combinators, an `Err`
-  whose `_tag` has no branch and no `Else` (reachable only outside the typed
+- **An unmodeled tag becomes a `Defect`.** In the transforming triage
+  combinators, an `Err` whose `_tag` has no branch (with an object triage;
+  reachable only outside the typed
   contract — a widened cast, a JS caller) becomes a `Defect` carrying that
   error as its cause, mirroring `matchTags`; the branch lookup is
   own-property-only (`Object.hasOwn`), so a rogue tag (`"constructor"`) cannot
@@ -174,8 +178,9 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   outgoing types computed from `TriageReturns<H>` (mapErr: the union itself;
   flatMapErr: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on the async
   surface — over it; recoverErr: `T | TriageReturns<H>` with `E = never`).
-  `Else`'s parameter is deliberately the full `E`, not the unhandled rest
-  (sound, simpler inference). The **observers** `tapErr`, `flatTapErr` (the
+  Each also carries a `mergeTags` **overload** (declared BEFORE the object
+  overload — contextual inference of the merged callback's parameter depends
+  on that order). The **observers** `tapErr`, `flatTapErr` (the
   error-channel mirror of `flatTap` — runs a `Result`-returning effect on the
   error, keeps the original error, threads the effect's error) take the
   partial `ErrTriagePartial<E, R>` — no exhaustiveness, no `defect`, an
@@ -227,8 +232,12 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   re-exported from `index.ts`). It is deliberately a **plain union of two
   mapped-type forms with no top-level conditionals**: the exhaustive form's
   untagged-members gate is a conditional _mapped key_ (resolving to a required
-  `Else` when untagged members exist, to no key otherwise) — a top-level
-  conditional would defeat the variance verification below.
+  an unsatisfiable message-key when untagged members exist, to no key
+  otherwise) — a top-level conditional would defeat the variance verification
+  below. `mergeTags` lives in `defect.ts` with the other markers
+  (`MergedTriage` is a `unique symbol`-branded wrapper; `isMergedTriage` is
+  the runtime guard); observers reject a `Defect`-producing merged handler via
+  `NoDefects`.
 - constructors: `Ok` (a no-arg overload — `Ok()` — constructs a `void` success,
   `Result<void, never>`, sparing `Ok(undefined)`; `OkAsync()` mirrors it),
   `Err` (there is **no** `Defect` constructor — a defect-state
@@ -302,9 +311,11 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   tag can be namespaced for collision-safety without leaking into the display
   name; the payload reserves `name` **and** `message` via `?: never`, so the
   message is set per subclass with `override message = "…"`, never as a payload
-  field) and `matchTags(result, handlers)` (an exhaustive `{ Ok, Defect } &
-per-tag` fold; has an async overload resolving to `Promise<R>`); see the
-  `TaggedError` convention in Thesis #4.
+  field), `matchTags(result, handlers)` (an exhaustive `{ Ok, Defect } &
+per-tag` fold; has an async overload resolving to `Promise<R>`), and
+  `mergeTags(fn)` (the explicit uniform-triage wrapper of Thesis #5 — the
+  branded `MergedTriage<E, R>` the error combinators accept in place of the
+  per-tag object); see the `TaggedError` convention in Thesis #4.
 
 Deliberately **excluded** for now: **generator** do-notation (`gen`/`yield*`
 "safeTry" style — the fluent `Do`/`bind`/`let` above covers sequential code
@@ -344,7 +355,8 @@ library can be "done".
   (`Result`, the views, `AsyncResult`) inherit the fast path through them.
 - **Triage runtime and its two deliberate loosenings.** All six triage methods
   dispatch through one `triageHandlerFor` helper (own-property tag lookup, then
-  `Else`, else `undefined` → the caller mints the unmodeled-tag `Defect`).
+  the `mergeTags` wrapper's uniform handler, else `undefined` → transformers
+  mint the unmodeled-tag `Defect`, observers pass through unobserved).
   `Res`'s triage methods keep the precise generic-`H` signatures with a cast per
   branch result; `AsyncRes`'s three are typed **loosely** (`never` channels,
   bivariantly compatible) because TS cannot unify the generic triage signatures
@@ -378,7 +390,7 @@ library can be "done".
   defensively, but the type advertises no rejection channel — because the internal
   promise never rejects.
 - **Source layout** (`packages/core/src/`): `types.ts` (public types), `defect.ts`
-  (the `Defect` marker), `core.ts` (the `Res`/`AsyncRes` engine + `UnwrapError`),
+  (the `Defect` marker + the `mergeTags`/`MergedTriage` merged-triage marker), `core.ts` (the `Res`/`AsyncRes` engine + `UnwrapError`),
   `constructors.ts` (`Ok`/`Err` + guards), `do.ts` (the `Do()` do-notation entry
   — the `bind`/`let` steps themselves live on the method surface in `core.ts`),
   `interop.ts` (`from*`/`qualify`/`all`), `facade.ts` (the `Result` object),
@@ -550,9 +562,10 @@ configured outside the repo).
   type-level behaviour the runtime can't (the conditional `all`/`allFromDict`
   shapes, `Exclude<R, Defect>` boundary inference, `flatTap`/`recoverErr` channel
   widening, the `this is …` guard narrowing, `matchTags` exhaustiveness, and the
-  `ErrTriage` semantics — per-tag narrowing, throw-branch subtraction, `Else`
-  forms, missing-tag/unknown-key/async-branch rejection, untagged/mixed/`never`
-  `E`) with a
+  `ErrTriage` semantics — per-tag narrowing, defect/throw-branch subtraction,
+  `mergeTags` forms and inference, missing-tag/unknown-key/async-branch/
+  bare-callback rejection, `NoDefects` on merged observers,
+  untagged/mixed/`never` `E`) with a
   `Expect<Equal<…>>` helper plus `@ts-expect-error` for must-not-compile cases.
   They are checked by `tsc` via `tsconfig.test-d.json` (which relaxes
   `noUnusedLocals`), folded into the package's `typecheck` script — so a typing

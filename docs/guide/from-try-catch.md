@@ -113,12 +113,12 @@ its only caller isn't buying you anything yet.
 Once you've wrapped a boundary, most of what you used to do inside a `catch`
 block has a direct combinator equivalent:
 
-| `try`/`catch` idiom       | unthrown combinator                             | Example                                                         |
-| ------------------------- | ----------------------------------------------- | --------------------------------------------------------------- |
-| catch-and-default         | `getOr(fallback)`                               | `parseConfig(text).getOr(DEFAULT_CONFIG)`                       |
-| catch-and-rethrow-wrapped | `mapErr({ … })`                                 | `parseConfig(text).mapErr({ Else: (e) => new ConfigError(e) })` |
-| catch-log-rethrow         | `tapErr({ … })`                                 | `parseConfig(text).tapErr({ Else: (e) => logger.warn(e) })`     |
-| `finally` cleanup         | run before eliminating, or in every `match` arm | see below                                                       |
+| `try`/`catch` idiom       | unthrown combinator                             | Example                                                          |
+| ------------------------- | ----------------------------------------------- | ---------------------------------------------------------------- |
+| catch-and-default         | `getOr(fallback)`                               | `parseConfig(text).getOr(DEFAULT_CONFIG)`                        |
+| catch-and-rethrow-wrapped | `mapErr({ … })`                                 | `parseConfig(text).mapErr(mergeTags((e) => new ConfigError(e)))` |
+| catch-log-rethrow         | `tapErr({ … })`                                 | `parseConfig(text).tapErr(mergeTags((e) => logger.warn(e)))`     |
+| `finally` cleanup         | run before eliminating, or in every `match` arm | see below                                                        |
 
 `catch-and-default`:
 
@@ -143,7 +143,7 @@ try {
   throw new ConfigError(cause);
 }
 // after — ConfigError becomes a modeled Err, not a throw
-parseConfig(text).mapErr({ Else: (e) => new ConfigError(e) });
+parseConfig(text).mapErr(mergeTags((e) => new ConfigError(e)));
 ```
 
 `catch-log-rethrow`:
@@ -157,7 +157,7 @@ try {
   throw cause;
 }
 // after — logs, keeps the original error, still propagates as an Err
-parseConfig(text).tapErr({ Else: (e) => logger.warn("bad config", e) });
+parseConfig(text).tapErr(mergeTags((e) => logger.warn("bad config", e)));
 ```
 
 `finally` has no combinator counterpart, because a `Result` pipeline has no

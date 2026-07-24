@@ -1,5 +1,6 @@
 export { Err, ErrAsync, isDefect, isErr, isOk, Ok, OkAsync } from "./constructors.js";
 export { isResult, UnwrapError } from "./core.js";
+export { mergeTags } from "./defect.js";
 export { Do } from "./do.js";
 export { AsyncResult, Result } from "./facade.js";
 export {
@@ -15,6 +16,7 @@ export {
 } from "./interop.js";
 export { matchTags, TaggedError } from "./tagged.js";
 
+export type { MergedTriage } from "./defect.js";
 export type { TaggedErrorConstructor, TaggedErrorInstance, TagHandlers } from "./tagged.js";
 export type {
   AsyncErrOf,
