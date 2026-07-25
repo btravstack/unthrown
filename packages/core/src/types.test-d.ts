@@ -263,10 +263,14 @@ arFallible.get();
 // @ts-expect-error - async getErr requires T = never
 arFallible.getErr();
 
-// getOrThrow is NOT gated — it compiles on a fallible Result and returns T
-// (it throws the modeled error at runtime instead of eliminating it in the type)
+// getOrThrow is gated as the COMPLEMENT of get: it compiles only when the error
+// channel is NON-empty (E ≠ never) — there must be a modeled error to throw.
 type _getOrThrow = Expect<Equal<ReturnType<typeof rFallible.getOrThrow>, number>>;
 type _getOrThrowAsync = Expect<Equal<ReturnType<typeof arFallible.getOrThrow>, Promise<number>>>;
+// @ts-expect-error - getOrThrow requires E ≠ never (nothing to throw; use get())
+rNever.getOrThrow();
+// @ts-expect-error - async getOrThrow requires E ≠ never
+arNever.getOrThrow();
 
 // --- extractor types ---------------------------------------------------------
 

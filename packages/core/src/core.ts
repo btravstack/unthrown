@@ -64,7 +64,7 @@ export class UnwrapError<E = unknown> extends Error {
    */
   readonly error: E;
   constructor(error: E) {
-    super("unthrown: called unwrap on a non-matching Result", { cause: error });
+    super("unthrown: get() / getErr() called on a non-matching Result variant", { cause: error });
     this.name = "UnwrapError";
     this.error = error;
     Object.setPrototypeOf(this, new.target.prototype);
@@ -303,13 +303,6 @@ class Res<T, E> {
     }
   }
 
-  /** @deprecated Use {@link Res.get}. */
-  unwrap(this: Result<T, E>): T {
-    // Runtime-identical alias; the cast only sidesteps `get`'s type-gate, which
-    // is re-imposed on the public `unwrap` signature in `types.ts`.
-    return (this as Result<T, never>).get();
-  }
-
   getErr(this: Result<T, E>): E {
     switch (this.tag) {
       case "Err":
@@ -321,32 +314,16 @@ class Res<T, E> {
     }
   }
 
-  /** @deprecated Use {@link Res.getErr}. */
-  unwrapErr(this: Result<T, E>): E {
-    // Runtime-identical alias; the cast only sidesteps `getErr`'s type-gate.
-    return (this as Result<never, E>).getErr();
-  }
-
   getOr<U>(this: Result<T, E>, fallback: U): T | U {
     if (this.tag === "Ok") return this.value;
     if (this.tag === "Defect") throw this.cause;
     return fallback;
   }
 
-  /** @deprecated Use {@link Res.getOr}. */
-  unwrapOr<U>(this: Result<T, E>, fallback: U): T | U {
-    return this.getOr(fallback);
-  }
-
   getOrElse<U>(this: Result<T, E>, f: (error: E) => U): T | U {
     if (this.tag === "Ok") return this.value;
     if (this.tag === "Defect") throw this.cause;
     return f(this.error);
-  }
-
-  /** @deprecated Use {@link Res.getOrElse}. */
-  unwrapOrElse<U>(this: Result<T, E>, f: (error: E) => U): T | U {
-    return this.getOrElse(f);
   }
 
   getOrNull(this: Result<T, E>): T | null {
@@ -666,8 +643,8 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   // class/`implements` boundary (relating the two generic signatures fails to
   // equate `MatchErrOut<M>` on each side), so these implementations are typed
   // loosely — `never` error channels keep the returns bivariantly compatible —
-  // and the interface re-imposes the precision, mirroring how `unwrap`'s gate
-  // is re-imposed in `types.ts`.
+  // and the interface re-imposes the precision, mirroring how `get`'s `this`
+  // gate is re-imposed in `types.ts`.
   mapErr(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
   ): AsyncResult<T, never> {
@@ -816,30 +793,14 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   get(): Promise<T> {
     return this.promise.then((r) => (r as Result<T, never>).get());
   }
-  /** @deprecated Use {@link AsyncRes.get}. */
-  unwrap(): Promise<T> {
-    return this.get();
-  }
   getErr(): Promise<E> {
     return this.promise.then((r) => (r as Result<never, E>).getErr());
-  }
-  /** @deprecated Use {@link AsyncRes.getErr}. */
-  unwrapErr(): Promise<E> {
-    return this.getErr();
   }
   getOr<U>(fallback: U): Promise<T | U> {
     return this.promise.then((r) => r.getOr(fallback));
   }
-  /** @deprecated Use {@link AsyncRes.getOr}. */
-  unwrapOr<U>(fallback: U): Promise<T | U> {
-    return this.getOr(fallback);
-  }
   getOrElse<U>(f: (error: E) => U): Promise<T | U> {
     return this.promise.then((r) => r.getOrElse(f));
-  }
-  /** @deprecated Use {@link AsyncRes.getOrElse}. */
-  unwrapOrElse<U>(f: (error: E) => U): Promise<T | U> {
-    return this.getOrElse(f);
   }
   getOrNull(): Promise<T | null> {
     return this.promise.then((r) => r.getOrNull());
@@ -848,6 +809,8 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     return this.promise.then((r) => r.getOrUndefined());
   }
   getOrThrow(): Promise<T> {
-    return this.promise.then((r) => r.getOrThrow());
+    // The cast sidesteps `getOrThrow`'s `this` gate (non-empty error channel),
+    // re-imposed on the public `AsyncResultMethods` signature — mirroring `get`.
+    return this.promise.then((r) => (r as Result<T, unknown>).getOrThrow());
   }
 }

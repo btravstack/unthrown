@@ -387,7 +387,9 @@ describe("AsyncResult eliminators", () => {
   });
 
   it("getOrThrow resolves the Ok value but rejects with the modeled error on Err", async () => {
-    await expect(asyncOk(2).getOrThrow()).resolves.toBe(2);
+    // getOrThrow is gated to a non-empty error channel (E ≠ never); cast the
+    // Ok to a fallible type to exercise the resolve path.
+    await expect((asyncOk(2) as AsyncResult<number, "e">).getOrThrow()).resolves.toBe(2);
     await expect(asyncErr("e").getOrThrow()).rejects.toBe("e");
   });
 
@@ -402,7 +404,7 @@ describe("AsyncResult eliminators", () => {
     await expect(asyncDefect().getOrElse(() => 0)).rejects.toBe(boom);
     await expect(asyncDefect().getOrNull()).rejects.toBe(boom);
     await expect(asyncDefect().getOrUndefined()).rejects.toBe(boom);
-    await expect(asyncDefect().getOrThrow()).rejects.toBe(boom);
+    await expect((asyncDefect() as AsyncResult<number, "e">).getOrThrow()).rejects.toBe(boom);
   });
 
   it("Promise.all adopts AsyncResults, settling to Results", async () => {

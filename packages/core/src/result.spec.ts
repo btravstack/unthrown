@@ -677,7 +677,9 @@ describe("Result eliminators on Ok / Err", () => {
   });
 
   it("getOrThrow returns the Ok value, throws the modeled error as-is on Err, and panics on a Defect", () => {
-    expect(Ok(3).getOrThrow()).toBe(3);
+    // getOrThrow is gated to a non-empty error channel (E ≠ never); the casts
+    // give an Ok/Defect a fallible type so the runtime paths can be exercised.
+    expect((Ok(3) as Result<number, "e">).getOrThrow()).toBe(3);
 
     // Err throws the error value itself, BY REFERENCE (faithful to
     // `.flatMapErr((e) => { throw e })`). `toThrow(err)` only matches the message,
@@ -699,7 +701,7 @@ describe("Result eliminators on Ok / Err", () => {
 
     // a Defect rethrows the ORIGINAL cause with its stack (a panic, like getOrNull)
     try {
-      defectOf(boom).getOrThrow();
+      (defectOf(boom) as Result<number, "e">).getOrThrow();
       expect.unreachable();
     } catch (thrown) {
       expect(thrown).toBe(boom);

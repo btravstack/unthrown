@@ -237,21 +237,24 @@ Defect>`); flatMapErr: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on the
   (same `T | U` widening), `getOrNull`, `getOrUndefined` — the `getOr…`
   family extracts from a still-fallible `Result` with a fallback, since
   `get`/`getErr` won't compile on it. `getOrThrow` completes the `getOr…`
-  family with a **deliberate escape hatch**: not type-gated, it extracts `T` from
-  any `Result<T, E>` and **throws the modeled `error` as-is** on `Err` (and
-  panics on a `Defect`, like the rest of the family). It exists so a `no-throw`
-  lint rule can ban raw `throw` while this one sanctioned extraction remains — the
-  faithful, lint-clean form of `.flatMapErr((matcher) => matcher.with(P._, (e) => { throw e })).get()`; it is
+  family with a **deliberate escape hatch** — it **throws the modeled `error`
+  as-is** on `Err` (and panics on a `Defect`, like the rest of the family). It
+  exists so a `no-throw` lint rule can ban raw `throw` while this one sanctioned
+  extraction remains — the faithful, lint-clean form of
+  `.flatMapErr((matcher) => matcher.with(P._, (e) => { throw e })).get()`; it is
   **off the errors-as-values thesis** by design, so reach for `match` / `recoverErr`
-  / `flatMapErr` whenever the error can stay a value
-- deprecated aliases: the extractor family was unified under `get…`; the old
-  names remain as **deprecated, runtime-identical aliases** — one concept, not a
-  second: `unwrap` → `get`, `unwrapErr` → `getErr`, `unwrapOr` → `getOr`,
-  `unwrapOrElse` → `getOrElse`. Each alias just delegates to its replacement (the
-  gated `unwrap`/`unwrapErr` keep their `this` gate); slated for removal in a
-  future major. The error-channel aliases `orElse`/`recover` were **removed** in
-  the matcher major — their signatures broke anyway, so keeping them bought no
-  migration path.
+  / `flatMapErr` whenever the error can stay a value. It is type-gated as the
+  **complement of `get`**: it compiles only when the error channel is **non-empty**
+  (`E` is not `never`, spelled `this: [E] extends [never] ? never : Result<T,E>`) —
+  on a `Result<T, never>` there is nothing to throw, so `getOrThrow` does not
+  compile and `get()` is the tool. `get` and `getOrThrow` thus **partition**
+  extraction by the error channel's state, with no overlap.
+- no deprecated aliases: the extractor family is spelled **only** `get…`
+  (`get`/`getErr`/`getOr`/`getOrElse`/`getOrNull`/`getOrUndefined`/`getOrThrow`).
+  The old `unwrap`/`unwrapErr`/`unwrapOr`/`unwrapOrElse` aliases were **removed**
+  (they were runtime-identical delegates); the error-channel aliases
+  `orElse`/`recover` were removed earlier in the same major. One concept, one
+  name — no deprecated surface survives into v5.
 - ts-pattern re-exports: `match` and `P` are re-exported from `ts-pattern` (core
   depends on it), and `tag(t)` (the `{ _tag: t }` pattern, narrowing to the
   variant + payload) lives in `tagged.ts`. These make the error matcher, and
@@ -407,8 +410,8 @@ library can be "done".
   generic-`M` signatures; `AsyncRes`'s five are typed **loosely** (`never`
   channels, bivariantly compatible) because TS cannot unify the generic matcher
   signatures across the class/`implements` boundary — the public
-  `AsyncResultMethods` re-imposes the precision, the same pattern as `unwrap`'s
-  re-imposed gate. `AsyncOkOf`/`AsyncErrOf` infer through the `Awaitable` `then`
+  `AsyncResultMethods` re-imposes the precision, the same pattern as `get`'s
+  re-imposed `this` gate. `AsyncOkOf`/`AsyncErrOf` infer through the `Awaitable` `then`
   channel only (`R extends Awaitable<infer Res>`), NOT `R extends
 AsyncResult<infer T, …>` — structural inference over the whole method surface
   would pick up junk candidates.

@@ -399,11 +399,19 @@ export function allFromDict<R extends ResultRecord>(
 export function allAsync<Rs extends readonly AsyncResult<unknown, unknown>[]>(
   results: readonly [...Rs],
 ): AsyncResult<AllOk<Rs, { [K in keyof Rs]: AsyncOkOf<Rs[K]> }>, AsyncErrOf<Rs[number]>> {
-  // Each AsyncResult is a (never-rejecting) thenable, so Promise.all adopts them;
-  // `foldArray` then applies the all() rules. The internal promise never rejects.
-  const settled = Promise.all(results).then((resolved) =>
-    foldArray(resolved as readonly Result<unknown, unknown>[]),
-  );
+  // Each library AsyncResult is a never-rejecting thenable, so Promise.all
+  // adopts them; `foldArray` then applies the all() rules. Adopt every input
+  // defensively — a cast/untyped rejecting thenable becomes a `Defect` rather
+  // than rejecting the internal promise (the "internal promise never rejects"
+  // invariant holds even for out-of-contract input).
+  const settled = Promise.all(
+    results.map((r) =>
+      Promise.resolve(r).then(
+        (x) => x,
+        (cause) => defectRes(cause),
+      ),
+    ),
+  ).then((resolved) => foldArray(resolved as readonly Result<unknown, unknown>[]));
   return new AsyncRes(settled) as unknown as AsyncResult<
     AllOk<Rs, { [K in keyof Rs]: AsyncOkOf<Rs[K]> }>,
     AsyncErrOf<Rs[number]>
@@ -435,7 +443,16 @@ export function allFromDictAsync<R extends AsyncResultRecord>(
   results: R,
 ): AsyncResult<{ [K in keyof R]: AsyncOkOf<R[K]> }, AsyncErrOf<R[keyof R]>> {
   const entries = Object.entries(results);
-  const settled = Promise.all(entries.map(([, ar]) => ar)).then((resolved) => {
+  const settled = Promise.all(
+    // Adopt each input defensively (see `allAsync`): a rejecting thenable
+    // becomes a `Defect`, so the internal promise never rejects.
+    entries.map(([, ar]) =>
+      Promise.resolve(ar).then(
+        (x) => x,
+        (cause) => defectRes(cause),
+      ),
+    ),
+  ).then((resolved) => {
     // Null-proto accumulator: pairing resolved values back to keys can't pollute.
     const byKey: ResultRecord = Object.create(null) as ResultRecord;
     entries.forEach(([key], i) => {
