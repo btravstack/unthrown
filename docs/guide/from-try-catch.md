@@ -92,9 +92,10 @@ user.match({
 `Result` composes at whatever boundary you choose to draw it — there's no
 requirement that every function up and down the call stack returns one.
 `getOrThrow()` exists precisely so you can re-enter throw-land at the edges you
-haven't converted yet, on purpose — it's the one ungated extractor, throwing the
-modeled error **as-is** (unlike `get()`, which only compiles once the error
-channel is `never`):
+haven't converted yet, on purpose — it's gated the opposite way from `get()`,
+compiling only while the error channel is non-empty, and it throws the modeled
+error **as-is** (unlike `get()`, which only compiles once the error channel is
+`never`):
 
 ```ts
 // Only the read is converted. Everything downstream still expects a plain

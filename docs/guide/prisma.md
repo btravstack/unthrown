@@ -68,7 +68,7 @@ with the ts-pattern matcher gives you an exhaustive fold — the compiler lists
 exactly the cases the operation can hit:
 
 ```ts
-import { tag } from "unthrown";
+import { P, tag } from "unthrown";
 
 const created = await db.user.tryCreate({ data: { email, name } });
 
@@ -95,7 +95,7 @@ back out as the same typed error; the `try*` methods are available on the
 transaction client `tx`:
 
 ```ts
-const moved = await db.$tryTransaction((tx) =>
+const moved = db.$tryTransaction((tx) =>
   tx.account
     .tryUpdate({ where: { id: from }, data: { balance: { decrement: amount } } })
     .flatMap(() =>
@@ -125,7 +125,7 @@ cursor API — same option names, same `[results, meta]` shape:
 const page = await db.user
   .tryPaginate({ where: { active: true }, orderBy: { id: "asc" } })
   .withCursor({ limit: 20, after: req.query.cursor });
-//    ^? AsyncResult<[User[], CursorPaginationMeta], DriverError>
+//    ^? Result<[User[], CursorPaginationMeta], DriverError>
 
 page.match({
   ok: ([users, meta]) => json({ users, nextCursor: meta.endCursor, hasMore: meta.hasNextPage }),

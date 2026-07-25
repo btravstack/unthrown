@@ -48,8 +48,9 @@ before proposing a change. In particular:
 
 - **oxlint rules are binding:** no `interface` (use `type`), no `any` (use
   `unknown`). Genuine exceptions carry a targeted `oxlint-disable` with a reason.
-- **Core has no runtime dependencies.** This is a feature — protect it. Never pull
-  `ts-pattern`, `vitest`, or any interop peer into core.
+- **Core has exactly one runtime dependency, `ts-pattern`** (it powers the
+  exhaustive error matchers and is re-exported as `match`/`P`). Add no others —
+  never pull `vitest` or any interop peer into core.
 - **One name per concept.** Resist convenience aliases.
 - Public API carries full **TSDoc**; `pnpm --filter <pkg> build:docs` must stay
   warning-free.
@@ -88,8 +89,10 @@ need one.
 When a change is breaking, or a batch of changes needs to be validated in a real
 consumer before it becomes a stable major, publish it as a **beta** first instead
 of cutting the major straight to `latest`. This uses [changesets pre
-mode](https://github.com/changesets/changesets/blob/main/docs/prereleases.md); all
-eight packages are `fixed`, so they move together to the same beta version.
+mode](https://github.com/changesets/changesets/blob/main/docs/prereleases.md); the
+seven packages in the `fixed` group move together to the same beta version
+(`@unthrown/prisma` and `@unthrown/orpc` sit outside it — their majors track
+Prisma's and oRPC's cadence, not the family's).
 
 The release pipeline needs **no changes** — while a `.changeset/pre.json` is
 present, `changeset publish` (run by `release.yml`) publishes under the `beta`

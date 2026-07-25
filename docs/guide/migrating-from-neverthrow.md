@@ -124,11 +124,13 @@ those through `defect(cause)` instead.
 
 ## What you can delete after migrating
 
-- the eslint `must-use-result` setup (the `@unthrown/oxlint` rules cover the
-  equivalent surface — see [Linting](./linting));
+- the eslint `must-use-result` setup (`@unthrown/oxlint` ships a syntactic
+  `no-unhandled-result` rule that catches the common dropped-result cases —
+  direct constructor/boundary calls and locally-annotated functions — though
+  it is not a full type-aware `must-use-result`; see [Linting](./linting));
 - defensive `try`/`catch` around combinator chains — the defect channel is
   the backstop now;
 - any `E = unknown` / `E = Error` unions that existed to absorb "everything
   else" — that is the defect channel's job now.
 
-→ Continue to [Getting Started](./getting-started).
+→ Continue to [From try/catch](./from-try-catch).
