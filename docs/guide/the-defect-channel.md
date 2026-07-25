@@ -35,8 +35,8 @@ const d = Ok(1).map(() => {
 });
 
 d.map((n) => n + 1); // still a Defect — callback skipped
-d.mapErr((matcher) => matcher.with(P._, (e) => e)); // still a Defect — matcher skipped
-d.recoverErr((matcher) => matcher.with(P._, () => 0)); // still a Defect — see below
+d.mapErr((matcher) => matcher); // still a Defect — matcher skipped (E is never)
+d.recoverErr((matcher) => matcher); // still a Defect — see below
 ```
 
 That last line is the crucial one.
@@ -48,6 +48,9 @@ That last line is the crucial one.
 runtime:
 
 ```ts
+import { P } from "unthrown";
+
+// the `P._` branch is what supplies the `U` in `Result<T | U, never>`
 const recovered = d.recoverErr((matcher) => matcher.with(P._, () => 99));
 // type: Result<number, never>
 recovered.isDefect(); // => true — `never` does NOT mean "total"

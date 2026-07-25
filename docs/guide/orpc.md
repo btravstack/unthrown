@@ -137,7 +137,7 @@ The error channel is the raw inferable `ORPCError` union, discriminated by
 `code` — deliberately **not** re-wrapped into [tagged errors](./tagged-errors):
 oRPC already ships a discriminated error type, and one concept should have one
 name. Branch on `code` — in `match`'s `err` matcher (as above), a `switch`, a
-standalone [ts-pattern](./pattern-matching) `match`, or via the `.errors` data
+standalone [ts-pattern](https://github.com/gvergnaud/ts-pattern) `match`, or via the `.errors` data
 types. Because these are plain `ORPCError`s rather than `TaggedError`s, `tag(...)`
 doesn't apply here — match on the `code` field instead.
 

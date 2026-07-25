@@ -9,8 +9,7 @@ This reference is generated from the source with
   constructors (`Ok`, `Err` — a `Defect` has no constructor; it arises only at
   boundaries), guards, boundary interop
   (`fromNullable`, `fromThrowable`, `fromPromise`, `fromSafePromise`),
-  aggregation (`all`), and the tagged-error utilities (`TaggedError`,
-  `matchTags`).
+  aggregation (`all`), and the tagged-error utilities (`TaggedError`, `tag`).
 - [**@unthrown/vitest**](./vitest/) — custom Vitest matchers (`toBeOk`,
   `toBeOkWith`, `toBeErr`, `toBeErrTagged`, `toBeDefect`).
 - [**@unthrown/effect**](./effect/) — bijective `Result ↔ Exit` bridges

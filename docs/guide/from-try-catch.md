@@ -82,7 +82,7 @@ And the call site becomes an ordinary `Result`, `await`ed once:
 const user = await getUser(id); // Result<User, "not_found">
 user.match({
   ok: (u) => render(u),
-  err: (matcher) => matcher.with(P._, () => render404()),
+  err: (matcher) => matcher.with("not_found", () => render404()), // the one modeled error
   defect: (cause) => render500(cause),
 });
 ```

@@ -15,8 +15,8 @@ page](./the-defect-channel). This page covers the everyday surface.
 
 A `Result` is a real **discriminated union** — each variant carries a `tag` of
 `"Ok"` / `"Err"` / `"Defect"` plus its payload (`value` / `error` / `cause`) —
-so you can `switch` on it or [match it natively](./pattern-matching) with
-`ts-pattern`. It also carries the full method surface below; the payload is only
+so you can `switch` on it or match it natively with
+[`ts-pattern`](https://github.com/gvergnaud/ts-pattern). It also carries the full method surface below; the payload is only
 reachable once you've narrowed to a variant.
 
 ## The method surface
@@ -41,7 +41,7 @@ through untouched:
 ```ts
 Ok(2).map((n) => n + 1); // => Ok(3)
 Err("e").map((n) => n + 1); // => Err("e") — callback skipped
-Ok(2).mapErr((matcher) => matcher.with(P._, (e) => `${e}!`)); // => Ok(2) — matcher skipped
+Ok(2).mapErr((matcher) => matcher); // => Ok(2) — matcher skipped (E is never, so it's vacuously exhaustive)
 ```
 
 `tap` and `flatTap` both run a side effect and keep the original value — the
