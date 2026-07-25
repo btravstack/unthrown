@@ -31,8 +31,13 @@ total.get(); // ok
 total.getOrThrow(); // ✗ compile error — nothing to throw; use get()
 ```
 
+**`UnwrapError` is renamed to `GetError`** — it is what the `get…` extractors
+throw on a wrong-variant access, so it now lives in the `get` register (its
+message no longer says "unwrap" either). It is unreachable through well-typed
+code (only a cast or JS caller reaches it), so most callers never name it; those
+that `instanceof`/`catch` it do a one-line rename.
+
 Also: `allAsync` / `allFromDictAsync` now adopt each input defensively, so a
 cast/untyped rejecting thenable becomes a `Defect` rather than rejecting the
 internal promise (upholding "an `AsyncResult`'s internal promise never rejects"
-even for out-of-contract input). And `UnwrapError`'s message no longer says
-"unwrap".
+even for out-of-contract input).

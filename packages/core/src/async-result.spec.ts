@@ -361,13 +361,13 @@ describe("AsyncResult eliminators", () => {
     expect(await fold(asyncDefect())).toBe("defect");
   });
 
-  it("get resolves the value and rejects (via UnwrapError) on Err", async () => {
+  it("get resolves the value and rejects (via GetError) on Err", async () => {
     await expect(asyncOk(1).get()).resolves.toBe(1);
     // The Err branch is unreachable in typed code (get needs E = never);
     // force it via a cast to exercise the defensive runtime guard.
     await expect(
       (asyncErr("e") as unknown as AsyncResult<number, never>).get(),
-    ).rejects.toMatchObject({ name: "UnwrapError", error: "e" });
+    ).rejects.toMatchObject({ name: "GetError", error: "e" });
   });
 
   it("getErr resolves the error", async () => {

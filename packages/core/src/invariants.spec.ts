@@ -5,7 +5,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { Do, Err, fromSafePromise, Ok, P, type Result, UnwrapError } from "./index.js";
+import { Do, Err, fromSafePromise, Ok, P, type Result, GetError } from "./index.js";
 
 const boom = new Error("boom");
 const defectOf = (cause: unknown): Result<number, never> =>
@@ -110,17 +110,17 @@ describe("Invariant 2: a Defect flows through every method except match() and re
 });
 
 describe("Invariant 3: get() is asymmetric", () => {
-  it("on Err throws an UnwrapError carrying E", () => {
+  it("on Err throws a GetError carrying E", () => {
     try {
       // The Err branch is unreachable in typed code (get needs E = never);
       // force it via a cast to exercise the defensive runtime guard.
       (Err("modeled") as unknown as Result<number, never>).get();
       expect.unreachable();
     } catch (e) {
-      expect(e).toBeInstanceOf(UnwrapError);
-      expect((e as UnwrapError<string>).error).toBe("modeled");
+      expect(e).toBeInstanceOf(GetError);
+      expect((e as GetError<string>).error).toBe("modeled");
       // the offending value is also surfaced as the standard Error.cause
-      expect((e as UnwrapError<string>).cause).toBe("modeled");
+      expect((e as GetError<string>).cause).toBe("modeled");
     }
   });
 

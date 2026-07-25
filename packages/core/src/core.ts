@@ -40,12 +40,12 @@ import type {
  * `Ok`.
  *
  * @remarks
- * The offending value is exposed two ways: the typed {@link UnwrapError.error}
+ * The offending value is exposed two ways: the typed {@link GetError.error}
  * property for programmatic access, and the standard `Error.cause` for the
  * runtime and devtools to chain — when `E` is an `Error` (e.g. a `TaggedError`)
  * its original stack is printed under "caused by".
  *
- * A `Defect` is never wrapped in an `UnwrapError`: its original cause is
+ * A `Defect` is never wrapped in a `GetError`: its original cause is
  * re-thrown (with its original stack) instead.
  *
  * `get()` and `getErr()` are type-gated (`this: Result<T, never>` /
@@ -53,11 +53,11 @@ import type {
  * unreachable through well-typed code — it remains only as a defensive guard
  * against unsound runtime misuse (e.g. an `as` cast past the gate).
  *
- * @typeParam E - the type of the {@link UnwrapError.error} it carries.
+ * @typeParam E - the type of the {@link GetError.error} it carries.
  *
  * @category Errors
  */
-export class UnwrapError<E = unknown> extends Error {
+export class GetError<E = unknown> extends Error {
   /**
    * The offending value: the `Err` error for `get()`, or the `Ok` value for
    * `getErr()`.
@@ -65,7 +65,7 @@ export class UnwrapError<E = unknown> extends Error {
   readonly error: E;
   constructor(error: E) {
     super("unthrown: get() / getErr() called on a non-matching Result variant", { cause: error });
-    this.name = "UnwrapError";
+    this.name = "GetError";
     this.error = error;
     Object.setPrototypeOf(this, new.target.prototype);
   }
@@ -297,7 +297,7 @@ class Res<T, E> {
       case "Ok":
         return this.value;
       case "Err":
-        throw new UnwrapError(this.error);
+        throw new GetError(this.error);
       case "Defect":
         throw this.cause; // rethrow original cause, original stack
     }
@@ -308,7 +308,7 @@ class Res<T, E> {
       case "Err":
         return this.error;
       case "Ok":
-        throw new UnwrapError(this.value);
+        throw new GetError(this.value);
       case "Defect":
         throw this.cause;
     }

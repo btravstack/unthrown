@@ -82,7 +82,7 @@ error channel is `never` (`Result<T, never>`), `getErr()` only when the success
 channel is `never` (`Result<never, E>`). Calling `.get()` on a still-fallible
 `Result<T, E>` is a compile error, not a runtime throw — so the `Err` case can't
 reach either eliminator in well-typed code. The remaining wrong-variant throw
-(`UnwrapError`) is a defensive runtime guard for unsound edges (e.g. a cast), not
+(`GetError`) is a defensive runtime guard for unsound edges (e.g. a cast), not
 something you should hit normally.
 
 A `Defect`, though, is invisible to the type system — `never` on the error

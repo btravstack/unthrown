@@ -165,7 +165,7 @@ was planned).
   `getOrElse` / `getOrNull` / `getOrUndefined` family (which recover an `Err`).
   On a `Defect` they still **rethrow the original `cause`** (they _panic_) with its
   original stack — so `Result<T, never>` means the modeled error channel is empty,
-  **not** that `get()` cannot throw. The `UnwrapError`-on-wrong-variant branch
+  **not** that `get()` cannot throw. The `GetError`-on-wrong-variant branch
   remains at runtime as a defensive guard but is **unreachable through well-typed
   code** (only a cast or a raw-JS caller can reach it).
 - **`recoverErr` returns `Result<T | U, never>`, and `never` means only the _error_
@@ -433,7 +433,7 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   defensively, but the type advertises no rejection channel — because the internal
   promise never rejects.
 - **Source layout** (`packages/core/src/`): `types.ts` (public types), `defect.ts`
-  (the `Defect` marker), `core.ts` (the `Res`/`AsyncRes` engine + `UnwrapError`),
+  (the `Defect` marker), `core.ts` (the `Res`/`AsyncRes` engine + `GetError`),
   `constructors.ts` (`Ok`/`Err` + guards), `do.ts` (the `Do()` do-notation entry
   — the `bind`/`let` steps themselves live on the method surface in `core.ts`),
   `interop.ts` (`from*`/`qualify`/`all`), `facade.ts` (the `Result` object),
