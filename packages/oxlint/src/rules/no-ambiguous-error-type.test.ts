@@ -15,6 +15,12 @@ ruleTester.run("no-ambiguous-error-type", noAmbiguousErrorType, {
     { code: `import type { Result } from "unthrown";\ntype T = Result<number, { code: number }>;` },
     // A `Result` from another library is none of our business.
     { code: `import type { Result } from "neverthrow";\ntype T = Result<number, unknown>;` },
+    // Same for another library's namespace.
+    { code: `import type * as N from "neverthrow";\ntype T = N.Result<number, unknown>;` },
+    // A qualified name that isn't Result/AsyncResult is not ours to police.
+    { code: `import type * as U from "unthrown";\ntype T = U.OkView<number, unknown>;` },
+    // A default import is not the named `Result` binding.
+    { code: `import R from "unthrown";\ntype T = R<number, unknown>;` },
     // A user's own `type Error` is not the ambiguous global — resolve by scope,
     // not by name. (Regression guard for the bare-`Error` false positive.)
     {
@@ -27,6 +33,18 @@ ruleTester.run("no-ambiguous-error-type", noAmbiguousErrorType, {
     // A generic error parameter `E` is concrete — never treat it as ambiguous.
     {
       code: `import type { Result } from "unthrown";\nfunction f<E>(): Result<number, E> { throw 0; }`,
+    },
+    // A LOCAL name `Result` that is actually a rename of something else is not
+    // unthrown's Result type — resolution goes through the *imported* name.
+    // (Regression guard for the local-name false positive.)
+    {
+      code: `import { Ok as Result } from "unthrown";\ntype T = Result<number, unknown>;`,
+    },
+    // Alias indirection is a documented syntactic limit: the rule sees the
+    // type *argument* as written; an alias that resolves to `unknown` is not
+    // followed. Pinned valid on purpose — see the Linting guide.
+    {
+      code: `import type { Result } from "unthrown";\ntype E = unknown;\ntype T = Result<number, E>;`,
     },
   ],
   invalid: [
@@ -86,6 +104,26 @@ ruleTester.run("no-ambiguous-error-type", noAmbiguousErrorType, {
     // Inner scope — a nested block.
     {
       code: `import type { Result } from "unthrown";\n{ type T = Result<number, Error>; }`,
+      errors: [{ messageId: "noAmbiguousErrorType" }],
+    },
+    // `void` says nothing about the domain either.
+    {
+      code: `import type { Result } from "unthrown";\ntype T = Result<number, void>;`,
+      errors: [{ messageId: "noAmbiguousErrorType" }],
+    },
+    // A renamed import is still unthrown's Result — resolution goes through
+    // the *imported* name. (Regression guard for the rename false negative.)
+    {
+      code: `import type { Result as R } from "unthrown";\ntype T = R<number, unknown>;`,
+      errors: [{ messageId: "noAmbiguousErrorType" }],
+    },
+    {
+      code: `import type { AsyncResult as AR } from "unthrown";\ntype T = AR<number, any>;`,
+      errors: [{ messageId: "noAmbiguousErrorType" }],
+    },
+    // A namespace import's qualified name resolves too.
+    {
+      code: `import type * as U from "unthrown";\ntype T = U.Result<number, unknown>;`,
       errors: [{ messageId: "noAmbiguousErrorType" }],
     },
   ],
