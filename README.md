@@ -14,17 +14,6 @@
 
 [**Documentation**](https://btravstack.github.io/unthrown/) · [**Get Started**](https://btravstack.github.io/unthrown/guide/getting-started) · [**Why unthrown?**](https://btravstack.github.io/unthrown/guide/why-unthrown)
 
-<br/>
-
-<sub><strong>USED IN PRODUCTION AT</strong></sub>
-
-<a href="https://emeriagroup.com/fr/">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/public/emeria-dark.svg" />
-    <img src="docs/public/emeria-light.svg" alt="Emeria" height="26" />
-  </picture>
-</a>
-
 </div>
 
 Ordinary errors are _unthrown_ — returned as values, not flung up the stack.
@@ -104,6 +93,17 @@ defect, so the edge of your program needs a single `match` and no `try`/`catch`.
 | [`@unthrown/orpc`](./packages/orpc)                       | oRPC (v2) bridge: `Result`-returning handlers, `AsyncResult` client, typed errors end-to-end.       |
 | [`@unthrown/standard-schema`](./packages/standard-schema) | `fromSchema` / `fromSchemaAsync`: any Standard Schema validator into a `Result`.                    |
 | [`@unthrown/oxlint`](./packages/oxlint)                   | oxlint plugin: `no-ambiguous-error-type`, `prefer-async-result`, `no-unhandled-result`, `no-throw`. |
+
+## Used by
+
+unthrown runs in production at [**Emeria**](https://emeriagroup.com/fr/).
+
+<a href="https://emeriagroup.com/fr/">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/public/emeria-dark.svg" />
+    <img src="docs/public/emeria-light.svg" alt="Emeria" height="28" />
+  </picture>
+</a>
 
 ## Contributing
 
