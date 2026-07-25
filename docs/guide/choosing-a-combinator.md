@@ -141,6 +141,46 @@ The rules, in order of how often you'll meet them:
   throws `NonExhaustiveError`, which the combinator's throw-to-defect net turns
   into a `Defect` — an unmodeled failure.
 
+### Doing one thing for every error
+
+When you genuinely want the same handling for _any_ error — logging is the
+classic case — a single `P._` branch covers the whole union and is exhaustive by
+itself:
+
+```ts
+import { P } from "unthrown";
+
+// log whatever the error is, then let it flow through unchanged
+loadUser(id).tapErr((matcher) => matcher.with(P._, (e) => logger.error(e)));
+```
+
+The `e` is the full error union `E`. The same one-branch shape works for every
+error combinator — transform, recover, or fold at the edge:
+
+```ts
+result.mapErr((matcher) => matcher.with(P._, (e) => new AppError(e))); // any error → AppError
+result.recoverErr((matcher) => matcher.with(P._, () => fallback)); // any error → fallback value
+result.match({
+  ok: (v) => v,
+  err: (matcher) => matcher.with(P._, (e) => `failed: ${e}`),
+  defect: (c) => `bug: ${c}`,
+});
+```
+
+Unlike listing the cases, a `P._` branch **keeps compiling when you enrich `E`**
+(a new tag or `code` is already covered) — which is exactly what you want for
+"log whatever it is". When you'd rather be forced to revisit a new case, list the
+variants and omit `P._`. You can also mix the two: handle a few cases specially,
+then `P._` for the rest.
+
+```ts
+result.tapErr((matcher) =>
+  matcher
+    .with(tag("RateLimited"), (e) => metrics.rateLimit(e.retryAfter))
+    .with(P._, (e) => logger.error(e)),
+);
+```
+
 For eliminating at the edge (folding `Ok`/`Err`/`Defect` to a plain value), the
 same matcher drives [`match`](./tagged-errors#matching-a-tagged-error-union-with-match)'s
 `err` handler, or you can match the whole `Result` with ts-pattern's `match`; the
