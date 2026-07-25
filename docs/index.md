@@ -73,7 +73,7 @@ import { withBase } from "vitepress";
 
 <div class="used-by">
   <span class="used-by__label">Used in production at</span>
-  <a class="used-by__link" href="https://emeriagroup.com/fr/" target="_blank" rel="noopener" aria-label="Emeria">
+  <a class="used-by__link" href="https://emeriagroup.com/fr/" target="_blank" rel="noopener noreferrer" aria-label="Emeria">
     <img :src="withBase('/emeria-light.svg')" alt="Emeria" class="used-by__logo used-by__logo--light" />
     <img :src="withBase('/emeria-dark.svg')" alt="Emeria" class="used-by__logo used-by__logo--dark" />
   </a>

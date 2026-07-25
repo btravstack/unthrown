@@ -67,7 +67,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1.1rem;
+  /* No container gap on wide screens — the divider pseudo-element owns the
+   * spacing on both sides (see `.used-by__label::after`). The column layout
+   * below re-introduces a gap once the divider is hidden. */
   max-width: 640px;
   margin: 4.5rem auto 1rem;
   padding-top: 2.5rem;
@@ -88,7 +90,9 @@
   display: inline-block;
   width: 1px;
   height: 0.95em;
-  margin-left: 1.1rem;
+  /* Owns the full label↔logo spacing: 1.1rem on each side of the bar, so the
+   * lockup is symmetric with one knob and no container gap. */
+  margin: 0 1.1rem;
   vertical-align: -0.12em;
   background: var(--vp-c-divider);
 }
