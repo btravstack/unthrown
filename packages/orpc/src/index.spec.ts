@@ -24,7 +24,7 @@ import {
 } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import "@unthrown/vitest";
-import { Err, fromSafePromise, Ok, P, type Result } from "unthrown";
+import { type AsyncResult, Err, fromSafePromise, Ok, P, type Result } from "unthrown";
 import { describe, expect, test } from "vitest";
 
 import { createResultClient, fromCall } from "./client.js";
@@ -217,6 +217,20 @@ describe("createResultClient", () => {
     const weird = Object.assign(() => Promise.resolve(1), { version: 3 });
     const wrapped = createResultClient(weird as never) as unknown as { version: number };
     expect(wrapped.version).toBe(3);
+  });
+
+  test("a synchronously-throwing callable yields a Defect, not a raw throw", async () => {
+    // Out of contract for a real oRPC client (a procedure call returns a
+    // promise), but reachable through the untyped proxy: the call runs inside
+    // the fromPromise thunk boundary, so the throw must land in the Defect
+    // channel instead of escaping the AsyncResult raw.
+    const boom = new Error("sync boom");
+    const throwing = createResultClient((() => {
+      throw boom;
+    }) as never) as unknown as () => AsyncResult<unknown, never>;
+    const result = await throwing();
+    expect(result).toBeDefect();
+    if (result.isDefect()) expect(result.cause).toBe(boom);
   });
 
   test("call options thread through to the handler (signal observed)", async () => {
