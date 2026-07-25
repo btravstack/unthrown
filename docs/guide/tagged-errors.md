@@ -55,7 +55,8 @@ set `this.message` in a constructor override.
 
 ### Namespacing the tag without renaming the error
 
-`_tag` is the discriminant `matchTags` dispatches on; `Error.name` is the
+`_tag` is the discriminant `match`'s error matcher (and `tag(t)`) dispatches on;
+`Error.name` is the
 human-facing label in stack traces and logs. By default they're the same, but a
 second `options.name` argument decouples them — so you can namespace a tag for
 collision-safety without that prefix leaking into the display name:
@@ -82,35 +83,55 @@ function authorize(id: string): Result<User, ApiError> {
 }
 ```
 
-## `matchTags`
+## Matching a tagged error union with `match`
 
-`matchTags` is a zero-dependency, **exhaustive** fold over a `Result` whose error
-is a tagged union. The handler object provides `Ok`, `Defect`, and exactly one
-branch per error tag — each receiving the narrowed variant:
+To fold a `Result` whose error is a tagged union straight to a value, use
+`match`. Its `ok` and `defect` handlers are plain callbacks; its **`err` handler
+receives the ts-pattern error matcher** — the same exhaustive matcher the error
+combinators use — so you add one branch per tag with `tag(t)` and **return the
+un-terminated builder** (`match` calls `.exhaustive()` for you):
 
 ```ts
-import { matchTags } from "unthrown";
+import { P, tag } from "unthrown";
 
-const status = matchTags(authorize(id), {
-  Ok: () => 200,
-  Defect: (cause) => {
+const status = authorize(id).match({
+  ok: () => 200,
+  defect: (cause) => {
     logger.error(cause);
     return 500;
   },
-  NotFound: () => 404,
-  Forbidden: (e) => {
-    audit(e.user); // narrowed to Forbidden — `user` is available
-    return 403;
-  },
+  err: (matcher) =>
+    matcher
+      .with(tag("NotFound"), () => 404)
+      .with(tag("Forbidden"), (e) => {
+        audit(e.user); // narrowed to Forbidden — `user` is available
+        return 403;
+      }),
 });
 ```
 
 Miss a tag and it **won't compile** — exhaustiveness is enforced by the type,
-with no `.exhaustive()` to forget. For an `AsyncResult`, `matchTags` resolves to
-a `Promise<R>`.
+with no `.exhaustive()` to forget. For an `AsyncResult`, `match` resolves to a
+`Promise<R>`.
 
-`matchTags` covers the everyday case. When you need richer matching — guards,
-nested patterns, wildcards — reach for [pattern matching](./pattern-matching)
-with `ts-pattern`.
+The matcher isn't limited to `_tag`. Because ts-pattern matches by structure,
+you can also branch on a `code`, on a guard, or on grouped patterns, and
+`.with(P._, (e) => …)` is the deliberate catch-all when you want to handle every
+error the same way:
+
+```ts
+const status = authorize(id).match({
+  ok: () => 200,
+  defect: () => 500,
+  err: (matcher) => matcher.with(P._, () => 403), // every error → 403
+});
+```
+
+Unlike the error _combinators_ (`mapErr`, `flatMapErr`, …), `match`'s `err`
+handler receives **no `defect` helper** — `match` is total elimination to a
+value, and a `Result` that already carries a defect is handled by the `defect:`
+case. To keep matching _inside_ the pipeline (transforming or recovering the
+error rather than eliminating it), reach for those combinators instead — see
+[Choosing a combinator](./choosing-a-combinator#triaging-the-error-channel).
 
 → Continue to [Testing](./testing).

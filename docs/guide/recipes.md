@@ -26,7 +26,7 @@ modeled statuses are mapped in a `flatMap` (a `throw` there, like an unexpected
 status or malformed JSON, becomes a `Defect`):
 
 ```ts
-import { fromPromise, Err } from "unthrown";
+import { fromPromise, Err, tag } from "unthrown";
 
 const loadProfile = (id: string) =>
   // A network error (a rejected fetch) is unexpected → defect.
@@ -39,9 +39,13 @@ const loadProfile = (id: string) =>
 // AsyncResult<Profile, NotFound | Forbidden>
 
 async function handler(id: string): Promise<HttpResponse> {
+  // Each channel folds to its own shape; the result type unions them.
   return (await loadProfile(id)).match({
     ok: (profile) => ({ status: 200, body: profile }),
-    err: (e) => ({ status: e._tag === "NotFound" ? 404 : 403, body: e }),
+    err: (matcher) =>
+      matcher
+        .with(tag("NotFound"), (e) => ({ status: 404, body: e }))
+        .with(tag("Forbidden"), (e) => ({ status: 403, body: e })),
     defect: (cause) => {
       logger.error(cause); // a real bug — log it, don't leak it
       return { status: 500, body: "Internal Error" };
@@ -105,24 +109,27 @@ position, `allFromDict` / `allFromDictAsync`.)
 
 ## 5. Fold a tagged-error union exhaustively
 
-When you want a branch per error tag (not just per channel), `matchTags` is an
-exhaustive fold — miss a tag and it won't compile, with no `.exhaustive()` to
+When you want a branch per error tag (not just per channel), drive `match`'s
+`err` handler with the ts-pattern matcher and one `tag(...)` branch per variant —
+an exhaustive fold, miss a tag and it won't compile, with no `.exhaustive()` to
 forget:
 
 ```ts
-import { matchTags, type Result } from "unthrown";
+import { tag, type Result } from "unthrown";
 
 declare const result: Result<Profile, ProfileError>;
 
-const status = matchTags(result, {
-  Ok: () => 200,
-  Defect: (cause) => {
+const status = result.match({
+  ok: () => 200,
+  defect: (cause) => {
     logger.error(cause);
     return 500;
   },
-  NotFound: (e) => (logger.info(`missing ${e.id}`), 404),
-  Forbidden: () => 403,
-  InvalidProfile: (e) => (logger.warn(`bad ${e.field}`), 422),
+  err: (matcher) =>
+    matcher
+      .with(tag("NotFound"), (e) => (logger.info(`missing ${e.id}`), 404))
+      .with(tag("Forbidden"), () => 403)
+      .with(tag("InvalidProfile"), (e) => (logger.warn(`bad ${e.field}`), 422)),
 });
 ```
 
@@ -130,7 +137,8 @@ const status = matchTags(result, {
 
 A complete route, no `try`/`catch` anywhere: `fromSchema` validates the path
 param, `flatMap` feeds the parsed id into a repository call that returns its
-own `AsyncResult`, and `matchTags` folds every tag straight to a status code.
+own `AsyncResult`, and `match`'s error matcher folds every tag straight to a
+status code.
 A throw in a `mapErr` branch or inside the repository call is caught by that
 combinator and becomes a `Defect` — the same containment as recipe 1 — so a
 bug in any pipeline step surfaces as the `Defect` arm's 500, never an unhandled
@@ -140,7 +148,7 @@ exception:
 import { Hono } from "hono";
 import { z } from "zod";
 import { fromSchema } from "@unthrown/standard-schema";
-import { matchTags, P, TaggedError, type AsyncResult } from "unthrown";
+import { P, tag, TaggedError, type AsyncResult } from "unthrown";
 
 class InvalidId extends TaggedError("InvalidId") {}
 
@@ -156,16 +164,18 @@ const app = new Hono();
 
 app.get("/users/:id", (c) => {
   const user = parseId(c.req.param("id"))
-    .mapErr((m) => m.with(P._, () => new InvalidId()))
+    .mapErr((matcher) => matcher.with(P._, () => new InvalidId()))
     .toAsync()
     .flatMap((id) => userRepo.findById(id));
   // AsyncResult<User, InvalidId | NotFound>
 
-  return matchTags(user, {
-    Ok: (u) => c.json(u, 200),
-    InvalidId: () => c.json({ error: "invalid id" }, 400),
-    NotFound: (e) => c.json({ error: `no user ${e.id}` }, 404),
-    Defect: (cause) => {
+  return user.match({
+    ok: (u) => c.json(u, 200),
+    err: (matcher) =>
+      matcher
+        .with(tag("InvalidId"), () => c.json({ error: "invalid id" }, 400))
+        .with(tag("NotFound"), (e) => c.json({ error: `no user ${e.id}` }, 404)),
+    defect: (cause) => {
       logger.error(cause); // a real bug — log it, don't leak it
       return c.json({ error: "Internal Error" }, 500);
     },
@@ -173,7 +183,7 @@ app.get("/users/:id", (c) => {
 });
 ```
 
-`matchTags` accepts an `AsyncResult` directly and resolves to a `Promise` —
+`match` accepts an `AsyncResult` directly and resolves to a `Promise` —
 Hono awaits whatever the handler returns, so there's no manual `await` to
 remember.
 
@@ -185,6 +195,7 @@ the validator's own **issues array** — not the schema library's exception
 type. Map that array to per-field messages in the `err` arm:
 
 ```ts
+import { P } from "unthrown";
 import { z } from "zod";
 import { fromSchema, type SchemaIssues } from "@unthrown/standard-schema";
 
@@ -201,20 +212,27 @@ const fieldOf = (issue: SchemaIssues[number]) => {
   return key === undefined ? "_form" : String(key);
 };
 
-function validateSignup(input: unknown) {
+type ValidationResult =
+  | { ok: true; data: { email: string; password: string } }
+  | { ok: false; fieldErrors: Record<string, string[]> };
+
+function validateSignup(input: unknown): ValidationResult {
   return parseSignup(input).match({
-    ok: (data) => ({ ok: true as const, data }),
-    err: (issues) => ({
-      ok: false as const,
-      fieldErrors: issues.reduce<Record<string, string[]>>((byField, issue) => {
-        const field = fieldOf(issue);
-        (byField[field] ??= []).push(issue.message);
-        return byField;
-      }, {}),
-    }),
+    ok: (data) => ({ ok: true, data }),
+    // the error channel is the issues array (not a tagged union) — the `P._`
+    // catch-all hands it to the branch, where it's reduced to per-field messages
+    err: (matcher) =>
+      matcher.with(P._, (issues) => ({
+        ok: false as const,
+        fieldErrors: issues.reduce<Record<string, string[]>>((byField, issue) => {
+          const field = fieldOf(issue);
+          (byField[field] ??= []).push(issue.message);
+          return byField;
+        }, {}),
+      })),
     defect: (cause) => {
       logger.error(cause); // the validator itself threw — a real bug, not a bad form
-      return { ok: false as const, fieldErrors: { _form: ["Something went wrong."] } };
+      return { ok: false, fieldErrors: { _form: ["Something went wrong."] } };
     },
   });
 }

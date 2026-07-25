@@ -51,7 +51,7 @@ pnpm add unthrown
 ## Quick Example
 
 ```ts
-import { fromPromise, TaggedError } from "unthrown";
+import { fromPromise, P, TaggedError } from "unthrown";
 
 // Our modeled domain failure:
 class NotFound extends TaggedError("NotFound") {}
@@ -67,7 +67,8 @@ const user = fromPromise(fetchUser(id), (cause, defect) =>
 // Handle every channel once, at the edge — no surrounding try/catch.
 const status = await user.match({
   ok: () => 200,
-  err: () => 404, // your modeled NotFound
+  // `err` receives the exhaustive ts-pattern matcher; `.with(P._, …)` handles every error:
+  err: (matcher) => matcher.with(P._, () => 404), // your modeled NotFound
   defect: (cause) => {
     logger.error(cause); // everything unexpected
     return 500;
@@ -80,17 +81,17 @@ defect, so the edge of your program needs a single `match` and no `try`/`catch`.
 
 ## Packages
 
-| Package                                                   | Description                                                                                        |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| [`unthrown`](./packages/core)                             | The core `Result` / `AsyncResult`, interop, `TaggedError`, `matchTags`, ts-pattern error matching. |
-| [`@unthrown/vitest`](./packages/vitest)                   | Vitest matchers: `toBeOk`, `toBeOkWith`, `toBeErr`, `toBeErrTagged`, `toBeDefect`.                 |
-| [`@unthrown/effect`](./packages/effect)                   | Effect interop: `Result ↔ Exit` (bijection), `Either`, `Effect`.                                   |
-| [`@unthrown/neverthrow`](./packages/neverthrow)           | neverthrow interop: `Result ↔ Result`, `AsyncResult ↔ ResultAsync`.                                |
-| [`@unthrown/boxed`](./packages/boxed)                     | Boxed interop: `Result ↔ Result`, `AsyncResult ↔ Future<Result>`.                                  |
-| [`@unthrown/prisma`](./packages/prisma)                   | Prisma Client extension: `try*` query methods returning `AsyncResult`, per-operation errors.       |
-| [`@unthrown/orpc`](./packages/orpc)                       | oRPC (v2) bridge: `Result`-returning handlers, `AsyncResult` client, typed errors end-to-end.      |
-| [`@unthrown/standard-schema`](./packages/standard-schema) | `fromSchema` / `fromSchemaAsync`: any Standard Schema validator into a `Result`.                   |
-| [`@unthrown/oxlint`](./packages/oxlint)                   | oxlint plugin: `no-ambiguous-error-type`, `prefer-async-result`.                                   |
+| Package                                                   | Description                                                                                   |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| [`unthrown`](./packages/core)                             | The core `Result` / `AsyncResult`, interop, `TaggedError`, ts-pattern error matching.         |
+| [`@unthrown/vitest`](./packages/vitest)                   | Vitest matchers: `toBeOk`, `toBeOkWith`, `toBeErr`, `toBeErrTagged`, `toBeDefect`.            |
+| [`@unthrown/effect`](./packages/effect)                   | Effect interop: `Result ↔ Exit` (bijection), `Either`, `Effect`.                              |
+| [`@unthrown/neverthrow`](./packages/neverthrow)           | neverthrow interop: `Result ↔ Result`, `AsyncResult ↔ ResultAsync`.                           |
+| [`@unthrown/boxed`](./packages/boxed)                     | Boxed interop: `Result ↔ Result`, `AsyncResult ↔ Future<Result>`.                             |
+| [`@unthrown/prisma`](./packages/prisma)                   | Prisma Client extension: `try*` query methods returning `AsyncResult`, per-operation errors.  |
+| [`@unthrown/orpc`](./packages/orpc)                       | oRPC (v2) bridge: `Result`-returning handlers, `AsyncResult` client, typed errors end-to-end. |
+| [`@unthrown/standard-schema`](./packages/standard-schema) | `fromSchema` / `fromSchemaAsync`: any Standard Schema validator into a `Result`.              |
+| [`@unthrown/oxlint`](./packages/oxlint)                   | oxlint plugin: `no-ambiguous-error-type`, `prefer-async-result`.                              |
 
 ## Contributing
 

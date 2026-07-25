@@ -167,7 +167,7 @@ class Res<T, E> {
 
   mapErr<M extends ExhaustiveMatch<unknown>>(
     this: Result<T, E>,
-    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+    f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
   ): Result<T, MatchErrOut<M>> {
     if (this.tag !== "Err") return passThrough(this);
     try {
@@ -181,7 +181,7 @@ class Res<T, E> {
 
   flatMapErr<M extends ExhaustiveMatch<Result<unknown, unknown> | Defect>>(
     this: Result<T, E>,
-    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+    f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
   ): Result<T | OkOf<MatchOut<M>>, ErrOf<MatchOut<M>>> {
     if (this.tag !== "Err") return passThrough(this);
     try {
@@ -195,7 +195,7 @@ class Res<T, E> {
 
   recoverErr<M extends ExhaustiveMatch<unknown>>(
     this: Result<T, E>,
-    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+    f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
   ): Result<T | MatchErrOut<M>, never> {
     if (this.tag !== "Err") return passThrough(this);
     try {
@@ -209,7 +209,7 @@ class Res<T, E> {
 
   tapErr(
     this: Result<T, E>,
-    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
+    f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
   ): Result<T, E> {
     if (this.tag !== "Err") return this;
     try {
@@ -222,7 +222,7 @@ class Res<T, E> {
 
   flatTapErr<M extends ExhaustiveMatch<Result<unknown, unknown>>>(
     this: Result<T, E>,
-    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+    f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
   ): Result<T, E | ErrOf<MatchOut<M>>> {
     if (this.tag !== "Err") return this;
     try {
@@ -269,19 +269,24 @@ class Res<T, E> {
     }
   }
 
-  match<R>(
+  match<ROk, RDefect, M extends ExhaustiveMatch<unknown>>(
     this: Result<T, E>,
     cases: {
-      ok: (value: T) => R;
-      err: (error: E) => R;
-      defect: (cause: unknown) => R;
+      ok: (value: T) => ROk;
+      err: (matcher: ErrMatcher<E>) => M;
+      defect: (cause: unknown) => RDefect;
     },
-  ): R {
+  ): ROk | RDefect | MatchOut<M> {
     switch (this.tag) {
       case "Ok":
         return cases.ok(this.value);
       case "Err":
-        return cases.err(this.error);
+        // The `err` handler returns the un-terminated builder; `.run()` executes
+        // `.exhaustive()`. Type-forced exhaustive for well-typed callers; a value
+        // slipping past the types (widened cast, JS caller) with no matching case
+        // throws ts-pattern's `NonExhaustiveError` — `match` is an edge eliminator,
+        // so it surfaces rather than being caught into a Defect.
+        return cases.err(match(this.error) as ErrMatcher<E>).run() as MatchOut<M>;
       case "Defect":
         return cases.defect(this.cause);
     }
@@ -480,7 +485,7 @@ function passThrough<T, E>(self: Result<unknown, unknown>): Result<T, E> {
  * @internal
  */
 function runMatch<E>(
-  f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => { run: () => unknown },
+  f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => { run: () => unknown },
   error: E,
 ): unknown {
   return f(match(error) as ErrMatcher<E>, defect).run();
@@ -664,7 +669,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   // and the interface re-imposes the precision, mirroring how `unwrap`'s gate
   // is re-imposed in `types.ts`.
   mapErr(
-    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
+    f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
   ): AsyncResult<T, never> {
     return new AsyncRes<T, never>(
       this.promise.then((r) => {
@@ -682,7 +687,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
 
   flatMapErr(
     f: (
-      m: ErrMatcher<E>,
+      matcher: ErrMatcher<E>,
       defect: (cause: unknown) => Defect,
     ) => ExhaustiveMatch<Result<unknown, unknown> | AsyncResult<unknown, unknown> | Defect>,
   ): AsyncResult<T, never> {
@@ -703,7 +708,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   }
 
   recoverErr(
-    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
+    f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
   ): AsyncResult<T, never> {
     return new AsyncRes<T, never>(
       this.promise.then((r) => {
@@ -720,7 +725,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   }
 
   tapErr(
-    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
+    f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
   ): AsyncResult<T, E> {
     return new AsyncRes<T, E>(
       this.promise.then((r) => {
@@ -737,7 +742,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
 
   flatTapErr(
     f: (
-      m: ErrMatcher<E>,
+      matcher: ErrMatcher<E>,
       defect: (cause: unknown) => Defect,
     ) => ExhaustiveMatch<Result<unknown, unknown> | AsyncResult<unknown, unknown>>,
   ): AsyncResult<T, E> {
@@ -800,11 +805,11 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  match<R>(cases: {
-    ok: (value: T) => R;
-    err: (error: E) => R;
-    defect: (cause: unknown) => R;
-  }): Promise<R> {
+  match<ROk, RDefect, M extends ExhaustiveMatch<unknown>>(cases: {
+    ok: (value: T) => ROk;
+    err: (matcher: ErrMatcher<E>) => M;
+    defect: (cause: unknown) => RDefect;
+  }): Promise<ROk | RDefect | MatchOut<M>> {
     return this.promise.then((r) => r.match(cases));
   }
 

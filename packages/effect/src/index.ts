@@ -41,11 +41,12 @@ import type { AsyncResult, Result } from "unthrown";
  * ```
  */
 export function toExit<T, E>(result: Result<T, E>): Exit.Exit<T, E> {
-  return result.match<Exit.Exit<T, E>>({
-    ok: (value) => Exit.succeed(value),
-    err: (error) => Exit.fail(error),
-    defect: (cause) => Exit.die(cause),
-  });
+  // Guard-based (not `match`): this bridge is generic in `E`, and `match`'s
+  // exhaustive `err` matcher cannot be proven exhaustive over an unresolved
+  // type parameter.
+  if (result.isOk()) return Exit.succeed(result.value);
+  if (result.isErr()) return Exit.fail(result.error);
+  return Exit.die(result.cause);
 }
 
 /**
@@ -121,11 +122,9 @@ export function toEither<T, E>(
   result: Result<T, E>,
   onDefect: (cause: unknown) => E,
 ): Either.Either<T, E> {
-  return result.match<Either.Either<T, E>>({
-    ok: (value) => Either.right(value),
-    err: (error) => Either.left(error),
-    defect: (cause) => Either.left(onDefect(cause)),
-  });
+  if (result.isOk()) return Either.right(result.value);
+  if (result.isErr()) return Either.left(result.error);
+  return Either.left(onDefect(result.cause));
 }
 
 /**
@@ -217,11 +216,9 @@ export function fromEffect<T, E>(effect: Effect.Effect<T, E>): AsyncResult<T, E>
 }
 
 function resultToEffect<T, E>(result: Result<T, E>): Effect.Effect<T, E> {
-  return result.match<Effect.Effect<T, E>>({
-    ok: (value) => Effect.succeed(value),
-    err: (error) => Effect.fail(error),
-    defect: (cause) => Effect.die(cause),
-  });
+  if (result.isOk()) return Effect.succeed(result.value);
+  if (result.isErr()) return Effect.fail(result.error);
+  return Effect.die(result.cause);
 }
 
 // Effect's `die`/interruption channel is an un-triaged failure crossing into

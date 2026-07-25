@@ -26,27 +26,27 @@ describe("Invariant 1: throw inside any combinator becomes a Defect", () => {
     expect(Do().let("a", t).isDefect()).toBe(true);
     expect(
       Err("e")
-        .mapErr((m) => m.with(P._, t))
+        .mapErr((matcher) => matcher.with(P._, t))
         .isDefect(),
     ).toBe(true);
     expect(
       Err("e")
-        .flatMapErr((m) => m.with(P._, t))
+        .flatMapErr((matcher) => matcher.with(P._, t))
         .isDefect(),
     ).toBe(true);
     expect(
       Err("e")
-        .recoverErr((m) => m.with(P._, t))
+        .recoverErr((matcher) => matcher.with(P._, t))
         .isDefect(),
     ).toBe(true);
     expect(
       Err("e")
-        .tapErr((m) => m.with(P._, t))
+        .tapErr((matcher) => matcher.with(P._, t))
         .isDefect(),
     ).toBe(true);
     expect(
       Err("e")
-        .flatTapErr((m) => m.with(P._, t))
+        .flatTapErr((matcher) => matcher.with(P._, t))
         .isDefect(),
     ).toBe(true);
     expect(defectOf(boom).recoverDefect(t).isDefect()).toBe(true);
@@ -68,11 +68,11 @@ describe("Invariant 2: a Defect flows through every method except match() and re
       defectOf(boom).let("a", f),
       defectOf(boom).as(1),
       defectOf(boom).discard(),
-      defectOf(boom).mapErr((m) => m.with(P._, f)),
-      defectOf(boom).flatMapErr((m) => m.with(P._, f)),
-      defectOf(boom).recoverErr((m) => m.with(P._, f)),
-      defectOf(boom).tapErr((m) => m.with(P._, f)),
-      defectOf(boom).flatTapErr((m) => m.with(P._, f)),
+      defectOf(boom).mapErr((matcher) => matcher.with(P._, f)),
+      defectOf(boom).flatMapErr((matcher) => matcher.with(P._, f)),
+      defectOf(boom).recoverErr((matcher) => matcher.with(P._, f)),
+      defectOf(boom).tapErr((matcher) => matcher.with(P._, f)),
+      defectOf(boom).flatTapErr((matcher) => matcher.with(P._, f)),
     ];
     for (const r of passesThrough) expect(r.isDefect()).toBe(true);
     expect(f).not.toHaveBeenCalled();
@@ -87,7 +87,13 @@ describe("Invariant 2: a Defect flows through every method except match() and re
   });
 
   it("only match(), recoverDefect(), and the defect observers see the Defect", () => {
-    expect(defectOf(boom).match({ ok: () => "o", err: () => "e", defect: () => "d" })).toBe("d");
+    expect(
+      defectOf(boom).match({
+        ok: () => "o",
+        err: (matcher) => matcher.with(P._, () => "e"),
+        defect: () => "d",
+      }),
+    ).toBe("d");
     expect(
       defectOf(boom)
         .recoverDefect(() => Ok("handled"))
@@ -131,7 +137,7 @@ describe("Invariant 3: get() is asymmetric", () => {
 
 describe("Invariant 4: recoverErr empties the error channel in the type, not the runtime", () => {
   it("recoverErr() returns a value whose type is Result<_, never> but may still be a Defect", () => {
-    const recovered = defectOf(boom).recoverErr((m) => m.with(P._, () => 1));
+    const recovered = defectOf(boom).recoverErr((matcher) => matcher.with(P._, () => 1));
     // `never` in the type does not mean total — a Defect survives at runtime.
     expect(recovered.isDefect()).toBe(true);
   });

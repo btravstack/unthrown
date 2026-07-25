@@ -63,25 +63,29 @@ error you want to model (`RecordNotFound`).
 
 ## Handling the errors
 
-Because the errors are [tagged](./tagged-errors), `matchTags` gives you an
-exhaustive fold — the compiler lists exactly the cases the operation can hit:
+Because the errors are [tagged](./tagged-errors), driving `match`'s `err` handler
+with the ts-pattern matcher gives you an exhaustive fold — the compiler lists
+exactly the cases the operation can hit:
 
 ```ts
-import { matchTags } from "unthrown";
+import { tag } from "unthrown";
 
 const created = await db.user.tryCreate({ data: { email, name } });
 
-return matchTags(created, {
-  Ok: (user) => resp.created(user),
-  UniqueConstraintViolation: (e) => resp.conflict(`taken: ${e.fields.join(", ")}`),
-  ForeignKeyViolation: () => resp.badRequest("unknown reference"),
-  Defect: (cause) => resp.serverError(cause),
+return created.match({
+  ok: (user) => resp.created(user),
+  err: (matcher) =>
+    matcher
+      .with(tag("UniqueConstraintViolation"), (e) => resp.conflict(`taken: ${e.fields.join(", ")}`))
+      .with(tag("ForeignKeyViolation"), () => resp.badRequest("unknown reference"))
+      .with(tag("DriverError"), (e) => resp.serverError(e)),
+  defect: (cause) => resp.serverError(cause),
 });
 // No RecordNotFound arm — a create can't raise it, and the type knows.
 ```
 
-Or handle it inline with `.match({ ok, err, defect })` when you don't need
-per-tag branches — one call at the HTTP edge, no `try`/`catch`.
+When you don't need per-tag branches, collapse the `err` matcher to a single
+`.with(P._, …)` catch-all — one call at the HTTP edge, no `try`/`catch`.
 
 ## Transactions
 
@@ -125,7 +129,7 @@ const page = await db.user
 
 page.match({
   ok: ([users, meta]) => json({ users, nextCursor: meta.endCursor, hasMore: meta.hasNextPage }),
-  err: (e) => serverError(e),
+  err: (matcher) => matcher.with(P._, (e) => serverError(e)),
   defect: serverError,
 });
 ```

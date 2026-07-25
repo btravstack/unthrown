@@ -41,7 +41,7 @@ through untouched:
 ```ts
 Ok(2).map((n) => n + 1); // => Ok(3)
 Err("e").map((n) => n + 1); // => Err("e") — callback skipped
-Ok(2).mapErr((m) => m.with(P._, (e) => `${e}!`)); // => Ok(2) — matcher skipped
+Ok(2).mapErr((matcher) => matcher.with(P._, (e) => `${e}!`)); // => Ok(2) — matcher skipped
 ```
 
 `tap` and `flatTap` both run a side effect and keep the original value — the

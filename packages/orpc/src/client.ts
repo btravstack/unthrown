@@ -95,6 +95,7 @@ export type ResultClient<T extends AnyNestedClient> =
  *
  * @example
  * ```ts
+ * import { P } from "unthrown";
  * import { createResultClient } from "@unthrown/orpc/client";
  *
  * const rc = createResultClient(client);
@@ -104,7 +105,11 @@ export type ResultClient<T extends AnyNestedClient> =
  *   .map((planet) => `Hello, ${planet.name}!`)
  *   .match({
  *     ok: (msg) => msg,
- *     err: (e) => (e.code === "NOT_FOUND" ? "Hello, void!" : "Hello, trouble!"),
+ *     // the `err` handler matches the error exhaustively (here on `code`)
+ *     err: (matcher) =>
+ *       matcher
+ *         .with({ code: "NOT_FOUND" }, () => "Hello, void!")
+ *         .with(P._, () => "Hello, trouble!"),
  *     defect: () => "Hello, bug tracker!",
  *   });
  * ```

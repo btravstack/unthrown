@@ -52,11 +52,12 @@ export function toNeverthrow<T, E>(
   result: Result<T, E>,
   onDefect: (cause: unknown) => E,
 ): NeverthrowResult<T, E> {
-  return result.match<NeverthrowResult<T, E>>({
-    ok: (value) => neverthrowOk(value),
-    err: (error) => neverthrowErr(error),
-    defect: (cause) => neverthrowErr(onDefect(cause)),
-  });
+  // Guard-based (not `match`): this bridge is generic in `E`, and `match`'s
+  // exhaustive `err` matcher cannot be proven exhaustive over an unresolved
+  // type parameter.
+  if (result.isOk()) return neverthrowOk(result.value);
+  if (result.isErr()) return neverthrowErr(result.error);
+  return neverthrowErr(onDefect(result.cause));
 }
 
 /**

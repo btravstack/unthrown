@@ -73,7 +73,7 @@ export type ResultHandler<
  *   .errors({ NOT_FOUND: {} })
  *   .handler(
  *     handlerResult(({ input, errors }) =>
- *       repo.findPlanet(input.id).mapErr((m) => m.with(P._, () => errors.NOT_FOUND())),
+ *       repo.findPlanet(input.id).mapErr((matcher) => matcher.with(P._, () => errors.NOT_FOUND())),
  *     ),
  *   );
  * ```
@@ -89,19 +89,19 @@ export function handlerResult<
 ): ProcedureHandler<TCurrentContext, TInput, TOutput | TError, ORPCErrorConstructorMap<TErrorMap>> {
   return async (opts, input) => {
     const result = await handler(opts, input);
-    return result.match<TOutput | TError>({
-      ok: (value) => value,
-      err: (error) => {
-        // Unreachable through well-typed code (`TError extends AnyORPCError`);
-        // a widened or raw-JS caller's non-ORPCError `Err` must not be
-        // returned, or oRPC would serve it as a SUCCESSFUL output. Route it
-        // to the defect path instead (same defensive rule as `matchTags`).
-        if (error instanceof ORPCError) return error;
-        throw error;
-      },
-      defect: (cause) => {
-        throw cause;
-      },
-    });
+    // Branch via the guards rather than `match`: this library code is generic in
+    // the error type `TError`, and `match`'s exhaustive `err` matcher cannot be
+    // proven exhaustive by ts-pattern over an unresolved type parameter. The
+    // concrete triage (`.mapErr((matcher) => …)`) still happens at the endpoint.
+    if (result.isOk()) return result.value;
+    if (result.isErr()) {
+      // Unreachable through well-typed code (`TError extends AnyORPCError`); a
+      // widened or raw-JS caller's non-ORPCError `Err` must not be returned, or
+      // oRPC would serve it as a SUCCESSFUL output. Throw it so it lands on
+      // oRPC's defect path instead.
+      if (result.error instanceof ORPCError) return result.error;
+      throw result.error;
+    }
+    throw result.cause; // Defect — rethrow the cause onto oRPC's defect path.
   };
 }

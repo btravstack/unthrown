@@ -26,7 +26,7 @@ The `→ Result<…>` half of each signature is the tell — it shows how the co
 moves the channels: `flatMap` widens `E` to `E | E2`, `recoverErr` empties it to
 `never`, `flatMapErr` widens the value to `T | U`. The error combinators take an
 [exhaustive ts-pattern matcher](#triaging-the-error-channel) rather than a single
-callback; the signatures below abbreviate its callback as `(m) => …`.
+callback; the signatures below abbreviate its callback as `(matcher) => …`.
 
 | I want to…                                     | use               | signature                                                    | channel      |
 | ---------------------------------------------- | ----------------- | ------------------------------------------------------------ | ------------ |
@@ -37,11 +37,11 @@ callback; the signatures below abbreviate its callback as `(m) => …`.
 | sequence steps into a named scope              | `Do`/`bind`/`let` | `bind(k, (scope) => Result<U, E2>)` → `Result<{…}, E \| E2>` | Ok           |
 | replace the value with a constant              | `as`              | `(value: U)` → `Result<U, E>`                                | Ok           |
 | drop the value (success type becomes `void`)   | `discard`         | `()` → `Result<void, E>`                                     | Ok           |
-| transform the error (matched)                  | `mapErr`          | `(m) => …` → `Result<T, E2>`                                 | Err          |
-| try a fallback that returns a `Result`         | `flatMapErr`      | `(m) => …` → `Result<T \| U, E2>`                            | Err          |
-| turn an error into a success value             | `recoverErr`      | `(m) => …` → `Result<T \| U, never>`                         | Err          |
-| run a side effect on the error                 | `tapErr`          | `(m) => …` → `Result<T, E>`                                  | Err          |
-| run a **failable** side effect on the error    | `flatTapErr`      | `(m) => …` → `Result<T, E \| E2>`                            | Err          |
+| transform the error (matched)                  | `mapErr`          | `(matcher) => …` → `Result<T, E2>`                           | Err          |
+| try a fallback that returns a `Result`         | `flatMapErr`      | `(matcher) => …` → `Result<T \| U, E2>`                      | Err          |
+| turn an error into a success value             | `recoverErr`      | `(matcher) => …` → `Result<T \| U, never>`                   | Err          |
+| run a side effect on the error                 | `tapErr`          | `(matcher) => …` → `Result<T, E>`                            | Err          |
+| run a **failable** side effect on the error    | `flatTapErr`      | `(matcher) => …` → `Result<T, E \| E2>`                      | Err          |
 | recover from a defect (rare)                   | `recoverDefect`   | `(cause) => Result<U, E2>` → `Result<T \| U, E \| E2>`       | Defect       |
 | observe a defect, e.g. log it                  | `tapDefect`       | `(cause) => void` → `Result<T, E>`                           | Defect       |
 | observe **any** failure (error _or_ defect)    | `tapFailure`      | `(f: FailureView<E>) => void` → `Result<T, E>`               | Err + Defect |
@@ -90,8 +90,8 @@ for you:
 import { P, tag } from "unthrown";
 
 db.reading.tryFindUniqueOrThrow({ where: { id } }).mapErr(
-  (m, defect) =>
-    m
+  (matcher, defect) =>
+    matcher
       .with(tag("RecordNotFound"), () => new ReadingNotFoundException(id))
       .with(tag("DriverError"), (e) => defect(e.cause)), // deliberate defect — the tag leaves E
 );
@@ -124,7 +124,7 @@ The rules, in order of how often you'll meet them:
   safety-net invariant), but `defect(...)` is the lint-clean, expression-position
   form.
 - **`P._` is the deliberate catch-all.** Uniform handling — the equivalent of the
-  old single callback — is one wildcard branch: `m.with(P._, (e) => wrap(e))`.
+  old single callback — is one wildcard branch: `matcher.with(P._, (e) => wrap(e))`.
   It makes the match exhaustive, and it reads as an explicit "everything else"
   at the call site, so opting out of per-case handling is visible and greppable.
   There is no partial-with-fallback middle ground hiding inside an object: a wide
@@ -139,12 +139,12 @@ The rules, in order of how often you'll meet them:
 - **A non-exhaustive match is a `Defect` if it ever slips past the types.** Only
   reachable outside the typed contract (a widened cast, a JS caller): ts-pattern
   throws `NonExhaustiveError`, which the combinator's throw-to-defect net turns
-  into a `Defect` — an unmodeled failure, mirroring `matchTags`.
+  into a `Defect` — an unmodeled failure.
 
-For eliminating at the edge (folding `Ok`/`Err`/`Defect` to a plain value) the
-per-tag fold stays [`matchTags`](./tagged-errors), or match the whole `Result`
-with ts-pattern's `match`; the builder here is the same idea kept _inside_ the
-pipeline.
+For eliminating at the edge (folding `Ok`/`Err`/`Defect` to a plain value), the
+same matcher drives [`match`](./tagged-errors#matching-a-tagged-error-union-with-match)'s
+`err` handler, or you can match the whole `Result` with ts-pattern's `match`; the
+builder here is the same idea kept _inside_ the pipeline.
 
 ## Result and AsyncResult
 
@@ -181,7 +181,7 @@ const status = await findUser(id) // Result<User, NotFound>  (sync)
   .toAsync() // AsyncResult<User, NotFound>
   .flatMap((user) => fromPromise(loadOrders(user.id), qualify)) // async step
   .map((orders) => orders.length) // sync callback, still AsyncResult
-  .match({ ok: (n) => n, err: () => 0, defect: () => -1 }); // await collapses it
+  .match({ ok: (n) => n, err: (matcher) => matcher.with(P._, () => 0), defect: () => -1 }); // await collapses it
 ```
 
 Once a chain crosses an async boundary it stays an `AsyncResult`; `await` at the

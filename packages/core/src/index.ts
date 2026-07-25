@@ -18,9 +18,9 @@ export {
   fromSafeThrowable,
   fromThrowable,
 } from "./interop.js";
-export { matchTags, tag, TaggedError } from "./tagged.js";
+export { tag, TaggedError } from "./tagged.js";
 
-export type { TaggedErrorConstructor, TaggedErrorInstance, TagHandlers } from "./tagged.js";
+export type { TaggedErrorConstructor, TaggedErrorInstance } from "./tagged.js";
 export type {
   AsyncErrOf,
   AsyncOkOf,

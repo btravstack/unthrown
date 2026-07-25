@@ -81,9 +81,18 @@ was planned).
    so an async branch is a visible Promise-valued result, not a rejection
    bypass. `tapDefect` / `tapFailure` keep single callbacks — their payloads
    carry no discriminant to match (a defect's cause is `unknown`; `tapFailure`
-   splits on channel, not tag). Eliminators (`match`, `getOrElse`, `matchTags`)
-   are exempt — they sit at the edge, where exhaustiveness is either total
-   (`match`/`matchTags`) or the value is being surrendered anyway. **Core
+   splits on channel, not tag). The one eliminator that still handles the error
+   channel, **`match`**, applies the **same exhaustive matcher** to its `err`
+   handler (`(matcher) => matcher.with(…)`, returning the un-terminated builder;
+   `match` runs `.exhaustive()`) — so folding at the edge is exhaustive too, and
+   there is no blanket `err` callback left to silently drop a value. Its `err`
+   handler receives the matcher but **no `defect` helper** — `match` folds to a
+   plain value, with no `Defect` output channel; the separate `defect` case
+   handles a `Result` that already carries one. (This subsumes the former
+   `matchTags` fold — per-tag folding at the edge is now `match` with the
+   matcher and `tag(t)`, and it works on any discriminant, not only `_tag`.) The
+   value-surrendering extractors (`getOr` / `getOrElse` / `getOrNull` /
+   `getOrUndefined`) stay exempt — the value is being surrendered anyway. **Core
    depends on `ts-pattern`** (a light, types-heavy, dual-copy-safe library —
    its matcher protocol keys off a global `Symbol.for`), re-exporting `match`
    and `P` so the matcher is first-class in one import.
@@ -96,13 +105,16 @@ was planned).
   `Defect`. Nothing escapes a pipeline as a raw throw.
   This is what lets an HTTP adapter do a single `match({ ok, err, defect })`
   with **no surrounding `try/catch`**.
-- **A non-exhaustive error match becomes a `Defect`.** In the error
-  combinators, the callback returns a ts-pattern builder and the combinator
-  runs `.run()` (which executes `.exhaustive()`). For well-typed callers the
-  match is exhaustive by construction; a value that slips past the types (a
-  widened cast, a JS caller) with no matching case throws ts-pattern's
-  `NonExhaustiveError`, which the throw-to-defect net turns into a `Defect` —
-  an unmodeled failure, mirroring `matchTags`.
+- **A non-exhaustive error match becomes a `Defect` (in the combinators).** In
+  the error combinators, the callback returns a ts-pattern builder and the
+  combinator runs `.run()` (which executes `.exhaustive()`). For well-typed
+  callers the match is exhaustive by construction; a value that slips past the
+  types (a widened cast, a JS caller) with no matching case throws ts-pattern's
+  `NonExhaustiveError`, which the throw-to-defect net turns into a `Defect` — an
+  unmodeled failure. In **`match`** (an edge eliminator, exempt from
+  throw→defect) the same non-exhaustive rogue value instead **throws**
+  `NonExhaustiveError` outright — a genuinely unmodeled tag at the edge is a
+  bug, not a routed value.
 - **Exhaustiveness is type-enforced, with no forgettable step.** `mapErr` /
   `flatMapErr` / `recoverErr` / `tapErr` / `flatTapErr` require the callback to
   return an `ExhaustiveMatch` — `.exhaustive` is typed callable only when
@@ -137,10 +149,15 @@ was planned).
 - **Result instances are frozen.** `okRes`/`errRes`/`defectRes` return
   `Object.freeze`d objects, so a variant cannot be forged by mutation; the
   `readonly` types are real at runtime.
-- **`matchTags` never crashes on an unhandled tag.** Outside the typed contract
-  (widened cast, JS caller) an unknown or reserved (`"Ok"`/`"Defect"`) `_tag`
-  routes to the `Defect` handler; reserved tags in `E` are additionally a
-  compile error.
+- **`match`'s `err` matcher is type-forced exhaustive, and library code generic
+  in `E` uses the guards instead.** For well-typed concrete callers a missing
+  branch does not compile; a rogue value slipping past the types throws
+  `NonExhaustiveError` (see above). Because ts-pattern cannot prove `.with(P._,
+…)` exhaustive over an **unresolved type parameter**, code that folds a
+  generic `Result<T, E>` (the interop `to*` bridges, `@unthrown/orpc`'s
+  `handlerResult`) branches via the `isOk` / `isErr` / `isDefect` guards rather
+  than `match` — the guards narrow to `OkView` / `ErrView` / `DefectView` with
+  no exhaustiveness obligation. Concrete application code uses `match` normally.
 - **`get()` / `getErr()` are type-gated.** `get()` compiles only when the
   error channel is empty (`this: Result<T, never>`); `getErr()` only when the
   success channel is empty (`this: Result<never, E>`). Eliminate the opposite
@@ -209,7 +226,11 @@ Defect>`); flatMapErr: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on the
   meaning — recovering stays the separate `recoverDefect`; handling both for
   good is `match`), and no channel-moving operators (`Err`→`Defect` erases the
   modeled type; `Defect`→`Err` would put `unknown` in `E`, violating Thesis #1)
-- eliminate: `match`, `get`/`getErr` (type-gated — `get` only compiles on
+- eliminate: `match` (the `{ ok, defect }` handlers plus an `err` handler that
+  takes the **exhaustive ts-pattern matcher** `(matcher) => matcher.with(…)` —
+  same as the error combinators, but with no `defect` helper since `match` folds
+  to a value; the folded type unions all branch returns), `get`/`getErr`
+  (type-gated — `get` only compiles on
   `Result<T, never>`, `getErr` only on `Result<never, E>`; use `match` /
   `recoverErr` / `flatMapErr` to empty the opposite channel first), `getOr` (signature
   `getOr<U>(fallback: U): T | U` — widening, not narrowed to `T`), `getOrElse`
@@ -220,7 +241,7 @@ Defect>`); flatMapErr: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on the
   any `Result<T, E>` and **throws the modeled `error` as-is** on `Err` (and
   panics on a `Defect`, like the rest of the family). It exists so a `no-throw`
   lint rule can ban raw `throw` while this one sanctioned extraction remains — the
-  faithful, lint-clean form of `.flatMapErr((m) => m.with(P._, (e) => { throw e })).get()`; it is
+  faithful, lint-clean form of `.flatMapErr((matcher) => matcher.with(P._, (e) => { throw e })).get()`; it is
   **off the errors-as-values thesis** by design, so reach for `match` / `recoverErr`
   / `flatMapErr` whenever the error can stay a value
 - deprecated aliases: the extractor family was unified under `get…`; the old
@@ -329,10 +350,12 @@ match<E>>`, so ts-pattern's non-exported `Match` type is never imported).
   tag can be namespaced for collision-safety without leaking into the display
   name; the payload reserves `name` **and** `message` via `?: never`, so the
   message is set per subclass with `override message = "…"`, never as a payload
-  field), `matchTags(result, handlers)` (an exhaustive `{ Ok, Defect } &
-per-tag` fold; has an async overload resolving to `Promise<R>`), and
-  `tag(t)` (the `{ _tag: t }` ts-pattern pattern, for use in the error matchers
-  and in `match(result)`); see the `TaggedError` convention in Thesis #4.
+  field) and `tag(t)` (the `{ _tag: t }` ts-pattern pattern, for use in the
+  error matchers, in `match`'s `err` handler, and in `match(result)`); see the
+  `TaggedError` convention in Thesis #4. **There is no `matchTags`** — a per-tag
+  exhaustive fold over a tagged error union is `result.match({ ok, defect, err:
+(matcher) => matcher.with(tag("…"), …) })`, which generalises beyond `_tag` to
+  any discriminant.
 
 Deliberately **excluded** for now: **generator** do-notation (`gen`/`yield*`
 "safeTry" style — the fluent `Do`/`bind`/`let` above covers sequential code
@@ -411,7 +434,7 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   `constructors.ts` (`Ok`/`Err` + guards), `do.ts` (the `Do()` do-notation entry
   — the `bind`/`let` steps themselves live on the method surface in `core.ts`),
   `interop.ts` (`from*`/`qualify`/`all`), `facade.ts` (the `Result` object),
-  `tagged.ts` (`TaggedError`/`matchTags`/`tag`), and `index.ts` (the curated
+  `tagged.ts` (`TaggedError`/`tag`), and `index.ts` (the curated
   public re-exports, including `match`/`P` from `ts-pattern` — the one place the
   API is decided).
 
@@ -482,7 +505,8 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   server-side `call(...)`), `createResultClient(client)` recursively wraps a
   router (the `createSafeClient` mirror): `E` is the raw inferable `ORPCError`
   union discriminated by `code` — deliberately NOT re-wrapped into
-  `TaggedError` (`matchTags` doesn't apply to this package); non-inferable →
+  `TaggedError` (match it on `code`, e.g. `.mapErr((matcher) => matcher.with({
+code: "NOT_FOUND" }, …))`); non-inferable →
   `Defect`. Event-iterator (streaming) procedures are deliberately out of
   scope — the raw client is the escape hatch. Tested end-to-end against real
   oRPC machinery: `createRouterClient` in-process plus an
@@ -536,9 +560,11 @@ channel?**
    changesets `release.yml`.)
 2. ✅ **`packages/core/src/tagged.ts`** — Done. `TaggedError(tag)` factory
    (extends `Error`, `_tag`, no-arg constructor when payload is empty via the
-   `keyof A extends never ? void : A` trick) and `matchTags(result, handlers)`:
-   a zero-dependency exhaustive fold whose handler object is
-   `{ Ok, Defect } & { [K in E["_tag"]]: (e: Extract<E, {_tag: K}>) => R }`.
+   `keyof A extends never ? void : A` trick) and `tag(t)` (the `{ _tag: t }`
+   ts-pattern pattern). A per-tag exhaustive fold is `match`'s `err` handler
+   with the ts-pattern matcher (`matcher.with(tag("…"), …)`), not a dedicated
+   `matchTags` — that former helper was folded into `match` when the matcher
+   became the error-channel convention.
 3. ✅ **`packages/vitest`** — Done. Custom matchers `toBeOk`, `toBeOkWith`,
    `toBeErr`, `toBeErrWith` (the error-value mirror of `toBeOkWith` — a deep
    compare of the `Err` value), `toBeErrTagged` (optional second arg also matches
@@ -580,7 +606,9 @@ configured outside the repo).
 - **Type-level tests:** `packages/core/src/types.test-d.ts` asserts the
   type-level behaviour the runtime can't (the conditional `all`/`allFromDict`
   shapes, `Exclude<R, Defect>` boundary inference, `flatTap`/`recoverErr` channel
-  widening, the `this is …` guard narrowing, `matchTags` exhaustiveness, and the
+  widening, the `this is …` guard narrowing, `match`'s `err`-matcher
+  exhaustiveness (a missing tag does not compile; the folded type unions the
+  branch returns), and the
   error-matcher semantics — narrowing, defect/throw-branch subtraction,
   `P._` catch-all, grouped patterns, `code`-discriminated and untagged unions,
   forced exhaustiveness (a missing case does not compile), the `E`-inference

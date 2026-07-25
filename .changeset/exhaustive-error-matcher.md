@@ -19,12 +19,14 @@ result.mapErr((error) => {
 });
 
 // after — exhaustive; the type checker forces every case to be handled
-result.mapErr((m, defect) =>
-  m
+result.mapErr((matcher, defect) =>
+  matcher
     .with(tag("RecordNotFound"), () => new NotFoundException(id))
     .with(tag("DriverError"), (e) => defect(e.cause)),
 );
 ```
+
+The matcher callback parameter is named `matcher` (not `m`).
 
 **Every error is handled explicitly, and enriching the error channel is a
 compile error at every consuming site** until each new case is handled. Because
@@ -50,6 +52,40 @@ matching a whole `Result` (`match(r).with(P.Ok(), …)`), are first-class in one
 import. **The `@unthrown/pattern` package is removed** — its `tag` helper moved
 into core; the `P.Ok`/`P.Err`/`P.Defect` sugar is dropped (match the union
 structurally instead).
+
+**`match` now matches the error channel exhaustively too, and `matchTags` is
+removed.** `match`'s `err` handler no longer takes a blanket `(error) => R`
+callback — it receives the same ts-pattern matcher and returns the un-terminated
+builder (no `defect` helper: `match` folds to a value, with no `Defect` output
+channel). This subsumes the old `matchTags` fold — a per-tag fold over a tagged
+union is now `match` with the matcher and `tag(t)`, and it generalises to any
+discriminant, not only `_tag`:
+
+```ts
+import { P, tag } from "unthrown";
+
+// before
+matchTags(result, {
+  Ok: (n) => `got ${n}`,
+  Defect: (cause) => `bug: ${String(cause)}`,
+  NotFound: () => "404",
+  Forbidden: (e) => `403 for ${e.user}`,
+});
+
+// after
+result.match({
+  ok: (n) => `got ${n}`,
+  defect: (cause) => `bug: ${String(cause)}`,
+  err: (matcher) =>
+    matcher.with(tag("NotFound"), () => "404").with(tag("Forbidden"), (e) => `403 for ${e.user}`),
+});
+```
+
+Use `.with(P._, …)` for a uniform catch-all. `matchTags` and its `TagHandlers`
+type are gone; `TaggedError` and `tag` are unchanged. **Library code generic in
+the error type `E`** (which ts-pattern can't prove exhaustive over an unresolved
+type parameter) should fold with the `isOk` / `isErr` / `isDefect` guards
+instead of `match`.
 
 **Also breaking:** the deprecated error-channel aliases `orElse` and `recover`
 are removed; the extractor aliases (`unwrap`, `unwrapErr`, `unwrapOr`,

@@ -38,7 +38,7 @@ Effect is the exception: it _does_ have a defect channel (`Cause.die`), so
 `Result ↔ Exit` round-trips losslessly.
 
 ```ts
-import { Ok, Err } from "unthrown";
+import { Ok, Err, P } from "unthrown";
 import { toExit, fromEffect } from "@unthrown/effect";
 import { Effect } from "effect";
 
@@ -49,7 +49,7 @@ toExit(Err("e")); // Exit.fail("e")  — a modeled Cause.fail
 // Run an Effect and collect its outcome; a die/interrupt becomes a Defect:
 await fromEffect(Effect.succeed(1)).match({
   ok: (value) => value,
-  err: (error) => error,
+  err: (matcher) => matcher.with(P._, (error) => error),
   defect: String,
 });
 ```
