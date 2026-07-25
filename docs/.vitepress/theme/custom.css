@@ -56,27 +56,51 @@
   }
 }
 
-/* "Used in production at" strip — a subtle, centered adopter logo below the
- * At-a-glance example. The light/dark logo pair mirrors the hero's own
- * logo-light/logo-dark swap (VitePress toggles `html.dark`); the shipped
+/* "Used in production at" strip — a single-adopter endorsement, closing the
+ * homepage. Composed as one inline lockup (label · hairline · logo) rather
+ * than a "logo wall of one", and set off from the content with a hairline top
+ * rule in the site's own divider language, so it reads as a deliberate closing
+ * band instead of a floating island. The light/dark logo pair mirrors the
+ * hero's logo-light/logo-dark swap (VitePress toggles `html.dark`); the shipped
  * Emeria SVGs share one geometry, recoloured navy (light) / white (dark). */
 .used-by {
-  margin: 4rem auto 1.5rem;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.1rem;
+  max-width: 640px;
+  margin: 4.5rem auto 1rem;
+  padding-top: 2.5rem;
+  border-top: 1px solid var(--vp-c-divider);
 }
 .used-by__label {
-  margin: 0 0 1rem;
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--vp-c-text-3);
+  white-space: nowrap;
+}
+/* Thin lockup divider between the label and the logo — the hairline again, so
+ * the two sit as one object rather than two centred fragments. */
+.used-by__label::after {
+  content: "";
+  display: inline-block;
+  width: 1px;
+  height: 0.95em;
+  margin-left: 1.1rem;
+  vertical-align: -0.12em;
+  background: var(--vp-c-divider);
+}
+.used-by__link {
+  display: inline-flex;
+  align-items: center;
 }
 .used-by__logo {
-  height: 30px;
+  height: 22px;
   width: auto;
-  opacity: 0.75;
-  transition: opacity 0.25s;
+  opacity: 0.72;
+  transition: opacity 0.25s ease;
 }
 .used-by__link:hover .used-by__logo {
   opacity: 1;
@@ -89,4 +113,16 @@
 }
 .dark .used-by__logo--dark {
   display: inline-block;
+}
+/* Narrow screens: stack the lockup and drop the inline divider so the label
+ * and logo never crowd on one line. */
+@media (max-width: 480px) {
+  .used-by {
+    flex-direction: column;
+    gap: 0.9rem;
+    padding-top: 2rem;
+  }
+  .used-by__label::after {
+    display: none;
+  }
 }
