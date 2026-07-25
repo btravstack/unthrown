@@ -64,6 +64,13 @@ describe("all", () => {
     expect(e.isErr()).toBe(true);
     if (e.isErr()) expect(e.error).toBe("bad");
   });
+
+  it("surfaces an out-of-contract non-Result element as a Defect (never throws)", () => {
+    // A hole/undefined element is a type error in well-typed code; reached only
+    // via untyped/cast input, the aggregate must not throw on `.tag`.
+    const bad = [Ok(1), undefined, Ok(3)] as unknown as Result<number, never>[];
+    expect(all(bad).isDefect()).toBe(true);
+  });
 });
 
 describe("allFromDict", () => {
@@ -94,6 +101,11 @@ describe("allFromDict", () => {
     expect(r.isOk()).toBe(true);
     // The dangerous key lands as a normal own property, not on Object.prototype.
     expect(({} as Record<string, unknown>)["polluted"]).toBeUndefined();
+  });
+
+  it("surfaces an out-of-contract non-Result value as a Defect", () => {
+    const bad = { a: Ok(1), b: undefined } as unknown as { a: Result<number, never> };
+    expect(allFromDict(bad).isDefect()).toBe(true);
   });
 });
 
@@ -142,6 +154,15 @@ describe("allAsync", () => {
     // turns it into a Defect so `await` still yields a Result.
     const rejecting = Promise.reject(boom) as unknown as AsyncResult<number, never>;
     const r = await allAsync([fromSafePromise(Promise.resolve(1)), rejecting]);
+    expect(r.isDefect()).toBe(true);
+  });
+
+  it("surfaces an out-of-contract non-Result element as a Defect, never rejecting", async () => {
+    const bad = [Ok(1).toAsync(), undefined, Ok(3).toAsync()] as unknown as AsyncResult<
+      number,
+      never
+    >[];
+    const r = await allAsync(bad);
     expect(r.isDefect()).toBe(true);
   });
 
@@ -198,6 +219,14 @@ describe("allFromDictAsync", () => {
   it("adopts a raw rejecting thenable as a Defect, never rejecting the internal promise", async () => {
     const rejecting = Promise.reject(boom) as unknown as AsyncResult<number, never>;
     const r = await allFromDictAsync({ a: fromSafePromise(Promise.resolve(1)), b: rejecting });
+    expect(r.isDefect()).toBe(true);
+  });
+
+  it("surfaces an out-of-contract non-Result value as a Defect, never rejecting", async () => {
+    const bad = { a: Ok(1).toAsync(), b: undefined } as unknown as {
+      a: AsyncResult<number, never>;
+    };
+    const r = await allFromDictAsync(bad);
     expect(r.isDefect()).toBe(true);
   });
 });

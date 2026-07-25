@@ -3,7 +3,7 @@
 // there is no path that yields `unknown` in `E`.
 
 import { Err, Ok } from "./constructors.js";
-import { AsyncRes, defectRes, errRes, okRes } from "./core.js";
+import { AsyncRes, defectRes, errRes, isResult, okRes } from "./core.js";
 import { type Defect, defect, isDefectMarker } from "./defect.js";
 import type { AsyncErrOf, AsyncOkOf, AsyncResult, ErrOf, OkOf, Result } from "./types.js";
 
@@ -275,11 +275,24 @@ type AsyncResultRecord = Record<string, AsyncResult<unknown, unknown>>;
  *
  * @internal
  */
+/** The Defect minted for an out-of-contract non-`Result` element in an aggregate. */
+function nonResultDefect(): Result<unknown, unknown> {
+  return defectRes(new TypeError("unthrown: aggregate received a non-Result element"));
+}
+
 function foldArray(results: readonly Result<unknown, unknown>[]): Result<unknown, unknown> {
   let firstErr: Result<unknown, unknown> | undefined;
   let firstDefect: Result<unknown, unknown> | undefined;
   const values: unknown[] = [];
   for (const r of results) {
+    if (!isResult(r)) {
+      // Out-of-contract element (a hole/undefined/non-Result, reachable only via
+      // untyped or cast input). Surface it as a Defect — an unexpected failure —
+      // rather than throwing on `.tag` (sync) or rejecting the internal promise
+      // (async). A Defect dominates, so break.
+      firstDefect ??= nonResultDefect();
+      break;
+    }
     if (r.tag === "Defect") {
       firstDefect ??= r;
       break; // any Defect dominates — nothing later can change the outcome
@@ -301,6 +314,10 @@ function foldRecord(results: ResultRecord): Result<unknown, unknown> {
   let firstDefect: Result<unknown, unknown> | undefined;
   const values: Record<string, unknown> = {};
   for (const [key, r] of Object.entries(results)) {
+    if (!isResult(r)) {
+      firstDefect ??= nonResultDefect(); // out-of-contract element → Defect (see foldArray)
+      break;
+    }
     if (r.tag === "Defect") {
       firstDefect ??= r;
       break; // any Defect dominates — nothing later can change the outcome
