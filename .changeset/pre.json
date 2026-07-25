@@ -1,0 +1,16 @@
+{
+  "mode": "pre",
+  "tag": "beta",
+  "initialVersions": {
+    "@unthrown/boxed": "4.3.0",
+    "unthrown": "4.3.0",
+    "@unthrown/effect": "4.3.0",
+    "@unthrown/neverthrow": "4.3.0",
+    "@unthrown/orpc": "0.1.0",
+    "@unthrown/oxlint": "4.3.0",
+    "@unthrown/prisma": "0.1.0",
+    "@unthrown/standard-schema": "4.3.0",
+    "@unthrown/vitest": "4.3.0"
+  },
+  "changesets": []
+}
