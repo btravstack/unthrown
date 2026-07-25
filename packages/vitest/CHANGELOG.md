@@ -1,5 +1,15 @@
 # @unthrown/vitest
 
+## 5.0.0-beta.0
+
+### Patch Changes
+
+- Updated dependencies [3b06099]
+- Updated dependencies [284b7be]
+- Updated dependencies [4096713]
+- Updated dependencies [a1f68d5]
+  - unthrown@5.0.0-beta.0
+
 ## 4.3.0
 
 ## 4.2.0

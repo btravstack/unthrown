@@ -12,5 +12,10 @@
     "@unthrown/standard-schema": "4.3.0",
     "@unthrown/vitest": "4.3.0"
   },
-  "changesets": []
+  "changesets": [
+    "adopt-btravstack-0.2",
+    "exhaustive-error-matcher",
+    "remove-tools-packages",
+    "v5-extractor-cleanup"
+  ]
 }
