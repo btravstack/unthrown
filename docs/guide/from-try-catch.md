@@ -91,21 +91,23 @@ user.match({
 
 `Result` composes at whatever boundary you choose to draw it — there's no
 requirement that every function up and down the call stack returns one.
-`get()` exists precisely so you can re-enter throw-land at the edges you
-haven't converted yet, on purpose:
+`getOrThrow()` exists precisely so you can re-enter throw-land at the edges you
+haven't converted yet, on purpose — it's the one ungated extractor, throwing the
+modeled error **as-is** (unlike `get()`, which only compiles once the error
+channel is `never`):
 
 ```ts
 // Only the read is converted. Everything downstream still expects a plain
-// Config, or a thrown error — and that's fine, get() is the deliberate seam.
+// Config, or a thrown error — and that's fine, getOrThrow() is the deliberate seam.
 function loadConfig(text: string): Config {
-  return parseConfig(text).get(); // throws UnwrapError("invalid_json") on bad input
+  return parseConfig(text).getOrThrow(); // throws "invalid_json" (the modeled error) on bad input
 }
 ```
 
 Convert the parts of the codebase where an untyped failure actually costs you
 something — a boundary you keep getting wrong, a `catch` block that silently
 swallows a bug. Leave the rest throwing until it earns the conversion. A
-`Result` two layers deep in a call chain that's `get()`'d immediately by
+`Result` two layers deep in a call chain that's `getOrThrow()`'d immediately by
 its only caller isn't buying you anything yet.
 
 ## `try`/`catch` idioms → combinators

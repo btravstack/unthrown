@@ -26,8 +26,9 @@ becomes a defect, short-circuits the pipeline, and is handled once at `match`.
 
 ## A defect flows through almost everything
 
-A defect passes through **every** method untouched — _except_ `match` and
-`recoverDefect`. The success and error combinators never see it:
+A defect passes through **every** method untouched — _except_ `match`,
+`recoverDefect`, and the observers `tapDefect` / `tapFailure` (which observe it
+without consuming it). The success and error combinators never see it:
 
 ```ts
 const d = Ok(1).map(() => {
