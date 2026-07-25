@@ -1,13 +1,9 @@
 import { defineRule } from "@oxlint/plugins";
 import type { ESTree, Scope } from "@oxlint/plugins";
 
-import { getImportSource } from "../helpers/get-import-source.js";
 import { hasTypeArguments } from "../helpers/has-type-arguments.js";
-import { isIdentifierTypeName } from "../helpers/is-identifier-type-name.js";
 import { isLocallyBound } from "../helpers/is-locally-bound.js";
-
-const MODULE = "unthrown";
-const RESULT_TYPES = ["Result", "AsyncResult"] as const;
+import { resolveResultType } from "../helpers/resolve-result-type.js";
 
 // Keyword type nodes that say nothing about the domain — they make `E` a
 // catch-all, which is exactly what Thesis #1 forbids.
@@ -22,6 +18,7 @@ const AMBIGUOUS_KEYWORDS: ReadonlySet<string> = new Set([
   "TSObjectKeyword",
   "TSNullKeyword",
   "TSUndefinedKeyword",
+  "TSVoidKeyword",
 ]);
 
 /**
@@ -47,11 +44,10 @@ export const noAmbiguousErrorType = defineRule({
   createOnce: (context) => {
     return {
       TSTypeReference: (node) => {
-        if (!isIdentifierTypeName(node, RESULT_TYPES)) return;
         if (!hasTypeArguments(node, 2)) return;
 
         const scope = context.sourceCode.getScope(node);
-        if (getImportSource(scope, node.typeName) !== MODULE) return;
+        if (resolveResultType(scope, node) === undefined) return;
 
         const errorNode: ESTree.TSType = node.typeArguments.params[1];
         if (!isAmbiguousType(errorNode, scope)) return;
