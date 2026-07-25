@@ -37,7 +37,10 @@ message no longer says "unwrap" either). It is unreachable through well-typed
 code (only a cast or JS caller reaches it), so most callers never name it; those
 that `instanceof`/`catch` it do a one-line rename.
 
-Also: `allAsync` / `allFromDictAsync` now adopt each input defensively, so a
-cast/untyped rejecting thenable becomes a `Defect` rather than rejecting the
-internal promise (upholding "an `AsyncResult`'s internal promise never rejects"
-even for out-of-contract input).
+Also: the aggregates are hardened against out-of-contract input (only reachable
+via untyped/cast code). `allAsync` / `allFromDictAsync` adopt each input
+defensively (a rejecting thenable becomes a `Defect` instead of rejecting the
+internal promise), and all four aggregates now surface a non-`Result` element (a
+hole/`undefined`) as a `Defect` rather than throwing on `.tag` (sync) or
+rejecting (async) — upholding "an `AsyncResult`'s internal promise never rejects"
+for every input.
