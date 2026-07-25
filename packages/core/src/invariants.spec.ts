@@ -22,6 +22,16 @@ describe("Invariant 1: throw inside any combinator becomes a Defect", () => {
     expect(Ok(1).flatMap(t).isDefect()).toBe(true);
     expect(Ok(1).tap(t).isDefect()).toBe(true);
     expect(Ok(1).flatTap(t).isDefect()).toBe(true);
+    expect(
+      Ok(1)
+        .ensure(t, () => "e")
+        .isDefect(),
+    ).toBe(true);
+    expect(
+      Ok(1)
+        .ensure(() => false, t)
+        .isDefect(),
+    ).toBe(true);
     expect(Do().bind("a", t).isDefect()).toBe(true);
     expect(Do().let("a", t).isDefect()).toBe(true);
     expect(
@@ -56,6 +66,59 @@ describe("Invariant 1: throw inside any combinator becomes a Defect", () => {
   });
 });
 
+describe("Invariant 1b: a Result-constrained callback returning a non-Result becomes a Defect", () => {
+  // Reachable only from untyped/JS callers (in typed code the constraint is a
+  // compile error) — hence the `as never` casts. Same policy as the aggregates'
+  // non-Result-element guard: a TypeError-caused Defect, never a poison value
+  // that throws a raw TypeError later in the pipeline.
+  const rogue = (() => 42) as never;
+
+  it("sync: flatMap / flatTap / bind / flatMapErr / flatTapErr / recoverDefect", () => {
+    const hardened = [
+      Ok(1).flatMap(rogue),
+      Ok(1).flatTap(rogue),
+      Do().bind("a", rogue),
+      Err("e").flatMapErr((matcher) => matcher.with(P._, () => 42 as never)),
+      Err("e").flatTapErr((matcher) => matcher.with(P._, () => 42 as never)),
+      defectOf(boom).recoverDefect(rogue),
+    ];
+    for (const r of hardened) {
+      expect(r.isDefect()).toBe(true);
+      if (r.isDefect()) {
+        expect(r.cause).toBeInstanceOf(TypeError);
+        expect(String((r.cause as TypeError).message)).toContain("non-Result");
+      }
+    }
+  });
+
+  it("async: the same six combinators, without rejecting the internal promise", async () => {
+    const hardened = await Promise.all([
+      Ok(1).toAsync().flatMap(rogue),
+      Ok(1).toAsync().flatTap(rogue),
+      Do().toAsync().bind("a", rogue),
+      Err("e")
+        .toAsync()
+        .flatMapErr((matcher) => matcher.with(P._, () => 42 as never)),
+      Err("e")
+        .toAsync()
+        .flatTapErr((matcher) => matcher.with(P._, () => 42 as never)),
+      defectOf(boom).toAsync().recoverDefect(rogue),
+    ]);
+    for (const r of hardened) {
+      expect(r.isDefect()).toBe(true);
+      if (r.isDefect()) expect(r.cause).toBeInstanceOf(TypeError);
+    }
+  });
+
+  it("async bind still legitimately accepts BOTH a Result and an AsyncResult", async () => {
+    const r = await Do()
+      .toAsync()
+      .bind("sync", () => Ok(1))
+      .bind("async", ({ sync }) => Ok(sync + 1).toAsync());
+    expect(r.getOr(null)).toEqual({ sync: 1, async: 2 });
+  });
+});
+
 describe("Invariant 2: a Defect flows through every method except match() and recoverDefect()", () => {
   it("success/error combinators pass a Defect through and never call their callback", () => {
     const f = vi.fn();
@@ -68,6 +131,10 @@ describe("Invariant 2: a Defect flows through every method except match() and re
       defectOf(boom).let("a", f),
       defectOf(boom).as(1),
       defectOf(boom).discard(),
+      defectOf(boom).ensure((v) => {
+        f(v);
+        return true;
+      }, f),
       defectOf(boom).mapErr((matcher) => matcher.with(P._, f)),
       defectOf(boom).flatMapErr((matcher) => matcher.with(P._, f)),
       defectOf(boom).recoverErr((matcher) => matcher.with(P._, f)),

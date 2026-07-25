@@ -6,7 +6,7 @@
 
 import { Err, ErrAsync, isDefect, isErr, isOk, Ok, OkAsync } from "./constructors.js";
 import { isResult } from "./core.js";
-import { Do } from "./do.js";
+import { Do, DoAsync } from "./do.js";
 import {
   all,
   allAsync,
@@ -83,8 +83,9 @@ export type Result<T, E> = ResultType<T, E>;
 /**
  * Companion object grouping the **`AsyncResult`-producing** entry points under
  * the matching namespace: {@link AsyncResult.Ok}, {@link AsyncResult.Err},
- * {@link AsyncResult.fromPromise}, {@link AsyncResult.fromSafePromise},
- * {@link AsyncResult.all}, {@link AsyncResult.allFromDict}.
+ * {@link AsyncResult.Do}, {@link AsyncResult.fromPromise},
+ * {@link AsyncResult.fromSafePromise}, {@link AsyncResult.all},
+ * {@link AsyncResult.allFromDict}.
  *
  * @remarks
  * The async sibling of {@link Result}. Statics are grouped by what they
@@ -92,7 +93,8 @@ export type Result<T, E> = ResultType<T, E>;
  * and the async aggregates sit here rather than on {@link Result}; the namespace
  * already conveys "async", so the members drop the `Async` suffix their free
  * functions carry (`AsyncResult.Ok` is `OkAsync`; `AsyncResult.Err` is
- * `ErrAsync`; `AsyncResult.all` is `allAsync`; `AsyncResult.allFromDict` is
+ * `ErrAsync`; `AsyncResult.Do` is `DoAsync`; `AsyncResult.all` is `allAsync`;
+ * `AsyncResult.allFromDict` is
  * `allFromDictAsync`). Like {@link Result}, the free functions remain the
  * primary, tree-shakeable API; the value `AsyncResult` and the type
  * {@link AsyncResult} share one name.
@@ -109,6 +111,7 @@ export type Result<T, E> = ResultType<T, E>;
 export const AsyncResult = {
   Ok: OkAsync,
   Err: ErrAsync,
+  Do: DoAsync,
   fromPromise,
   fromSafePromise,
   all: allAsync,

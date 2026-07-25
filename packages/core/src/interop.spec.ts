@@ -79,9 +79,11 @@ describe("fromThrowable", () => {
     // the original cause is preserved on the Defect channel
     expect(r.recoverDefect((c) => Ok(c === boom)).get()).toBe(true);
     // the injected helper yields an opaque marker carrying the cause — NOT a
-    // Result (it has no Result methods).
+    // Result (it has no Result methods) — and it is frozen: a mutated marker
+    // cannot smuggle a different cause past the boundary.
     expect(marker).toMatchObject({ cause: boom });
     expect((marker as { isOk?: unknown }).isOk).toBeUndefined();
+    expect(Object.isFrozen(marker)).toBe(true);
   });
 
   it("treats a throw inside qualify as a Defect", () => {
@@ -183,5 +185,54 @@ describe("fromSafePromise — non-thenable absorption", () => {
     const r = await fromSafePromise("x" as unknown as Promise<string>);
     expect(r.tag).toBe("Ok");
     if (r.isOk()) expect(r.value).toBe("x");
+  });
+});
+
+describe("qualify must be synchronous (runtime belt-and-braces)", () => {
+  // An async qualify is a compile error (NotThenable, guarded in
+  // types.test-d.ts); these exercise the runtime guard for untyped/JS callers.
+  it("fromThrowable: an async qualify slipped past the types yields a Defect, never Err(Promise)", () => {
+    const fn = fromThrowable(
+      () => {
+        throw boom;
+      },
+      (async () => "modeled") as never,
+    );
+    const r = fn();
+    expect(r.isErr()).toBe(false);
+    expect(r.isDefect()).toBe(true);
+    if (r.isDefect()) {
+      expect(r.cause).toBeInstanceOf(TypeError);
+      expect(String((r.cause as TypeError).message)).toContain("qualify must be synchronous");
+    }
+  });
+
+  it("fromPromise: an async qualify slipped past the types yields a Defect, never Err(Promise)", async () => {
+    const r = await fromPromise(Promise.reject(boom), (async () => "modeled") as never);
+    expect(r.isErr()).toBe(false);
+    expect(r.isDefect()).toBe(true);
+    if (r.isDefect()) expect(r.cause).toBeInstanceOf(TypeError);
+  });
+
+  it("an async-THROWING qualify still yields a Defect and its rejection never floats", async () => {
+    const floated: unknown[] = [];
+    const probe = (reason: unknown): void => {
+      floated.push(reason);
+    };
+    process.on("unhandledRejection", probe);
+    try {
+      const r = await fromPromise(Promise.reject(boom), (async () => {
+        throw new Error("late rejection");
+      }) as never);
+      expect(r.isDefect()).toBe(true);
+      // Give the orphaned promise time to settle and Node's unhandled-rejection
+      // detection a macrotask to fire — the adopt-and-silence handler must have
+      // claimed the rejection.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(floated).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", probe);
+    }
   });
 });

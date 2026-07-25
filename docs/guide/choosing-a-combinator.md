@@ -34,6 +34,7 @@ callback; the signatures below abbreviate its callback as `(matcher) => …`.
 | chain a `Result`-returning step                | `flatMap`         | `(v: T) => Result<U, E2>` → `Result<U, E \| E2>`             | Ok           |
 | run a side effect, keep the value              | `tap`             | `(v: T) => void` → `Result<T, E>`                            | Ok           |
 | run a **failable** side effect, keep the value | `flatTap`         | `(v: T) => Result<unknown, E2>` → `Result<T, E \| E2>`       | Ok           |
+| validate a success / refine its type           | `ensure`          | `((v: T) => boolean, (v: T) => E2)` → `Result<T, E \| E2>`   | Ok           |
 | sequence steps into a named scope              | `Do`/`bind`/`let` | `bind(k, (scope) => Result<U, E2>)` → `Result<{…}, E \| E2>` | Ok           |
 | replace the value with a constant              | `as`              | `(value: U)` → `Result<U, E>`                                | Ok           |
 | drop the value (success type becomes `void`)   | `discard`         | `()` → `Result<void, E>`                                     | Ok           |
@@ -62,6 +63,7 @@ failures). This grid is the whole story — notice the `Defect` column is
 | `map`                   | runs `f` | passes ▸      | passes ▸    | `E`             |
 | `flatMap`               | runs `f` | passes ▸      | passes ▸    | `E \| E2`       |
 | `tap` / `flatTap`       | runs `f` | passes ▸      | passes ▸    | `E` / `E \| E2` |
+| `ensure`                | runs `f` | passes ▸      | passes ▸    | `E \| E2`       |
 | `mapErr`                | passes ▸ | runs a branch | passes ▸    | `E2`            |
 | `flatMapErr`            | passes ▸ | runs a branch | passes ▸    | `E2`            |
 | `recoverErr`            | passes ▸ | branch → `Ok` | passes ▸    | `never`         |

@@ -145,6 +145,66 @@ describe("AsyncResult success channel", () => {
     expect(f).not.toHaveBeenCalled();
   });
 
+  it("ensure keeps the Ok value when the predicate holds", async () => {
+    const r = await asyncOk(5).ensure(
+      (n) => n > 0,
+      () => "neg" as const,
+    );
+    expect(r.getOr(-1)).toBe(5);
+  });
+
+  it("ensure fails into the modeled channel when the predicate rejects", async () => {
+    const r = await asyncOk(-2).ensure(
+      (n) => n > 0,
+      (n) => `neg:${n}`,
+    );
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toBe("neg:-2");
+  });
+
+  it("ensure refines the success type with a type-guard predicate", async () => {
+    const mixed = asyncOk<string | number>("x");
+    const r = await mixed
+      .ensure(
+        (v): v is string => typeof v === "string",
+        () => "not_a_string" as const,
+      )
+      .map((s) => s.toUpperCase()); // compiles only because the guard refined to string
+    expect(r.getOr("?")).toBe("X");
+  });
+
+  it("ensure passes Err and Defect through without running either callback", async () => {
+    const p = vi.fn(() => true);
+    const f = vi.fn(() => "e2");
+    expect((await asyncErr("e").ensure(p, f)).getErr()).toBe("e");
+    expect((await asyncDefect().ensure(p, f)).isDefect()).toBe(true);
+    expect(p).not.toHaveBeenCalled();
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("ensure converts a throw in the predicate or in onFail into a Defect", async () => {
+    expect(
+      (
+        await asyncOk(1).ensure(
+          () => {
+            throw boom;
+          },
+          () => "e",
+        )
+      ).isDefect(),
+    ).toBe(true);
+    expect(
+      (
+        await asyncOk(1).ensure(
+          () => false,
+          () => {
+            throw boom;
+          },
+        )
+      ).isDefect(),
+    ).toBe(true);
+  });
+
   it("as replaces the Ok value, and passes Err/Defect through", async () => {
     expect((await asyncOk(1).as("x")).get()).toBe("x");
     const r = await asyncErr("e").as("x");

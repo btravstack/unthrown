@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { Do, Err, fromSafePromise, Ok, type Result } from "./index.js";
+import { Do, DoAsync, Err, fromSafePromise, Ok, type Result } from "./index.js";
 
 const boom = new Error("boom");
 const defectOf = (cause: unknown): Result<number, never> =>
@@ -146,5 +146,29 @@ describe("Do / bind / let — async", () => {
       .toAsync()
       .let("a", () => 1);
     expect(fromLet.isDefect()).toBe(true);
+  });
+});
+
+describe("DoAsync — the pre-lifted async Do", () => {
+  it("starts an empty object scope, already lifted (no Do().toAsync() boilerplate)", async () => {
+    const r = await DoAsync();
+    expect(r.isOk()).toBe(true);
+    expect(r.get()).toEqual({});
+  });
+
+  it("chains bind/let from it, accepting sync Results and AsyncResults alike", async () => {
+    const r = await DoAsync()
+      .bind("a", () => fromSafePromise(Promise.resolve(1)))
+      .bind("b", ({ a }) => Ok(a + 1)) // a sync Result is accepted too
+      .let("c", ({ a, b }) => a + b);
+    expect(r.get()).toEqual({ a: 1, b: 2, c: 3 });
+  });
+
+  it("short-circuits on an Err exactly like Do().toAsync()", async () => {
+    const r = await DoAsync()
+      .bind("a", () => Err("denied"))
+      .bind("b", () => Ok(1));
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toBe("denied");
   });
 });

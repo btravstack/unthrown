@@ -221,6 +221,52 @@ export type ResultMethods<out T, out E> = {
    * is `void`: the value's story ends here.
    */
   discard(): Result<void, E>;
+  /**
+   * Validate the success value — keep the `Ok` when `predicate` holds,
+   * otherwise fail into the **modeled** channel with `Err(onFail(value))`.
+   *
+   * @remarks
+   * The named form of `flatMap((v) => (p(v) ? Ok(v) : Err(e)))`. With a
+   * **type-guard** predicate (`(v): v is U`) the success type is **refined** to
+   * `U` on the way through (this overload). Runs only on `Ok` — a passing value
+   * flows through as the *same* `Ok`; `Err` and `Defect` pass through
+   * untouched. A throw in `predicate` or `onFail` becomes a `Defect`.
+   *
+   * Both callbacks are synchronous: an async `onFail` is rejected at compile
+   * time ({@link NotThenable}), and an async predicate does not type-check
+   * either — its `Promise<boolean>` is not a `boolean` (and, being truthy,
+   * would have silently always passed).
+   *
+   * @typeParam U - the refined success type (type-guard form).
+   * @typeParam E2 - the error type `onFail` produces.
+   * @param predicate - the check; a type guard refines `T` to `U`.
+   * @param onFail - maps the failing value to the modeled error.
+   *
+   * @example
+   * ```ts
+   * // boolean form: gate a value
+   * Ok(-1).ensure((n) => n > 0, (n) => `negative: ${n}`); // Err("negative: -1")
+   *
+   * // type-guard form: refine the success type
+   * declare const r: Result<string | number, "e">;
+   * const s = r.ensure(
+   *   (v): v is string => typeof v === "string",
+   *   () => "not_a_string" as const,
+   * ); // Result<string, "e" | "not_a_string">
+   * ```
+   */
+  ensure<U extends T, E2>(
+    predicate: (value: T) => value is U,
+    onFail: (value: T) => E2 & NotThenable<E2>,
+  ): Result<U, E | E2>;
+  /**
+   * Boolean form of {@link ResultMethods.ensure | ensure} — validates without
+   * refining, keeping the success type `T`.
+   */
+  ensure<E2>(
+    predicate: (value: T) => boolean,
+    onFail: (value: T) => E2 & NotThenable<E2>,
+  ): Result<T, E | E2>;
 
   /**
    * Transform the modeled error by **matching it exhaustively** with ts-pattern.
@@ -290,14 +336,20 @@ export type ResultMethods<out T, out E> = {
    * values are ignored and the original `Err` flows through. Exhaustive like the
    * transformers (use `.with(P._, …)` for a catch-all). If a branch throws, the
    * result is a `Defect` whose cause is an `AggregateError` of `[thrown, original
-   * failure]` — observing a failure never destroys it. A failable
+   * failure]` — observing a failure never destroys it. An **async branch is
+   * rejected at compile time** ({@link NotThenable} on the builder output):
+   * because the branch results are discarded, a returned `Promise` would float
+   * unobserved and its rejection would vanish. A failable
    * `Result`-returning effect belongs in
    * {@link ResultMethods.flatTapErr | flatTapErr}.
    *
    * @param f - builds the match; branch returns are ignored.
    */
-  tapErr(
-    f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
+  tapErr<R>(
+    f: (
+      matcher: ErrMatcher<E>,
+      defect: (cause: unknown) => Defect,
+    ) => ExhaustiveMatch<R & NotThenable<R>>,
   ): Result<T, E>;
 
   /**
@@ -607,7 +659,7 @@ export type FailureView<E, T = never> = ErrView<E, T> | DefectView<T, E>;
  *
  * @example
  * ```ts
- * import { Ok, Err, type Result } from "unthrown";
+ * import { Ok, Err, P, type Result } from "unthrown";
  *
  * function half(n: number): Result<number, "odd"> {
  *   return n % 2 === 0 ? Ok(n / 2) : Err("odd");
@@ -615,7 +667,7 @@ export type FailureView<E, T = never> = ErrView<E, T> | DefectView<T, E>;
  *
  * const message = half(10).match({
  *   ok: (n) => `got ${n}`,
- *   err: (e) => `failed: ${e}`,
+ *   err: (matcher) => matcher.with(P._, (e) => `failed: ${e}`),
  *   defect: (cause) => `bug: ${String(cause)}`,
  * });
  * ```
@@ -719,6 +771,22 @@ export type AsyncResultMethods<out T, out E> = {
   as<U>(value: U): AsyncResult<U, E>;
   /** Asynchronous {@link ResultMethods.discard | discard}: drops the value, collapsing the success type to `void`. */
   discard(): AsyncResult<void, E>;
+  /**
+   * Asynchronous {@link ResultMethods.ensure | ensure}: validate the success
+   * value — and, with a type-guard predicate (this overload), **refine** it —
+   * failing into the modeled channel with `Err(onFail(value))`. Both callbacks
+   * are synchronous (an async `onFail` is rejected at compile time,
+   * {@link NotThenable}); a throw in either becomes a `Defect`.
+   */
+  ensure<U extends T, E2>(
+    predicate: (value: T) => value is U,
+    onFail: (value: T) => E2 & NotThenable<E2>,
+  ): AsyncResult<U, E | E2>;
+  /** Boolean form of the asynchronous {@link ResultMethods.ensure | ensure} — validates without refining, keeping `T`. */
+  ensure<E2>(
+    predicate: (value: T) => boolean,
+    onFail: (value: T) => E2 & NotThenable<E2>,
+  ): AsyncResult<T, E | E2>;
 
   /**
    * Asynchronous {@link ResultMethods.mapErr | mapErr} — the same exhaustive
@@ -755,13 +823,18 @@ export type AsyncResultMethods<out T, out E> = {
    * Asynchronous {@link ResultMethods.tapErr | tapErr}. `f` is synchronous; if it
    * throws, the result is a `Defect` whose cause is an `AggregateError` of
    * `[thrown, original failure]` — observing a failure never destroys it. An
-   * async callback is rejected at compile time ({@link NotThenable}). The
+   * async branch is rejected at compile time ({@link NotThenable} on the
+   * builder output) — branch results are discarded, so a rejected `Promise`
+   * would float unobserved. The
    * {@link AsyncResultMethods.tap | tap} fire-and-forget caveat applies here
    * too — a failable effect belongs in
    * {@link AsyncResultMethods.flatTapErr | flatTapErr}.
    */
-  tapErr(
-    f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
+  tapErr<R>(
+    f: (
+      matcher: ErrMatcher<E>,
+      defect: (cause: unknown) => Defect,
+    ) => ExhaustiveMatch<R & NotThenable<R>>,
   ): AsyncResult<T, E>;
 
   /**
