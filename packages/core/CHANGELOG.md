@@ -1,5 +1,147 @@
 # unthrown
 
+## 5.0.0-beta.0
+
+### Major Changes
+
+- 284b7be: **The error channel is now matched exhaustively with ts-pattern** (Thesis #5).
+  The error combinators — `mapErr`, `flatMapErr`, `recoverErr`, `tapErr`,
+  `flatTapErr` — no longer take a plain callback. Their callback receives a
+  ts-pattern match builder over the error (`match(error)`) plus the injected
+  `defect` helper, and **returns the un-terminated builder** — the combinator
+  calls `.exhaustive()` for you:
+
+  ```ts
+  import { P, tag } from "unthrown";
+
+  // before
+  result.mapErr((error) => {
+    if (error._tag === "RecordNotFound") return new NotFoundException(id);
+    throw error.cause; // silent fallthrough — a future tag lands here unnoticed
+  });
+
+  // after — exhaustive; the type checker forces every case to be handled
+  result.mapErr((matcher, defect) =>
+    matcher
+      .with(tag("RecordNotFound"), () => new NotFoundException(id))
+      .with(tag("DriverError"), (e) => defect(e.cause)),
+  );
+  ```
+
+  The matcher callback parameter is named `matcher` (not `m`).
+
+  **Every error is handled explicitly, and enriching the error channel is a
+  compile error at every consuming site** until each new case is handled. Because
+  the combinator runs `.exhaustive()`, a missing case does not compile — there is
+  no `.exhaustive()` to forget and no `.otherwise()` to smuggle in a fallback.
+
+  - **Match on anything ts-pattern supports** — `_tag`, a `code`-discriminated
+    union (the oRPC shape), structural shapes, guards, and grouped patterns
+    (`.with(a, b, handler)` — one strategy for several cases). `tag("X")` is sugar
+    for the `{ _tag: "X" }` pattern.
+  - **`P._` is the deliberate catch-all** — the uniform "handle everything else"
+    branch that replaces the old single callback, made explicit and greppable.
+  - Each branch receives the narrowed variant **and the injected `defect` helper**
+    (`.with(tag("X"), (e) => defect(e.cause))`); its `Defect` arm is subtracted
+    from the outgoing `E` (`Exclude<O, Defect>`, the boundary inference). A
+    throwing branch also becomes a `Defect` (the safety net).
+  - **Observers match exhaustively too** (`tapErr`/`flatTapErr`, use `P._` for a
+    catch-all); the error is observed and flows through unchanged.
+
+  **Core now depends on `ts-pattern`** (a small, types-heavy, dual-copy-safe
+  library), and re-exports `match` and `P`, plus `tag` — so the matcher, and
+  matching a whole `Result` (`match(r).with(P.Ok(), …)`), are first-class in one
+  import. **The `@unthrown/pattern` package is removed** — its `tag` helper moved
+  into core; the `P.Ok`/`P.Err`/`P.Defect` sugar is dropped (match the union
+  structurally instead).
+
+  **`match` now matches the error channel exhaustively too, and `matchTags` is
+  removed.** `match`'s `err` handler no longer takes a blanket `(error) => R`
+  callback — it receives the same ts-pattern matcher and returns the un-terminated
+  builder (no `defect` helper: `match` folds to a value, with no `Defect` output
+  channel). This subsumes the old `matchTags` fold — a per-tag fold over a tagged
+  union is now `match` with the matcher and `tag(t)`, and it generalises to any
+  discriminant, not only `_tag`:
+
+  ```ts
+  import { P, tag } from "unthrown";
+
+  // before
+  matchTags(result, {
+    Ok: (n) => `got ${n}`,
+    Defect: (cause) => `bug: ${String(cause)}`,
+    NotFound: () => "404",
+    Forbidden: (e) => `403 for ${e.user}`,
+  });
+
+  // after
+  result.match({
+    ok: (n) => `got ${n}`,
+    defect: (cause) => `bug: ${String(cause)}`,
+    err: (matcher) =>
+      matcher.with(tag("NotFound"), () => "404").with(tag("Forbidden"), (e) => `403 for ${e.user}`),
+  });
+  ```
+
+  Use `.with(P._, …)` for a uniform catch-all. `matchTags` and its `TagHandlers`
+  type are gone; `TaggedError` and `tag` are unchanged. **Library code generic in
+  the error type `E`** (which ts-pattern can't prove exhaustive over an unresolved
+  type parameter) should fold with the `isOk` / `isErr` / `isDefect` guards
+  instead of `match`.
+
+  **Also breaking:** the deprecated error-channel aliases `orElse` and `recover`
+  are removed; the extractor aliases (`unwrap`, `unwrapErr`, `unwrapOr`,
+  `unwrapOrElse`) remain. `AsyncOkOf` / `AsyncErrOf` now infer through the
+  awaitable channel only (same results for ordinary `AsyncResult` types).
+
+- a1f68d5: **The extractor family is spelled only `get…`, and `getOrThrow` is now gated.**
+
+  The deprecated `unwrap*` aliases are **removed** — `unwrap`, `unwrapErr`,
+  `unwrapOr`, `unwrapOrElse` (they were runtime-identical delegates). Rename to
+  their replacements:
+
+  ```ts
+  result.unwrap(); // → result.get()
+  result.unwrapErr(); // → result.getErr()
+  result.unwrapOr(v); // → result.getOr(v)
+  result.unwrapOrElse(f); // → result.getOrElse(f)
+  ```
+
+  **`getOrThrow` is now type-gated as the complement of `get`.** It compiles only
+  when the error channel is **non-empty** (`E` is not `never`) — there must be a
+  modeled error for it to throw. On a `Result<T, never>` there is nothing to
+  throw, so use `get()` (which gates the other way). Together they partition
+  extraction by the error channel's state:
+
+  ```ts
+  declare const fallible: Result<number, "e">;
+  declare const total: Result<number, never>;
+
+  fallible.getOrThrow(); // ok — throws "e" on Err
+  fallible.get(); // ✗ compile error — error channel not empty
+  total.get(); // ok
+  total.getOrThrow(); // ✗ compile error — nothing to throw; use get()
+  ```
+
+  **`UnwrapError` is renamed to `GetError`** — it is what the `get…` extractors
+  throw on a wrong-variant access, so it now lives in the `get` register (its
+  message no longer says "unwrap" either). It is unreachable through well-typed
+  code (only a cast or JS caller reaches it), so most callers never name it; those
+  that `instanceof`/`catch` it do a one-line rename.
+
+  Also: the aggregates are hardened against out-of-contract input (only reachable
+  via untyped/cast code). `allAsync` / `allFromDictAsync` adopt each input
+  defensively (a rejecting thenable becomes a `Defect` instead of rejecting the
+  internal promise), and all four aggregates now surface a non-`Result` element (a
+  hole/`undefined`) as a `Defect` rather than throwing on `.tag` (sync) or
+  rejecting (async) — upholding "an `AsyncResult`'s internal promise never rejects"
+  for every input.
+
+### Patch Changes
+
+- 3b06099: Adopt @btravstack/tsconfig@0.2.0 (verbatimModuleSyntax), @btravstack/oxlint@0.2.1 (consistent-type-imports), and @btravstack/lefthook.
+- 4096713: Remove the local `tools/tsconfig` / `tools/typedoc` packages and consume the published `@btravstack/tsconfig` / `@btravstack/typedoc` config directly (every package now extends `@btravstack/*` and takes it from the catalog).
+
 ## 4.3.0
 
 ### Minor Changes
