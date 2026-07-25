@@ -95,5 +95,3 @@ await expect(fromSafePromise(Promise.reject(boom))).toBeDefect();
 A forgotten `await` on an async assertion makes it pass **silently** — the
 promise is never observed. Always `await expect(asyncResult)…`.
 :::
-
-→ Continue to [Pattern Matching](./pattern-matching).
