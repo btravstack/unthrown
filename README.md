@@ -16,7 +16,7 @@
 
 <br/>
 
-<sub>**USED IN PRODUCTION AT**</sub>
+<sub><strong>USED IN PRODUCTION AT</strong></sub>
 
 <a href="https://emeriagroup.com/fr/">
   <picture>
