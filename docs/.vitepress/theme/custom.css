@@ -55,3 +55,38 @@
     object-fit: contain;
   }
 }
+
+/* "Used in production at" strip — a subtle, centered adopter logo below the
+ * At-a-glance example. The light/dark logo pair mirrors the hero's own
+ * logo-light/logo-dark swap (VitePress toggles `html.dark`); the shipped
+ * Emeria SVGs share one geometry, recoloured navy (light) / white (dark). */
+.used-by {
+  margin: 4rem auto 1.5rem;
+  text-align: center;
+}
+.used-by__label {
+  margin: 0 0 1rem;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--vp-c-text-3);
+}
+.used-by__logo {
+  height: 30px;
+  width: auto;
+  opacity: 0.75;
+  transition: opacity 0.25s;
+}
+.used-by__link:hover .used-by__logo {
+  opacity: 1;
+}
+.used-by__logo--dark {
+  display: none;
+}
+.dark .used-by__logo--light {
+  display: none;
+}
+.dark .used-by__logo--dark {
+  display: inline-block;
+}
