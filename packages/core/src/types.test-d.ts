@@ -125,6 +125,14 @@ type _safeThrowable = Expect<
 // @ts-expect-error - the qualify argument is required
 fromPromise(Promise.resolve(1));
 
+// qualify is synchronous — an async qualify would put a Promise in E (an
+// un-triaged boundary) and let its own rejection float, so NotThenable bans it
+const asyncQualify = async (c: unknown) => c;
+// @ts-expect-error - an async qualify is banned on fromPromise
+fromPromise(Promise.resolve(1), asyncQualify);
+// @ts-expect-error - an async qualify is banned on fromThrowable
+fromThrowable(() => 1, asyncQualify);
+
 // --- combinators -------------------------------------------------------------
 
 // flatMap widens the error channel
@@ -331,6 +339,12 @@ new WithCode({ code: 1 });
 new WithCode({ code: 1, name: "nope" });
 // @ts-expect-error - a `message` payload key is reserved (owned by Error)
 new WithCode({ code: 1, message: "nope" });
+// @ts-expect-error - a `stack` payload key is reserved (Error's trace)
+new WithCode({ code: 1, stack: "nope" });
+// `cause` is deliberately NOT reserved — Error.cause is `unknown`, so a typed
+// payload `cause` is a legitimate structured field.
+class WithCause extends TaggedError("WithCause")<{ cause: unknown }> {}
+new WithCause({ cause: "anything" });
 // Even a forced `name` payload does not narrow `Error.name`: it stays `string`.
 type _nameNotShadowed = Expect<
   Equal<TaggedErrorInstance<"X", { code: number; name: "lit" }>["name"], string>
@@ -338,6 +352,10 @@ type _nameNotShadowed = Expect<
 // Likewise a forced `message` payload does not narrow `Error.message`.
 type _messageNotShadowed = Expect<
   Equal<TaggedErrorInstance<"X", { code: number; message: "lit" }>["message"], string>
+>;
+// And a forced `stack` payload does not shadow `Error.stack` either.
+type _stackNotShadowed = Expect<
+  Equal<TaggedErrorInstance<"X", { code: number; stack: 123 }>["stack"], string | undefined>
 >;
 // The message is defined per subclass the standard way — `override message`,
 // which may interpolate the payload via `this`.
@@ -358,15 +376,19 @@ new WithMsg({ ticketId: "t1" });
   r.tap(async () => {});
   // @ts-expect-error — async map callback is banned (sync surface)
   r.map(async (n) => n + 1);
-  // A raw Promise / async branch would bypass qualification only where the
+  // A raw Promise / async branch would bypass qualification where the
   // combinator awaits it — flatMapErr / flatTapErr — so those reject it via
-  // their builder-output constraint. (mapErr / recoverErr / tapErr run the
-  // handler synchronously with no await, so an async branch is merely a
-  // Promise-valued result, not a rejection bypass.)
+  // their builder-output constraint; tapErr rejects it too, because its branch
+  // results are DISCARDED (a rejected Promise would float unobserved). Only
+  // the non-awaiting transformers mapErr / recoverErr run the handler
+  // synchronously with no await, so an async branch there is merely a visible
+  // Promise-valued result, not a rejection bypass.
   // @ts-expect-error — an async flatMapErr branch is banned
   r.flatMapErr((matcher) => matcher.with(P._, async () => Ok(1)));
   // @ts-expect-error — an async flatTapErr branch is banned
   r.flatTapErr((matcher) => matcher.with(P._, async () => Ok(1)));
+  // @ts-expect-error — an async tapErr branch is banned (discarded, would float)
+  r.tapErr((matcher) => matcher.with(P._, async () => {}));
   // @ts-expect-error — async tapDefect callback is banned
   r.tapDefect(async () => {});
   // @ts-expect-error — async tapFailure callback is banned
@@ -382,6 +404,8 @@ new WithMsg({ ticketId: "t1" });
   ar.flatMapErr((matcher) => matcher.with(P._, async () => Ok(1)));
   // @ts-expect-error — an async flatTapErr branch is banned (async surface)
   ar.flatTapErr((matcher) => matcher.with(P._, async () => Ok(1)));
+  // @ts-expect-error — an async tapErr branch is banned (async surface)
+  ar.tapErr((matcher) => matcher.with(P._, async () => {}));
   // @ts-expect-error — async tapDefect callback is banned (async surface)
   ar.tapDefect(async () => {});
   // @ts-expect-error — async tapFailure callback is banned (async surface)
@@ -403,6 +427,56 @@ new WithMsg({ ticketId: "t1" });
     err: (matcher) => matcher.with(P._, async (e) => e.length),
     defect: async () => 0,
   });
+}
+
+// --- ensure: validate a success, or refine its type with a guard --------------
+
+{
+  const r = Ok(1) as Result<number, "e">;
+
+  // boolean form: T is kept, E widens to E | E2
+  const gated = r.ensure(
+    (n) => n > 0,
+    () => "neg" as const,
+  );
+  type _Gated = Expect<Equal<typeof gated, Result<number, "e" | "neg">>>;
+
+  // type-guard form: the success type is refined to U
+  const mixed = Ok("x") as Result<string | number, "e">;
+  const refined = mixed.ensure(
+    (v): v is string => typeof v === "string",
+    () => "not_a_string" as const,
+  );
+  type _Refined = Expect<Equal<typeof refined, Result<string, "e" | "not_a_string">>>;
+
+  // async surface mirrors both overloads
+  const arE = r.toAsync();
+  const gatedAsync = arE.ensure(
+    (n) => n > 0,
+    () => "neg" as const,
+  );
+  type _GatedAsync = Expect<Equal<typeof gatedAsync, AsyncResult<number, "e" | "neg">>>;
+  const refinedAsync = mixed.toAsync().ensure(
+    (v): v is string => typeof v === "string",
+    () => "nas" as const,
+  );
+  type _RefinedAsync = Expect<Equal<typeof refinedAsync, AsyncResult<string, "e" | "nas">>>;
+
+  // an async onFail would smuggle a Promise into E — banned (NotThenable)
+  // @ts-expect-error - an async onFail is banned (sync surface)
+  r.ensure(
+    (n) => n > 0,
+    async () => "neg",
+  );
+  // @ts-expect-error - an async onFail is banned (async surface)
+  arE.ensure(
+    (n) => n > 0,
+    async () => "neg",
+  );
+  // an async predicate would be always-truthy — Promise<boolean> is not boolean
+  const asyncPredicate = async (n: number) => n > 0;
+  // @ts-expect-error - an async predicate is banned
+  r.ensure(asyncPredicate, () => "neg" as const);
 }
 
 // --- tapFailure: the callback receives the discriminated failure variant ----

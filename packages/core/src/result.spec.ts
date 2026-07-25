@@ -156,6 +156,70 @@ describe("Result.flatTap", () => {
   });
 });
 
+describe("Result.ensure", () => {
+  it("keeps the SAME Ok when the predicate holds (no reallocation)", () => {
+    const r = Ok(5);
+    expect(
+      r.ensure(
+        (n) => n > 0,
+        () => "neg" as const,
+      ),
+    ).toBe(r);
+  });
+
+  it("fails into the modeled channel with onFail(value) when the predicate rejects", () => {
+    const r = Ok(-2).ensure(
+      (n) => n > 0,
+      (n) => `neg:${n}`,
+    );
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toBe("neg:-2");
+  });
+
+  it("refines the success type with a type-guard predicate", () => {
+    const r = (Ok("x") as Result<string | number, "e">).ensure(
+      (v): v is string => typeof v === "string",
+      () => "not_a_string" as const,
+    );
+    // `s.toUpperCase()` compiles only because the guard refined the value to string.
+    expect(r.map((s) => s.toUpperCase()).getOr("?")).toBe("X");
+  });
+
+  it("passes Err and Defect through without running either callback", () => {
+    const p = vi.fn(() => true);
+    const f = vi.fn(() => "e2");
+    const e = Err("e").ensure(p, f);
+    expect(e.isErr()).toBe(true);
+    if (e.isErr()) expect(e.error).toBe("e");
+    expect(defectOf(boom).ensure(p, f).isDefect()).toBe(true);
+    expect(p).not.toHaveBeenCalled();
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("converts a throw in the predicate or in onFail into a Defect", () => {
+    expect(
+      Ok(1)
+        .ensure(
+          () => {
+            throw boom;
+          },
+          () => "e",
+        )
+        .isDefect(),
+    ).toBe(true);
+    expect(
+      Ok(1)
+        .ensure(
+          () => false,
+          () => {
+            throw boom;
+          },
+        )
+        .isDefect(),
+    ).toBe(true);
+  });
+});
+
 describe("Result.as", () => {
   it("replaces the Ok value", () => {
     expect(Ok(1).as("x").get()).toBe("x");
@@ -447,6 +511,44 @@ describe("Result.flatTapErr (ts-pattern matcher, exhaustive)", () => {
             throw boom;
           }),
         )
+        .isDefect(),
+    ).toBe(true);
+  });
+});
+
+describe("a rogue value past the types: NonExhaustiveError → Defect in EVERY error combinator", () => {
+  // The mapErr case is guarded above; the other four share runMatch, but the
+  // invariant claims all five — so each gets its own probe.
+  const smuggled = () => Err({ _tag: "C" }) as unknown as Result<never, TagA>;
+
+  it("flatMapErr routes the unmatched rogue value to a Defect", () => {
+    expect(
+      smuggled()
+        .flatMapErr((matcher) => matcher.with(tag("A"), (e) => Ok(e.a)))
+        .isDefect(),
+    ).toBe(true);
+  });
+
+  it("recoverErr routes the unmatched rogue value to a Defect", () => {
+    expect(
+      smuggled()
+        .recoverErr((matcher) => matcher.with(tag("A"), (e) => e.a))
+        .isDefect(),
+    ).toBe(true);
+  });
+
+  it("tapErr routes the unmatched rogue value to a Defect", () => {
+    expect(
+      smuggled()
+        .tapErr((matcher) => matcher.with(tag("A"), () => undefined))
+        .isDefect(),
+    ).toBe(true);
+  });
+
+  it("flatTapErr routes the unmatched rogue value to a Defect", () => {
+    expect(
+      smuggled()
+        .flatTapErr((matcher) => matcher.with(tag("A"), () => Ok(1)))
         .isDefect(),
     ).toBe(true);
   });

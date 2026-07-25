@@ -3,7 +3,7 @@
 // scope to grow.
 
 import { Ok } from "./constructors.js";
-import type { Result } from "./types.js";
+import type { AsyncResult, Result } from "./types.js";
 
 /**
  * Start a do-notation chain with an empty object scope, grown step by step with
@@ -47,4 +47,32 @@ import type { Result } from "./types.js";
  */
 export function Do(): Result<{}, never> {
   return Ok({});
+}
+
+/**
+ * Start an **asynchronous** do-notation chain with an empty object scope — the
+ * pre-lifted form of {@link Do}, sparing you `Do().toAsync()`.
+ *
+ * @remarks
+ * From here a `bind` may return a `Result` **or** an `AsyncResult`; the scope
+ * accumulates exactly as in a sync {@link Do} chain, and a throw in any step
+ * becomes a `Defect`. Named with the `Async` suffix the async free functions
+ * carry (`OkAsync`, `allAsync`); the {@link AsyncResult} companion aliases it as
+ * `AsyncResult.Do` (the namespace already says "async", so the suffix drops).
+ *
+ * @example
+ * ```ts
+ * import { DoAsync, Ok } from "unthrown";
+ *
+ * const result = await DoAsync()
+ *   .bind("user", () => findUser(id)) // AsyncResult<User, NotFound>
+ *   .bind("plan", ({ user }) => Ok(user.plan)) // a sync Result is accepted too
+ *   .let("label", ({ user, plan }) => `${user.name} on ${plan}`);
+ * // Result<{ user: User; plan: Plan; label: string }, NotFound>
+ * ```
+ *
+ * @category Do-notation
+ */
+export function DoAsync(): AsyncResult<{}, never> {
+  return Do().toAsync();
 }

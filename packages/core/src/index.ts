@@ -5,7 +5,7 @@ export { match, P } from "ts-pattern";
 
 export { Err, ErrAsync, isDefect, isErr, isOk, Ok, OkAsync } from "./constructors.js";
 export { isResult, GetError } from "./core.js";
-export { Do } from "./do.js";
+export { Do, DoAsync } from "./do.js";
 export { AsyncResult, Result } from "./facade.js";
 export {
   all,

@@ -133,6 +133,23 @@ describe("isResult narrows an unknown value to a Result", () => {
   it("is false for an AsyncResult (not a Result)", () => {
     expect(isResult(Ok(1).toAsync())).toBe(false);
   });
+
+  it("accepts a Result from another copy of unthrown via the Symbol.for prototype brand", () => {
+    // Simulate a dual-copy (the CJS and ESM builds side by side) or cross-realm
+    // Result: a foreign prototype that carries the shared Symbol.for brand but
+    // is not our Res prototype, so `instanceof` alone would reject it.
+    const foreignProto = Object.defineProperty({}, Symbol.for("unthrown.Result"), { value: true });
+    const foreign = Object.assign(Object.create(foreignProto), { tag: "Ok", value: 1 });
+    expect(foreign instanceof Object.getPrototypeOf(Ok(1)).constructor).toBe(false);
+    expect(isResult(foreign)).toBe(true);
+  });
+
+  it("still rejects a structural look-alike that carries no brand on its prototype", () => {
+    expect(isResult(Object.assign(Object.create({}), { tag: "Ok", value: 1 }))).toBe(false);
+    // The brand comes only from a copy of unthrown's prototype — an accidental
+    // `{ tag: "Ok" }` literal never carries it.
+    expect(isResult({ tag: "Ok", value: 1, isOk: () => true })).toBe(false);
+  });
 });
 
 describe("method guards narrow (parity with the standalone guards)", () => {
@@ -174,6 +191,20 @@ describe("Result instances are frozen — a variant cannot be forged by mutation
     }).toThrow(TypeError);
     expect(r.isOk()).toBe(true);
     expect(Object.isFrozen(Err("e"))).toBe(true);
+  });
+
+  it("freezes Defect instances too (all three variants share the guarantee)", () => {
+    const d = defectOf(boom);
+    expect(Object.isFrozen(d)).toBe(true);
+    expect(() => {
+      (d as unknown as { tag: string }).tag = "Ok";
+    }).toThrow(TypeError);
+    expect(d.isDefect()).toBe(true);
+  });
+
+  it("freezes the prototypes — the shared combinators cannot be swapped out", () => {
+    expect(Object.isFrozen(Object.getPrototypeOf(Ok(1)))).toBe(true);
+    expect(Object.isFrozen(Object.getPrototypeOf(Ok(1).toAsync()))).toBe(true);
   });
 });
 

@@ -7,6 +7,7 @@ import {
   allFromDictAsync,
   AsyncResult,
   Do,
+  DoAsync,
   Err,
   fromNullable,
   fromPromise,
@@ -71,8 +72,14 @@ describe("AsyncResult facade groups the async-producing entry points", () => {
   it("aliases the free functions, dropping the Async suffix on the aggregates", () => {
     expect(AsyncResult.fromPromise).toBe(fromPromise);
     expect(AsyncResult.fromSafePromise).toBe(fromSafePromise);
+    expect(AsyncResult.Do).toBe(DoAsync);
     expect(AsyncResult.all).toBe(allAsync);
     expect(AsyncResult.allFromDict).toBe(allFromDictAsync);
+  });
+
+  it("AsyncResult.Do starts an async do-chain", async () => {
+    const r = await AsyncResult.Do().bind("a", () => Ok(1));
+    expect(r.get()).toEqual({ a: 1 });
   });
 
   it("constructs and aggregates async results", async () => {

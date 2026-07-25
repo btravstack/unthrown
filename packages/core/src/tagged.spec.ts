@@ -77,6 +77,23 @@ describe("TaggedError", () => {
     expect(e.user).toBe("Bob");
   });
 
+  it("keeps `stack` reserved — an untyped payload `stack` cannot clobber the real trace", () => {
+    class UserError extends TaggedError("UserError")<{ user: string }> {}
+    // An untyped/JS caller sneaks a `stack` past the compile-time reservation.
+    const e = new UserError({ user: "Eve", stack: 123 } as unknown as { user: string });
+    expect(e.stack).not.toBe(123); // the genuine Error trace survives
+    expect(typeof e.stack).toBe("string");
+    expect(e.user).toBe("Eve");
+  });
+
+  it("allows `cause` as a payload field (deliberately not reserved — Error.cause is unknown)", () => {
+    const driverFailure = new Error("driver blew up");
+    class DriverError extends TaggedError("DriverError")<{ cause: unknown }> {}
+    const e = new DriverError({ cause: driverFailure });
+    expect(e.cause).toBe(driverFailure);
+    expect(e._tag).toBe("DriverError");
+  });
+
   it("distinct tags produce distinct, discriminable classes", () => {
     const errors: ApiError[] = [new NotFound(), new Forbidden({ user: "a" })];
     expect(errors.map((e) => e._tag)).toEqual(["NotFound", "Forbidden"]);

@@ -5,7 +5,15 @@
 import { Err, Ok } from "./constructors.js";
 import { AsyncRes, defectRes, errRes, isResult, okRes } from "./core.js";
 import { type Defect, defect, isDefectMarker } from "./defect.js";
-import type { AsyncErrOf, AsyncOkOf, AsyncResult, ErrOf, OkOf, Result } from "./types.js";
+import type {
+  AsyncErrOf,
+  AsyncOkOf,
+  AsyncResult,
+  ErrOf,
+  NotThenable,
+  OkOf,
+  Result,
+} from "./types.js";
 
 /**
  * Bridge a nullable value into a {@link Result}: absence becomes a **modeled**
@@ -47,7 +55,10 @@ export function fromNullable<T, E>(
  * `qualify` **must** triage every thrown cause into a modeled error `E` or a
  * `Defect` (via the injected `defect` helper, its second argument) — there is no
  * path that leaves `unknown` in `E`. A throw inside `qualify` itself is treated
- * as a `Defect`.
+ * as a `Defect`. `qualify` is **synchronous**: an `async` qualify is rejected at
+ * compile time ({@link NotThenable}) — its `Promise` would land in `E` un-triaged
+ * — and a thenable slipped past the types at runtime becomes a `Defect` (never
+ * an `Err(Promise)`), its orphaned rejection silenced.
  *
  * The modeled error type is `Exclude<R, Defect>` — the `Defect` arm of
  * `qualify`'s return is **subtracted** from `E`, never inferred into it. So a
@@ -83,7 +94,7 @@ export function fromNullable<T, E>(
  */
 export function fromThrowable<A extends unknown[], T, R>(
   fn: (...args: A) => T,
-  qualify: (cause: unknown, defect: (cause: unknown) => Defect) => R,
+  qualify: (cause: unknown, defect: (cause: unknown) => Defect) => R & NotThenable<R>,
 ): (...args: A) => Result<T, Exclude<R, Defect>> {
   type E = Exclude<R, Defect>;
   const triage = qualify as (cause: unknown, defect: (cause: unknown) => Defect) => E | Defect;
@@ -145,7 +156,10 @@ export function fromSafeThrowable<A extends unknown[], T>(
  * `qualify` **must** map each rejection cause into a modeled error `E` or a
  * `Defect` (via the injected `defect` helper, its second argument). The returned
  * `AsyncResult`'s internal promise never rejects; `await`-ing it always yields a
- * `Result`. A throw inside `qualify` is itself a `Defect`.
+ * `Result`. A throw inside `qualify` is itself a `Defect`. `qualify` is
+ * **synchronous**: an `async` qualify is rejected at compile time
+ * ({@link NotThenable}), and a thenable slipped past the types at runtime
+ * becomes a `Defect` (never an `Err(Promise)`), its orphaned rejection silenced.
  *
  * The modeled error type is `Exclude<R, Defect>` — the `Defect` arm of
  * `qualify`'s return is **subtracted** from `E`, never inferred into it. So a
@@ -176,7 +190,7 @@ export function fromSafeThrowable<A extends unknown[], T>(
  */
 export function fromPromise<T, R>(
   promise: Promise<T> | (() => Promise<T>),
-  qualify: (cause: unknown, defect: (cause: unknown) => Defect) => R,
+  qualify: (cause: unknown, defect: (cause: unknown) => Defect) => R & NotThenable<R>,
 ): AsyncResult<T, Exclude<R, Defect>> {
   type E = Exclude<R, Defect>;
   const triage = qualify as (cause: unknown, defect: (cause: unknown) => Defect) => E | Defect;
@@ -235,11 +249,39 @@ function qualifyToResult<T, E>(
 ): Result<T, E> {
   try {
     const q = qualify(cause, defect);
-    return isDefectMarker(q) ? defectRes<T, E>(q.cause) : errRes<T, E>(q);
+    if (isDefectMarker(q)) return defectRes<T, E>(q.cause);
+    if (isThenable(q)) {
+      // An async `qualify` slipped past the compile-time NotThenable ban
+      // (untyped/JS caller). Its Promise must never become the modeled error —
+      // the boundary would be un-triaged — so surface a Defect instead. Also
+      // adopt-and-silence the orphaned thenable: if the async qualify later
+      // rejects, that rejection must not float as an unhandled rejection.
+      void Promise.resolve(q).then(undefined, () => undefined);
+      return defectRes<T, E>(
+        new TypeError(
+          "unthrown: qualify must be synchronous — it returned a thenable; triage the cause without awaiting",
+        ),
+      );
+    }
+    return errRes<T, E>(q);
   } catch (qErr) {
     // a throw inside qualify is itself a Defect
     return defectRes<T, E>(qErr);
   }
+}
+
+/**
+ * Runtime thenable probe for the belt-and-braces guard above. Called inside the
+ * caller's `try`, so even a hostile `.then` getter lands on the Defect path.
+ *
+ * @internal
+ */
+function isThenable(x: unknown): boolean {
+  return (
+    (typeof x === "object" || typeof x === "function") &&
+    x !== null &&
+    typeof (x as { then?: unknown }).then === "function"
+  );
 }
 
 /**

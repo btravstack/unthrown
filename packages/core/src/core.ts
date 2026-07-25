@@ -91,7 +91,8 @@ class Res<T, E> {
   flatMap<U, E2>(this: Result<T, E>, f: (value: T) => Result<U, E2>): Result<U, E | E2> {
     if (this.tag !== "Ok") return passThrough(this);
     try {
-      return f(this.value);
+      const r = f(this.value);
+      return isResult(r) ? r : nonResultCallbackDefect();
     } catch (cause) {
       return defectRes(cause);
     }
@@ -111,6 +112,7 @@ class Res<T, E> {
     if (this.tag !== "Ok") return this;
     try {
       const r = f(this.value);
+      if (!isResult(r)) return nonResultCallbackDefect();
       // Keep the original value on success; an Err/Defect from `f` short-circuits.
       return r.tag === "Ok" ? this : passThrough(r);
     } catch (cause) {
@@ -126,6 +128,7 @@ class Res<T, E> {
     if (this.tag !== "Ok") return passThrough(this);
     try {
       const r = f(this.value);
+      if (!isResult(r)) return nonResultCallbackDefect();
       if (r.tag !== "Ok") return passThrough(r);
       // The merged scope can't be spelled at the type level (a computed key
       // widens to an index signature), so the constructed Ok is cast to `Bound`.
@@ -165,6 +168,23 @@ class Res<T, E> {
     return okRes<void, E>(undefined);
   }
 
+  // The type-guard/boolean overload pair lives on the public surface
+  // (`ResultMethods`); this single implementation signature covers both.
+  ensure<E2>(
+    this: Result<T, E>,
+    predicate: (value: T) => boolean,
+    onFail: (value: T) => E2,
+  ): Result<T, E | E2> {
+    if (this.tag !== "Ok") return passThrough(this);
+    try {
+      // A passing value flows through as the SAME Ok (the passThrough
+      // philosophy: nothing changed, so nothing is reallocated).
+      return predicate(this.value) ? this : errRes(onFail(this.value));
+    } catch (cause) {
+      return defectRes(cause);
+    }
+  }
+
   mapErr<M extends ExhaustiveMatch<unknown>>(
     this: Result<T, E>,
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
@@ -187,6 +207,7 @@ class Res<T, E> {
     try {
       const out = runMatch(f, this.error);
       if (isDefectMarker(out)) return defectRes(out.cause);
+      if (!isResult(out)) return nonResultCallbackDefect();
       return out as Result<OkOf<MatchOut<M>>, ErrOf<MatchOut<M>>>;
     } catch (cause) {
       return defectRes(cause);
@@ -226,7 +247,8 @@ class Res<T, E> {
   ): Result<T, E | ErrOf<MatchOut<M>>> {
     if (this.tag !== "Err") return this;
     try {
-      const r = runMatch(f, this.error) as Result<unknown, unknown>;
+      const r = runMatch(f, this.error);
+      if (!isResult(r)) return nonResultCallbackDefect();
       // Keep the original error on the effect's success; an Err/Defect threads through.
       return r.tag === "Ok" ? this : passThrough(r);
     } catch (cause) {
@@ -240,7 +262,8 @@ class Res<T, E> {
   ): Result<T | U, E | E2> {
     if (this.tag !== "Defect") return this;
     try {
-      return f(this.cause);
+      const r = f(this.cause);
+      return isResult(r) ? r : nonResultCallbackDefect();
     } catch (cause) {
       return defectRes(cause);
     }
@@ -361,7 +384,22 @@ class Res<T, E> {
   }
 }
 
+/**
+ * Cross-copy brand: `Symbol.for` yields the same symbol in every copy of the
+ * library (the dual CJS/ESM build, a duplicated install, another realm), so
+ * {@link isResult} can recognise a `Result` built by another copy whose `Res`
+ * class fails the `instanceof` check. Defined non-enumerably on the prototype,
+ * before it is frozen.
+ *
+ * @internal
+ */
+const RESULT_BRAND = Symbol.for("unthrown.Result");
+
 const RESULT_PROTO = Res.prototype;
+Object.defineProperty(RESULT_PROTO, RESULT_BRAND, { value: true });
+// Frozen prototype: the shared combinators cannot be swapped out from under
+// every instance (the instances themselves are frozen by the builders below).
+Object.freeze(RESULT_PROTO);
 
 /**
  * Construct an `Ok` result — a plain object on the {@link Res} prototype.
@@ -413,9 +451,12 @@ export function defectRes<T, E>(cause: unknown): Result<T, E> {
  * @remarks
  * Unlike {@link isOk} / {@link isErr} / {@link isDefect}, which narrow a value
  * already known to be a `Result`, this narrows from `unknown` — useful at an
- * untyped boundary. It checks the value carries the `Result` prototype, so a
- * look-alike plain object (`{ tag: "Ok" }`) is **not** matched. An `AsyncResult`
- * is not a `Result` and returns `false`.
+ * untyped boundary. It checks the value carries the `Result` prototype
+ * (`instanceof` first, falling back to the `Symbol.for("unthrown.Result")`
+ * brand the prototype carries — so a `Result` built by **another copy** of
+ * unthrown, e.g. the CJS and ESM builds loaded side by side, is still
+ * recognised). A look-alike plain object (`{ tag: "Ok" }`) carries neither and
+ * is **not** matched. An `AsyncResult` is not a `Result` and returns `false`.
  *
  * @returns `true` when `x` is a `Result` produced by this library.
  *
@@ -434,7 +475,16 @@ export function defectRes<T, E>(cause: unknown): Result<T, E> {
  * @category Guards
  */
 export function isResult(x: unknown): x is Result<unknown, unknown> {
-  return x instanceof Res;
+  if (x instanceof Res) return true;
+  // Dual-copy / cross-realm fallback: another copy of unthrown has its own
+  // `Res`, so `instanceof` fails — but its prototype carries the shared
+  // `Symbol.for` brand. Reading the brand off the prototype chain keeps the
+  // guarantee that a structural look-alike (no unthrown prototype) still fails.
+  return (
+    (typeof x === "object" || typeof x === "function") &&
+    x !== null &&
+    Reflect.get(x, RESULT_BRAND) === true
+  );
 }
 
 /**
@@ -449,6 +499,20 @@ export function isResult(x: unknown): x is Result<unknown, unknown> {
  */
 function passThrough<T, E>(self: Result<unknown, unknown>): Result<T, E> {
   return self as unknown as Result<T, E>;
+}
+
+/**
+ * The Defect minted when a callback constrained to return a `Result` returns
+ * something else — reachable only from untyped/cast callers (in typed code the
+ * constraint is a compile error). The combinator-side sibling of the
+ * aggregates' non-`Result`-element guard: surface the out-of-contract value as
+ * a `Defect` here rather than letting a poison value throw a raw `TypeError`
+ * further down the pipeline.
+ *
+ * @internal
+ */
+function nonResultCallbackDefect<T, E>(): Result<T, E> {
+  return defectRes(new TypeError("unthrown: a combinator callback returned a non-Result value"));
 }
 
 /**
@@ -519,19 +583,25 @@ function scopeOf(value: unknown): object {
  * @internal
  */
 export class AsyncRes<T, E> implements AsyncResult<T, E> {
-  constructor(private readonly promise: Promise<Result<T, E>>) {}
+  // A native #private field: invisible to property access and untouchable even
+  // via Object.defineProperty, so the wrapped promise cannot be tampered with.
+  readonly #promise: Promise<Result<T, E>>;
+
+  constructor(promise: Promise<Result<T, E>>) {
+    this.#promise = promise;
+  }
 
   // oxlint-disable-next-line no-thenable -- AsyncResult is an intentional (success-only) thenable so `await` collapses it to a Result; see the Awaitable type. onrejected is still forwarded so a hypothetical internal rejection settles the await instead of hanging — though the internal promise never rejects.
   then<R1 = Result<T, E>, R2 = never>(
     onfulfilled?: ((value: Result<T, E>) => R1 | PromiseLike<R1>) | null,
     onrejected?: ((reason: unknown) => R2 | PromiseLike<R2>) | null,
   ): PromiseLike<R1 | R2> {
-    return this.promise.then(onfulfilled, onrejected);
+    return this.#promise.then(onfulfilled, onrejected);
   }
 
   map<U>(f: (value: T) => U & NotThenable<U>): AsyncResult<U, E> {
     return new AsyncRes<U, E>(
-      this.promise.then((r) => {
+      this.#promise.then((r) => {
         if (r.tag !== "Ok") return passThrough(r);
         try {
           return okRes(f(r.value));
@@ -544,10 +614,11 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
 
   flatMap<U, E2>(f: (value: T) => Result<U, E2> | AsyncResult<U, E2>): AsyncResult<U, E | E2> {
     return new AsyncRes<U, E | E2>(
-      this.promise.then(async (r) => {
+      this.#promise.then(async (r) => {
         if (r.tag !== "Ok") return passThrough(r);
         try {
-          return await f(r.value);
+          const inner = await f(r.value);
+          return isResult(inner) ? inner : nonResultCallbackDefect<U, E | E2>();
         } catch (cause) {
           return defectRes(cause);
         }
@@ -557,7 +628,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
 
   tap<R>(f: (value: T) => R & NotThenable<R>): AsyncResult<T, E> {
     return new AsyncRes<T, E>(
-      this.promise.then((r) => {
+      this.#promise.then((r) => {
         if (r.tag !== "Ok") return r;
         try {
           f(r.value);
@@ -573,10 +644,11 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     f: (value: T) => Result<unknown, E2> | AsyncResult<unknown, E2>,
   ): AsyncResult<T, E | E2> {
     return new AsyncRes<T, E | E2>(
-      this.promise.then(async (r) => {
+      this.#promise.then(async (r) => {
         if (r.tag !== "Ok") return passThrough(r);
         try {
           const inner = await f(r.value);
+          if (!isResult(inner)) return nonResultCallbackDefect();
           // Keep the original value on success; an Err/Defect from `f` wins.
           return inner.tag === "Ok" ? r : passThrough(inner);
         } catch (cause) {
@@ -591,10 +663,11 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     f: (scope: T) => Result<U, E2> | AsyncResult<U, E2>,
   ): AsyncResult<Bound<T, K, U>, E | E2> {
     return new AsyncRes<Bound<T, K, U>, E | E2>(
-      this.promise.then(async (r) => {
+      this.#promise.then(async (r) => {
         if (r.tag !== "Ok") return passThrough(r);
         try {
           const inner = await f(r.value);
+          if (!isResult(inner)) return nonResultCallbackDefect();
           if (inner.tag !== "Ok") return passThrough(inner);
           return okRes({ ...scopeOf(r.value), [name]: inner.value }) as unknown as Result<
             Bound<T, K, U>,
@@ -612,7 +685,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     f: (scope: T) => U & NotThenable<U>,
   ): AsyncResult<Bound<T, K, U>, E> {
     return new AsyncRes<Bound<T, K, U>, E>(
-      this.promise.then((r) => {
+      this.#promise.then((r) => {
         if (r.tag !== "Ok") return passThrough(r);
         try {
           return okRes({ ...scopeOf(r.value), [name]: f(r.value) }) as unknown as Result<
@@ -628,13 +701,34 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
 
   as<U>(value: U): AsyncResult<U, E> {
     return new AsyncRes<U, E>(
-      this.promise.then((r) => (r.tag === "Ok" ? okRes<U, E>(value) : passThrough(r))),
+      this.#promise.then((r) => (r.tag === "Ok" ? okRes<U, E>(value) : passThrough(r))),
     );
   }
 
   discard(): AsyncResult<void, E> {
     return new AsyncRes<void, E>(
-      this.promise.then((r) => (r.tag === "Ok" ? okRes<void, E>(undefined) : passThrough(r))),
+      this.#promise.then((r) => (r.tag === "Ok" ? okRes<void, E>(undefined) : passThrough(r))),
+    );
+  }
+
+  // Like the matcher methods below, `ensure` is typed loosely here (`never`
+  // channels) because TypeScript cannot relate this single implementation
+  // signature to the public type-guard/boolean overload pair across the
+  // class/`implements` boundary; `AsyncResultMethods` re-imposes the precision.
+  ensure(
+    predicate: (value: T) => boolean,
+    onFail: (value: T) => unknown,
+  ): AsyncResult<never, never> {
+    return new AsyncRes<never, never>(
+      this.#promise.then((r) => {
+        if (r.tag !== "Ok") return passThrough(r);
+        try {
+          // A passing value flows through as the same Ok (see the sync `ensure`).
+          return (predicate(r.value) ? r : errRes(onFail(r.value))) as Result<never, never>;
+        } catch (cause) {
+          return defectRes(cause);
+        }
+      }),
     );
   }
 
@@ -649,7 +743,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
   ): AsyncResult<T, never> {
     return new AsyncRes<T, never>(
-      this.promise.then((r) => {
+      this.#promise.then((r) => {
         if (r.tag !== "Err") return passThrough(r);
         try {
           const out = runMatch(f, r.error);
@@ -669,14 +763,14 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     ) => ExhaustiveMatch<Result<unknown, unknown> | AsyncResult<unknown, unknown> | Defect>,
   ): AsyncResult<T, never> {
     return new AsyncRes<T, never>(
-      this.promise.then(async (r) => {
+      this.#promise.then(async (r) => {
         if (r.tag !== "Err") return passThrough(r);
         try {
           const out = runMatch(f, r.error);
           if (isDefectMarker(out)) return defectRes<T, never>(out.cause);
-          return (await (out as
-            | Result<unknown, unknown>
-            | AsyncResult<unknown, unknown>)) as Result<T, never>;
+          const inner = await (out as Result<unknown, unknown> | AsyncResult<unknown, unknown>);
+          if (!isResult(inner)) return nonResultCallbackDefect<T, never>();
+          return inner as Result<T, never>;
         } catch (cause) {
           return defectRes(cause);
         }
@@ -688,7 +782,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
   ): AsyncResult<T, never> {
     return new AsyncRes<T, never>(
-      this.promise.then((r) => {
+      this.#promise.then((r) => {
         if (r.tag !== "Err") return passThrough(r);
         try {
           const out = runMatch(f, r.error);
@@ -705,7 +799,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
   ): AsyncResult<T, E> {
     return new AsyncRes<T, E>(
-      this.promise.then((r) => {
+      this.#promise.then((r) => {
         if (r.tag !== "Err") return r;
         try {
           runMatch(f, r.error);
@@ -724,12 +818,13 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     ) => ExhaustiveMatch<Result<unknown, unknown> | AsyncResult<unknown, unknown>>,
   ): AsyncResult<T, E> {
     return new AsyncRes<T, E>(
-      this.promise.then(async (r) => {
+      this.#promise.then(async (r) => {
         if (r.tag !== "Err") return passThrough(r);
         try {
           const inner = await (runMatch(f, r.error) as
             | Result<unknown, unknown>
             | AsyncResult<unknown, unknown>);
+          if (!isResult(inner)) return nonResultCallbackDefect();
           // Keep the original error on success; an Err/Defect from the effect wins.
           return inner.tag === "Ok" ? passThrough(r) : passThrough(inner);
         } catch (cause) {
@@ -743,10 +838,11 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     f: (cause: unknown) => Result<U, E2> | AsyncResult<U, E2>,
   ): AsyncResult<T | U, E | E2> {
     return new AsyncRes<T | U, E | E2>(
-      this.promise.then(async (r) => {
+      this.#promise.then(async (r) => {
         if (r.tag !== "Defect") return r;
         try {
-          return await f(r.cause);
+          const inner = await f(r.cause);
+          return isResult(inner) ? inner : nonResultCallbackDefect<T | U, E | E2>();
         } catch (cause) {
           return defectRes(cause);
         }
@@ -756,7 +852,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
 
   tapDefect<R>(f: (cause: unknown) => R & NotThenable<R>): AsyncResult<T, E> {
     return new AsyncRes<T, E>(
-      this.promise.then((r) => {
+      this.#promise.then((r) => {
         if (r.tag !== "Defect") return r;
         try {
           f(r.cause);
@@ -770,7 +866,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
 
   tapFailure<R>(f: (failure: FailureView<E, T>) => R & NotThenable<R>): AsyncResult<T, E> {
     return new AsyncRes<T, E>(
-      this.promise.then((r) => {
+      this.#promise.then((r) => {
         if (r.tag === "Ok") return r;
         try {
           f(r);
@@ -787,30 +883,35 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     err: (matcher: ErrMatcher<E>) => M;
     defect: (cause: unknown) => RDefect;
   }): Promise<ROk | RDefect | MatchOut<M>> {
-    return this.promise.then((r) => r.match(cases));
+    return this.#promise.then((r) => r.match(cases));
   }
 
   get(): Promise<T> {
-    return this.promise.then((r) => (r as Result<T, never>).get());
+    return this.#promise.then((r) => (r as Result<T, never>).get());
   }
   getErr(): Promise<E> {
-    return this.promise.then((r) => (r as Result<never, E>).getErr());
+    return this.#promise.then((r) => (r as Result<never, E>).getErr());
   }
   getOr<U>(fallback: U): Promise<T | U> {
-    return this.promise.then((r) => r.getOr(fallback));
+    return this.#promise.then((r) => r.getOr(fallback));
   }
   getOrElse<U>(f: (error: E) => U): Promise<T | U> {
-    return this.promise.then((r) => r.getOrElse(f));
+    return this.#promise.then((r) => r.getOrElse(f));
   }
   getOrNull(): Promise<T | null> {
-    return this.promise.then((r) => r.getOrNull());
+    return this.#promise.then((r) => r.getOrNull());
   }
   getOrUndefined(): Promise<T | undefined> {
-    return this.promise.then((r) => r.getOrUndefined());
+    return this.#promise.then((r) => r.getOrUndefined());
   }
   getOrThrow(): Promise<T> {
     // The cast sidesteps `getOrThrow`'s `this` gate (non-empty error channel),
     // re-imposed on the public `AsyncResultMethods` signature — mirroring `get`.
-    return this.promise.then((r) => (r as Result<T, unknown>).getOrThrow());
+    return this.#promise.then((r) => (r as Result<T, unknown>).getOrThrow());
   }
 }
+
+// Same hardening as `Res.prototype` above: the shared async combinators cannot
+// be swapped out from under every instance. (The wrapped promise is already a
+// native #private field, unreachable from outside.)
+Object.freeze(AsyncRes.prototype);

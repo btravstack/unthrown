@@ -33,7 +33,9 @@ export type Defect = {
  * @internal
  */
 export function defect(cause: unknown): Defect {
-  return { [DEFECT]: true, cause };
+  // Frozen like Result instances: the marker is an opaque triage token, and a
+  // mutated one must not be able to smuggle a different cause past a boundary.
+  return Object.freeze({ [DEFECT]: true, cause });
 }
 
 /**
