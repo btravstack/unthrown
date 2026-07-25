@@ -136,6 +136,15 @@ describe("allAsync", () => {
     expect(r.isDefect()).toBe(true);
   });
 
+  it("adopts a raw rejecting thenable as a Defect, never rejecting the internal promise", async () => {
+    // The one input the library can't produce itself: a cast/untyped rejecting
+    // thenable. `Promise.all` would otherwise reject; the defensive adoption
+    // turns it into a Defect so `await` still yields a Result.
+    const rejecting = Promise.reject(boom) as unknown as AsyncResult<number, never>;
+    const r = await allAsync([fromSafePromise(Promise.resolve(1)), rejecting]);
+    expect(r.isDefect()).toBe(true);
+  });
+
   it("collapses a dynamic AsyncResult[] to AsyncResult<T[], E> without a cast", async () => {
     const combine = <T, E>(rs: AsyncResult<T, E>[]): AsyncResult<T[], E> => allAsync(rs);
     const r = await combine([
@@ -184,5 +193,11 @@ describe("allFromDictAsync", () => {
     });
     expect(r.isOk()).toBe(true);
     expect(({} as Record<string, unknown>)["polluted"]).toBeUndefined();
+  });
+
+  it("adopts a raw rejecting thenable as a Defect, never rejecting the internal promise", async () => {
+    const rejecting = Promise.reject(boom) as unknown as AsyncResult<number, never>;
+    const r = await allFromDictAsync({ a: fromSafePromise(Promise.resolve(1)), b: rejecting });
+    expect(r.isDefect()).toBe(true);
   });
 });

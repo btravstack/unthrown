@@ -309,8 +309,11 @@ export type ResultMethods<out T, out E> = {
    * The error-channel mirror of {@link ResultMethods.flatTap | flatTap}: each
    * branch returns a `Result` whose **success value is discarded** — on the
    * effect's `Ok` the original `Err` flows through, while an `Err`/`Defect` from a
-   * branch short-circuits and threads its error. If a branch throws, the result
-   * is a `Defect` aggregating `[thrown, original failure]`.
+   * branch short-circuits and threads its error. Note the asymmetry with a
+   * *throw*: a branch that **returns** a `Defect` **replaces** the original `Err`
+   * (Defect-dominance, the short-circuit rule — it is not aggregated), whereas a
+   * branch that **throws** produces a `Defect` aggregating `[thrown, original
+   * failure]` (observing a failure by throwing never destroys it).
    *
    * @typeParam M - the exhaustive builder the callback returns.
    * @param f - builds the match; each branch is a failable effect (its `Ok` is ignored).
@@ -420,15 +423,6 @@ export type ResultMethods<out T, out E> = {
    */
   get(this: Result<T, never>): T;
   /**
-   * Extract the success value.
-   *
-   * @deprecated Renamed to {@link ResultMethods.get | get}, unifying the extractor
-   * family under `get…`. This alias will be removed in a future major.
-   *
-   * @returns the `Ok` value.
-   */
-  unwrap(this: Result<T, never>): T;
-  /**
    * Extract the modeled error.
    *
    * @remarks
@@ -443,15 +437,6 @@ export type ResultMethods<out T, out E> = {
    */
   getErr(this: Result<never, E>): E;
   /**
-   * Extract the modeled error.
-   *
-   * @deprecated Renamed to {@link ResultMethods.getErr | getErr}, unifying the
-   * extractor family under `get…`. This alias will be removed in a future major.
-   *
-   * @returns the `Err` value.
-   */
-  unwrapErr(this: Result<never, E>): E;
-  /**
    * The success value, or `fallback` on `Err`.
    *
    * @typeParam U - the fallback type (may differ from `T`; the return widens to `T | U`).
@@ -461,17 +446,6 @@ export type ResultMethods<out T, out E> = {
    */
   getOr<U>(fallback: U): T | U;
   /**
-   * The success value, or `fallback` on `Err`.
-   *
-   * @deprecated Renamed to {@link ResultMethods.getOr | getOr}, unifying the
-   * extractor family under `get…`. This alias will be removed in a future major.
-   *
-   * @typeParam U - the fallback type (may differ from `T`; the return widens to `T | U`).
-   * @param fallback - returned when the result is an `Err`.
-   * @throws Re-throws on a `Defect`.
-   */
-  unwrapOr<U>(fallback: U): T | U;
-  /**
    * The success value, or `f(error)` on `Err`.
    *
    * @typeParam U - the fallback type (may differ from `T`; the return widens to `T | U`).
@@ -479,17 +453,6 @@ export type ResultMethods<out T, out E> = {
    * @throws Re-throws on a `Defect`.
    */
   getOrElse<U>(f: (error: E) => U): T | U;
-  /**
-   * The success value, or `f(error)` on `Err`.
-   *
-   * @deprecated Renamed to {@link ResultMethods.getOrElse | getOrElse}, unifying
-   * the extractor family under `get…`. This alias will be removed in a future major.
-   *
-   * @typeParam U - the fallback type (may differ from `T`; the return widens to `T | U`).
-   * @param f - lazily computes the fallback from the error.
-   * @throws Re-throws on a `Defect`.
-   */
-  unwrapOrElse<U>(f: (error: E) => U): T | U;
   /**
    * The success value, or `null` on `Err`.
    *
@@ -506,20 +469,26 @@ export type ResultMethods<out T, out E> = {
    * The success value, or **throw** the modeled error on `Err`.
    *
    * @remarks
-   * A deliberate escape hatch off the errors-as-values model. Unlike
-   * {@link ResultMethods.get | get} (type-gated to an empty error
-   * channel), this compiles on any `Result<T, E>` and **throws the `Err` value
-   * as-is** at the call site. Its purpose is to move a literal `throw` behind a
-   * method, so a `no-throw` lint rule can ban raw throws while this one
-   * sanctioned extraction remains — _not_ to replace principled handling. When
-   * you can keep the error a value, prefer {@link ResultMethods.match | match} /
-   * {@link ResultMethods.recoverErr | recoverErr} / {@link ResultMethods.flatMapErr | flatMapErr}.
+   * A deliberate escape hatch off the errors-as-values model — it **throws the
+   * `Err` value as-is** at the call site. Its purpose is to move a literal
+   * `throw` behind a method, so a `no-throw` lint rule can ban raw throws while
+   * this one sanctioned extraction remains — _not_ to replace principled
+   * handling. When you can keep the error a value, prefer
+   * {@link ResultMethods.match | match} / {@link ResultMethods.recoverErr | recoverErr} /
+   * {@link ResultMethods.flatMapErr | flatMapErr}.
+   *
+   * Type-gated as the **complement** of {@link ResultMethods.get | get}: it
+   * compiles only when the error channel is **non-empty** (`E` is not `never`) —
+   * there must be a modeled error for it to throw. On a `Result<T, never>` there
+   * is nothing to throw, so `getOrThrow` does not compile; use `get()` (which
+   * gates the other way). Together they partition extraction by the error
+   * channel's state, with no overlap.
    *
    * @returns the `Ok` value.
    * @throws the modeled `error` on `Err`; re-throws the original `cause` on a
    * `Defect` (a panic, like the rest of the `getOr…` family).
    */
-  getOrThrow(): T;
+  getOrThrow(this: [E] extends [never] ? never : Result<T, E>): T;
 
   /** Whether this result is `Ok` — narrows `this` to its {@link OkView} on `true`. */
   isOk(): this is OkView<T, E>;
@@ -852,35 +821,15 @@ export type AsyncResultMethods<out T, out E> = {
    */
   get(this: AsyncResult<T, never>): Promise<T>;
   /**
-   * @deprecated Renamed to {@link AsyncResultMethods.get | get}. This alias will
-   * be removed in a future major.
-   */
-  unwrap(this: AsyncResult<T, never>): Promise<T>;
-  /**
    * Asynchronous {@link ResultMethods.getErr | getErr}. Compiles only when
    * the success channel is empty (`this: AsyncResult<never, E>`); the returned
    * promise rejects on a `Defect` (rethrowing its cause).
    */
   getErr(this: AsyncResult<never, E>): Promise<E>;
-  /**
-   * @deprecated Renamed to {@link AsyncResultMethods.getErr | getErr}. This alias
-   * will be removed in a future major.
-   */
-  unwrapErr(this: AsyncResult<never, E>): Promise<E>;
   /** Asynchronous {@link ResultMethods.getOr | getOr}. */
   getOr<U>(fallback: U): Promise<T | U>;
-  /**
-   * @deprecated Renamed to {@link AsyncResultMethods.getOr | getOr}. This alias
-   * will be removed in a future major.
-   */
-  unwrapOr<U>(fallback: U): Promise<T | U>;
   /** Asynchronous {@link ResultMethods.getOrElse | getOrElse}. */
   getOrElse<U>(f: (error: E) => U): Promise<T | U>;
-  /**
-   * @deprecated Renamed to {@link AsyncResultMethods.getOrElse | getOrElse}. This
-   * alias will be removed in a future major.
-   */
-  unwrapOrElse<U>(f: (error: E) => U): Promise<T | U>;
   /** Asynchronous {@link ResultMethods.getOrNull | getOrNull}. */
   getOrNull(): Promise<T | null>;
   /** Asynchronous {@link ResultMethods.getOrUndefined | getOrUndefined}. */
@@ -888,9 +837,10 @@ export type AsyncResultMethods<out T, out E> = {
   /**
    * Asynchronous {@link ResultMethods.getOrThrow | getOrThrow} — the returned
    * promise **rejects** with the modeled error on `Err` (or the original cause
-   * on a `Defect`), rather than throwing synchronously.
+   * on a `Defect`), rather than throwing synchronously. Gated the same way: it
+   * compiles only when the error channel is non-empty (`E` is not `never`).
    */
-  getOrThrow(): Promise<T>;
+  getOrThrow(this: [E] extends [never] ? never : AsyncResult<T, E>): Promise<T>;
 };
 
 /**
