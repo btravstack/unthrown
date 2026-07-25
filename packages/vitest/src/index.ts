@@ -8,10 +8,12 @@
 //   await expect(fromSafePromise(p)).toBeOk(); // AsyncResult — `await` REQUIRED
 //
 // IMPORTANT: for an AsyncResult the matcher is asynchronous, so you MUST `await`
-// the assertion. A forgotten `await` makes the assertion pass silently.
+// the assertion. A forgotten `await` does not pass silently: an `afterEach`
+// hook (registered below, alongside `expect.extend`) fails the test with an
+// explicit message naming the matchers still pending when the test ended.
 
 import { isDefect, isErr, isOk, isResult, type Result } from "unthrown";
-import { expect } from "vitest";
+import { afterEach, expect } from "vitest";
 import type { MatcherResult, MatcherState } from "vitest";
 
 type SomeResult = Result<unknown, unknown>;
@@ -50,14 +52,30 @@ function payloadOf(error: object): Record<string, unknown> {
   return out;
 }
 
+// Async assertions in flight: every matcher that adopts a thenable registers
+// its gate promise here and unregisters when the assertion settles. Whatever
+// survives a test is a forgotten `await`, which `failOnForgottenAwait` (the
+// `afterEach` hook registered below) turns into a loud, correctly-attributed
+// test failure.
+type InFlight = { matcherName: string; abandon: () => void };
+const inFlight = new Map<Promise<Outcome>, InFlight>();
+
 // Resolve `received` — awaiting it when it is an AsyncResult — then run `check`.
 // This is what lets one matcher serve both `expect(result)` and
 // `await expect(asyncResult)`. A non-Result fails with a clear message.
+//
+// The async path returns a GATE promise rather than the raw chain: delivery is
+// indirect so `failOnForgottenAwait` can abandon a forgotten-await assertion —
+// once abandoned, the gate resolves neutrally (`pass` matching the negation, so
+// vitest never throws on it) and the failure is reported exactly once, by the
+// hook, instead of also late-firing as a mis-attributed unhandled rejection.
 function settle(
+  matcherName: string,
+  state: MatcherState,
   received: unknown,
-  stringify: Stringify,
   check: (result: SomeResult) => Outcome,
 ): MatcherResult {
+  const { stringify } = state.utils;
   const run = (value: unknown): Outcome =>
     isResult(value)
       ? check(value)
@@ -65,12 +83,90 @@ function settle(
           pass: false,
           message: () => `expected an unthrown Result, but received ${stringify(value)}`,
         };
-  return isThenable(received) ? Promise.resolve(received).then(run) : run(received);
+  if (!isThenable(received)) return run(received);
+
+  let deliver!: (outcome: Outcome) => void;
+  const gate = new Promise<Outcome>((resolve) => {
+    deliver = resolve;
+  });
+  inFlight.set(gate, {
+    matcherName,
+    abandon: () =>
+      deliver({
+        pass: !state.isNot,
+        message: () => `assertion abandoned by @unthrown/vitest forgotten-await detection`,
+      }),
+  });
+  const finish = (outcome: Outcome) => {
+    // Already abandoned by the hook? Then the gate has resolved neutrally and
+    // this outcome is deliberately dropped (resolving twice would be a no-op
+    // anyway; the delete guard just makes the intent explicit).
+    if (inFlight.delete(gate)) deliver(outcome);
+  };
+  Promise.resolve(received)
+    .then(run, (cause): Outcome => {
+      // A REJECTING thenable is by definition not an AsyncResult (an
+      // AsyncResult's internal promise never rejects): fail with the friendly
+      // message instead of surfacing the raw rejection cause.
+      return {
+        pass: false,
+        message: () =>
+          `expected an unthrown Result, but received a thenable that rejected with ${stringify(cause)} — an unthrown AsyncResult never rejects`,
+      };
+    })
+    .then(finish, (cause) => {
+      // Defensive: `check` itself threw. Without this arm the gate would never
+      // resolve and an awaited assertion would hang the test.
+      /* v8 ignore start */
+      finish({
+        pass: false,
+        message: () => `the matcher check threw: ${stringify(cause)}`,
+      });
+      /* v8 ignore stop */
+    });
+  return gate;
+}
+
+/**
+ * The check behind the registered `afterEach` hook: when async matcher
+ * assertions are still pending at the end of a test — a forgotten `await` —
+ * it abandons them (so they cannot late-fire as unhandled rejections) and
+ * throws an error naming the un-awaited matchers, failing that test.
+ *
+ * @remarks
+ * You never need to call this yourself: importing the package registers it as
+ * an `afterEach` hook alongside the matchers. It is exported so the mechanism
+ * itself is testable.
+ */
+export function failOnForgottenAwait(): void {
+  if (inFlight.size === 0) return;
+  const entries = [...inFlight.values()];
+  // Clear first so one failure cannot cascade into the following tests, then
+  // resolve the abandoned assertions neutrally: the forgotten await is
+  // reported exactly once — here — never as a late unhandled rejection.
+  inFlight.clear();
+  for (const entry of entries) entry.abandon();
+  const names = entries.map((entry) => entry.matcherName).join(", ");
+  throw new Error(
+    `@unthrown/vitest: ${entries.length} async assertion(s) (${names}) were still pending when the test ended — a forgotten \`await\`. For an AsyncResult the matcher is asynchronous: write \`await expect(asyncResult).toBeOk()\`.`,
+  );
+}
+
+// Registered at module load, alongside `expect.extend`: this package is
+// imported from a setup or test file, where hook registration is legal. The
+// try/catch keeps an import outside a running vitest suite (a docs build, a
+// stray node import) from crashing at load time — `afterEach` exists there but
+// asserts a current suite when called.
+try {
+  afterEach(failOnForgottenAwait);
+} catch {
+  // Not inside a vitest run — the matchers still work synchronously; only the
+  // forgotten-`await` safety net is unavailable.
 }
 
 function toBeOk(this: MatcherState, received: unknown): MatcherResult {
   const { stringify } = this.utils;
-  return settle(received, stringify, (result) => {
+  return settle("toBeOk", this, received, (result) => {
     const pass = isOk(result);
     return {
       pass,
@@ -85,7 +181,7 @@ function toBeOk(this: MatcherState, received: unknown): MatcherResult {
 function toBeOkWith(this: MatcherState, received: unknown, expected: unknown): MatcherResult {
   const { stringify } = this.utils;
   const { equals } = this;
-  return settle(received, stringify, (result) => {
+  return settle("toBeOkWith", this, received, (result) => {
     const pass = isOk(result) && equals(result.value, expected);
     return {
       pass,
@@ -99,7 +195,7 @@ function toBeOkWith(this: MatcherState, received: unknown, expected: unknown): M
 
 function toBeErr(this: MatcherState, received: unknown): MatcherResult {
   const { stringify } = this.utils;
-  return settle(received, stringify, (result) => {
+  return settle("toBeErr", this, received, (result) => {
     const pass = isErr(result);
     return {
       pass,
@@ -114,7 +210,7 @@ function toBeErr(this: MatcherState, received: unknown): MatcherResult {
 function toBeErrWith(this: MatcherState, received: unknown, expected: unknown): MatcherResult {
   const { stringify } = this.utils;
   const { equals } = this;
-  return settle(received, stringify, (result) => {
+  return settle("toBeErrWith", this, received, (result) => {
     const pass = isErr(result) && equals(result.error, expected);
     return {
       pass,
@@ -154,7 +250,7 @@ function toBeErrTagged(
   const label = hasExpected
     ? `Err tagged ${stringify(tag)} matching ${stringify(expected)}`
     : `Err tagged ${stringify(tag)}`;
-  return settle(received, stringify, (result) => {
+  return settle("toBeErrTagged", this, received, (result) => {
     const error = isErr(result) ? result.error : undefined;
     const tagPass = (error as { _tag?: unknown } | undefined)?._tag === tag;
     const pass = tagPass && (!hasExpected || equals(payloadOf(error as object), expected));
@@ -170,7 +266,7 @@ function toBeErrTagged(
 
 function toBeDefect(this: MatcherState, received: unknown): MatcherResult {
   const { stringify } = this.utils;
-  return settle(received, stringify, (result) => {
+  return settle("toBeDefect", this, received, (result) => {
     const pass = isDefect(result);
     return {
       pass,
@@ -193,6 +289,11 @@ export { toBeDefect, toBeErr, toBeErrTagged, toBeErrWith, toBeOk, toBeOkWith };
  * @remarks
  * Import the package once (e.g. in a test setup file) to register the
  * matchers and pull in this type augmentation.
+ *
+ * For an `AsyncResult` the assertion is asynchronous and must be `await`ed.
+ * A forgotten `await` does not pass silently: an `afterEach` hook (registered
+ * on import, see {@link failOnForgottenAwait}) fails the test with an explicit
+ * message naming the matchers still pending when the test ended.
  *
  * @typeParam R - the assertion's chaining return type.
  *

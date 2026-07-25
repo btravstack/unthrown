@@ -2,7 +2,7 @@ import { Err, fromSafePromise, Ok, type Result, TaggedError } from "unthrown";
 import { describe, expect, it } from "vitest";
 
 // Registers the matchers and brings the `Matchers` augmentation into scope.
-import "./index.js";
+import { failOnForgottenAwait } from "./index.js";
 
 class MyError extends TaggedError("MyError")<{ code: number }> {}
 
@@ -92,6 +92,62 @@ describe("AsyncResult matchers (await required)", () => {
     await expect(fromSafePromise(Promise.resolve(1))).toBeOkWith(1);
     await expect(fromSafePromise(Promise.reject(boom))).toBeDefect();
     await expect(fromSafePromise(Promise.resolve(1))).not.toBeErr();
+  });
+});
+
+describe("forgotten await detection", () => {
+  it("a still-pending un-awaited assertion fails the test via the afterEach check", () => {
+    // A never-settling AsyncResult keeps the assertion pending — the
+    // forgotten `await` under test (deliberately not awaited).
+    void expect(fromSafePromise(new Promise<number>(() => {}))).toBeOk();
+    expect(() => failOnForgottenAwait()).toThrowError(
+      /1 async assertion\(s\) \(toBeOk\).*forgotten `await`/,
+    );
+    // State is cleared by the failure: the next check starts clean, so one
+    // forgotten await cannot cascade into the following tests.
+    expect(() => failOnForgottenAwait()).not.toThrow();
+  });
+
+  it("names every pending matcher, negated assertions included", () => {
+    void expect(fromSafePromise(new Promise<number>(() => {}))).toBeErr();
+    void expect(fromSafePromise(new Promise<number>(() => {}))).not.toBeOk();
+    expect(() => failOnForgottenAwait()).toThrowError(/2 async assertion\(s\) \(toBeErr, toBeOk\)/);
+  });
+
+  it("an abandoned failing assertion cannot late-fire as an unhandled rejection", async () => {
+    let resolve!: (n: number) => void;
+    const gated = fromSafePromise(
+      new Promise<number>((res) => {
+        resolve = res;
+      }),
+    );
+    // Both polarities: once settled Ok, the un-awaited `toBeErr` would fail
+    // and the negated `not.toBeOk` would fail too — each a rejection of the
+    // assertion promise nobody holds.
+    void expect(gated).toBeErr();
+    void expect(gated).not.toBeOk();
+    expect(() => failOnForgottenAwait()).toThrowError(/toBeErr, toBeOk/);
+    resolve(1);
+    await new Promise((res) => setTimeout(res, 0));
+    // Reaching the end cleanly IS the assertion: vitest surfaces an unhandled
+    // rejection as a run-level error.
+  });
+
+  it("a properly awaited assertion leaves nothing pending", async () => {
+    await expect(fromSafePromise(Promise.resolve(1))).toBeOk();
+    expect(() => failOnForgottenAwait()).not.toThrow();
+  });
+
+  it("a rejecting non-AsyncResult thenable fails with the friendly not-a-Result message", async () => {
+    // `settle` adopts any thenable; a rejecting one is by definition not an
+    // AsyncResult (whose internal promise never rejects). The failure must be
+    // the friendly triage message, not the raw rejection cause.
+    const assertion = expect(
+      Promise.reject(new Error("raw cause")),
+    ).toBeOk() as unknown as Promise<unknown>;
+    await expect(assertion).rejects.toThrowError(
+      /expected an unthrown Result, but received a thenable that rejected/,
+    );
   });
 });
 

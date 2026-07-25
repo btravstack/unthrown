@@ -93,6 +93,8 @@ await expect(fromSafePromise(Promise.reject(boom))).toBeDefect();
 ```
 
 ::: danger Don't forget the await
-A forgotten `await` on an async assertion makes it pass **silently** — the
-promise is never observed. Always `await expect(asyncResult)…`.
+Always `await expect(asyncResult)…`. As a safety net, importing the package
+also registers an `afterEach` hook: a test that ends with async assertions
+still pending **fails** with an explicit message naming the un-awaited
+matchers, instead of passing silently.
 :::
