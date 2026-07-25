@@ -34,7 +34,7 @@ const status = await user.match({
   to triage each failure into a modeled error or a defect.
 - **Tagged errors** — `TaggedError(tag)` + `tag(t)`, folded exhaustively through
   `match`'s ts-pattern error matcher.
-- Zero runtime dependencies, ESM-first, dual CJS/ESM.
+- One tiny runtime dependency (`ts-pattern`), ESM-first, dual CJS/ESM.
 
 See the [full documentation](https://btravstack.github.io/unthrown/) for the guide
 and complete API.

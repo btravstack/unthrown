@@ -77,6 +77,7 @@ expect(Err(new NotFound({ id: 1, msg: "nope" }))).toBeErrTagged(
 | `toBeOk()`                     | the result is `Ok`                                                                                |
 | `toBeOkWith(value)`            | the result is `Ok` and the value deep-equals `value`                                              |
 | `toBeErr()`                    | the result is `Err`                                                                               |
+| `toBeErrWith(value)`           | the result is `Err` and the error deep-equals `value`                                             |
 | `toBeErrTagged(tag)`           | the result is `Err` whose error has `_tag === tag`                                                |
 | `toBeErrTagged(tag, expected)` | …and its payload matches `expected` (exact for a plain object, partial for an asymmetric matcher) |
 | `toBeDefect()`                 | the result is a `Defect`                                                                          |

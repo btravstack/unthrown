@@ -34,7 +34,7 @@ features:
     details: fromPromise / fromThrowable force you to triage each failure into a modeled error or a defect. No path ever yields `unknown` in E.
   - icon: { src: /icons/check.svg }
     title: Small and done-able
-    details: Zero runtime dependencies, ESM-first, dual CJS/ESM, fully typed. One concept, one name. Small enough to be "done".
+    details: One tiny runtime dependency (ts-pattern), ESM-first, dual CJS/ESM, fully typed. One concept, one name. Small enough to be "done".
 ---
 
 ## At a glance

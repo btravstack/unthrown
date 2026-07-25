@@ -18,7 +18,7 @@ callback throws**.
 | `Option` type                      | ❌ (deliberate)                   | ❌                     | ✅         | ✅                    | ❌                                  |
 | Tagged errors                      | ✅ `TaggedError`                  | ❌                     | ❌         | ✅ `Data.TaggedError` | ❌                                  |
 | Error accumulation                 | ❌ (deliberate)                   | `combineWithAllErrors` | ❌         | ✅                    | ✅ `collect`                        |
-| Runtime dependencies (core)        | **0**                             | 0                      | 0          | a runtime             | 0                                   |
+| Runtime dependencies (core)        | **1** (`ts-pattern`)              | 0                      | 0          | a runtime             | 0                                   |
 
 ¹ byethrow's combinators don't `try/catch`; it relies on an oxlint rule
 (`no-throw-in-callback`) to keep throws out of callbacks. ² They force typing at

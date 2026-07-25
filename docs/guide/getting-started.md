@@ -19,7 +19,8 @@ yarn add unthrown
 :::
 
 `unthrown` is ESM-first, ships dual CJS/ESM builds with full type definitions,
-and has **zero runtime dependencies**. It targets TypeScript with `strict` mode.
+and has **one tiny runtime dependency** (`ts-pattern`, which powers the exhaustive
+error matcher). It targets TypeScript with `strict` mode.
 
 ## Your first Result
 
