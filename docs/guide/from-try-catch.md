@@ -82,7 +82,7 @@ And the call site becomes an ordinary `Result`, `await`ed once:
 const user = await getUser(id); // Result<User, "not_found">
 user.match({
   ok: (u) => render(u),
-  err: () => render404(),
+  err: (matcher) => matcher.with(P._, () => render404()),
   defect: (cause) => render500(cause),
 });
 ```
@@ -113,12 +113,12 @@ its only caller isn't buying you anything yet.
 Once you've wrapped a boundary, most of what you used to do inside a `catch`
 block has a direct combinator equivalent:
 
-| `try`/`catch` idiom       | unthrown combinator                             | Example                                                                   |
-| ------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------- |
-| catch-and-default         | `getOr(fallback)`                               | `parseConfig(text).getOr(DEFAULT_CONFIG)`                                 |
-| catch-and-rethrow-wrapped | `mapErr((m) => …)`                              | `parseConfig(text).mapErr((m) => m.with(P._, (e) => new ConfigError(e)))` |
-| catch-log-rethrow         | `tapErr((m) => …)`                              | `parseConfig(text).tapErr((m) => m.with(P._, (e) => logger.warn(e)))`     |
-| `finally` cleanup         | run before eliminating, or in every `match` arm | see below                                                                 |
+| `try`/`catch` idiom       | unthrown combinator                             | Example                                                                               |
+| ------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------- |
+| catch-and-default         | `getOr(fallback)`                               | `parseConfig(text).getOr(DEFAULT_CONFIG)`                                             |
+| catch-and-rethrow-wrapped | `mapErr((matcher) => …)`                        | `parseConfig(text).mapErr((matcher) => matcher.with(P._, (e) => new ConfigError(e)))` |
+| catch-log-rethrow         | `tapErr((matcher) => …)`                        | `parseConfig(text).tapErr((matcher) => matcher.with(P._, (e) => logger.warn(e)))`     |
+| `finally` cleanup         | run before eliminating, or in every `match` arm | see below                                                                             |
 
 `catch-and-default`:
 
@@ -143,7 +143,7 @@ try {
   throw new ConfigError(cause);
 }
 // after — ConfigError becomes a modeled Err, not a throw
-parseConfig(text).mapErr((m) => m.with(P._, (e) => new ConfigError(e)));
+parseConfig(text).mapErr((matcher) => matcher.with(P._, (e) => new ConfigError(e)));
 ```
 
 `catch-log-rethrow`:
@@ -157,7 +157,7 @@ try {
   throw cause;
 }
 // after — logs, keeps the original error, still propagates as an Err
-parseConfig(text).tapErr((m) => m.with(P._, (e) => logger.warn("bad config", e)));
+parseConfig(text).tapErr((matcher) => matcher.with(P._, (e) => logger.warn("bad config", e)));
 ```
 
 `finally` has no combinator counterpart, because a `Result` pipeline has no
@@ -181,10 +181,11 @@ result.match({
     connection.close();
     return v;
   },
-  err: (e) => {
-    connection.close();
-    return handleErr(e);
-  },
+  err: (matcher) =>
+    matcher.with(P._, (e) => {
+      connection.close();
+      return handleErr(e);
+    }),
   defect: (cause) => {
     connection.close();
     throw cause; // still a bug — let it bubble after cleanup

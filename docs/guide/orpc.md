@@ -51,7 +51,7 @@ const find = os
   .errors({ NOT_FOUND: {} })
   .handler(
     handlerResult(({ input, errors }) =>
-      repo.findPlanet(input.id).mapErr((m) => m.with(P._, () => errors.NOT_FOUND())),
+      repo.findPlanet(input.id).mapErr((matcher) => matcher.with(P._, () => errors.NOT_FOUND())),
     ),
   );
 ```
@@ -99,7 +99,7 @@ const find = os
   .input(z.object({ id: z.string() }))
   .errors({ NOT_FOUND: {} })
   .result(({ input, errors }) =>
-    repo.findPlanet(input.id).mapErr((m) => m.with(P._, () => errors.NOT_FOUND())),
+    repo.findPlanet(input.id).mapErr((matcher) => matcher.with(P._, () => errors.NOT_FOUND())),
   );
 ```
 
@@ -116,6 +116,7 @@ third-party prototype is unwelcome.
 `Result`s instead of `[error, data, inferableError]` tuples:
 
 ```ts
+import { P } from "unthrown";
 import { createResultClient } from "@unthrown/orpc/client";
 
 const rc = createResultClient(client);
@@ -125,7 +126,9 @@ const greeting = await rc.planet
   .map((planet) => `Hello, ${planet.name}!`)
   .match({
     ok: (msg) => msg,
-    err: (e) => (e.code === "NOT_FOUND" ? "Hello, void!" : "Hello, trouble!"),
+    // the matcher branches on the ORPCError `code`, not a `_tag`
+    err: (matcher) =>
+      matcher.with({ code: "NOT_FOUND" }, () => "Hello, void!").with(P._, () => "Hello, trouble!"),
     defect: () => "Hello, bug tracker!",
   });
 ```
@@ -133,8 +136,10 @@ const greeting = await rc.planet
 The error channel is the raw inferable `ORPCError` union, discriminated by
 `code` — deliberately **not** re-wrapped into [tagged errors](./tagged-errors):
 oRPC already ships a discriminated error type, and one concept should have one
-name. Branch on `code` (a `switch`, [ts-pattern](./pattern-matching), or the
-`.errors` data types); `matchTags` does not apply to this package.
+name. Branch on `code` — in `match`'s `err` matcher (as above), a `switch`, a
+standalone [ts-pattern](./pattern-matching) `match`, or via the `.errors` data
+types. Because these are plain `ORPCError`s rather than `TaggedError`s, `tag(...)`
+doesn't apply here — match on the `code` field instead.
 
 Anything non-inferable — a network failure, an undeclared throw collapsed to
 `INTERNAL_SERVER_ERROR`, a malformed response — is a `Defect`: it flows past
@@ -180,8 +185,8 @@ const createUser = os
     handlerResult(({ input, errors }) =>
       db.user
         .tryCreate({ data: input })
-        .mapErr((m) =>
-          m
+        .mapErr((matcher) =>
+          matcher
             .with(tag("UniqueConstraintViolation"), () => errors.EMAIL_TAKEN())
             .with(
               tag("ForeignKeyViolation"),

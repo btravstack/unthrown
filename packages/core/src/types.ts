@@ -244,7 +244,7 @@ export type ResultMethods<out T, out E> = {
    * @param f - builds the match over the error (returns the un-terminated builder).
    */
   mapErr<M extends ExhaustiveMatch<unknown>>(
-    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+    f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
   ): Result<T, MatchErrOut<M>>;
 
   /**
@@ -260,7 +260,7 @@ export type ResultMethods<out T, out E> = {
    * @param f - builds the match; each branch produces a fallback `Result`.
    */
   flatMapErr<M extends ExhaustiveMatch<Result<unknown, unknown> | Defect>>(
-    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+    f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
   ): Result<T | OkOf<MatchOut<M>>, ErrOf<MatchOut<M>>>;
 
   /**
@@ -278,7 +278,7 @@ export type ResultMethods<out T, out E> = {
    * @param f - builds the match; each branch produces a success value.
    */
   recoverErr<M extends ExhaustiveMatch<unknown>>(
-    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+    f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
   ): Result<T | MatchErrOut<M>, never>;
 
   /**
@@ -297,7 +297,7 @@ export type ResultMethods<out T, out E> = {
    * @param f - builds the match; branch returns are ignored.
    */
   tapErr(
-    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
+    f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
   ): Result<T, E>;
 
   /**
@@ -317,7 +317,7 @@ export type ResultMethods<out T, out E> = {
    */
   flatTapErr<E2>(
     f: (
-      m: ErrMatcher<E>,
+      matcher: ErrMatcher<E>,
       defect: (cause: unknown) => Defect,
     ) => ExhaustiveMatch<Result<unknown, E2>>,
   ): Result<T, E | E2>;
@@ -374,19 +374,34 @@ export type ResultMethods<out T, out E> = {
   tapFailure<R>(f: (failure: FailureView<E, T>) => R & NotThenable<R>): Result<T, E>;
 
   /**
-   * Exhaustively fold all three runtime states into a single value of type `R`.
+   * Exhaustively fold all three runtime states into a single value.
    *
    * @remarks
    * Exactly one handler runs. Together with the throw-to-Defect guarantee, this
    * is typically the single place a pipeline is handled at the edge — mapping
    * `Ok`/`Err`/`Defect` to (for example) 2xx / 4xx / 5xx with no `try`/`catch`.
-   * (For richer matching, a `Result` is also a discriminated union — branch on
-   * its `tag` property, e.g. with `ts-pattern`.)
    *
-   * @typeParam R - the folded result type.
-   * @param cases - one handler per channel.
+   * The `err` handler does not take a single blanket callback: it receives
+   * `match(error)` (an {@link ErrMatcher}) and **matches the error exhaustively**,
+   * exactly like the error combinators. Chain `.with(pattern, handler)` and
+   * **return the un-terminated builder** — `match` calls `.exhaustive()` itself,
+   * so a missing case is a compile error at the call site (no `.exhaustive()` to
+   * forget). Use `.with(P._, …)` for a uniform catch-all. Unlike the combinators
+   * the branches receive **no `defect` helper** — `match` is total elimination
+   * to a value, with no `Defect` output channel; the `defect` case handles a
+   * `Result` that already carries one. (A `Result` is also a discriminated
+   * union — for richer whole-`Result` matching, `match(result).with(…)`.)
+   *
+   * @typeParam ROk - the `ok` handler return type.
+   * @typeParam RDefect - the `defect` handler return type.
+   * @typeParam M - the exhaustive builder the `err` handler returns.
+   * @param cases - the `ok`/`defect` handlers plus the `err` matcher builder.
    */
-  match<R>(cases: { ok: (value: T) => R; err: (error: E) => R; defect: (cause: unknown) => R }): R;
+  match<ROk, RDefect, M extends ExhaustiveMatch<unknown>>(cases: {
+    ok: (value: T) => ROk;
+    err: (matcher: ErrMatcher<E>) => M;
+    defect: (cause: unknown) => RDefect;
+  }): ROk | RDefect | MatchOut<M>;
   /**
    * Extract the success value.
    *
@@ -741,7 +756,7 @@ export type AsyncResultMethods<out T, out E> = {
    * {@link ErrMatcher} form; the combinator calls `.exhaustive()`.
    */
   mapErr<M extends ExhaustiveMatch<unknown>>(
-    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+    f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
   ): AsyncResult<T, MatchErrOut<M>>;
 
   /**
@@ -752,7 +767,7 @@ export type AsyncResultMethods<out T, out E> = {
   flatMapErr<
     M extends ExhaustiveMatch<Result<unknown, unknown> | AsyncResult<unknown, unknown> | Defect>,
   >(
-    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+    f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
   ): AsyncResult<
     T | OkOf<MatchOut<M>> | AsyncOkOf<MatchOut<M>>,
     ErrOf<MatchOut<M>> | AsyncErrOf<MatchOut<M>>
@@ -764,7 +779,7 @@ export type AsyncResultMethods<out T, out E> = {
    * becomes a `Defect`.
    */
   recoverErr<M extends ExhaustiveMatch<unknown>>(
-    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+    f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
   ): AsyncResult<T | MatchErrOut<M>, never>;
 
   /**
@@ -777,7 +792,7 @@ export type AsyncResultMethods<out T, out E> = {
    * {@link AsyncResultMethods.flatTapErr | flatTapErr}.
    */
   tapErr(
-    f: (m: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
+    f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
   ): AsyncResult<T, E>;
 
   /**
@@ -790,7 +805,7 @@ export type AsyncResultMethods<out T, out E> = {
    */
   flatTapErr<E2>(
     f: (
-      m: ErrMatcher<E>,
+      matcher: ErrMatcher<E>,
       defect: (cause: unknown) => Defect,
     ) => ExhaustiveMatch<Result<unknown, E2> | AsyncResult<unknown, E2>>,
   ): AsyncResult<T, E | E2>;
@@ -821,14 +836,15 @@ export type AsyncResultMethods<out T, out E> = {
   tapFailure<R>(f: (failure: FailureView<E, T>) => R & NotThenable<R>): AsyncResult<T, E>;
 
   /**
-   * Asynchronous {@link ResultMethods.match | match}. Handlers are synchronous;
-   * resolves to a `Promise<R>`.
+   * Asynchronous {@link ResultMethods.match | match}. Handlers are synchronous
+   * (the `err` handler returns an exhaustive {@link ErrMatcher} builder, no
+   * `defect` helper); resolves to a `Promise` of the folded value.
    */
-  match<R>(cases: {
-    ok: (value: T) => R;
-    err: (error: E) => R;
-    defect: (cause: unknown) => R;
-  }): Promise<R>;
+  match<ROk, RDefect, M extends ExhaustiveMatch<unknown>>(cases: {
+    ok: (value: T) => ROk;
+    err: (matcher: ErrMatcher<E>) => M;
+    defect: (cause: unknown) => RDefect;
+  }): Promise<ROk | RDefect | MatchOut<M>>;
   /**
    * Asynchronous {@link ResultMethods.get | get}. Compiles only when the
    * error channel is empty (`this: AsyncResult<T, never>`); the returned promise

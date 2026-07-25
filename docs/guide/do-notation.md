@@ -39,14 +39,14 @@ the normal surface, so you can mix in `map`, `flatMap`, `match`, and the rest
 freely, and a thrown callback still becomes a `Defect`:
 
 ```ts
-import { Do, Ok } from "unthrown";
+import { Do, Ok, P } from "unthrown";
 
 Do()
   .bind("n", () => Ok(2))
   .let("doubled", ({ n }) => n * 2)
   .match({
     ok: ({ n, doubled }) => `${n} → ${doubled}`,
-    err: (e) => `failed: ${e}`,
+    err: (matcher) => matcher.with(P._, (e) => `failed: ${e}`),
     defect: (cause) => `bug: ${String(cause)}`,
   });
 ```
@@ -58,14 +58,14 @@ To sequence asynchronous steps, lift the chain with `toAsync()`. From there a
 [Boundaries](./boundaries)):
 
 ```ts
-import { Do, fromPromise } from "unthrown";
+import { Do, fromPromise, P } from "unthrown";
 
 const profile = await Do()
   .toAsync()
   .bind("user", () => fromPromise(fetchUser(id), (c, defect) => defect(c)))
   .bind("posts", ({ user }) => fromPromise(fetchPosts(user.id), (c, defect) => defect(c)))
   .let("count", ({ posts }) => posts.length)
-  .match({ ok: (s) => s, err: () => null, defect: () => null });
+  .match({ ok: (s) => s, err: (matcher) => matcher.with(P._, () => null), defect: () => null });
 ```
 
 ## Why not a generator (`safeTry` / `gen`)?

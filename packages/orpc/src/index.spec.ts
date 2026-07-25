@@ -24,7 +24,7 @@ import {
 } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import "@unthrown/vitest";
-import { Err, fromSafePromise, Ok, type Result } from "unthrown";
+import { Err, fromSafePromise, Ok, P, type Result } from "unthrown";
 import { describe, expect, test } from "vitest";
 
 import { createResultClient, fromCall } from "./client.js";
@@ -207,7 +207,7 @@ describe("createResultClient", () => {
       .map((planet) => `Hello, ${planet.name}!`)
       .match({
         ok: (msg) => msg,
-        err: () => "not found",
+        err: (matcher) => matcher.with(P._, () => "not found"),
         defect: () => "bug",
       });
     expect(greeting).toBe("Hello, Mars!");

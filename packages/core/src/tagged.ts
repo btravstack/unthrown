@@ -1,7 +1,5 @@
-// The TaggedError convention (à la Effect's `Data.TaggedError`) and an
-// exhaustive, zero-dependency fold over a tagged error union.
-
-import type { AsyncResult, Result } from "./types.js";
+// The TaggedError convention (à la Effect's `Data.TaggedError`) and the
+// `tag(t)` ts-pattern pattern for matching a tagged error union.
 
 type Props = Record<string, unknown>;
 
@@ -59,8 +57,10 @@ export type TaggedErrorConstructor<Tag extends string> = {
  * rejected at compile time (and excluded from the instance type), so it can't
  * shadow `Error.name`.
  *
- * `_tag` is the discriminant used by {@link matchTags}; `Error.name` is the
- * human-facing label in stack traces and logs. By default they coincide, but
+ * `_tag` is the discriminant matched by {@link tag} in the error combinators
+ * (`result.mapErr((matcher) => matcher.with(tag("NotFound"), …))`) and in
+ * `match`; `Error.name` is the human-facing label in stack traces and logs. By
+ * default they coincide, but
  * they can be **decoupled** with `options.name` — so a tag can be namespaced for
  * collision-safety (`"@my-lib/RetryableError"`) without that slash-prefixed
  * string leaking into `Error.name`:
@@ -121,105 +121,6 @@ export function TaggedError<Tag extends string>(
 }
 
 /**
- * The handler object {@link matchTags} requires: a branch per error tag, plus
- * `Ok` and `Defect`. Miss a tag and it will not compile — the exhaustiveness is
- * enforced by the type, with no `.exhaustive()` to forget.
- *
- * @typeParam T - the success value type.
- * @typeParam E - the tagged error union.
- * @typeParam R - the folded result type.
- *
- * @category Types
- */
-export type TagHandlers<T, E extends { _tag: string }, R> = {
-  Ok: (value: T) => R;
-  Defect: (cause: unknown) => R;
-} & { [K in E["_tag"]]: (error: Extract<E, { _tag: K }>) => R };
-
-/**
- * The channel-handler names are reserved: an error tag named `"Ok"` or
- * `"Defect"` would collide with them inside {@link TagHandlers}, so
- * {@link matchTags} rejects such unions at the call site.
- *
- * @internal
- */
-type ReservedTagError =
-  'unthrown: error tags "Ok" and "Defect" are reserved by matchTags — rename the colliding tag (TaggedError\'s options.name can keep the display name)';
-
-/**
- * Exhaustively fold a {@link Result} (or {@link AsyncResult}) whose error type is
- * a tagged union, dispatching each error to the handler matching its `_tag`.
- *
- * @remarks
- * The `handlers` object must provide `Ok`, `Defect`, and exactly one function
- * per error tag; each tag's handler receives the narrowed error variant. A
- * missing tag is a compile error. For an `AsyncResult`, the fold resolves to a
- * `Promise<R>`. At runtime, an error whose `_tag` has no handler (possible only
- * outside the typed contract) is routed to the `Defect` handler — an unmodeled
- * tag is an unmodeled failure. Tags named `"Ok"` or `"Defect"` are rejected at
- * compile time.
- *
- * @typeParam T - the success value type.
- * @typeParam E - the tagged error union (`E extends { _tag: string }`).
- * @typeParam R - the folded result type.
- * @param result - the result to fold.
- * @param handlers - one branch per channel/tag.
- *
- * @category Tagged errors
- *
- * @example
- * ```ts
- * import { Ok, Err, matchTags, TaggedError, type Result } from "unthrown";
- *
- * class NotFound extends TaggedError("NotFound") {}
- * class Forbidden extends TaggedError("Forbidden")<{ user: string }> {}
- *
- * const fold = (r: Result<number, NotFound | Forbidden>) =>
- *   matchTags(r, {
- *     Ok: (n) => `got ${n}`,
- *     Defect: (cause) => `bug: ${String(cause)}`,
- *     NotFound: () => "404",
- *     Forbidden: (e) => `403 for ${e.user}`,
- *   });
- *
- * fold(Ok(1)); // => "got 1"
- * fold(Err(new Forbidden({ user: "ada" }))); // => "403 for ada"
- * ```
- */
-export function matchTags<T, E extends { _tag: string }, R>(
-  result: Result<T, E>,
-  handlers: TagHandlers<T, E, R> &
-    ([Extract<E["_tag"], "Ok" | "Defect">] extends [never] ? unknown : ReservedTagError),
-): R;
-export function matchTags<T, E extends { _tag: string }, R>(
-  result: AsyncResult<T, E>,
-  handlers: TagHandlers<T, E, R> &
-    ([Extract<E["_tag"], "Ok" | "Defect">] extends [never] ? unknown : ReservedTagError),
-): Promise<R>;
-export function matchTags<T, E extends { _tag: string }, R>(
-  result: Result<T, E> | AsyncResult<T, E>,
-  handlers: TagHandlers<T, E, R>,
-): R | Promise<R> {
-  const onErr = (error: E): R => {
-    const tag = error._tag as E["_tag"];
-    // `Object.hasOwn` guards against a rogue tag (e.g. "constructor") resolving
-    // through the prototype chain to an unrelated `Object.prototype` member —
-    // only an own property of `handlers` counts as a real handler.
-    const handler =
-      tag === "Ok" || tag === "Defect" || !Object.hasOwn(handlers, tag)
-        ? undefined
-        : (handlers[tag] as unknown as ((e: E) => R) | undefined);
-    // An unhandled or reserved tag can only arise outside the typed contract (a
-    // widened cast, a JS caller). That is an unmodeled failure — route it to the
-    // Defect handler rather than crashing on `undefined(error)`.
-    return handler ? handler(error) : handlers.Defect(error);
-  };
-  // Both Result and AsyncResult share `match`; the cast picks one signature for
-  // the call while the public overloads keep the return type correct.
-  return (result as Result<T, E>).match({ ok: handlers.Ok, err: onErr, defect: handlers.Defect });
-}
-
-/**
  * A `ts-pattern` pattern matching any value whose `_tag` equals `value` — a
  * {@link TaggedError}, or any discriminated member. Equivalent to the object
  * pattern `{ _tag: value }`, but reads better inside an error-matching
@@ -232,8 +133,8 @@ export function matchTags<T, E extends { _tag: string }, R>(
  *
  * @example
  * ```ts
- * result.mapErr((m) =>
- *   m
+ * result.mapErr((matcher) =>
+ *   matcher
  *     .with(tag("NotFound"), () => new NotFoundException())
  *     .with(tag("Conflict"), (e) => new ConflictException(e.key)),
  * );

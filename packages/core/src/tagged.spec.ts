@@ -4,9 +4,10 @@ import {
   type AsyncResult,
   Err,
   fromSafePromise,
-  matchTags,
   Ok,
+  P,
   type Result,
+  tag,
   TaggedError,
 } from "./index.js";
 
@@ -96,44 +97,48 @@ describe("TaggedError", () => {
     expect(e.message).toBe("boom");
   });
 
-  it("still dispatches on the namespaced _tag in matchTags", () => {
+  it("still dispatches on the namespaced _tag via match's error matcher", () => {
     class Retryable extends TaggedError("@my-lib/Retryable", { name: "Retryable" }) {}
-    const out = matchTags(Err(new Retryable()) as Result<number, Retryable>, {
-      Ok: (n) => `ok:${n}`,
-      Defect: () => "defect",
-      "@my-lib/Retryable": (e) => `retry:${e.name}`,
+    const out = (Err(new Retryable()) as Result<number, Retryable>).match({
+      ok: (n) => `ok:${n}`,
+      defect: () => "defect",
+      err: (matcher) => matcher.with(tag("@my-lib/Retryable"), (e) => `retry:${e.name}`),
     });
     expect(out).toBe("retry:Retryable");
   });
 });
 
-describe("matchTags", () => {
+// The per-tag exhaustive fold that `matchTags` used to provide is now `match`
+// with its `err` handler driven by the ts-pattern error matcher and `tag(t)`.
+describe("match — per-tag error matching", () => {
   const fold = (r: Result<number, ApiError>): string =>
-    matchTags(r, {
-      Ok: (n) => `ok:${n}`,
-      Defect: (cause) => `defect:${String(cause)}`,
-      NotFound: () => "not-found",
-      Forbidden: (e) => `forbidden:${e.user}`,
-      HttpError: (e) => `http:${e.status}`,
+    r.match({
+      ok: (n) => `ok:${n}`,
+      defect: (cause) => `defect:${String(cause)}`,
+      err: (matcher) =>
+        matcher
+          .with(tag("NotFound"), () => "not-found")
+          .with(tag("Forbidden"), (e) => `forbidden:${e.user}`)
+          .with(tag("HttpError"), (e) => `http:${e.status}`),
     });
 
-  it("dispatches Ok to the Ok handler", () => {
+  it("dispatches Ok to the ok handler", () => {
     expect(fold(Ok(7))).toBe("ok:7");
   });
 
-  it("dispatches each tagged error to the handler matching its _tag", () => {
+  it("dispatches each tagged error to the branch matching its _tag", () => {
     expect(fold(Err(new NotFound()))).toBe("not-found");
     expect(fold(Err(new Forbidden({ user: "bob" })))).toBe("forbidden:bob");
     expect(fold(Err(new HttpError({ status: 503 })))).toBe("http:503");
   });
 
-  it("narrows each error variant to its payload in its handler", () => {
+  it("narrows each error variant to its payload in its branch", () => {
     // `e.user` / `e.status` below only typecheck because the variant is narrowed.
     const r: Result<number, ApiError> = Err(new Forbidden({ user: "alice" }));
     expect(fold(r)).toBe("forbidden:alice");
   });
 
-  it("dispatches a Defect to the Defect handler", () => {
+  it("dispatches a Defect to the defect handler", () => {
     const boom = new Error("kaboom");
     const r = Ok(0).map<number>(() => {
       throw boom;
@@ -143,57 +148,38 @@ describe("matchTags", () => {
 
   it("folds an AsyncResult to a Promise", async () => {
     const r = fromSafePromise(Promise.resolve(1)) as unknown as AsyncResult<number, ApiError>;
-    const out = await matchTags(r, {
-      Ok: (n) => `ok:${n}`,
-      Defect: () => "defect",
-      NotFound: () => "nf",
-      Forbidden: () => "fb",
-      HttpError: () => "he",
+    const out = await r.match({
+      ok: (n) => `ok:${n}`,
+      defect: () => "defect",
+      err: (matcher) =>
+        matcher
+          .with(tag("NotFound"), () => "nf")
+          .with(tag("Forbidden"), () => "fb")
+          .with(tag("HttpError"), () => "he"),
     });
     expect(out).toBe("ok:1");
   });
 
-  it("routes an error with an unhandled _tag to the Defect handler instead of crashing", () => {
+  it("handles every error uniformly through the P._ catch-all", () => {
+    const uniform = (r: Result<number, ApiError>): string =>
+      r.match({
+        ok: (n) => `ok:${n}`,
+        defect: () => "defect",
+        err: (matcher) => matcher.with(P._, (e) => `err:${e._tag}`),
+      });
+    expect(uniform(Err(new NotFound()))).toBe("err:NotFound");
+    expect(uniform(Err(new HttpError({ status: 500 })))).toBe("err:HttpError");
+  });
+
+  it("throws NonExhaustiveError on a rogue _tag slipped past the types (edge elimination — not routed to Defect)", () => {
     class Known extends TaggedError("Known") {}
     const rogue = { _tag: "Rogue" } as unknown as Known;
-    const out = matchTags(Err(rogue), {
-      Ok: () => "ok",
-      Defect: (cause) => `defect:${(cause as { _tag: string })._tag}`,
-      Known: () => "known",
-    });
-    expect(out).toBe("defect:Rogue");
-  });
-
-  it("routes an error whose _tag is the reserved 'Ok' to the Defect handler", () => {
-    class Known extends TaggedError("Known") {}
-    const rogue = { _tag: "Ok" } as unknown as Known;
-    const out = matchTags(Err(rogue), {
-      Ok: () => "ok",
-      Defect: () => "defect",
-      Known: () => "known",
-    });
-    expect(out).toBe("defect");
-  });
-
-  it("routes an error whose _tag is the reserved 'Defect' to the Defect handler", () => {
-    class Known extends TaggedError("Known") {}
-    const rogue = { _tag: "Defect" } as unknown as Known;
-    const out = matchTags(Err(rogue), {
-      Ok: () => "ok",
-      Defect: () => "defect",
-      Known: () => "known",
-    });
-    expect(out).toBe("defect");
-  });
-
-  it("routes a rogue _tag that collides with an inherited Object.prototype member (e.g. 'constructor') to the Defect handler, not the prototype's value", () => {
-    class Known extends TaggedError("Known") {}
-    const rogue = { _tag: "constructor" } as unknown as Known;
-    const out = matchTags(Err(rogue), {
-      Ok: () => "ok",
-      Defect: (cause) => `defect:${(cause as { _tag: string })._tag}`,
-      Known: () => "known",
-    });
-    expect(out).toBe("defect:constructor");
+    expect(() =>
+      (Err(rogue) as Result<number, Known>).match({
+        ok: () => "ok",
+        defect: () => "defect",
+        err: (matcher) => matcher.with(tag("Known"), () => "known"),
+      }),
+    ).toThrow();
   });
 });

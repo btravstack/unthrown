@@ -37,7 +37,7 @@ const find = os
   .errors({ NOT_FOUND: {} })
   .handler(
     handlerResult(({ input, errors }) =>
-      repo.findPlanet(input.id).mapErr((m) => m.with(P._, () => errors.NOT_FOUND())),
+      repo.findPlanet(input.id).mapErr((matcher) => matcher.with(P._, () => errors.NOT_FOUND())),
     ),
   );
 ```
@@ -55,7 +55,7 @@ const find = os
   .input(z.object({ id: z.string() }))
   .errors({ NOT_FOUND: {} })
   .result(({ input, errors }) =>
-    repo.findPlanet(input.id).mapErr((m) => m.with(P._, () => errors.NOT_FOUND())),
+    repo.findPlanet(input.id).mapErr((matcher) => matcher.with(P._, () => errors.NOT_FOUND())),
   );
 ```
 
@@ -66,6 +66,7 @@ and on contract-first `implement(...)` implementers.)
 ## Client — `createResultClient` / `fromCall`
 
 ```ts
+import { P } from "unthrown";
 import { createResultClient } from "@unthrown/orpc/client";
 
 const rc = createResultClient(client);
@@ -75,7 +76,9 @@ const greeting = await rc.planet
   .map((planet) => `Hello, ${planet.name}!`)
   .match({
     ok: (msg) => msg,
-    err: (e) => (e.code === "NOT_FOUND" ? "Hello, void!" : "Hello, trouble!"),
+    // `err` takes the exhaustive matcher — branch on the ORPCError `code`
+    err: (matcher) =>
+      matcher.with({ code: "NOT_FOUND" }, () => "Hello, void!").with(P._, () => "Hello, trouble!"),
     defect: () => "Hello, bug tracker!",
   });
 ```
