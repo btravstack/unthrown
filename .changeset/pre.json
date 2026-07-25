@@ -14,8 +14,16 @@
   },
   "changesets": [
     "adopt-btravstack-0.2",
+    "ensure-and-do-async",
     "exhaustive-error-matcher",
+    "orpc-sync-throw-defect",
+    "oxlint-four-rules",
+    "prisma-transaction-defect",
     "remove-tools-packages",
-    "v5-extractor-cleanup"
+    "runtime-hardening",
+    "standard-schema-orphan-adoption",
+    "synchronous-qualify-and-taperr",
+    "v5-extractor-cleanup",
+    "vitest-loud-forgotten-await"
   ]
 }

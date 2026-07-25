@@ -1,5 +1,18 @@
 # @unthrown/prisma
 
+## 0.1.1-beta.1
+
+### Patch Changes
+
+- 27f12a2: `$tryTransaction` no longer downgrades an out-of-contract callback return to a
+  modeled `Err(DriverError)`: a callback that resolves to a non-`Result` (untyped
+  or cast callers) now rolls back and surfaces as a `Defect` with a `TypeError`
+  cause — the same policy as a throwing callback. A bug stays a defect.
+- Updated dependencies [2297633]
+- Updated dependencies [2297633]
+- Updated dependencies [2297633]
+  - unthrown@5.0.0-beta.1
+
 ## 0.1.1-beta.0
 
 ### Patch Changes

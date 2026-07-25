@@ -1,5 +1,14 @@
 # @unthrown/neverthrow
 
+## 5.0.0-beta.1
+
+### Patch Changes
+
+- Updated dependencies [2297633]
+- Updated dependencies [2297633]
+- Updated dependencies [2297633]
+  - unthrown@5.0.0-beta.1
+
 ## 5.0.0-beta.0
 
 ### Patch Changes
