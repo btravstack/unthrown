@@ -17,7 +17,7 @@
 // for batch `$transaction([...])`, which needs unexecuted `PrismaPromise`s.
 
 import { Prisma } from "@prisma/client/extension";
-import { type AsyncResult, fromPromise, type Result, TaggedError } from "unthrown";
+import { type AsyncResult, fromPromise, isResult, type Result, TaggedError } from "unthrown";
 
 import {
   type CursorPaginationMeta,
@@ -542,12 +542,29 @@ export const unthrownPrisma = Prisma.defineExtension({
       // Passed as a THUNK so even a synchronous throw out of `$transaction`
       // itself (e.g. invalid options from untyped code) stays inside the
       // boundary instead of escaping as a raw throw.
-      return fromPromise(
+      //
+      // The triage runs with the concrete `PrismaQueryError` union — `qualify`'s
+      // `NotThenable` return constraint cannot be proven over the unresolved `E`
+      // parameter (the generic-`E` concession, as guards-over-match) — and the
+      // callback's modeled `E` is re-attached once, on the way out.
+      const lifted: AsyncResult<T, PrismaQueryError> = fromPromise(
         () =>
           client.$transaction(async (tx) => {
             let result: Result<T, E>;
             try {
-              result = await fn(tx as Omit<C, TxDenyList>);
+              const returned: unknown = await fn(tx as Omit<C, TxDenyList>);
+              // A callback that resolves to a NON-Result (out of contract —
+              // e.g. a raw value from untyped code) is a bug, exactly like a
+              // throwing callback: the TypeError is caught below, so it rolls
+              // back as a DEFECT — never downgraded to a modeled DriverError
+              // (which is what dispatching `returned.isOk()` outside this
+              // try/catch used to do).
+              if (!isResult(returned)) {
+                throw new TypeError(
+                  "@unthrown/prisma: the $tryTransaction callback did not return a Result.",
+                );
+              }
+              result = returned as Result<T, E>;
             } catch (cause) {
               // A callback that throws (instead of returning an AsyncResult) is a
               // bug — roll back and keep it a DEFECT. Only rejections outside
@@ -564,9 +581,12 @@ export const unthrownPrisma = Prisma.defineExtension({
           cause instanceof Rollback
             ? cause.wasDefect
               ? defect(cause.carried)
-              : (cause.carried as E | PrismaQueryError)
+              : (cause.carried as PrismaQueryError)
             : qualifyPrismaError(cause),
       );
+      // A non-defect `Rollback` carries the callback's own `Err` value, so the
+      // channel is really `E | PrismaQueryError` — re-attached here.
+      return lifted as AsyncResult<T, E | PrismaQueryError>;
     },
   },
 });

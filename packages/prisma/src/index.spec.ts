@@ -246,6 +246,27 @@ describe("$tryTransaction", () => {
     await expect(db.user.tryCount()).toBeOkWith(0);
   });
 
+  it("a callback that resolves to a raw value (not a Result) is a defect, and rolls back", async ({
+    db,
+  }) => {
+    // Out of contract: the callback resolves to `42` instead of a Result.
+    // Dispatching on `result.isOk` would then throw a TypeError OUTSIDE the
+    // sentinel try/catch, reject the transaction with a non-Rollback cause,
+    // and be downgraded into a modeled DriverError. A bug must stay a defect
+    // — and the write made before the rogue return must be rolled back.
+    const rogue = (async (tx: { user: { tryCreate: (args: unknown) => PromiseLike<unknown> } }) => {
+      await tx.user.tryCreate({ data: { email: "rogue@example.com" } });
+      return 42;
+    }) as never;
+    const result = await db.$tryTransaction(rogue);
+    expect(result).toBeDefect();
+    if (result.isDefect()) {
+      expect(result.cause).toBeInstanceOf(TypeError);
+      expect((result.cause as TypeError).message).toMatch(/did not return a Result/);
+    }
+    await expect(db.user.tryCount()).toBeOkWith(0);
+  });
+
   it("surfaces a query failure inside the transaction as its tagged error", async ({ db }) => {
     await db.user.tryCreate({ data: { email: "dup@example.com" } });
     await expect(
