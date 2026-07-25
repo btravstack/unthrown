@@ -1,5 +1,64 @@
 # unthrown
 
+## 5.0.0-beta.1
+
+### Major Changes
+
+- 2297633: **`qualify` is now synchronous, and `tapErr` bans async branches** — two
+  qualification-bypass holes closed at the type level.
+
+  - `fromThrowable` / `fromPromise` now intersect `qualify`'s return with
+    `NotThenable`, so an `async` qualify no longer compiles. It used to compile
+    and silently defeat the triage: the returned promise landed in `E` as
+    `Err(Promise<…>)` (the `Defect` subtraction cannot see through a promise),
+    and a throwing async qualify escaped as an unhandled rejection. At runtime a
+    thenable slipped past the types now becomes a `Defect` (never `Err(Promise)`),
+    and the orphaned thenable is adopted so its later rejection cannot float.
+  - `tapErr`'s matcher-builder output is now `NotThenable`-constrained on both
+    surfaces. It was the one observer whose branch results are discarded, so an
+    `async` branch's rejection floated invisibly — `tap`, `tapDefect`, and
+    `tapFailure` already banned thenable callbacks. The non-awaiting
+    transformers `mapErr` / `recoverErr` still accept an async branch (its
+    promise is a visible value in the output type, not a rejection bypass).
+
+  Migration: make the qualify (or `tapErr` branch) synchronous — do the async
+  work first, or re-enter through `fromPromise` and compose with `flatMap`.
+
+### Minor Changes
+
+- 2297633: **New: `ensure` and `DoAsync` / `AsyncResult.Do`.**
+
+  - `ensure(predicate, onFail)` — validate a success or fail it into the modeled
+    channel: `Ok` + passing predicate flows through unchanged; a failing one
+    becomes `Err(onFail(value))` (`E` widens to `E | E2`). A type-guard predicate
+    narrows the success type (`Result<U, E | E2>`). `Err` / `Defect` pass
+    through untouched; a throw in either callback becomes a `Defect` as usual.
+    Available on both `Result` and `AsyncResult`.
+  - `DoAsync()` — the pre-lifted async do-notation entry (`Do().toAsync()`
+    without the boilerplate), aliased as `AsyncResult.Do` (suffix dropped in the
+    namespace, like `AsyncResult.Ok`).
+
+### Patch Changes
+
+- 2297633: **Runtime hardening** — none of these change well-typed behavior:
+
+  - Every combinator whose callback must return a `Result` (`flatMap`,
+    `flatTap`, `bind`, `flatMapErr`, `flatTapErr`, `recoverDefect` — both
+    surfaces) now turns an out-of-contract non-`Result` return (untyped or cast
+    callers) into a `TypeError`-caused `Defect` instead of letting a poison
+    value throw a raw `TypeError` further down the pipeline — the same policy
+    the aggregates already apply.
+  - `Res.prototype` / `AsyncRes.prototype` are frozen, the `AsyncResult`
+    internal promise is a native `#private` field, and the qualify-time `defect`
+    marker is frozen — the never-rejects and no-forgery invariants are now
+    tamper-resistant.
+  - `isResult` recognises a `Result` built by another copy of unthrown (dual
+    CJS/ESM require/import, cross-realm) via a `Symbol.for("unthrown.Result")`
+    prototype brand; a structural look-alike still fails.
+  - `TaggedError` now reserves `stack` off the payload alongside `name` and
+    `message` (an untyped payload can no longer clobber the real trace);
+    `cause` stays a legitimate typed payload field.
+
 ## 5.0.0-beta.0
 
 ### Major Changes

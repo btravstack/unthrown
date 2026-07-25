@@ -1,5 +1,17 @@
 # @unthrown/orpc
 
+## 0.1.1-beta.1
+
+### Patch Changes
+
+- 445041a: `createResultClient`: a procedure (or custom link) that throws synchronously
+  now lands in the `Defect` channel instead of escaping as a raw throw — the
+  wrapped call runs inside the `fromPromise` boundary via its thunk form.
+- Updated dependencies [2297633]
+- Updated dependencies [2297633]
+- Updated dependencies [2297633]
+  - unthrown@5.0.0-beta.1
+
 ## 0.1.1-beta.0
 
 ### Patch Changes

@@ -1,5 +1,18 @@
 # @unthrown/standard-schema
 
+## 5.0.0-beta.1
+
+### Patch Changes
+
+- 39db0d9: `fromSchema`: when a sync-declared schema returns a thenable (the documented
+  deliberate `TypeError`), the in-flight validation promise is now adopted before
+  throwing, so its later rejection can no longer surface as an unhandled
+  rejection.
+- Updated dependencies [2297633]
+- Updated dependencies [2297633]
+- Updated dependencies [2297633]
+  - unthrown@5.0.0-beta.1
+
 ## 5.0.0-beta.0
 
 ### Patch Changes
