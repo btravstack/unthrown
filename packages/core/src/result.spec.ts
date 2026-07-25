@@ -627,7 +627,7 @@ describe("Result.match", () => {
 });
 
 describe("Result eliminators on Ok / Err", () => {
-  it("get returns the Ok value; throws UnwrapError on Err", () => {
+  it("get returns the Ok value; throws GetError on Err", () => {
     expect(Ok(1).get()).toBe(1);
     try {
       // The Err branch is unreachable in typed code (get needs E = never);
@@ -636,12 +636,12 @@ describe("Result eliminators on Ok / Err", () => {
       expect.unreachable();
     } catch (e) {
       expect(e).toBeInstanceOf(Error);
-      expect((e as { name: string }).name).toBe("UnwrapError");
+      expect((e as { name: string }).name).toBe("GetError");
       expect((e as { error: unknown }).error).toBe("e");
     }
   });
 
-  it("getErr returns the Err; throws UnwrapError on Ok; rethrows the cause on a Defect", () => {
+  it("getErr returns the Err; throws GetError on Ok; rethrows the cause on a Defect", () => {
     expect(Err("e").getErr()).toBe("e");
     try {
       // The Ok branch is unreachable in typed code (getErr needs T = never);
@@ -649,7 +649,7 @@ describe("Result eliminators on Ok / Err", () => {
       (Ok(1) as unknown as Result<never, number>).getErr();
       expect.unreachable();
     } catch (e) {
-      expect((e as { name: string }).name).toBe("UnwrapError");
+      expect((e as { name: string }).name).toBe("GetError");
       expect((e as { error: unknown }).error).toBe(1);
     }
     try {

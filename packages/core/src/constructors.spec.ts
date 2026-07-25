@@ -11,7 +11,7 @@ import {
   Ok,
   OkAsync,
   type Result,
-  UnwrapError,
+  GetError,
 } from "./index.js";
 
 const boom = new Error("boom");
@@ -177,19 +177,19 @@ describe("Result instances are frozen — a variant cannot be forged by mutation
   });
 });
 
-describe("UnwrapError", () => {
+describe("GetError", () => {
   it("carries the offending error and is an Error instance", () => {
-    const e = new UnwrapError("payload");
+    const e = new GetError("payload");
     expect(e).toBeInstanceOf(Error);
-    expect(e).toBeInstanceOf(UnwrapError);
-    expect(e.name).toBe("UnwrapError");
+    expect(e).toBeInstanceOf(GetError);
+    expect(e.name).toBe("GetError");
     expect(e.error).toBe("payload");
     expect(e.cause).toBe("payload");
   });
 
   it("chains an Error payload through the standard cause", () => {
     const boom = new Error("boom");
-    const e = new UnwrapError(boom);
+    const e = new GetError(boom);
     expect(e.cause).toBe(boom);
     expect((e.cause as Error).stack).toBe(boom.stack);
   });
