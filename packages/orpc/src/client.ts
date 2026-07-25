@@ -56,12 +56,27 @@ import { type AsyncResult, fromPromise } from "unthrown";
 export function fromCall<TOutput, TError = ThrowableError>(
   promise: PromiseWithError<TOutput, TError>,
 ): AsyncResult<TOutput, Extract<TError, AnyORPCError>> {
-  return fromPromise(promise, (cause, defect) => {
-    // `isInferableError` narrows against the call's declared error union; the
-    // cast re-attaches that union to the untyped rejection cause.
-    const candidate = cause as TError;
+  return liftCall(promise);
+}
+
+// The shared boundary behind `fromCall` and the proxy client: `fromPromise`
+// with the inferable-error triage. The thunk form matters for the proxy — the
+// wrapped callable runs INSIDE the boundary, so even a synchronous throw lands
+// in the Defect channel instead of escaping raw.
+function liftCall<TOutput, TError>(
+  promise: PromiseWithError<TOutput, TError> | (() => PromiseWithError<TOutput, TError>),
+): AsyncResult<TOutput, Extract<TError, AnyORPCError>> {
+  // The triage runs with the concrete `AnyORPCError` union — `qualify`'s
+  // `NotThenable` return constraint cannot be proven over the unresolved
+  // `TError` parameter (the same generic-`E` concession as guards-over-match).
+  const lifted: AsyncResult<TOutput, AnyORPCError> = fromPromise(promise, (cause, defect) => {
+    const candidate = cause as AnyORPCError;
     return isInferableError(candidate) ? candidate : defect(cause);
   });
+  // Re-attach the call's declared error union to the untyped rejection cause —
+  // the same trust the pre-lift `cause as TError` cast expressed, applied once
+  // at the boundary.
+  return lifted as AsyncResult<TOutput, Extract<TError, AnyORPCError>>;
 }
 
 /**
@@ -117,7 +132,10 @@ export type ResultClient<T extends AnyNestedClient> =
 export function createResultClient<T extends AnyNestedClient>(client: T): ResultClient<T> {
   const target = (...args: unknown[]) => {
     const procedure = client as (...rest: unknown[]) => PromiseWithError<unknown, unknown>;
-    return fromCall(procedure(...args));
+    // The call is passed as a THUNK: a callable that throws synchronously
+    // (out of contract for a real oRPC client, but reachable through the
+    // untyped proxy) becomes a Defect instead of escaping as a raw throw.
+    return liftCall(() => procedure(...args));
   };
   const proxy = new Proxy(target, {
     get(_, prop) {
