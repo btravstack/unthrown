@@ -138,6 +138,19 @@ describe("forgotten await detection", () => {
     expect(() => failOnForgottenAwait()).not.toThrow();
   });
 
+  it("claims only the ending test's own assertions (test.concurrent safety)", (ctx) => {
+    // A pending assertion created HERE carries this test's name. A hook
+    // context naming a DIFFERENT test must leave it alone (under
+    // `test.concurrent` it belongs to a still-running sibling)…
+    void expect(fromSafePromise(new Promise<number>(() => {}))).toBeOk();
+    expect(() => failOnForgottenAwait({ task: { name: "some other test" } })).not.toThrow();
+    // …while this test's own context — the real nested task chain, exactly
+    // what the registered afterEach receives — claims and reports it.
+    expect(() => failOnForgottenAwait({ task: ctx.task })).toThrowError(
+      /1 async assertion\(s\) \(toBeOk\).*forgotten `await`/,
+    );
+  });
+
   it("a rejecting non-AsyncResult thenable fails with the friendly not-a-Result message", async () => {
     // `settle` adopts any thenable; a rejecting one is by definition not an
     // AsyncResult (whose internal promise never rejects). The failure must be
