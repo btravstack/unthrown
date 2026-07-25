@@ -74,6 +74,10 @@ export function fromSchema<S extends StandardSchemaV1>(
     const settled = validate(input);
     // An async schema can't be represented synchronously — fail loud and early.
     if (settled.isOk() && isThenable(settled.value)) {
+      // The in-flight validation promise is deliberately dropped — adopt its
+      // eventual rejection (if any) so a validator that later fails cannot
+      // fire as an unhandled rejection after this throw.
+      Promise.resolve(settled.value).then(undefined, () => {});
       throw new TypeError(
         "@unthrown/standard-schema: this schema validates asynchronously — use fromSchemaAsync instead.",
       );

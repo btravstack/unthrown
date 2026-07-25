@@ -61,6 +61,27 @@ describe("fromSchema (sync)", () => {
     expect(() => fromSchema(foreign)("hi")).toThrow(TypeError);
   });
 
+  it("a later-rejecting thenable from a sync-declared schema fires no unhandled rejection", async () => {
+    // The TypeError throw abandons the live validation promise; its eventual
+    // rejection must have been adopted (a no-op handler), or it would surface
+    // as an unhandled rejection — which vitest reports as a run-level error,
+    // so reaching the end of this test cleanly IS the assertion.
+    let reject!: (cause: unknown) => void;
+    const lateRejecting: StandardSchemaV1<unknown, string> = {
+      "~standard": {
+        version: 1,
+        vendor: "test",
+        validate: () =>
+          new Promise<StandardSchemaV1.Result<string>>((_, rej) => {
+            reject = rej;
+          }),
+      },
+    };
+    expect(() => fromSchema(lateRejecting)("hi")).toThrow(TypeError);
+    reject(new Error("late validator failure"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
   it("turns a throwing validator into a Defect (it never escapes)", () => {
     const r = fromSchema(stringSchema({ throws: true }))("hi");
     expect(r.isDefect()).toBe(true);
