@@ -41,8 +41,9 @@ non-`Error`, a bug in a callback you typed as total.
   with it.
 - **unthrown** ships _just_ that idea: a third `Defect` state that is **invisible
   to the type**. `E` stays exactly your modeled errors; a bug becomes a defect
-  that short-circuits to the edge and can only be observed by `match` or
-  `recoverDefect`. See [The Defect Channel](./the-defect-channel).
+  that short-circuits to the edge and can only be observed by `match`,
+  `recoverDefect`, or the `tapDefect` / `tapFailure` observers. See
+  [The Defect Channel](./the-defect-channel).
 
 This is the line unthrown borrows from Effect and almost nothing else has: _your
 `E` should never have to include "and also, maybe a bug."_

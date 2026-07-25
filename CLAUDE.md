@@ -29,7 +29,12 @@ was planned).
 3. **Qualification is enforced at every boundary.** `fromPromise` / `fromThrowable`
    take a mandatory `qualify: (cause: unknown, defect) => E | Defect`, where
    `defect` is a helper the boundary **injects** as the second argument (domain
-   code never imports it — the qualify-time marker is not a public value). There
+   code never imports it — the qualify-time marker is not a public value).
+   `qualify` is **synchronous**: its return intersects `NotThenable`, so an
+   `async` qualify does not compile (its `Promise` would land in `E`
+   un-triaged); a thenable slipped past the types at runtime becomes a `Defect`
+   (never `Err(Promise)`), and the orphaned thenable is adopted-and-silenced so
+   its later rejection can't float unhandled. There
    is no path that produces `unknown` in `E`. The boundary forces a triage
    decision. The
    modeled error type is inferred as **`Exclude<R, Defect>`** (where `R` is
@@ -45,12 +50,16 @@ was planned).
    a `_tag` discriminant on a class extending `Error`. Core `Result<T, E>` stays
    **generic in `E`** (unconstrained); only the tag-aware utilities require
    `E extends { _tag: string }`. The payload carries **only structured domain
-   fields** — both `name` and `message` are **reserved** out of it (each typed
-   `?: never`): `name` is the display label (set via `options.name`), and
+   fields** — `name`, `message`, and `stack` are **reserved** out of it (each
+   typed `?: never`): `name` is the display label (set via `options.name`),
    `message` is `Error`'s human string, defined once per subclass the standard
    way (`override message = "…"`, which may interpolate the payload via `this`
    because the base populates the fields before the subclass field initialiser
-   runs). Keeping `message` off the payload is deliberate — contextual detail
+   runs), and `stack` is `Error`'s trace (the constructor re-asserts the real
+   one, so even an untyped payload can't clobber it). `cause` is deliberately
+   **not** reserved — `Error.cause` is `unknown`, so a typed payload `cause`
+   (e.g. `@unthrown/prisma`'s `DriverError`) is a legitimate structured field.
+   Keeping `message` off the payload is deliberate — contextual detail
    lives in typed fields, defined per error type, never baked into a per-call
    string.
 5. **The error channel is matched exhaustively, never blanket-handled.** The
@@ -75,11 +84,13 @@ was planned).
    defect branch — or a throwing one, the safety net — contributes nothing.
    The **observers** (`tapErr`, `flatTapErr`) take the same exhaustive builder
    (the error passes through unchanged); a branch that returns a raw
-   `Promise`/`AsyncResult` is rejected only where the combinator awaits it
-   (`flatMapErr`/`flatTapErr`, via the builder-output constraint) — the
-   non-awaiting `mapErr`/`recoverErr`/`tapErr` run the branch synchronously,
-   so an async branch is a visible Promise-valued result, not a rejection
-   bypass. `tapDefect` / `tapFailure` keep single callbacks — their payloads
+   `Promise`/`AsyncResult` is rejected where the combinator awaits it
+   (`flatMapErr`/`flatTapErr`, via the builder-output constraint) **and** in
+   `tapErr` (its branch results are discarded, so a rejected `Promise` would
+   float unobserved — its builder output is `NotThenable`-constrained) — only
+   the non-awaiting transformers `mapErr`/`recoverErr` run the branch
+   synchronously with an async branch remaining a visible Promise-valued
+   result, not a rejection bypass. `tapDefect` / `tapFailure` keep single callbacks — their payloads
    carry no discriminant to match (a defect's cause is `unknown`; `tapFailure`
    splits on channel, not tag). The one eliminator that still handles the error
    channel, **`match`**, applies the **same exhaustive matcher** to its `err`
@@ -100,11 +111,21 @@ was planned).
 ## Load-bearing runtime invariants (tests must guard these)
 
 - **Throw → defect.** Any value thrown by a callback (or match branch) inside
-  a combinator (`map`, `flatMap`, `flatTap`, `bind`, `let`, `mapErr`, `flatMapErr`,
+  a combinator (`map`, `flatMap`, `flatTap`, `ensure`, `bind`, `let`, `mapErr`,
+  `flatMapErr`,
   `recoverErr`, `tap*`, `flatTapErr`, `recoverDefect`) is caught and converted to a
   `Defect`. Nothing escapes a pipeline as a raw throw.
   This is what lets an HTTP adapter do a single `match({ ok, err, defect })`
   with **no surrounding `try/catch`**.
+- **An out-of-contract non-`Result` surfaces as a `Defect`, never a raw
+  throw/rejection.** Reachable only from untyped/cast callers: the aggregates
+  (`all` / `allFromDict` and their async pair) turn a non-`Result` element into
+  a `TypeError`-caused `Defect`, and every combinator whose callback is
+  constrained to return a `Result` (`flatMap`, `flatTap`, `bind`, `flatMapErr`,
+  `flatTapErr`, `recoverDefect` — both surfaces; the async ones check the
+  **awaited** value, so a legitimately returned `AsyncResult` still passes)
+  does the same with a non-`Result` callback return, instead of letting a
+  poison value throw a raw `TypeError` further down the pipeline.
 - **A non-exhaustive error match becomes a `Defect` (in the combinators).** In
   the error combinators, the callback returns a ts-pattern builder and the
   combinator runs `.run()` (which executes `.exhaustive()`). For well-typed
@@ -120,9 +141,13 @@ was planned).
   return an `ExhaustiveMatch` — `.exhaustive` is typed callable only when
   ts-pattern has narrowed the input to `never` (all cases covered); a
   non-exhaustive builder types `.exhaustive` as `NonExhaustiveError` and fails
-  the constraint at the call site. There is no path where a case slips past an
-  error combinator uncovered without a compile error, and no `.exhaustive()` /
-  `.otherwise()` for a caller to reach (the combinator owns termination). This
+  the constraint at the call site. For code that builds the match through the
+  provided matcher there is no path where a case slips past an error combinator
+  uncovered without a compile error, and no `.exhaustive()` / `.otherwise()`
+  for a caller to reach (the combinator owns termination). One honest caveat:
+  `ExhaustiveMatch` is **structural**, so a hand-rolled `{ exhaustive, run }`
+  object can satisfy it and bypass exhaustiveness in typed code — accepted, as
+  a deliberate act no worse than the sanctioned `P._` catch-all. This
   is a _type-level_ invariant, guarded in `types.test-d.ts`.
 - **A `Defect` flows through every method untouched EXCEPT `match()`,
   `recoverDefect()`, and the observers `tapDefect()` / `tapFailure()` (which
@@ -136,19 +161,31 @@ was planned).
   destroys it. (A throw in the success-channel `tap`/`map` keeps the plain
   thrown cause.)
 - **Thenable callback returns are rejected at compile time — where a rejection
-  could actually bypass qualification.** Every combinator callback not already
+  could bypass qualification or vanish.** Every combinator callback not already
   constrained to return a `Result` (`map`, `tap`, `let`, `tapDefect`,
-  `tapFailure`) intersects its return with `NotThenable<R>`, so an `async`
-  callback is a compile error. Among the error-matcher combinators, only the
-  **awaiting** ones — `flatMapErr` / `flatTapErr` — reject an async branch, via
+  `tapFailure`, `ensure`'s `onFail`) intersects its return with
+  `NotThenable<R>`, so an `async` callback is a compile error (an async
+  `ensure` predicate already fails its `boolean` return type — a `Promise`
+  would be always-truthy). Among the error-matcher combinators, the
+  **awaiting** ones — `flatMapErr` / `flatTapErr` — reject an async branch via
   their builder-output constraint (an awaited rejection would bypass
-  qualification). The **non-awaiting** `mapErr` / `recoverErr` / `tapErr` run
+  qualification), and so does the observer **`tapErr`** (its branch results are
+  **discarded**, so a rejected `Promise` would float unobserved; same
+  builder-output `NotThenable` constraint). The **non-awaiting** transformers
+  `mapErr` / `recoverErr` run
   the matched branch **synchronously with no await**, so an async branch is
   merely a visible `Promise`-valued result, not a rejection bypass — they do
-  not ban it. `match` handlers are deliberately exempt (edge elimination).
-- **Result instances are frozen.** `okRes`/`errRes`/`defectRes` return
-  `Object.freeze`d objects, so a variant cannot be forged by mutation; the
-  `readonly` types are real at runtime.
+  not ban it. The boundary `qualify` is constrained the same way, with a
+  runtime belt-and-braces: a thenable slipped past the types becomes a
+  `Defect` and its orphaned rejection is silenced (see Thesis #3). `match`
+  handlers are deliberately exempt (edge elimination).
+- **Result instances are frozen — and so is the machinery around them.**
+  `okRes`/`errRes`/`defectRes` return `Object.freeze`d objects, so a variant
+  cannot be forged by mutation; the `readonly` types are real at runtime.
+  `Res.prototype` and `AsyncRes.prototype` are frozen too (the shared
+  combinators can't be swapped out from under every instance), `AsyncRes`'s
+  wrapped promise is a native `#private` field, and the qualify-time `defect`
+  marker is frozen.
 - **`match`'s `err` matcher is type-forced exhaustive, and library code generic
   in `E` uses the guards instead.** For well-typed concrete callers a missing
   branch does not compile; a rogue value slipping past the types throws
@@ -194,10 +231,15 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
 
 - success: `map`, `flatMap`, `tap`, `flatTap` (a failable `tap` — runs a
   `Result`-returning effect, keeps the original value, threads the effect's
-  error), `as`, `discard` (drop the value — the success type collapses to
+  error), `ensure` (validate a success or refine its type — keeps the same `Ok`
+  when the predicate holds, else `Err(onFail(value))`, widening `E` to
+  `E | E2`; a type-guard predicate narrows `T` to `U`), `as`, `discard` (drop
+  the value — the success type collapses to
   `void`; the named form of `map(() => undefined)`, distinct from `as`)
 - do-notation: `Do()` (entry — `Ok({})`, an empty object scope; capitalised
-  because `do` is reserved) plus the methods `bind(name, f)` (sequence a
+  because `do` is reserved) and `DoAsync()` (its pre-lifted async twin —
+  `Do().toAsync()` without the boilerplate, aliased `AsyncResult.Do`) plus the
+  methods `bind(name, f)` (sequence a
   `Result`-returning step, binding its value under `name` in an accumulating
   **readonly** object scope; errors union `E | E2`) and `let(name, f)` (bind a
   pure value). On `AsyncResult`, `bind`'s `f` may return a `Result` or an
@@ -264,8 +306,11 @@ Defect>`); flatMapErr: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on the
   `isOk`/`isErr`/`isDefect` both narrow (to `OkView`/`ErrView`/`DefectView`) — the
   methods are `this is …` type predicates, so `if (r.isErr()) r.error` compiles.
   One narrowing concept, two call styles. Plus the standalone `isResult(x)` —
-  narrows an `unknown` to `Result<unknown, unknown>` (a prototype check, so a
-  plain `{ tag: "Ok" }` look-alike is not matched), for untyped boundaries.
+  narrows an `unknown` to `Result<unknown, unknown>` (an `instanceof` check
+  first, with a `Symbol.for("unthrown.Result")` prototype-brand fallback so a
+  `Result` from another copy of unthrown — dual CJS/ESM, duplicated install,
+  cross-realm — still passes; a plain `{ tag: "Ok" }` look-alike carries
+  neither and is not matched — see internal design), for untyped boundaries.
 - types: `NotThenable<R>` — rejects a `PromiseLike` at the type level, so a
   combinator callback that returns one is a compile error instead of a silently
   unqualified rejection. `FailureView<E, T>` — the exported `ErrView | DefectView`
@@ -320,9 +365,10 @@ match<E>>`, so ts-pattern's non-exported `Match` type is never imported).
   the `Result`-producing ones
   (`Result.Ok`/`Err`/`Do`/`fromNullable`/`fromThrowable`/`fromSafeThrowable`/`all`/`allFromDict`/`is*`);
   `AsyncResult.*` holds the `AsyncResult`-producing ones
-  (`AsyncResult.Ok`/`Err`/`fromPromise`/`fromSafePromise`/`all`/`allFromDict` — the
-  pre-lifted constructors and aggregates drop the `Async` suffix the free functions
-  carry (`OkAsync`→`AsyncResult.Ok`, `allAsync`→`AsyncResult.all`), since the
+  (`AsyncResult.Ok`/`Err`/`Do`/`fromPromise`/`fromSafePromise`/`all`/`allFromDict` —
+  the pre-lifted entry points and aggregates drop the `Async` suffix the free
+  functions carry (`OkAsync`→`AsyncResult.Ok`, `DoAsync`→`AsyncResult.Do`,
+  `allAsync`→`AsyncResult.all`), since the
   namespace already says async). Both are value+type companions (the value and
   the `Result<T,E>` / `AsyncResult<T,E>` type share one name). The free functions
   remain the primary, tree-shakeable API; the companions are opt-in sugar (only
@@ -351,7 +397,8 @@ match<E>>`, so ts-pattern's non-exported `Match` type is never imported).
 - tagged errors: `TaggedError(tag, options?)` (the error-class factory; optional
   `options.name` sets `Error.name` independently of the `_tag` discriminant, so a
   tag can be namespaced for collision-safety without leaking into the display
-  name; the payload reserves `name` **and** `message` via `?: never`, so the
+  name; the payload reserves `name`, `message`, **and** `stack` via `?: never`
+  (`cause` stays allowed — see Thesis #4), so the
   message is set per subclass with `override message = "…"`, never as a payload
   field) and `tag(t)` (the `{ _tag: t }` ts-pattern pattern, for use in the
   error matchers, in `match`'s `err` handler, and in `match(result)`); see the
@@ -361,8 +408,11 @@ match<E>>`, so ts-pattern's non-exported `Match` type is never imported).
   any discriminant.
 
 Deliberately **excluded** for now: **generator** do-notation (`gen`/`yield*`
-"safeTry" style — the fluent `Do`/`bind`/`let` above covers sequential code
-without the generator machinery), accumulation/`Validation`, and aliases
+"safeTry" style — the fluent `Do`/`bind`/`let`/`DoAsync` above covers sequential
+code without the generator machinery), accumulation/`Validation`,
+**serialization** (a `Result` does not survive `structuredClone`/JSON by design
+— fold with `match` at the boundary and re-enter through a constructor/boundary
+on the other side), and aliases
 (`andThen`, etc. — one name per concept). Keep the surface small enough that the
 library can be "done".
 
@@ -419,6 +469,16 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   type-checks on the `Ok` variant. `AsyncRes` operates purely on the public
   `Result` union (wraps a `Promise<Result>`, branches on `r.tag`), never on `Res`
   internals.
+- **`isResult` is `instanceof` first, `Symbol.for` prototype-brand fallback
+  second.** The core's own dual CJS/ESM build (or a duplicated install, or
+  another realm) can put two copies of `Res` in one process; since the
+  aggregates and `Result`-consuming combinators harden non-`Result`s into
+  Defects, an `instanceof`-only guard would turn the _other copy's_ genuine
+  `Result` into a `Defect`. So `Res.prototype` carries a non-enumerable
+  `Symbol.for("unthrown.Result")` brand (defined before the prototype is
+  frozen) and `isResult` falls back to reading it off the prototype chain.
+  Accidental forgery stays excluded — a structural look-alike has no brand;
+  producing one requires deliberately minting the shared symbol.
 - **Builders are free functions** (`Ok`, `Err`, …) because they tree-shake — and
   every shipped package sets `"sideEffects": false` so bundlers can prune between
   modules (the sole exception is `@unthrown/vitest`, whose top-level
@@ -455,13 +515,25 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   `Result` via `fromSchema` / `fromSchemaAsync`, with the validation issues as
   the modeled `E`)
 - `packages/oxlint` → `@unthrown/oxlint` (an oxlint **JS plugin**, peerDep
-  `oxlint`, dep `@oxlint/plugins`; ships `no-ambiguous-error-type` — enforces
-  Thesis #1 against `unknown`/`any`/`Error`/`{}` **and the primitive keywords**
-  in `E` — and `prefer-async-result` (reports `Promise<Result<T, E>>` in favour
-  of `AsyncResult<T, E>`, but withholds the autofix on an `async` function's
-  return annotation, since that must stay a native `Promise`). Purely syntactic
-  AST rules that resolve the import source via scope analysis so they only fire
-  on unthrown's `Result`. No TypeDoc API page; documented in the Linting guide.
+  `oxlint`, dep `@oxlint/plugins`; ships **four rules**: `no-ambiguous-error-type`
+  — enforces Thesis #1 against `unknown`/`any`/`Error`/`{}` **and the primitive
+  keywords** (`void` included) in `E`; `prefer-async-result` (reports
+  `Promise<Result<T, E>>` in favour of `AsyncResult<T, E>`, but withholds the
+  autofix on an `async` function's return annotation **and in function-type
+  return positions** — either must stay a native `Promise` at the
+  implementation, so the fix would not compile); `no-unhandled-result` (in the
+  recommended preset — flags a bare `ExpressionStatement` dropping a `Result`:
+  a call to an unthrown-imported producer or facade-companion member, or to a
+  locally-declared function whose return annotation is unthrown's
+  `Result`/`AsyncResult`, awaited or not; deliberately syntactic — a dropped
+  method _chain_ like `r.map(f);` is type-dependent and out of scope); and
+  `no-throw` (**opt-in**, not in the preset — reports every `throw` statement,
+  pointing at `Err`/`getOrThrow`/`fromSafeThrowable`; this is the `no-throw`
+  rule the `getOrThrow` rationale references). Purely syntactic AST rules that
+  resolve bindings via scope analysis keyed by the **imported** name (renamed
+  and namespace imports resolve; alias indirection like `type E = unknown` is a
+  documented limit) so they only fire on unthrown's `Result`. No TypeDoc API
+  page; documented in the Linting guide.
   Tested with oxlint's `RuleTester` from `oxlint/plugins-dev`.)
 - `packages/prisma` → `@unthrown/prisma` (peerDep `@prisma/client` ^7; a Prisma
   Client **extension** — `$extends(unthrownPrisma)` adds `try*` variants of
@@ -576,8 +648,11 @@ channel?**
    via `expect.extend`
    and augmenting Vitest's `Matchers` interface. They detect a thenable
    `AsyncResult` and await internally, so a test reads
-   `await expect(asyncResult).toBeOk()` (the required `await` is documented loudly
-   — a forgotten one passes silently).
+   `await expect(asyncResult).toBeOk()`. A forgotten `await` is **loud**: the
+   matchers track in-flight assertions and a module-registered `afterEach`
+   (`failOnForgottenAwait`) fails the test at its end, naming the pending
+   matchers — the abandoned assertion is reported exactly once, correctly
+   attributed, and can never late-fire as an unhandled rejection.
 4. ✅ **ts-pattern integration** — Done. `ts-pattern` is a core dependency: it
    powers the exhaustive error matchers (Thesis #5) and is re-exported as
    `match`/`P`, plus `tag(t)` (the `{ _tag: t }` pattern). Because `Result` is a

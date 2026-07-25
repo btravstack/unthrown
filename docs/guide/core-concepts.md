@@ -23,7 +23,8 @@ reachable once you've narrowed to a variant.
 
 Every `Result` shares one method surface, grouped by the channel it touches:
 
-- **success** (runs on `Ok`): `map`, `flatMap`, `tap`, `flatTap`, `as`, `discard`
+- **success** (runs on `Ok`): `map`, `flatMap`, `ensure`, `tap`, `flatTap`, `as`,
+  `discard`
 - **do-notation** (runs on `Ok`): `bind`, `let` — accumulate a named scope; see
   [Do Notation](./do-notation)
 - **error** (runs on `Err`): `mapErr`, `flatMapErr`, `recoverErr`, `tapErr`,
@@ -32,8 +33,11 @@ Every `Result` shares one method surface, grouped by the channel it touches:
   every consuming site (see
   [Choosing a combinator](./choosing-a-combinator#triaging-the-error-channel))
 - **defect** (the only door to a `Defect`): `recoverDefect`, `tapDefect`
+- **failure** (runs on `Err` **or** `Defect`): `tapFailure` — observe either
+  failing channel without consuming it
 - **eliminate**: `match`, `get`, `getErr`, `getOr`, `getOrElse`,
-  `getOrNull`, `getOrUndefined`
+  `getOrNull`, `getOrUndefined`, `getOrThrow` (gated as `get`'s complement — it
+  compiles only while the error channel is non-empty)
 
 A combinator only runs its callback on its own channel — the other states flow
 through untouched:

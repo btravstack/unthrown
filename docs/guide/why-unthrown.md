@@ -28,7 +28,7 @@ function getUser(id: string): Result<User, NotFound | Timeout>;
 
 getUser(id)
   .map((u) => u.emial.trim()) // typo — TypeError → Defect, NOT an Err
-  .match({ ok: render, err: showMessage, defect: report500 });
+  .match({ ok: render, err: (matcher) => matcher.with(P._, showMessage), defect: report500 });
 ```
 
 ## The gap: unexpected failures
@@ -51,8 +51,9 @@ disagreed.
 `unthrown` keeps a **third runtime state** — a `Defect` — that is **invisible to
 the type**. `Result<T, E>` exposes only your anticipated errors in `E`. Anything
 unexpected becomes a defect that short-circuits to the edge, where you log it and
-return a 500. A defect can only be observed by `match` or `recoverDefect`; it is
-never silently recovered by `getOr`, `getOrNull`, or `recoverErr`.
+return a 500. A defect can only be observed by `match`, `recoverDefect`, or the
+`tapDefect` / `tapFailure` observers; it is never silently recovered by `getOr`,
+`getOrNull`, or `recoverErr`.
 
 Two more deliberate choices follow from this:
 

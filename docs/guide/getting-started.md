@@ -58,9 +58,7 @@ can chain without checking at every step:
 parseAge("42")
   .map((n) => n + 1) // => Ok(43)   — map: callback returns a plain value
   .flatMap((n) => (n >= 18 ? Ok(n) : Err("underage"))) // => Ok(43) — flatMap: callback returns a Result
-  .getOrElse((e) => {
-    throw new Error(e); // eliminate the error channel first — get() needs E = never
-  }); // => 43
+  .getOrThrow(); // => 43 — throws the modeled error as-is (get() needs E = never)
 // the error type widens to AgeError | "underage" — flatMap unions the channels
 ```
 
