@@ -480,11 +480,18 @@ export function isResult(x: unknown): x is Result<unknown, unknown> {
   // `Res`, so `instanceof` fails — but its prototype carries the shared
   // `Symbol.for` brand. Reading the brand off the prototype chain keeps the
   // guarantee that a structural look-alike (no unthrown prototype) still fails.
-  return (
-    (typeof x === "object" || typeof x === "function") &&
-    x !== null &&
-    Reflect.get(x, RESULT_BRAND) === true
-  );
+  // Fail-closed: this guard exists for untyped boundaries, so a hostile input
+  // (a Proxy `get` trap or a throwing getter at the brand key) is `false`,
+  // never a throw.
+  try {
+    return (
+      (typeof x === "object" || typeof x === "function") &&
+      x !== null &&
+      Reflect.get(x, RESULT_BRAND) === true
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**

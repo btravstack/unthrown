@@ -150,6 +150,26 @@ describe("isResult narrows an unknown value to a Result", () => {
     // `{ tag: "Ok" }` literal never carries it.
     expect(isResult({ tag: "Ok", value: 1, isOk: () => true })).toBe(false);
   });
+
+  it("fails closed (false, never a throw) on hostile inputs", () => {
+    // A guard for untyped boundaries must not throw. A Proxy whose `get` trap
+    // throws — or a throwing getter at the brand key — is `false`.
+    const hostileProxy = new Proxy(
+      {},
+      {
+        get() {
+          throw new Error("trapped");
+        },
+      },
+    );
+    expect(isResult(hostileProxy)).toBe(false);
+    const throwingGetter = Object.defineProperty({}, Symbol.for("unthrown.Result"), {
+      get() {
+        throw new Error("trapped");
+      },
+    });
+    expect(isResult(throwingGetter)).toBe(false);
+  });
 });
 
 describe("method guards narrow (parity with the standalone guards)", () => {

@@ -57,8 +57,24 @@ function payloadOf(error: object): Record<string, unknown> {
 // survives a test is a forgotten `await`, which `failOnForgottenAwait` (the
 // `afterEach` hook registered below) turns into a loud, correctly-attributed
 // test failure.
-type InFlight = { matcherName: string; abandon: () => void };
+type InFlight = { matcherName: string; testName: string | undefined; abandon: () => void };
 const inFlight = new Map<Promise<Outcome>, InFlight>();
+
+// The slice of vitest's `TestContext` the hook needs: enough of the task tree
+// to rebuild the full test name (`"outer suite > inner suite > test"` — the
+// same shape `MatcherState.currentTestName` carries), without importing
+// vitest's runner types.
+type TaskLike = { name: string; suite?: TaskLike | undefined };
+type HookContext = { task?: TaskLike | undefined };
+
+function fullTestName(task: TaskLike | undefined): string | undefined {
+  if (task === undefined) return undefined;
+  const names: string[] = [];
+  for (let node: TaskLike | undefined = task; node !== undefined; node = node.suite) {
+    names.unshift(node.name);
+  }
+  return names.join(" > ");
+}
 
 // Resolve `received` — awaiting it when it is an AsyncResult — then run `check`.
 // This is what lets one matcher serve both `expect(result)` and
@@ -91,9 +107,16 @@ function settle(
   });
   inFlight.set(gate, {
     matcherName,
+    // Which test created the assertion — lets the afterEach hook claim only
+    // its own test's forgotten awaits under `test.concurrent`.
+    testName: state.currentTestName,
     abandon: () =>
       deliver({
         pass: !state.isNot,
+        // Never read: with `pass` matching the negation, vitest treats the
+        // abandoned assertion as passing and does not call `message` — the
+        // failure is reported by the hook instead.
+        /* v8 ignore next */
         message: () => `assertion abandoned by @unthrown/vitest forgotten-await detection`,
       }),
   });
@@ -114,16 +137,19 @@ function settle(
           `expected an unthrown Result, but received a thenable that rejected with ${stringify(cause)} — an unthrown AsyncResult never rejects`,
       };
     })
-    .then(finish, (cause) => {
+    .then(
+      finish,
       // Defensive: `check` itself threw. Without this arm the gate would never
       // resolve and an awaited assertion would hang the test.
       /* v8 ignore start */
-      finish({
-        pass: false,
-        message: () => `the matcher check threw: ${stringify(cause)}`,
-      });
+      (cause) => {
+        finish({
+          pass: false,
+          message: () => `the matcher check threw: ${stringify(cause)}`,
+        });
+      },
       /* v8 ignore stop */
-    });
+    );
   return gate;
 }
 
@@ -138,17 +164,32 @@ function settle(
  * an `afterEach` hook alongside the matchers. It is exported so the mechanism
  * itself is testable.
  */
-export function failOnForgottenAwait(): void {
+export function failOnForgottenAwait(context?: HookContext): void {
   if (inFlight.size === 0) return;
-  const entries = [...inFlight.values()];
-  // Clear first so one failure cannot cascade into the following tests, then
+  // Claim only the ending test's own assertions: under `test.concurrent`
+  // other tests' assertions are legitimately pending in this module-global
+  // map, and abandoning them here would mis-attribute (and mask) their
+  // failures. An entry with no test name — or a call with no context (a
+  // direct invocation) — is claimed unconditionally: in sequential runs
+  // everything pending belongs to the test that just ended.
+  const ending = fullTestName(context?.task);
+  const claimed: [Promise<Outcome>, InFlight][] = [];
+  for (const [gate, entry] of inFlight) {
+    if (ending === undefined || entry.testName === undefined || entry.testName === ending) {
+      claimed.push([gate, entry]);
+    }
+  }
+  if (claimed.length === 0) return;
+  // Remove the claimed entries first so one failure cannot cascade, then
   // resolve the abandoned assertions neutrally: the forgotten await is
   // reported exactly once — here — never as a late unhandled rejection.
-  inFlight.clear();
-  for (const entry of entries) entry.abandon();
-  const names = entries.map((entry) => entry.matcherName).join(", ");
+  for (const [gate, entry] of claimed) {
+    inFlight.delete(gate);
+    entry.abandon();
+  }
+  const names = claimed.map(([, entry]) => entry.matcherName).join(", ");
   throw new Error(
-    `@unthrown/vitest: ${entries.length} async assertion(s) (${names}) were still pending when the test ended — a forgotten \`await\`. For an AsyncResult the matcher is asynchronous: write \`await expect(asyncResult).toBeOk()\`.`,
+    `@unthrown/vitest: ${claimed.length} async assertion(s) (${names}) were still pending when the test ended — a forgotten \`await\`. For an AsyncResult the matcher is asynchronous: write \`await expect(asyncResult).toBeOk()\`.`,
   );
 }
 
@@ -158,7 +199,10 @@ export function failOnForgottenAwait(): void {
 // stray node import) from crashing at load time — `afterEach` exists there but
 // asserts a current suite when called.
 try {
-  afterEach(failOnForgottenAwait);
+  // Registered through a destructuring wrapper: vitest's fixture parser
+  // requires a hook callback's first parameter to be an object destructuring
+  // pattern (a plain identifier is read as a fixture request and rejected).
+  afterEach(({ task }) => failOnForgottenAwait({ task }));
 } catch {
   // Not inside a vitest run — the matchers still work synchronously; only the
   // forgotten-`await` safety net is unavailable.
