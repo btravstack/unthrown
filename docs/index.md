@@ -66,3 +66,15 @@ const status = await profile.match({
 Ordinary errors travel as values through `map` / `flatMap` / `match`. A thrown
 bug becomes a **defect** that short-circuits to the edge — never silently folded
 into your domain errors.
+
+<script setup>
+import { withBase } from "vitepress";
+</script>
+
+<div class="used-by">
+  <p class="used-by__label">Used in production at</p>
+  <a class="used-by__link" href="https://emeriagroup.com/fr/" target="_blank" rel="noopener" aria-label="Emeria">
+    <img :src="withBase('/emeria-light.svg')" alt="Emeria" class="used-by__logo used-by__logo--light" />
+    <img :src="withBase('/emeria-dark.svg')" alt="Emeria" class="used-by__logo used-by__logo--dark" />
+  </a>
+</div>

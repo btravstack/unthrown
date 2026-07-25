@@ -14,6 +14,17 @@
 
 [**Documentation**](https://btravstack.github.io/unthrown/) · [**Get Started**](https://btravstack.github.io/unthrown/guide/getting-started) · [**Why unthrown?**](https://btravstack.github.io/unthrown/guide/why-unthrown)
 
+<br/>
+
+<sub>**USED IN PRODUCTION AT**</sub>
+
+<a href="https://emeriagroup.com/fr/">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/public/emeria-dark.svg" />
+    <img src="docs/public/emeria-light.svg" alt="Emeria" height="26" />
+  </picture>
+</a>
+
 </div>
 
 Ordinary errors are _unthrown_ — returned as values, not flung up the stack.
