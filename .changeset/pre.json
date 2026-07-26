@@ -16,6 +16,7 @@
     "adopt-btravstack-0.2",
     "ensure-and-do-async",
     "exhaustive-error-matcher",
+    "fix-async-flatmap-inference",
     "orpc-sync-throw-defect",
     "oxlint-four-rules",
     "prisma-transaction-defect",
