@@ -146,6 +146,31 @@ declare const ar: AsyncResult<number, "e">;
 // @ts-expect-error - a raw Promise callback return is not assignable
 ar.flatMap((n) => Promise.resolve(Ok(n)));
 
+// REGRESSION GUARD: chaining a callback that returns a value typed as the
+// opaque `AsyncResult<U, E2>` alias (not a freshly-minted Ok/fromPromise) must
+// preserve `U` and `E2` — not collapse them to `unknown`. Inferring through the
+// full `AsyncResult` method surface junks them; inferring through the
+// `Awaitable` then-channel keeps them precise (see the async binds in types.ts).
+declare const aliasedAsync: () => AsyncResult<void, Error>;
+// flatMap: the success type survives (was collapsing to `unknown`)
+const chained = ar.flatMap(() => aliasedAsync());
+type _chained = Expect<Equal<typeof chained, AsyncResult<void, "e" | Error>>>;
+// flatTap: the threaded error survives (value kept as `number`)
+const flatTappedAsyncAlias = ar.flatTap(() => aliasedAsync());
+type _flatTappedAsyncAlias = Expect<
+  Equal<typeof flatTappedAsyncAlias, AsyncResult<number, "e" | Error>>
+>;
+// bind: the callback's error survives on the accumulated error channel
+declare const arScope: AsyncResult<{ a: number }, "e">;
+const boundAsyncAlias = arScope.bind("v", () => aliasedAsync());
+type _boundAsyncErr = Expect<Equal<AsyncErrOf<typeof boundAsyncAlias>, "e" | Error>>;
+type _boundAsyncOk = Expect<
+  Equal<AsyncOkOf<typeof boundAsyncAlias>, { a: number; readonly v: void }>
+>;
+// a sync `Result`-returning callback keeps its channels too (no `unknown` leak)
+const chainedSync = ar.flatMap((n) => Ok(n * 2));
+type _chainedSync = Expect<Equal<typeof chainedSync, AsyncResult<number, "e">>>;
+
 // ErrView's parameter order is <E, T> (error first) — the reverse of OkView /
 // DefectView / Result — because `Result<T, E>` narrows to `ErrView<E, T>`.
 type _errViewErr = Expect<Equal<ErrView<"boom", number>["error"], "boom">>;

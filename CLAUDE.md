@@ -464,7 +464,20 @@ library can be "done".
   re-imposed `this` gate. `AsyncOkOf`/`AsyncErrOf` infer through the `Awaitable` `then`
   channel only (`R extends Awaitable<infer Res>`), NOT `R extends
 AsyncResult<infer T, …>` — structural inference over the whole method surface
-  would pick up junk candidates.
+  would pick up junk candidates. The **plain async binds** (`flatMap` / `flatTap`
+  / `bind`) hit the same hazard from the other direction: destructuring `U`/`E2`
+  through an `AsyncResult<U, E2>` union member in the callback-return position
+  collapsed them to `unknown` when the callback returned a value typed as the
+  opaque `AsyncResult` alias. So their async branch is spelled
+  `Awaitable<Result<U, E2>> & { flatMap: unknown }` — inference runs through the
+  `Awaitable` then-channel (junk-free), and the `{ flatMap: unknown }` marker
+  keeps a bare `Promise<Result>` out (a Promise has no `flatMap`, so a raw
+  rejection still can't bypass qualification). The error channel stays a **plain**
+  `E | E2` — deriving it as `E | ErrOf<R> | AsyncErrOf<R>` re-invaded `E`'s
+  variance (the same `out E` collapse `flatTapErr` avoids), so `flatMap` keeps
+  the plain `E2`. Keeping the `<U, E2>` shape (rather than inferring a whole
+  `R`) also means the precise `AsyncRes` impl signatures conform to the public
+  type unchanged — no loosening needed for these three.
 - "Check before you access" is enforced by the union: `result.value` only
   type-checks on the `Ok` variant. `AsyncRes` operates purely on the public
   `Result` union (wraps a `Promise<Result>`, branches on `r.tag`), never on `Res`
