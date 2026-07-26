@@ -728,7 +728,16 @@ export type AsyncResultMethods<out T, out E> = {
    * `f` may return a `Result` **or** an `AsyncResult` (never a raw `Promise`); a
    * throw becomes a `Defect`.
    */
-  flatMap<U, E2>(f: (value: T) => Result<U, E2> | AsyncResult<U, E2>): AsyncResult<U, E | E2>;
+  flatMap<U, E2>(
+    // The async branch is written `Awaitable<Result<U, E2>> & { flatMap: unknown }`
+    // rather than `AsyncResult<U, E2>` deliberately: inferring `U`/`E2` through
+    // the `Awaitable` then-channel is junk-free, whereas inferring them through
+    // the full `AsyncResult` method surface collapses `U` to `unknown` when the
+    // callback returns a value typed as the opaque `AsyncResult` alias. The
+    // `& { flatMap: unknown }` marker keeps a bare `Promise<Result>` out (a
+    // Promise has no `flatMap`), so a raw rejection still can't bypass triage.
+    f: (value: T) => Result<U, E2> | (Awaitable<Result<U, E2>> & { flatMap: unknown }),
+  ): AsyncResult<U, E | E2>;
   /**
    * Asynchronous {@link ResultMethods.tap | tap}. `f` is synchronous; a throw
    * becomes a `Defect`. An async callback is rejected at compile time
@@ -747,7 +756,9 @@ export type AsyncResultMethods<out T, out E> = {
    * becomes a `Defect`.
    */
   flatTap<E2>(
-    f: (value: T) => Result<unknown, E2> | AsyncResult<unknown, E2>,
+    // See `flatMap` above for why the async branch is `Awaitable<…> & { flatMap }`
+    // rather than `AsyncResult<…>` (junk-free `E2` inference; excludes raw Promises).
+    f: (value: T) => Result<unknown, E2> | (Awaitable<Result<unknown, E2>> & { flatMap: unknown }),
   ): AsyncResult<T, E | E2>;
   /**
    * Asynchronous {@link ResultMethods.bind | bind} (do-notation). `f` may return
@@ -756,7 +767,9 @@ export type AsyncResultMethods<out T, out E> = {
    */
   bind<K extends string, U, E2>(
     name: K,
-    f: (scope: T) => Result<U, E2> | AsyncResult<U, E2>,
+    // See `flatMap` above for why the async branch is `Awaitable<…> & { flatMap }`
+    // rather than `AsyncResult<…>` (junk-free `U`/`E2` inference; excludes raw Promises).
+    f: (scope: T) => Result<U, E2> | (Awaitable<Result<U, E2>> & { flatMap: unknown }),
   ): AsyncResult<Bound<T, K, U>, E | E2>;
   /**
    * Asynchronous {@link ResultMethods.let | let} (do-notation). `f` returns a
