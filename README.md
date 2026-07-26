@@ -94,17 +94,6 @@ defect, so the edge of your program needs a single `match` and no `try`/`catch`.
 | [`@unthrown/standard-schema`](./packages/standard-schema) | `fromSchema` / `fromSchemaAsync`: any Standard Schema validator into a `Result`.                    |
 | [`@unthrown/oxlint`](./packages/oxlint)                   | oxlint plugin: `no-ambiguous-error-type`, `prefer-async-result`, `no-unhandled-result`, `no-throw`. |
 
-## Used by
-
-unthrown runs in production at [**Emeria**](https://emeriagroup.com/fr/).
-
-<a href="https://emeriagroup.com/fr/">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/public/emeria-dark.svg" />
-    <img src="docs/public/emeria-light.svg" alt="Emeria" height="28" />
-  </picture>
-</a>
-
 ## Contributing
 
 This is a pnpm + turbo monorepo. Common tasks:
