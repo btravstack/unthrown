@@ -80,40 +80,4 @@ The extra `fromPromise` is not ceremony — it is the forced triage decision tha
 guarantees the failure becomes a modeled error or a defect, never an untyped
 `unknown`.
 
-## Two inference notes for generic code
-
-These only bite when you write **generic** wrappers over `Result` (a typed
-client, a framework adapter); ordinary application code never hits them. Both
-have a one-line workaround.
-
-**Widening `Err(x)` into a generic error union.** In a function whose declared
-error type is an unresolved union, returning a concrete `Err` doesn't widen:
-
-```ts
-function step<E>(): Result<Data, E | RuntimeError> {
-  // ❌ Result<never, RuntimeError> won't widen to Result<Data, E | RuntimeError>
-  // return Err(new RuntimeError());
-  return Err<E | RuntimeError>(new RuntimeError()); // ✅ annotate the constructor
-}
-```
-
-TypeScript can't prove `Result`'s error covariance when the target is an
-unresolved generic union (the variant views are intersections, whose variance is
-measured structurally). Naming the union on the constructor — `Err<TheUnion>(x)`
-— resolves it.
-
-**`fromPromise` with an inline `.then` chain.** Passing an inline
-`Promise.resolve().then(() => …)` collapses the value type to `unknown`:
-
-```ts
-// ❌ infers AsyncResult<unknown, E>
-// fromPromise(Promise.resolve().then(() => makeThing()), qualify)
-
-const p: Promise<Thing> = Promise.resolve().then(() => makeThing());
-const r = fromPromise(p, qualify); // ✅ AsyncResult<Thing, E>
-```
-
-Binding a typed intermediate (or `fromPromise<Thing, E>(…)`) breaks the
-contextual-typing cycle.
-
 → Continue to [Do Notation](./do-notation).
