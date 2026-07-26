@@ -476,8 +476,9 @@ library can be "done".
      (fragile); duplicating the surface into each view is unmaintainable. The
      v4-clean equivalent worked only because there was no matcher then.
      **Workaround:** annotate the constructor — `Err<TheUnion>(x)`.
-  2. **`fromPromise` T-collapse on an inline `.then` chain.** `fromPromise(
-Promise.resolve().then(() => makeThing()), qualify)` infers `T = unknown`.
+  2. **`fromPromise` T-collapse on an inline `.then` chain.** Passing an inline
+     `Promise.resolve().then(() => makeThing())` to `fromPromise` infers
+     `T = unknown`.
      Root cause: TS contextual-typing circularity — `fromPromise`'s `Promise<T>`
      parameter contextually types the `.then` chain whose callback return _is_
      `T`, so `T` is inferred while it is still being resolved. Not the union
