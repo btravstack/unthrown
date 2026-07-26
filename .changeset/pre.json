@@ -17,6 +17,7 @@
     "ensure-and-do-async",
     "exhaustive-error-matcher",
     "fix-async-flatmap-inference",
+    "fix-variance-and-frompromise-inference",
     "orpc-sync-throw-defect",
     "oxlint-four-rules",
     "prisma-transaction-defect",
