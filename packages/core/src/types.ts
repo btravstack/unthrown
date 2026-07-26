@@ -727,15 +727,17 @@ export type AsyncResultMethods<out T, out E> = {
    * Asynchronous {@link ResultMethods.flatMap | flatMap}. Unlike the sync form,
    * `f` may return a `Result` **or** an `AsyncResult` (never a raw `Promise`); a
    * throw becomes a `Defect`.
+   *
+   * @remarks
+   * The async branch of `f`'s return type is spelled `Awaitable<Result<U, E2>> &
+   * { flatMap: unknown }` rather than `AsyncResult<U, E2>`: this is what you get
+   * by returning an `AsyncResult` (it satisfies both), but inference runs through
+   * the `Awaitable` then-channel so `U`/`E2` stay precise instead of collapsing
+   * to `unknown`, while the `{ flatMap: unknown }` marker still rejects a bare
+   * `Promise` (it has no `flatMap`). Just return a `Result` or an `AsyncResult`.
    */
   flatMap<U, E2>(
-    // The async branch is written `Awaitable<Result<U, E2>> & { flatMap: unknown }`
-    // rather than `AsyncResult<U, E2>` deliberately: inferring `U`/`E2` through
-    // the `Awaitable` then-channel is junk-free, whereas inferring them through
-    // the full `AsyncResult` method surface collapses `U` to `unknown` when the
-    // callback returns a value typed as the opaque `AsyncResult` alias. The
-    // `& { flatMap: unknown }` marker keeps a bare `Promise<Result>` out (a
-    // Promise has no `flatMap`), so a raw rejection still can't bypass triage.
+    // async branch spelled `Awaitable & { flatMap }` for junk-free inference — see @remarks
     f: (value: T) => Result<U, E2> | (Awaitable<Result<U, E2>> & { flatMap: unknown }),
   ): AsyncResult<U, E | E2>;
   /**
