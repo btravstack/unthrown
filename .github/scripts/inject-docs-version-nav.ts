@@ -70,6 +70,16 @@ if (typeof window !== "undefined") {
   document.addEventListener(
     "click",
     (event) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return; // modified or non-left click — keep native new-tab/window behavior
+      }
       const target = event.target instanceof Element ? event.target : null;
       const anchor = target?.closest("a[href]");
       const match = anchor
