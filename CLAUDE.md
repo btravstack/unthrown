@@ -444,13 +444,49 @@ library can be "done".
   the declared `out` fast-path carries it. TS **verifies** the annotations
   (TS2636 if unprovable). Only aliases whose body is directly an object type may
   be annotated — the unions/intersections (`Result`, the views, `AsyncResult`)
-  inherit the fast path through them. **`ErrMatcher<E>` (ts-pattern's `Match`,
+  inherit the fast path through them for _concrete_ arguments, but **not** when
+  the target type argument is an unresolved generic union (see the known
+  limitation below — an intersection view's variance is then measured
+  structurally, where `E` is invariant). **`ErrMatcher<E>` (ts-pattern's `Match`,
   invariant in its input) must stay in a callback parameter position only**: it
   is contravariant there and harmless, but unioning an `M`-derived output with
   the class `E` in a covariant return re-invaded `E`'s variance and collapsed
   inference (`combine<T,E>(rs: AsyncResult<T,E>[])` inferring `unknown`) — which
   is exactly why `flatTapErr` infers a plain `E2` from the builder output and
   returns `E | E2` rather than `E | ErrOf<MatchOut<M>>`.
+- **Known type-system limitations (workarounds, not bugs to chase).** Two v5
+  inference gaps have no clean, safe fix and are handled at the call site with an
+  explicit type argument. Both were dead-ends after a full investigation
+  (documented so they are not re-litigated):
+  1. **Widening `Err(x)` into a _generic_ error union.** In generic code,
+     `return Err(concreteError)` where the function's declared error is an
+     unresolved union (e.g. `E | RuntimeError`, or a conditional like
+     `ContractErrorsOf<T> | …`) fails to compile — `Result<never, X>` won't
+     widen to `Result<T, ‹generic union›>`. Root cause: the `out E` fast-path is
+     honored on `ResultMethods` **directly**, but the variant **views**
+     (`OkView = ResultMethods<T,E> & { tag; value }`) are **intersections**, and
+     TS measures an intersection's variance _structurally_, ignoring the declared
+     `out E`. Structurally `E` is **invariant** (ts-pattern's `Match<E>` is
+     invariant; `FailureView<E,T>` and the `this`-gated `getErr` are
+     contravariant), so the views don't inherit the covariance. Every fix hits a
+     wall: intersections can't take an `out` annotation (TS2637); flattening the
+     views into annotated mapped types recurses infinitely (TS2589) through the
+     self-referential surface (`toAsync`/`flatMapErr`/`FailureView`); making
+     `ResultMethods` structurally covariant means defeating `Match`'s invariance
+     (fragile); duplicating the surface into each view is unmaintainable. The
+     v4-clean equivalent worked only because there was no matcher then.
+     **Workaround:** annotate the constructor — `Err<TheUnion>(x)`.
+  2. **`fromPromise` T-collapse on an inline `.then` chain.** Passing an inline
+     `Promise.resolve().then(() => makeThing())` to `fromPromise` infers
+     `T = unknown`.
+     Root cause: TS contextual-typing circularity — `fromPromise`'s `Promise<T>`
+     parameter contextually types the `.then` chain whose callback return _is_
+     `T`, so `T` is inferred while it is still being resolved. Not the union
+     parameter (per-shape overloads don't help), and not fixable from the
+     signature. **Workaround:** bind a typed intermediate
+     (`const p: Promise<Thing> = …then(…); fromPromise(p, qualify)`), pass an
+     explicit `fromPromise<Thing, E>(…)`, or don't annotate the `.then` chain
+     inline.
 - **Error-matcher runtime.** All five error methods dispatch through one
   `runMatch` helper: `f(match(error), defect).run()` — build `match(error)`,
   hand it (plus `defect`) to the callback, and `.run()` the returned builder
