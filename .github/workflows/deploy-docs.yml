@@ -60,13 +60,18 @@ jobs:
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
             echo "beta_version=$beta_version" >> "$GITHUB_OUTPUT"
             STABLE_VERSION="$stable_version" BETA_VERSION="$beta_version" node -e "
+              // target: '_self' — cross-version links are same-site; without it
+              // VitePress treats the absolute URLs as external and opens a new tab
+              // (the client-side enhancement also preserves the current page).
               const stable = {
                 text: 'v' + process.env.STABLE_VERSION + ' (stable)',
                 link: 'https://btravstack.github.io/unthrown/',
+                target: '_self',
               };
               const beta = {
                 text: 'v' + process.env.BETA_VERSION + ' (beta)',
                 link: 'https://btravstack.github.io/unthrown/beta/',
+                target: '_self',
               };
               const out = [
                 'versions_stable=' + JSON.stringify({ current: 'v' + process.env.STABLE_VERSION, items: [stable, beta] }),
@@ -105,7 +110,7 @@ jobs:
           # version dropdown injected; a no-op once the stable tag carries it natively.
           # (Runs with the main checkout's docs toolchain — tsx lives there.)
           pnpm --filter ./docs exec tsx "$GITHUB_WORKSPACE/.github/scripts/inject-docs-version-nav.ts" \
-            /tmp/stable-docs/docs/.vitepress/config.ts
+            /tmp/stable-docs/docs/.vitepress
           cd /tmp/stable-docs
           pnpm install --frozen-lockfile
           pnpm --filter ./docs exec turbo build
