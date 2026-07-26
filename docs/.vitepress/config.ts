@@ -3,11 +3,35 @@ import { defineConfig } from "vitepress";
 const SITE_DESCRIPTION =
   "Explicit errors as values for TypeScript, with a separate defect channel for the unexpected and qualification enforced at every boundary.";
 
+// Versioned deploys (deploy-docs.yml): while a prerelease is in progress the
+// workflow builds main's docs a second time as the "beta" site, overriding the
+// base to /unthrown/beta/ via DOCS_BASE; the stable site (built from the latest
+// stable tag) stays at the root. Absent env — local dev, plain builds — keeps
+// today's root base.
+const BASE = process.env.DOCS_BASE ?? "/unthrown/";
+const SITE_URL = `https://btravstack.github.io${BASE}`;
+
+// DOCS_VERSIONS — the marker the deploy workflow probes for to detect native
+// version-picker support (legacy tags without it get the dropdown injected at
+// build time instead). JSON: { current: string, items: { text, link }[] } —
+// rendered as a dropdown at the end of the nav, linking every deployed version
+// with absolute URLs (cross-version links must not inherit this build's base).
+// Absent env → no dropdown (single-version site, local dev).
+const DOCS_VERSIONS = process.env.DOCS_VERSIONS
+  ? (JSON.parse(process.env.DOCS_VERSIONS) as {
+      current: string;
+      items: { text: string; link: string }[];
+    })
+  : undefined;
+const VERSION_NAV = DOCS_VERSIONS
+  ? [{ text: DOCS_VERSIONS.current, items: DOCS_VERSIONS.items }]
+  : [];
+
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
   title: "unthrown",
   description: SITE_DESCRIPTION,
-  base: "/unthrown/",
+  base: BASE,
   lang: "en-US",
   cleanUrls: true,
 
@@ -16,7 +40,7 @@ export default defineConfig({
   ignoreDeadLinks: [/^\/api\//, /^\.\/index$/, /^\.\/[a-z-]+$/, /^\.\.\//],
 
   sitemap: {
-    hostname: "https://btravstack.github.io/unthrown/",
+    hostname: SITE_URL,
   },
 
   // Per-page canonical URL + Open Graph / Twitter title & description, so every
@@ -29,7 +53,7 @@ export default defineConfig({
     const normalizedPath = pageData.relativePath.replace(/^\/+/, "");
     // cleanUrls is true, so the public URL has no `.html` extension: strip
     // `index.md` to the directory and any other `.md` to the bare route.
-    const canonicalUrl = `https://btravstack.github.io/unthrown/${normalizedPath}`
+    const canonicalUrl = `${SITE_URL}${normalizedPath}`
       .replace(/index\.md$/, "")
       .replace(/\.md$/, "");
 
@@ -70,6 +94,8 @@ export default defineConfig({
       },
       // Back to the btravstack hub (links the docs up to the landing page).
       { text: "btravstack", link: "https://btravstack.github.io/" },
+      // Version dropdown (stable / beta), present only on versioned deploys.
+      ...VERSION_NAV,
     ],
 
     sidebar: {
