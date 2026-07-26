@@ -136,6 +136,12 @@ const asyncQualify = async (c: unknown) => c;
 fromPromise(Promise.resolve(1), asyncQualify);
 // @ts-expect-error - an async qualify is banned on fromThrowable
 fromThrowable(() => 1, asyncQualify);
+// …and so is a SOMETIMES-thenable one (a union return with a thenable arm) —
+// the guard extracts the thenable arms, so a conditional `Promise` can't slip
+// an unqualified rejection path past the ban either
+const sometimesAsyncQualify = (c: unknown) => (c ? Promise.resolve("late") : ("e" as const));
+// @ts-expect-error - a union return with a thenable arm is banned on fromPromise
+fromPromise(Promise.resolve(1), sometimesAsyncQualify);
 
 // REGRESSION GUARD: an inline `.then` chain as the promise argument keeps its
 // value type (it collapsed to `unknown` while the ban lived on qualify's

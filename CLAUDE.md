@@ -626,7 +626,14 @@ code: "NOT_FOUND" }, …))`); non-inferable →
 - `tools/tsconfig`, `tools/typedoc` → private shared config (`@unthrown/tsconfig`,
   `@unthrown/typedoc`)
 - `docs` → `@unthrown/docs`, the VitePress site (guide + TypeDoc-generated API
-  reference); deployed to GitHub Pages by `deploy-docs.yml`
+  reference); deployed to GitHub Pages by `deploy-docs.yml` — **versioned**:
+  while a prerelease is in progress (`.changeset/pre.json` on main) the site is
+  built twice, the latest stable tag's docs at the root (the default) and main's
+  under `/beta/`, linked by a nav version dropdown (`DOCS_BASE` /
+  `DOCS_VERSIONS` env in the VitePress config; a legacy tag without native
+  support gets the dropdown injected by
+  `.github/scripts/inject-docs-version-nav.ts`). With no prerelease, main
+  deploys alone to the root as before
 
 Core depends on `ts-pattern` (it powers the error matchers). Never pull
 `vitest` or any interop peer (`effect`, `neverthrow`, `@bloodyowl/boxed`,

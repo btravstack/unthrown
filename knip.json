@@ -1,7 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreExportsUsedInFile": true,
-  "ignore": ["**/*.test-d.ts"],
+  "ignore": ["**/*.test-d.ts", ".github/scripts/**"],
   "workspaces": {
     "packages/*": {
       "project": ["src/**/*.ts"]
