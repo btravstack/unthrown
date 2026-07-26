@@ -632,7 +632,7 @@ code: "NOT_FOUND" }, …))`); non-inferable →
   under `/beta/`, linked by a nav version dropdown (`DOCS_BASE` /
   `DOCS_VERSIONS` env in the VitePress config; a legacy tag without native
   support gets the dropdown injected by
-  `.github/scripts/inject-docs-version-nav.mjs`). With no prerelease, main
+  `.github/scripts/inject-docs-version-nav.ts`). With no prerelease, main
   deploys alone to the root as before
 
 Core depends on `ts-pattern` (it powers the error matchers). Never pull
