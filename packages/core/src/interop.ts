@@ -202,11 +202,16 @@ export function fromPromise<T, R>(
   // With the conditional here instead, an async qualify demands an impossible
   // third argument (compile error carrying the message) while `T`/`R` infer
   // normally. Nothing is ever passed at runtime.
-  ..._guard: [R] extends [never]
-    ? [] // a qualify that always throws returns `never` — legal (the throw is a Defect)
-    : [R] extends [PromiseLike<unknown>]
-      ? ["unthrown: qualify must be synchronous — its Promise would land in E un-triaged"]
-      : []
+  //
+  // `Extract` (not `[R] extends [PromiseLike<…>]`) so the ban also fires when
+  // only SOME arms of a union return are thenable (`E | Promise<X>` — a
+  // sometimes-async qualify is still an unqualified rejection path), and it
+  // vacuously admits the always-throwing qualify (`R = never` extracts to
+  // `never`) with no special case. The runtime thenable→Defect net in
+  // `qualifyToResult` stays as the last resort for untyped callers.
+  ..._guard: [Extract<R, PromiseLike<unknown>>] extends [never]
+    ? []
+    : ["unthrown: qualify must be synchronous — its Promise would land in E un-triaged"]
 ): AsyncResult<T, Exclude<R, Defect>> {
   type E = Exclude<R, Defect>;
   const triage = qualify as (cause: unknown, defect: (cause: unknown) => Defect) => E | Defect;

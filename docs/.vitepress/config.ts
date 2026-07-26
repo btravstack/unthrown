@@ -8,7 +8,10 @@ const SITE_DESCRIPTION =
 // base to /unthrown/beta/ via DOCS_BASE; the stable site (built from the latest
 // stable tag) stays at the root. Absent env — local dev, plain builds — keeps
 // today's root base.
-const BASE = process.env.DOCS_BASE ?? "/unthrown/";
+// Normalized to a guaranteed leading + trailing slash — a DOCS_BASE typed
+// without one in CI must not corrupt asset routing or canonical URLs.
+const RAW_BASE = process.env.DOCS_BASE ?? "/unthrown/";
+const BASE = `/${RAW_BASE.replace(/^\/+|\/+$/g, "")}/`;
 const SITE_URL = `https://btravstack.github.io${BASE}`;
 
 // DOCS_VERSIONS — the marker the deploy workflow probes for to detect native
