@@ -565,10 +565,11 @@ export type ResultMethods<out T, out E> = {
  *
  * @category Types
  */
-export type OkView<T, E = never> = ResultMethods<T, E> & {
+// oxlint-disable-next-line typescript/consistent-type-definitions -- deliberately an interface, not a `type` intersection: interfaces are the only construct that can carry a VERIFIED `out T, out E` variance annotation, which the intersection form silently loses (TS measures intersection variance structurally, where the matcher makes `E` invariant — a concrete `Err` then fails to widen into a generic error union)
+export interface OkView<out T, out E = never> extends ResultMethods<T, E> {
   readonly tag: "Ok";
   readonly value: T;
-};
+}
 /**
  * The `Err` variant of a {@link Result}: a modeled failure carrying an `error`.
  * This is what a successful `isErr` guard narrows to, exposing `.error`. It also
@@ -589,10 +590,11 @@ export type OkView<T, E = never> = ResultMethods<T, E> & {
  *
  * @category Types
  */
-export type ErrView<E, T = never> = ResultMethods<T, E> & {
+// oxlint-disable-next-line typescript/consistent-type-definitions -- see OkView: the variance annotations require an interface
+export interface ErrView<out E, out T = never> extends ResultMethods<T, E> {
   readonly tag: "Err";
   readonly error: E;
-};
+}
 /**
  * The `Defect` variant of a {@link Result}: an unmodeled failure carrying a
  * `cause`. This is what a successful `isDefect` guard narrows to, exposing
@@ -605,10 +607,11 @@ export type ErrView<E, T = never> = ResultMethods<T, E> & {
  *
  * @category Types
  */
-export type DefectView<T = never, E = never> = ResultMethods<T, E> & {
+// oxlint-disable-next-line typescript/consistent-type-definitions -- see OkView: the variance annotations require an interface
+export interface DefectView<out T = never, out E = never> extends ResultMethods<T, E> {
   readonly tag: "Defect";
   readonly cause: unknown;
-};
+}
 
 /**
  * A failure variant of a {@link Result}: an {@link ErrView} **or** a
@@ -952,7 +955,9 @@ export type AsyncResultMethods<out T, out E> = {
  * @typeParam T - the success value type.
  * @typeParam E - the modeled error type.
  */
-export type AsyncResult<T, E> = Awaitable<Result<T, E>> & AsyncResultMethods<T, E>;
+// oxlint-disable-next-line typescript/consistent-type-definitions -- see OkView: the variance annotations require an interface
+export interface AsyncResult<out T, out E>
+  extends Awaitable<Result<T, E>>, AsyncResultMethods<T, E> {}
 
 /**
  * Extract the success type `T` from a `Result` type — derive one type from

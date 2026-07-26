@@ -436,57 +436,41 @@ library can be "done".
   the `bind`/`let` scope merge (a computed key widens to an index signature, so it
   can't be spelled at the type level), the builder construction noted above, and
   the error-matcher internals noted below.
-- **`ResultMethods` / `AsyncResultMethods` / `Awaitable` carry `out` variance
-  annotations, and they must verify.** `Result<T, E>`'s covariance in both
-  params is what lets generic engine and user code widen (`Result<U, E2>` →
-  `Result<U, E | E2>`); with the matcher signatures, TypeScript can no longer
-  _measure_ that covariance structurally across unresolved type parameters, so
-  the declared `out` fast-path carries it. TS **verifies** the annotations
-  (TS2636 if unprovable). Only aliases whose body is directly an object type may
-  be annotated — the unions/intersections (`Result`, the views, `AsyncResult`)
-  inherit the fast path through them for _concrete_ arguments, but **not** when
-  the target type argument is an unresolved generic union (see the known
-  limitation below — an intersection view's variance is then measured
-  structurally, where `E` is invariant). **`ErrMatcher<E>` (ts-pattern's `Match`,
+- **Declared variance is load-bearing at every layer: `ResultMethods` /
+  `AsyncResultMethods` / `Awaitable` carry `out` annotations, and the variant
+  views (`OkView`/`ErrView`/`DefectView`) plus `AsyncResult` are
+  `interface … extends` — NOT intersection aliases — precisely so they can carry
+  verified `out T, out E` annotations of their own** (the one sanctioned use of
+  `interface` in core, each with a targeted oxlint-disable). An intersection
+  can't be annotated (TS2637) and gets its variance measured _structurally_ —
+  where the matcher signatures make `E` invariant — so the intersection form
+  silently loses the covariance for unresolved-generic targets: a concrete
+  `Err(x)` then fails to widen into a generic error union
+  (`Result<T, G | RuntimeError>`), which is exactly the v5-beta regression this
+  shape fixed. v4 didn't need any of this: its plain `(e: E) => …` callbacks sat
+  in bivariantly-compared method-parameter positions (the same reason
+  neverthrow's class surface widens without annotations); the exhaustive matcher
+  is what made declared variance mandatory. TS **verifies** every annotation
+  (TS2636 if unprovable); `Result` (a union of the annotated views) inherits the
+  fast path. **`ErrMatcher<E>` (ts-pattern's `Match`,
   invariant in its input) must stay in a callback parameter position only**: it
   is contravariant there and harmless, but unioning an `M`-derived output with
   the class `E` in a covariant return re-invaded `E`'s variance and collapsed
   inference (`combine<T,E>(rs: AsyncResult<T,E>[])` inferring `unknown`) — which
   is exactly why `flatTapErr` infers a plain `E2` from the builder output and
   returns `E | E2` rather than `E | ErrOf<MatchOut<M>>`.
-- **Known type-system limitations (workarounds, not bugs to chase).** Two v5
-  inference gaps have no clean, safe fix and are handled at the call site with an
-  explicit type argument. Both were dead-ends after a full investigation
-  (documented so they are not re-litigated):
-  1. **Widening `Err(x)` into a _generic_ error union.** In generic code,
-     `return Err(concreteError)` where the function's declared error is an
-     unresolved union (e.g. `E | RuntimeError`, or a conditional like
-     `ContractErrorsOf<T> | …`) fails to compile — `Result<never, X>` won't
-     widen to `Result<T, ‹generic union›>`. Root cause: the `out E` fast-path is
-     honored on `ResultMethods` **directly**, but the variant **views**
-     (`OkView = ResultMethods<T,E> & { tag; value }`) are **intersections**, and
-     TS measures an intersection's variance _structurally_, ignoring the declared
-     `out E`. Structurally `E` is **invariant** (ts-pattern's `Match<E>` is
-     invariant; `FailureView<E,T>` and the `this`-gated `getErr` are
-     contravariant), so the views don't inherit the covariance. Every fix hits a
-     wall: intersections can't take an `out` annotation (TS2637); flattening the
-     views into annotated mapped types recurses infinitely (TS2589) through the
-     self-referential surface (`toAsync`/`flatMapErr`/`FailureView`); making
-     `ResultMethods` structurally covariant means defeating `Match`'s invariance
-     (fragile); duplicating the surface into each view is unmaintainable. The
-     v4-clean equivalent worked only because there was no matcher then.
-     **Workaround:** annotate the constructor — `Err<TheUnion>(x)`.
-  2. **`fromPromise` T-collapse on an inline `.then` chain.** Passing an inline
-     `Promise.resolve().then(() => makeThing())` to `fromPromise` infers
-     `T = unknown`.
-     Root cause: TS contextual-typing circularity — `fromPromise`'s `Promise<T>`
-     parameter contextually types the `.then` chain whose callback return _is_
-     `T`, so `T` is inferred while it is still being resolved. Not the union
-     parameter (per-shape overloads don't help), and not fixable from the
-     signature. **Workaround:** bind a typed intermediate
-     (`const p: Promise<Thing> = …then(…); fromPromise(p, qualify)`), pass an
-     explicit `fromPromise<Thing, E>(…)`, or don't annotate the `.then` chain
-     inline.
+- **Inference-bearing parameters stay free of conditional types.** The
+  async-qualify ban on `fromPromise` is a **phantom rest-tuple guard** (an async
+  qualify demands an impossible extra argument carrying the message; a
+  `[R] extends [never]` carve-out keeps an always-throwing qualify legal) — NOT
+  `R & NotThenable<R>` on the qualify's return: that conditional made TS defer
+  qualify's inference and collapse `T` to `unknown` when the promise argument
+  was an inline `.then(…)` chain (a v5-beta regression; v4's identical
+  union-parameter signature was fine without the conditional). `fromThrowable`
+  keeps `NotThenable` on its qualify — its `T` infers directly from `fn`, so
+  nothing is disturbed. General rule: a conditional-type constraint may sit on a
+  parameter only if no _other_ parameter's inference can be deflected by it;
+  otherwise encode it as a trailing phantom guard.
 - **Error-matcher runtime.** All five error methods dispatch through one
   `runMatch` helper: `f(match(error), defect).run()` — build `match(error)`,
   hand it (plus `defect`) to the callback, and `.run()` the returned builder

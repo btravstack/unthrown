@@ -190,7 +190,18 @@ export function fromSafeThrowable<A extends unknown[], T>(
  */
 export function fromPromise<T, R>(
   promise: Promise<T> | (() => Promise<T>),
-  qualify: (cause: unknown, defect: (cause: unknown) => Defect) => R & NotThenable<R>,
+  qualify: (cause: unknown, defect: (cause: unknown) => Defect) => R,
+  // Phantom rest-tuple guard — the async-qualify ban, encoded OFF the callback's
+  // return type: `R & NotThenable<R>` there made TS defer qualify's inference,
+  // which collapsed `T` to `unknown` for an inline `.then(…)` chain argument.
+  // With the conditional here instead, an async qualify demands an impossible
+  // third argument (compile error carrying the message) while `T`/`R` infer
+  // normally. Nothing is ever passed at runtime.
+  ..._guard: [R] extends [never]
+    ? [] // a qualify that always throws returns `never` — legal (the throw is a Defect)
+    : [R] extends [PromiseLike<unknown>]
+      ? ["unthrown: qualify must be synchronous — its Promise would land in E un-triaged"]
+      : []
 ): AsyncResult<T, Exclude<R, Defect>> {
   type E = Exclude<R, Defect>;
   const triage = qualify as (cause: unknown, defect: (cause: unknown) => Defect) => E | Defect;

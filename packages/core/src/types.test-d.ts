@@ -126,12 +126,48 @@ type _safeThrowable = Expect<
 fromPromise(Promise.resolve(1));
 
 // qualify is synchronous — an async qualify would put a Promise in E (an
-// un-triaged boundary) and let its own rejection float, so NotThenable bans it
+// un-triaged boundary) and let its own rejection float. On `fromPromise` the
+// ban is a phantom rest-tuple guard (an async qualify demands an impossible
+// extra argument), NOT `NotThenable` on the return — that intersection made TS
+// defer qualify's inference and collapse `T` to `unknown` for an inline
+// `.then(…)` chain argument (see the guard below).
 const asyncQualify = async (c: unknown) => c;
 // @ts-expect-error - an async qualify is banned on fromPromise
 fromPromise(Promise.resolve(1), asyncQualify);
 // @ts-expect-error - an async qualify is banned on fromThrowable
 fromThrowable(() => 1, asyncQualify);
+
+// REGRESSION GUARD: an inline `.then` chain as the promise argument keeps its
+// value type (it collapsed to `unknown` while the ban lived on qualify's
+// return type as `R & NotThenable<R>`).
+const inlineThen = fromPromise(
+  Promise.resolve().then(() => ({ a: 1 })),
+  () => "e" as const,
+);
+type _inlineThen = Expect<Equal<typeof inlineThen, AsyncResult<{ a: number }, "e">>>;
+// an always-throwing qualify returns `never` — legal (the throw is a Defect)
+const throwingQualify = fromPromise(Promise.resolve(1), (): never => {
+  throw new Error("boom");
+});
+type _throwingQualify = Expect<Equal<typeof throwingQualify, AsyncResult<number, never>>>;
+
+// REGRESSION GUARD: a concrete `Err` widens into a GENERIC error union — the
+// variant views and `AsyncResult` are interfaces carrying verified
+// `out T, out E` annotations precisely so this covariance survives an
+// unresolved type parameter (as an intersection, their variance was measured
+// structurally, where the matcher makes `E` invariant, and this failed).
+function _widenErr<G>(): Result<number, G | "boom"> {
+  return Err("boom" as const);
+}
+void _widenErr;
+function _widenErrAsync<G>(): AsyncResult<number, G | "boom"> {
+  return ErrAsync("boom" as const);
+}
+void _widenErrAsync;
+function _widenOk<G>(): Result<number, G | "boom"> {
+  return Ok(1);
+}
+void _widenOk;
 
 // --- combinators -------------------------------------------------------------
 
