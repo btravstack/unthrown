@@ -172,6 +172,11 @@ export function fromSafeThrowable<A extends unknown[], T>(
  * @param promise - the promise, or a thunk returning one.
  * @param qualify - triages a rejection `cause` into a modeled `E`, or marks it
  * unmodeled by returning `defect(cause)` (the helper passed as its second arg).
+ * @param _guard - compile-time only; never pass it. The phantom rest-tuple that
+ * enforces "qualify is synchronous": an `async` qualify makes this demand an
+ * impossible extra argument (whose type spells out the error), while a
+ * synchronous one leaves it empty. Encoded here — not on `qualify`'s return
+ * type — so `T`'s inference from `promise` is undisturbed.
  *
  * @category Interop
  *
