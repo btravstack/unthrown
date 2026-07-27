@@ -50,13 +50,13 @@ only the tag-aware utilities require `E extends { _tag: string }`. See
 [Model errors](../how-to/model-errors).
 
 **matcher**
-: The [ts-pattern](https://github.com/gvergnaud/ts-pattern) `match(error)` builder
+: The built-in `match(error)` builder
 handed to every error combinator's callback. You return it un-terminated; the
 combinator runs `.exhaustive()`, so a missing case does not compile. See
 [Exhaustive error matching](../explanation/exhaustive-error-matching).
 
 **`P` / `tag(t)`**
-: `P` is ts-pattern's pattern namespace, re-exported from `unthrown`; `P._` is the
+: `P` is unthrown's pattern namespace (`P._`, `P.instanceOf`, `P.when`, `P.union`, `P.string`, `P.number`); `P._` is the
 catch-all pattern. `tag(t)` is sugar for the `{ _tag: t }` pattern, narrowing to
 a tagged variant and its payload.
 

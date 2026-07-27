@@ -14,9 +14,8 @@
 // The only other casts are the builders' construction (`as OkView`/…) and the
 // `bind`/`let` scope merge (a computed key can't be spelled at the type level).
 
-import { match } from "ts-pattern";
-
 import { type Defect, defect, isDefectMarker } from "./defect.js";
+import { match } from "./matcher.js";
 import type {
   AsyncResult,
   Bound,
@@ -307,7 +306,7 @@ class Res<T, E> {
         // The `errCases` handler returns the un-terminated builder; `.run()`
         // executes `.exhaustive()`. Type-forced exhaustive for well-typed
         // callers; a value slipping past the types (widened cast, JS caller) with
-        // no matching case throws ts-pattern's `NonExhaustiveError` — `match` is
+        // no matching case throws the matcher's `NonExhaustiveError` — `match` is
         // an edge eliminator, so it surfaces rather than being caught into a Defect.
         return cases.errCases(match(this.error) as ErrMatcher<E>).run() as MatchOut<M>;
       case "Defect":

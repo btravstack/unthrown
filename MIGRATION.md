@@ -7,7 +7,7 @@ The full, worked guide lives in the docs:
 The headline breaking surface, so you have it up front:
 
 - **Error combinators renamed** with a `…Cases` suffix (each takes an exhaustive
-  ts-pattern matcher): `mapErr` → `mapErrCases`, `flatMapErr` → `flatMapErrCases`,
+  matcher): `mapErr` → `mapErrCases`, `flatMapErr` → `flatMapErrCases`,
   `recoverErr` → `recoverErrCases`, `tapErr` → `tapErrCases`,
   `flatTapErr` → `flatTapErrCases`.
 - **`match`'s error handler renamed** `err` → `errCases` (it takes the matcher,
@@ -21,8 +21,9 @@ The headline breaking surface, so you have it up front:
 - **Renamed export:** `UnwrapError` → `GetError`.
 - **`getOrThrow()`** is now gated to a non-empty error channel; on a
   `Result<T, never>` use `get()`.
-- **`ts-pattern` is a peer dependency** (`^5`) — install it yourself so you own
-  the single copy.
+- **The matcher is built-in** — nothing to install alongside `unthrown`. (The
+  early v5 betas took `ts-pattern` as a peer; the built-in matcher replaced it,
+  keeping the same `.with(…)` / `tag` / `P` call-site shape.)
 - **`@unthrown/pattern` was absorbed into core** — import `match` / `P` / `tag`
   from `unthrown`.
 - **New:** `ensure`, `DoAsync`, and the `match` / `P` / `tag` re-exports.

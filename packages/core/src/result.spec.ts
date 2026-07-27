@@ -251,7 +251,7 @@ type TagB = { _tag: "B"; b: string };
 const errA = (a: number): Result<never, TagA | TagB> => Err<TagA | TagB>({ _tag: "A", a });
 const errB = (b: string): Result<never, TagA | TagB> => Err<TagA | TagB>({ _tag: "B", b });
 
-describe("Result.mapErrCases (ts-pattern matcher)", () => {
+describe("Result.mapErrCases (matcher)", () => {
   it("dispatches a tagged error to its matching branch", () => {
     const r = errA(7).mapErrCases((matcher) =>
       matcher.with(tag("A"), (e) => `a:${e.a}`).with(tag("B"), (e) => `b:${e.b}`),
@@ -326,7 +326,7 @@ describe("Result.mapErrCases (ts-pattern matcher)", () => {
   });
 });
 
-describe("Result.flatMapErrCases (ts-pattern matcher)", () => {
+describe("Result.flatMapErrCases (matcher)", () => {
   it("recovers an Err into an Ok", () => {
     expect(
       Err("e")
@@ -379,7 +379,7 @@ describe("Result.flatMapErrCases (ts-pattern matcher)", () => {
   });
 });
 
-describe("Result.recoverErrCases (ts-pattern matcher)", () => {
+describe("Result.recoverErrCases (matcher)", () => {
   it("turns an Err into an Ok", () => {
     expect(
       Err("e")
@@ -432,7 +432,7 @@ describe("Result.recoverErrCases (ts-pattern matcher)", () => {
   });
 });
 
-describe("Result.tapErrCases (ts-pattern matcher, exhaustive)", () => {
+describe("Result.tapErrCases (matcher, exhaustive)", () => {
   it("runs the side effect on Err and returns the same error", () => {
     const seen: string[] = [];
     const r = Err("e").tapErrCases((matcher) => matcher.with(P._, (s) => seen.push(s)));
@@ -465,7 +465,7 @@ describe("Result.tapErrCases (ts-pattern matcher, exhaustive)", () => {
   });
 });
 
-describe("Result.flatTapErrCases (ts-pattern matcher, exhaustive)", () => {
+describe("Result.flatTapErrCases (matcher, exhaustive)", () => {
   it("runs the failable effect on Err and keeps the original error on success", () => {
     const seen: string[] = [];
     const r = Err("e").flatTapErrCases((matcher) =>

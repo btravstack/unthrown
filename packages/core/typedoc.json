@@ -24,6 +24,8 @@
     "ResultRecord",
     "AsyncResultRecord",
     "ExhaustiveMatch",
-    "MatchOut"
+    "MatchOut",
+    "NonExhaustive",
+    "MatchedOf"
   ]
 }

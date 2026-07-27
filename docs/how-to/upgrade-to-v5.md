@@ -15,31 +15,35 @@
 | **Removed** (aliases)  | `orElse` / `recover`                                             | `flatMapErrCases` / `recoverErrCases`                                                     |
 | **Removed**            | `matchTags` / the `TagHandlers` type                             | `match({ …, errCases: (m) => m.with(tag("…"), …) })`                                      |
 | **Changed, same name** | `getOrThrow()` on any `Result`                                   | gated to a **non-empty** error channel (use `get()` otherwise)                            |
-| **Packaging**          | `ts-pattern` bundled as a dependency                             | `ts-pattern` is now a **peer** — install it yourself                                      |
+| **Packaging**          | `ts-pattern` bundled as a dependency                             | the matcher is **built-in** — no dependency at all                                        |
 | **Packaging**          | `@unthrown/pattern` (`match` / `P` / `tag`)                      | absorbed into core — import them from `unthrown`                                          |
-| **New**                | —                                                                | `ensure`, `DoAsync`, and `match` / `P` / `tag` re-exports                                 |
+| **New**                | —                                                                | `ensure`, `DoAsync`, and the built-in `match` / `P` / `tag` / `NonExhaustiveError`        |
 
 Everything except the two rows below is a compile error at the old call site, so
 `pnpm typecheck` is your migration to-do list.
 
-## 1. Install `ts-pattern`
+## 1. Nothing to install — the matcher is built-in
 
-`ts-pattern` (`^5`) moved from a bundled dependency to a **peer** so a codebase
-that already uses ts-pattern shares one copy — two copies' declarations don't
-unify, and feeding a `P.union(...)` built by one into an unthrown matcher fails
-deep in a conditional type.
+unthrown's exhaustive matcher is its own module (same `.with(…)` / `tag` / `P`
+call-site shape ts-pattern users know), exported as `match` / `P` / `tag` /
+`NonExhaustiveError`. There is **no dependency to install** alongside
+`unthrown` — and no version of any third-party library can change what
+"exhaustive" means.
 
-```sh
-pnpm add ts-pattern   # if you don't already depend on it
-```
+(History, if you followed the betas: early v5 bundled `ts-pattern`, then
+briefly declared it a peer; the built-in matcher replaced it. If you added
+`ts-pattern` for unthrown's sake, you can remove it — unless your own code
+imports it directly for other matching.)
 
-Your package manager will otherwise warn about a missing peer. If you already use
-ts-pattern, keep your own version — unthrown works with any `^5`.
+One boundary to know: patterns built by the real `ts-pattern` library are
+**not** accepted by unthrown's matchers (and vice versa). Import `P` / `match`
+/ `tag` from `"unthrown"` at unthrown call sites; keep `ts-pattern` for your
+own unrelated matching if you use it.
 
 ## 2. Rename the error-channel combinators
 
 Every Err-channel combinator gained a `…Cases` suffix, because each takes a
-ts-pattern matcher over the error's _cases_, not a plain `(error) => …` callback.
+matcher over the error's _cases_, not a plain `(error) => …` callback.
 The old names no longer exist, so the compiler flags each site:
 
 ```diff

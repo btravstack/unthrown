@@ -58,15 +58,11 @@
     "@btravstack/typedoc": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "ts-pattern": "catalog:",
     "tsdown": "catalog:",
     "typedoc": "catalog:",
     "typedoc-plugin-markdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
-  },
-  "peerDependencies": {
-    "ts-pattern": "^5"
   },
   "engines": {
     "node": ">=20"

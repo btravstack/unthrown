@@ -12,24 +12,22 @@ outcome as a value — with no `try`/`catch` to write. It takes about ten minute
 ::: code-group
 
 ```sh [pnpm]
-pnpm add unthrown ts-pattern
+pnpm add unthrown
 ```
 
 ```sh [npm]
-npm install unthrown ts-pattern
+npm install unthrown
 ```
 
 ```sh [yarn]
-yarn add unthrown ts-pattern
+yarn add unthrown
 ```
 
 :::
 
-`unthrown` is ESM-first, ships dual CJS/ESM builds with full types, and has one
-tiny runtime dependency, `ts-pattern` (`^5`) — a **peer** you install alongside
-it, so you own the single copy that powers the error matchers (and that
-`unthrown` re-exports as `match` / `P`). Use it with TypeScript in `strict`
-mode.
+`unthrown` is ESM-first, ships dual CJS/ESM builds with full types, and has
+**zero runtime dependencies** — the exhaustive error matcher is built-in
+(exported as `match` / `P` / `tag`). Use it with TypeScript in `strict` mode.
 
 ## Step 2 — Return a failure instead of throwing
 
@@ -96,7 +94,7 @@ _unexpected_ (you'll meet it in the next step):
 ```ts
 const message = parseAge("-3").match({
   ok: (age) => `age is ${age}`,
-  // `errCases` receives an exhaustive matcher — one branch per error. ts-pattern
+  // `errCases` receives an exhaustive matcher — one branch per error. It
   // matches plain strings too (no tag required), and a missing case won't compile.
   errCases: (matcher) =>
     matcher.with("negative", () => "must be positive").with("not_a_number", () => "not a number"),

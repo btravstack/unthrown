@@ -126,7 +126,7 @@ describe("TaggedError", () => {
 });
 
 // The per-tag exhaustive fold that `matchTags` used to provide is now `match`
-// with its `errCases` handler driven by the ts-pattern error matcher and `tag(t)`.
+// with its `errCases` handler driven by the error matcher and `tag(t)`.
 describe("match — per-tag error matching", () => {
   const fold = (r: Result<number, ApiError>): string =>
     r.match({

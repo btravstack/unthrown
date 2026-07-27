@@ -37,8 +37,8 @@ defect that short-circuits to the edge, where you log it and return a 500.
 - 🛂 **Qualification at every boundary** — `fromPromise` / `fromThrowable` force
   you to triage each failure into a modeled error or a defect; no path yields
   `unknown` in `E`.
-- 🪶 **Small and done-able** — one tiny runtime dependency (`ts-pattern`, which
-  powers the exhaustive error matchers), ESM-first, dual CJS/ESM, fully typed.
+- 🪶 **Small and done-able** — **zero runtime dependencies** (the exhaustive
+  error matcher is built-in), ESM-first, dual CJS/ESM, fully typed.
 
 See [Why unthrown?](https://btravstack.github.io/unthrown/explanation/why-unthrown) for
 the comparison with `neverthrow`, `boxed`, and `effect`.
@@ -46,13 +46,11 @@ the comparison with `neverthrow`, `boxed`, and `effect`.
 ## Install
 
 ```sh
-pnpm add unthrown ts-pattern
+pnpm add unthrown
 ```
 
-`ts-pattern` (`^5`) is a peer dependency — it powers the exhaustive error
-matchers and is re-exported by `unthrown` as `match` / `P`. Owning the single
-copy yourself means `import { P } from "ts-pattern"` composes with unthrown's
-matchers instead of colliding with a second, nested copy.
+No peer dependencies — the exhaustive error matcher is built-in and exported as
+`match` / `P` / `tag`.
 
 ## Quick Example
 
@@ -73,7 +71,7 @@ const user = fromPromise(fetchUser(id), (cause, defect) =>
 // Handle every channel once, at the edge — no surrounding try/catch.
 const status = await user.match({
   ok: () => 200,
-  // `errCases` receives the exhaustive ts-pattern matcher; `.with(P._, …)` handles every error:
+  // `errCases` receives the exhaustive matcher; `.with(P._, …)` handles every error:
   errCases: (matcher) => matcher.with(P._, () => 404), // your modeled NotFound
   defect: (cause) => {
     logger.error(cause); // everything unexpected
@@ -89,7 +87,7 @@ defect, so the edge of your program needs a single `match` and no `try`/`catch`.
 
 | Package                                                   | Description                                                                                         |
 | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| [`unthrown`](./packages/core)                             | The core `Result` / `AsyncResult`, interop, `TaggedError`, ts-pattern error matching.               |
+| [`unthrown`](./packages/core)                             | The core `Result` / `AsyncResult`, interop, `TaggedError`, built-in exhaustive error matching.      |
 | [`@unthrown/vitest`](./packages/vitest)                   | Vitest matchers: `toBeOk`, `toBeOkWith`, `toBeErr`, `toBeErrWith`, `toBeErrTagged`, `toBeDefect`.   |
 | [`@unthrown/effect`](./packages/effect)                   | Effect interop: `Result ↔ Exit` (bijection), `Either`, `Effect`.                                    |
 | [`@unthrown/neverthrow`](./packages/neverthrow)           | neverthrow interop: `Result ↔ Result`, `AsyncResult ↔ ResultAsync`.                                 |

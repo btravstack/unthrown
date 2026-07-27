@@ -1,7 +1,11 @@
-// ts-pattern powers the error-matching combinators (`mapErrCases`/`flatMapErrCases`/…),
-// and is re-exported so `P` (wildcards, `P.union`, guards) and `match` (for
-// eliminating a `Result` directly) are available from one import.
-export { match, P } from "ts-pattern";
+// The built-in matcher powers the error-matching combinators
+// (`mapErrCases`/`flatMapErrCases`/…): `match` starts a match (over an error or
+// any discriminated value, a `Result` included), `P` carries the pattern
+// helpers (`P._`, `P.instanceOf`, `P.when`, `P.union`, `P.string`, `P.number`),
+// and `NonExhaustiveError` is what a rogue unmatched value throws at the
+// `match` edge.
+export { match, NonExhaustiveError, P } from "./matcher.js";
+export type { Matcher, PatternMatcher, UniversalPattern } from "./matcher.js";
 
 export { Err, ErrAsync, isDefect, isErr, isOk, Ok, OkAsync } from "./constructors.js";
 export { isResult, GetError } from "./core.js";
