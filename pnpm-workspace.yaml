@@ -16,7 +16,7 @@ catalog:
   "@btravstack/theme": 1.7.0
   "@btravstack/tsconfig": 0.2.0
   "@btravstack/typedoc": 0.1.0
-  "@changesets/cli": 2.31.0
+  "@changesets/cli": 2.31.1
   "@commitlint/cli": 21.2.1
   "@orpc/client": 2.0.0-beta.18
   "@orpc/contract": 2.0.0-beta.15
