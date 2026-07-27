@@ -10,7 +10,7 @@
 //   Defect     → rethrow the cause     (oRPC collapses it to INTERNAL_SERVER_ERROR)
 //
 // The handler's `Err` channel is constrained to `ORPCError`: mapping a domain
-// error into one (`mapErrCases((e) => errors.NOT_FOUND({...}))`) is the explicit
+// error into one (`mapErrCases((m) => m.with(P._, () => errors.NOT_FOUND({...})))`) is the explicit
 // triage point at the transport boundary (Thesis #3).
 
 import {

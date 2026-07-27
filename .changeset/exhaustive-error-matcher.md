@@ -13,7 +13,7 @@ calls `.exhaustive()` for you:
 import { P, tag } from "unthrown";
 
 // before
-result.mapErrCases((error) => {
+result.mapErr((error) => {
   if (error._tag === "RecordNotFound") return new NotFoundException(id);
   throw error.cause; // silent fallthrough — a future tag lands here unnoticed
 });

@@ -784,7 +784,7 @@ describe("Result eliminators on Ok / Err", () => {
     expect((Ok(3) as Result<number, "e">).getOrThrow()).toBe(3);
 
     // Err throws the error value itself, BY REFERENCE (faithful to
-    // `.flatMapErrCases((e) => { throw e })`). `toThrow(err)` only matches the message,
+    // `.flatMapErrCases((m) => m.with(P._, (e) => { throw e }))`). `toThrow(err)` only matches the message,
     // so assert identity via try/catch instead.
     const err = new Error("modeled");
     try {
