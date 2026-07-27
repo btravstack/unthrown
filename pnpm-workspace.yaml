@@ -32,7 +32,7 @@ catalog:
   lefthook: 2.1.10
   neverthrow: 8.2.0
   oxfmt: 0.58.0
-  oxlint: 1.73.0
+  oxlint: 1.74.0
   prisma: 7.8.0
   ts-pattern: 5.9.0
   tsdown: 0.22.7
