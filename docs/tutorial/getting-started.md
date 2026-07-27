@@ -12,21 +12,24 @@ outcome as a value — with no `try`/`catch` to write. It takes about ten minute
 ::: code-group
 
 ```sh [pnpm]
-pnpm add unthrown
+pnpm add unthrown ts-pattern
 ```
 
 ```sh [npm]
-npm install unthrown
+npm install unthrown ts-pattern
 ```
 
 ```sh [yarn]
-yarn add unthrown
+yarn add unthrown ts-pattern
 ```
 
 :::
 
 `unthrown` is ESM-first, ships dual CJS/ESM builds with full types, and has one
-tiny runtime dependency (`ts-pattern`). Use it with TypeScript in `strict` mode.
+tiny runtime dependency, `ts-pattern` (`^5`) — a **peer** you install alongside
+it, so you own the single copy that powers the error matchers (and that
+`unthrown` re-exports as `match` / `P`). Use it with TypeScript in `strict`
+mode.
 
 ## Step 2 — Return a failure instead of throwing
 

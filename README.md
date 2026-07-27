@@ -46,8 +46,13 @@ the comparison with `neverthrow`, `boxed`, and `effect`.
 ## Install
 
 ```sh
-pnpm add unthrown
+pnpm add unthrown ts-pattern
 ```
+
+`ts-pattern` (`^5`) is a peer dependency — it powers the exhaustive error
+matchers and is re-exported by `unthrown` as `match` / `P`. Owning the single
+copy yourself means `import { P } from "ts-pattern"` composes with unthrown's
+matchers instead of colliding with a second, nested copy.
 
 ## Quick Example
 

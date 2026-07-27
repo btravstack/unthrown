@@ -536,8 +536,12 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
 
 ## Monorepo layout
 
-- `packages/core` → `unthrown` (one runtime dependency: `ts-pattern`, which
-  powers the exhaustive error matchers and is re-exported as `match`/`P`)
+- `packages/core` → `unthrown` (one runtime peer dependency: `ts-pattern`
+  `^5`, which powers the exhaustive error matchers and is re-exported as
+  `match`/`P`. A **peer**, not a plain dependency, so a consumer that already
+  uses ts-pattern shares one copy — two copies' declarations don't unify, and
+  mixing them is a type error. Kept as a `devDependency` (catalog) for the
+  workspace's own build/test.)
 - `packages/vitest` → `@unthrown/vitest` (peerDep `vitest`)
 - `packages/effect` → `@unthrown/effect` (peerDep `effect`)
 - `packages/neverthrow` → `@unthrown/neverthrow` (peerDep `neverthrow`)
@@ -635,9 +639,9 @@ code: "NOT_FOUND" }, …))`); non-inferable →
   `.github/scripts/inject-docs-version-nav.ts`). With no prerelease, main
   deploys alone to the root as before
 
-Core depends on `ts-pattern` (it powers the error matchers). Never pull
-`vitest` or any interop peer (`effect`, `neverthrow`, `@bloodyowl/boxed`,
-`@orpc/*`) into core.
+Core takes `ts-pattern` as a **peer** dependency (it powers the error matchers).
+Never pull `vitest` or any interop peer (`effect`, `neverthrow`,
+`@bloodyowl/boxed`, `@orpc/*`) into core.
 
 Every satellite package depends on core via `workspace:^` (an exact pin would
 create a dual-copy hazard with the `instanceof`-based `isResult`); for the same
@@ -751,5 +755,9 @@ configured outside the repo).
   that would reopen the blanket-handling hole the matcher closes. Do not
   re-litigate or add bare aliases. Documented user-side in the
   exhaustive-error-matching guide.
-- The core has **one runtime dependency, `ts-pattern`** (it powers the error
-  matchers and is re-exported). Add no others — protect that minimalism.
+- The core has **one runtime dependency, `ts-pattern`**, declared as a
+  **peerDependency** (`^5`) so a consumer already using ts-pattern shares a
+  single copy (two copies' declarations don't unify — a type error five layers
+  deep in a conditional type; the same dual-copy hazard `isResult` guards
+  against at runtime). It powers the error matchers and is re-exported. Add no
+  others — protect that minimalism.
