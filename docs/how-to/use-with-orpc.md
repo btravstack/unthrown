@@ -49,14 +49,16 @@ const find = os
   .errors({ NOT_FOUND: {} })
   .handler(
     handlerResult(({ input, errors }) =>
-      repo.findPlanet(input.id).mapErr((matcher) => matcher.with(P._, () => errors.NOT_FOUND())),
+      repo
+        .findPlanet(input.id)
+        .mapErrCases((matcher) => matcher.with(P._, () => errors.NOT_FOUND())),
     ),
   );
 ```
 
 - `Ok` becomes the procedure's output.
 - `Err` is **returned as a value**; oRPC marks it inferable, so the client sees it
-  fully typed. The error channel is constrained to `ORPCError` — the `mapErr` that
+  fully typed. The error channel is constrained to `ORPCError` — the `mapErrCases` that
   turns a domain error into one (here `errors.NOT_FOUND()`) is the explicit triage
   point at the transport boundary.
 - A `Defect` rethrows its original cause, which oRPC collapses to
@@ -93,7 +95,7 @@ const find = os
   .input(z.object({ id: z.string() }))
   .errors({ NOT_FOUND: {} })
   .result(({ input, errors }) =>
-    repo.findPlanet(input.id).mapErr((matcher) => matcher.with(P._, () => errors.NOT_FOUND())),
+    repo.findPlanet(input.id).mapErrCases((matcher) => matcher.with(P._, () => errors.NOT_FOUND())),
   );
 ```
 
@@ -164,7 +166,7 @@ browser consumes it, all in `Result`:
 ```ts
 import { tag } from "unthrown";
 
-// server — the one mapErr is the whole edge, and it is exhaustive: a new P-code
+// server — the one mapErrCases is the whole edge, and it is exhaustive: a new P-code
 // in the union becomes a compile error here, never a silent 500.
 const createUser = os
   .input(z.object({ email: z.string() }))
@@ -173,7 +175,7 @@ const createUser = os
     handlerResult(({ input, errors }) =>
       db.user
         .tryCreate({ data: input })
-        .mapErr((matcher) =>
+        .mapErrCases((matcher) =>
           matcher
             .with(tag("UniqueConstraintViolation"), () => errors.EMAIL_TAKEN())
             .with(

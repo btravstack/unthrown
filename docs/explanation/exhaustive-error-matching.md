@@ -1,10 +1,10 @@
 # Exhaustive error matching
 
 > **Explanation.** This page explains _why_ the error combinators take a
-> ts-pattern matcher instead of a plain callback, and why they keep their
-> conventional `map*` / `tap*` names anyway. For the mechanics — the rules, the
-> `P._` catch-all, the per-method signatures — see the
-> [combinator reference](../reference/combinators#the-error-channel).
+> ts-pattern matcher instead of a plain callback, and why they carry a `*Cases`
+> suffix (`mapErrCases`, `tapErrCases`, …) rather than a bare `map`/`tap`-style
+> name. For the mechanics — the rules, the `P._` catch-all, the per-method
+> signatures — see the [combinator reference](../reference/combinators#the-error-channel).
 
 Errors-as-values only pays off if the values **can't be silently dropped**. On
 the success channel that is easy — `T` is one type, so a `(value: T) => …`
@@ -14,13 +14,13 @@ is what shapes the entire error surface.
 ## The problem with a blanket error handler
 
 `E` is a **union of possibilities**: `NotFound | Forbidden | RateLimited`. A
-plain callback over that union —
+combinator that handed your callback the error _value_ directly —
 
 ```ts
-result.mapErr((e) => wrap(e)); // e: NotFound | Forbidden | RateLimited
+(e) => wrap(e); // e: NotFound | Forbidden | RateLimited
 ```
 
-— keeps compiling no matter how the union grows. Add a `PaymentDeclined` tag a
+— would keep compiling no matter how the union grows. Add a `PaymentDeclined` tag a
 year later and this call site does not change, does not warn, does not fail. It
 silently absorbs the new case. That is precisely the blanket handler
 errors-as-values is supposed to eliminate: the whole reason to make failures
@@ -28,14 +28,14 @@ values is so the compiler forces you to _account for each one_.
 
 ## The solution: an exhaustive matcher, terminated for you
 
-So the error combinators — `mapErr`, `flatMapErr`, `recoverErr`, `tapErr`,
-`flatTapErr` — do not take a single callback. Their callback receives a
+So the error combinators — `mapErrCases`, `flatMapErrCases`, `recoverErrCases`, `tapErrCases`,
+`flatTapErrCases` — do not take a single callback. Their callback receives a
 [ts-pattern](https://github.com/gvergnaud/ts-pattern) **match builder** over the
 error, and you **return the un-terminated builder**. The combinator calls
 `.exhaustive()` itself:
 
 ```ts
-db.reading.tryFindUniqueOrThrow({ where: { id } }).mapErr(
+db.reading.tryFindUniqueOrThrow({ where: { id } }).mapErrCases(
   (matcher, defect) =>
     matcher
       .with(tag("RecordNotFound"), () => new ReadingNotFoundException(id))
@@ -60,7 +60,7 @@ subtracted from the outgoing `E` just like at a boundary.
 A natural first instinct is that returning the matcher untouched must be a no-op:
 
 ```ts
-result.mapErr((matcher) => matcher); // ⚠️ not an identity
+result.mapErrCases((matcher) => matcher); // ⚠️ not an identity
 ```
 
 It isn't. The combinator terminates the builder with `.exhaustive()`, and a
@@ -75,33 +75,38 @@ net turns into a `Defect`.
 There is deliberately **no** identity on the error channel. Passing the error
 through unchanged is a real decision with a real spelling:
 
-- to _observe_ and pass through, use `tapErr` (an observer);
+- to _observe_ and pass through, use `tapErrCases` (an observer);
 - to _re-emit_ every case unchanged, write the catch-all: `.with(P._, (e) => e)`.
 
 `P._` is the sanctioned "handle everything else" branch — the explicit,
 greppable replacement for the old blanket callback. It makes the match
 exhaustive and it reads, at the call site, as an on-purpose "everything else".
 
-## Why keep the `map*` / `tap*` names?
+## Why the `*Cases` suffix?
 
-The names nominally promise the functional-programming functor contract (the
-callback receives the value), while the callback actually receives the _matcher_.
-That break is deliberate, and it was a weighed, settled decision:
+A bare `mapErr` / `tapErr` would promise the functional-programming functor
+contract — that the callback receives the error _value_. It doesn't: it receives
+a **matcher over the error's cases**. The `*Cases` suffix names that difference
+honestly, so the signature tells you what the callback gets before you write it:
 
-- **The names state the channel and the pipeline effect.** `mapErr` transforms
-  the error channel; `tapErr` observes it. They preserve the operator × channel
-  symmetry with the success surface (`map`/`mapErr`, `tap`/`tapErr`), and they
-  stay greppable for people arriving from neverthrow or fp-ts.
-- **Each matcher branch still hands you the error**, narrowed to its exact case —
-  so the functor intuition holds _inside_ a branch, where there is a single
-  concrete value.
-- **Alternatives were rejected**: plural names (`mapErrs`), explicit `*ErrCases`
-  suffixes, and collapsing to `catchErrs` + observers each cost more than the
-  convention break they avoided.
+- **The success surface keeps `map` / `tap`.** Those callbacks really do hand you
+  the value, so the functor name is true there.
+- **The error surface says `*ErrCases`** — `mapErrCases`, `flatMapErrCases`,
+  `recoverErrCases`, `tapErrCases`, `flatTapErrCases` — because the callback builds
+  a match over the union's cases. Each matcher _branch_ still hands you the error,
+  narrowed to its exact case, so the functor intuition holds _inside_ a branch,
+  where there is a single concrete value.
 
-Plain-callback variants are deliberately **not** offered alongside — adding
-`mapErr((e) => …)` back would reopen exactly the blanket-handling hole the
-matcher closes.
+Naming both surfaces the same (`map` / `mapErr`) was considered and **reversed**
+(2026-07): the symmetry read nicely but lied about the protocol, and a reader
+reaching for `mapErr((e) => …)` — the shape that name implies — hit a type error
+with no hint why. The suffix trades a little visual symmetry for a name that
+matches the behavior. Other options — plural `mapErrs`, `catchErrs` + observers —
+were rejected for saying even less about what the callback receives.
+
+There is deliberately **no** bare `mapErr((e) => …)` variant alongside
+`mapErrCases` — a plain callback over the union is exactly the blanket handler the
+matcher exists to eliminate.
 
 ## The one eliminator that still folds the error: `match`
 

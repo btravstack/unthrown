@@ -49,7 +49,7 @@ This is the rule that keeps qualification honest:
 If `.map(async …)` were allowed, a rejection inside that callback would silently
 become a defect — an un-qualified async boundary, exactly what
 [qualification](./qualification) exists to prevent. So combinator callbacks are
-synchronous. The `Result`-returning binds (`flatMap`, `flatMapErr`,
+synchronous. The `Result`-returning binds (`flatMap`, `flatMapErrCases`,
 `recoverDefect`, `bind`, …) accept a `Result` **or** an `AsyncResult`, but never a
 raw promise — a `Promise` has no `flatMap`, so the types keep it out.
 

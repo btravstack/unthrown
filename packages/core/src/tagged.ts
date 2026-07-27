@@ -66,7 +66,7 @@ export type TaggedErrorConstructor<Tag extends string> = {
  * *narrowing* structured field.
  *
  * `_tag` is the discriminant matched by {@link tag} in the error combinators
- * (`result.mapErr((matcher) => matcher.with(tag("NotFound"), …))`) and in
+ * (`result.mapErrCases((matcher) => matcher.with(tag("NotFound"), …))`) and in
  * `match`; `Error.name` is the human-facing label in stack traces and logs. By
  * default they coincide, but
  * they can be **decoupled** with `options.name` — so a tag can be namespaced for
@@ -160,7 +160,7 @@ export function TaggedError<Tag extends string>(
  *
  * @example
  * ```ts
- * result.mapErr((matcher) =>
+ * result.mapErrCases((matcher) =>
  *   matcher
  *     .with(tag("NotFound"), () => new NotFoundException())
  *     .with(tag("Conflict"), (e) => new ConflictException(e.key)),

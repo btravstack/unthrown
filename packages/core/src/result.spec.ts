@@ -251,9 +251,9 @@ type TagB = { _tag: "B"; b: string };
 const errA = (a: number): Result<never, TagA | TagB> => Err<TagA | TagB>({ _tag: "A", a });
 const errB = (b: string): Result<never, TagA | TagB> => Err<TagA | TagB>({ _tag: "B", b });
 
-describe("Result.mapErr (ts-pattern matcher)", () => {
+describe("Result.mapErrCases (ts-pattern matcher)", () => {
   it("dispatches a tagged error to its matching branch", () => {
-    const r = errA(7).mapErr((matcher) =>
+    const r = errA(7).mapErrCases((matcher) =>
       matcher.with(tag("A"), (e) => `a:${e.a}`).with(tag("B"), (e) => `b:${e.b}`),
     );
     expect(r.getErr()).toBe("a:7");
@@ -261,7 +261,7 @@ describe("Result.mapErr (ts-pattern matcher)", () => {
 
   it("matches a non-_tag (code-discriminated) union", () => {
     type CodeErr = { code: "NOT_FOUND" } | { code: "FORBIDDEN" };
-    const r = (Err({ code: "FORBIDDEN" }) as Result<never, CodeErr>).mapErr((matcher) =>
+    const r = (Err({ code: "FORBIDDEN" }) as Result<never, CodeErr>).mapErrCases((matcher) =>
       matcher.with({ code: "NOT_FOUND" }, () => 404).with({ code: "FORBIDDEN" }, () => 403),
     );
     expect(r.getErr()).toBe(403);
@@ -269,23 +269,23 @@ describe("Result.mapErr (ts-pattern matcher)", () => {
 
   it("shares one strategy across grouped patterns", () => {
     const build = (r: Result<never, TagA | TagB>) =>
-      r.mapErr((matcher) => matcher.with(tag("A"), tag("B"), () => "grouped" as const));
+      r.mapErrCases((matcher) => matcher.with(tag("A"), tag("B"), () => "grouped" as const));
     expect(build(errA(7)).getErr()).toBe("grouped");
     expect(build(errB("x")).getErr()).toBe("grouped");
   });
 
   it("P._ is the deliberate catch-all", () => {
-    const r = errA(7).mapErr((matcher) => matcher.with(P._, (e) => `all:${e._tag}`));
+    const r = errA(7).mapErrCases((matcher) => matcher.with(P._, (e) => `all:${e._tag}`));
     expect(r.getErr()).toBe("all:A");
   });
 
   it("a branch returning the injected defect(cause) becomes a Defect carrying that cause", () => {
-    const ok = errA(7).mapErr((matcher, defect) =>
+    const ok = errA(7).mapErrCases((matcher, defect) =>
       matcher.with(tag("A"), (e) => e.a).with(tag("B"), (_e) => defect(boom)),
     );
     expect(ok.isDefect()).toBe(false); // an A error takes the mapped branch
 
-    const d = errB("x").mapErr((matcher, defect) =>
+    const d = errB("x").mapErrCases((matcher, defect) =>
       matcher.with(tag("A"), (e) => e.a).with(tag("B"), (_e) => defect(boom)),
     );
     expect(d.isDefect()).toBe(true);
@@ -294,13 +294,13 @@ describe("Result.mapErr (ts-pattern matcher)", () => {
 
   it("throws NonExhaustiveError → Defect when a value slips past the types", () => {
     const smuggled = Err({ _tag: "C" }) as unknown as Result<never, TagA>;
-    const r = smuggled.mapErr((matcher) => matcher.with(tag("A"), (e) => e.a));
+    const r = smuggled.mapErrCases((matcher) => matcher.with(tag("A"), (e) => e.a));
     expect(r.isDefect()).toBe(true);
   });
 
   it("passes Ok through and does not run the matcher", () => {
     const f = vi.fn();
-    const r = Ok(1).mapErr((matcher) => matcher.with(P._, f));
+    const r = Ok(1).mapErrCases((matcher) => matcher.with(P._, f));
     expect(r.isOk()).toBe(true);
     if (r.isOk()) expect(r.value).toBe(1);
     expect(f).not.toHaveBeenCalled();
@@ -310,14 +310,14 @@ describe("Result.mapErr (ts-pattern matcher)", () => {
     const f = vi.fn();
     expect(
       defectOf(boom)
-        .mapErr((matcher) => matcher.with(P._, f))
+        .mapErrCases((matcher) => matcher.with(P._, f))
         .isDefect(),
     ).toBe(true);
     expect(f).not.toHaveBeenCalled();
   });
 
   it("converts a throw inside a branch into a Defect", () => {
-    const r = errA(7).mapErr((matcher) =>
+    const r = errA(7).mapErrCases((matcher) =>
       matcher.with(P._, () => {
         throw boom;
       }),
@@ -326,18 +326,18 @@ describe("Result.mapErr (ts-pattern matcher)", () => {
   });
 });
 
-describe("Result.flatMapErr (ts-pattern matcher)", () => {
+describe("Result.flatMapErrCases (ts-pattern matcher)", () => {
   it("recovers an Err into an Ok", () => {
     expect(
       Err("e")
-        .flatMapErr((matcher) => matcher.with(P._, () => Ok(99)))
+        .flatMapErrCases((matcher) => matcher.with(P._, () => Ok(99)))
         .get(),
     ).toBe(99);
   });
 
   it("dispatches per tag — one branch recovers, another re-emits", () => {
     const build = (r: Result<never, TagA | TagB>) =>
-      r.flatMapErr((matcher) =>
+      r.flatMapErrCases((matcher) =>
         matcher.with(tag("A"), (e) => Ok(e.a)).with(tag("B"), (e) => Err(e)),
       );
     expect(build(errA(7)).getOr(-1)).toBe(7);
@@ -346,7 +346,7 @@ describe("Result.flatMapErr (ts-pattern matcher)", () => {
   });
 
   it("a branch may return defect(cause)", () => {
-    const d = Err("e").flatMapErr((matcher, defect) => matcher.with(P._, (e) => defect(e)));
+    const d = Err("e").flatMapErrCases((matcher, defect) => matcher.with(P._, (e) => defect(e)));
     expect(d.isDefect()).toBe(true);
     if (d.isDefect()) expect(d.cause).toBe("e");
   });
@@ -355,12 +355,12 @@ describe("Result.flatMapErr (ts-pattern matcher)", () => {
     const f = vi.fn();
     expect(
       Ok(1)
-        .flatMapErr((matcher) => matcher.with(P._, f))
+        .flatMapErrCases((matcher) => matcher.with(P._, f))
         .getOr(-1),
     ).toBe(1);
     expect(
       defectOf(boom)
-        .flatMapErr((matcher) => matcher.with(P._, f))
+        .flatMapErrCases((matcher) => matcher.with(P._, f))
         .isDefect(),
     ).toBe(true);
     expect(f).not.toHaveBeenCalled();
@@ -369,7 +369,7 @@ describe("Result.flatMapErr (ts-pattern matcher)", () => {
   it("converts a throw into a Defect", () => {
     expect(
       Err("e")
-        .flatMapErr((matcher) =>
+        .flatMapErrCases((matcher) =>
           matcher.with(P._, () => {
             throw boom;
           }),
@@ -379,11 +379,11 @@ describe("Result.flatMapErr (ts-pattern matcher)", () => {
   });
 });
 
-describe("Result.recoverErr (ts-pattern matcher)", () => {
+describe("Result.recoverErrCases (ts-pattern matcher)", () => {
   it("turns an Err into an Ok", () => {
     expect(
       Err("e")
-        .recoverErr((matcher) => matcher.with(P._, () => 7))
+        .recoverErrCases((matcher) => matcher.with(P._, () => 7))
         .get(),
     ).toBe(7);
   });
@@ -391,7 +391,7 @@ describe("Result.recoverErr (ts-pattern matcher)", () => {
   it("dispatches per tag and unions the recovered values", () => {
     expect(
       errA(7)
-        .recoverErr((matcher) => matcher.with(tag("A"), (e) => e.a).with(tag("B"), (e) => e.b))
+        .recoverErrCases((matcher) => matcher.with(tag("A"), (e) => e.a).with(tag("B"), (e) => e.b))
         .get(),
     ).toBe(7);
   });
@@ -400,7 +400,7 @@ describe("Result.recoverErr (ts-pattern matcher)", () => {
     const f = vi.fn();
     expect(
       Ok(1)
-        .recoverErr((matcher) => matcher.with(P._, f))
+        .recoverErrCases((matcher) => matcher.with(P._, f))
         .get(),
     ).toBe(1);
     expect(f).not.toHaveBeenCalled();
@@ -408,13 +408,13 @@ describe("Result.recoverErr (ts-pattern matcher)", () => {
 
   it("does NOT recover a Defect — `never` empties only the error channel", () => {
     const f = vi.fn();
-    const recovered = defectOf(boom).recoverErr((matcher) => matcher.with(P._, f));
+    const recovered = defectOf(boom).recoverErrCases((matcher) => matcher.with(P._, f));
     expect(f).not.toHaveBeenCalled();
     expect(recovered.isDefect()).toBe(true);
   });
 
   it("a branch returning defect(cause) stays a Defect (not a recovery)", () => {
-    const d = Err("e").recoverErr((matcher, defect) => matcher.with(P._, (e) => defect(e)));
+    const d = Err("e").recoverErrCases((matcher, defect) => matcher.with(P._, (e) => defect(e)));
     expect(d.isDefect()).toBe(true);
     if (d.isDefect()) expect(d.cause).toBe("e");
   });
@@ -422,7 +422,7 @@ describe("Result.recoverErr (ts-pattern matcher)", () => {
   it("converts a throw into a Defect", () => {
     expect(
       Err("e")
-        .recoverErr((matcher) =>
+        .recoverErrCases((matcher) =>
           matcher.with(P._, () => {
             throw boom;
           }),
@@ -432,17 +432,17 @@ describe("Result.recoverErr (ts-pattern matcher)", () => {
   });
 });
 
-describe("Result.tapErr (ts-pattern matcher, exhaustive)", () => {
+describe("Result.tapErrCases (ts-pattern matcher, exhaustive)", () => {
   it("runs the side effect on Err and returns the same error", () => {
     const seen: string[] = [];
-    const r = Err("e").tapErr((matcher) => matcher.with(P._, (s) => seen.push(s)));
+    const r = Err("e").tapErrCases((matcher) => matcher.with(P._, (s) => seen.push(s)));
     expect(seen).toEqual(["e"]);
     expect(r.getErr()).toBe("e");
   });
 
   it("runs only the matching branch; the error still passes through unchanged", () => {
     const seenA: number[] = [];
-    const observed = errA(7).tapErr((matcher) =>
+    const observed = errA(7).tapErrCases((matcher) =>
       matcher.with(tag("A"), (e) => seenA.push(e.a)).with(tag("B"), () => undefined),
     );
     expect(seenA).toEqual([7]);
@@ -453,22 +453,22 @@ describe("Result.tapErr (ts-pattern matcher, exhaustive)", () => {
     const f = vi.fn();
     expect(
       Ok(1)
-        .tapErr((matcher) => matcher.with(P._, f))
+        .tapErrCases((matcher) => matcher.with(P._, f))
         .getOr(-1),
     ).toBe(1);
     expect(
       defectOf(boom)
-        .tapErr((matcher) => matcher.with(P._, f))
+        .tapErrCases((matcher) => matcher.with(P._, f))
         .isDefect(),
     ).toBe(true);
     expect(f).not.toHaveBeenCalled();
   });
 });
 
-describe("Result.flatTapErr (ts-pattern matcher, exhaustive)", () => {
+describe("Result.flatTapErrCases (ts-pattern matcher, exhaustive)", () => {
   it("runs the failable effect on Err and keeps the original error on success", () => {
     const seen: string[] = [];
-    const r = Err("e").flatTapErr((matcher) =>
+    const r = Err("e").flatTapErrCases((matcher) =>
       matcher.with(P._, (s) => {
         seen.push(s);
         return Ok("ignored");
@@ -479,12 +479,12 @@ describe("Result.flatTapErr (ts-pattern matcher, exhaustive)", () => {
   });
 
   it("threads the effect's Err", () => {
-    const r = Err("e").flatTapErr((matcher) => matcher.with(P._, () => Err("log_failed")));
+    const r = Err("e").flatTapErrCases((matcher) => matcher.with(P._, () => Err("log_failed")));
     expect(r.getErr()).toBe("log_failed");
   });
 
   it("propagates a Defect from the effect", () => {
-    const r = Err("e").flatTapErr((matcher) => matcher.with(P._, () => defectOf(boom)));
+    const r = Err("e").flatTapErrCases((matcher) => matcher.with(P._, () => defectOf(boom)));
     expect(r.isDefect()).toBe(true);
   });
 
@@ -492,12 +492,12 @@ describe("Result.flatTapErr (ts-pattern matcher, exhaustive)", () => {
     const f = vi.fn(() => Ok(1));
     expect(
       Ok(1)
-        .flatTapErr((matcher) => matcher.with(P._, f))
+        .flatTapErrCases((matcher) => matcher.with(P._, f))
         .getOr(-1),
     ).toBe(1);
     expect(
       defectOf(boom)
-        .flatTapErr((matcher) => matcher.with(P._, f))
+        .flatTapErrCases((matcher) => matcher.with(P._, f))
         .isDefect(),
     ).toBe(true);
     expect(f).not.toHaveBeenCalled();
@@ -506,7 +506,7 @@ describe("Result.flatTapErr (ts-pattern matcher, exhaustive)", () => {
   it("converts a throw into a Defect", () => {
     expect(
       Err("e")
-        .flatTapErr((matcher) =>
+        .flatTapErrCases((matcher) =>
           matcher.with(P._, () => {
             throw boom;
           }),
@@ -517,38 +517,38 @@ describe("Result.flatTapErr (ts-pattern matcher, exhaustive)", () => {
 });
 
 describe("a rogue value past the types: NonExhaustiveError → Defect in EVERY error combinator", () => {
-  // The mapErr case is guarded above; the other four share runMatch, but the
+  // The mapErrCases case is guarded above; the other four share runMatch, but the
   // invariant claims all five — so each gets its own probe.
   const smuggled = () => Err({ _tag: "C" }) as unknown as Result<never, TagA>;
 
-  it("flatMapErr routes the unmatched rogue value to a Defect", () => {
+  it("flatMapErrCases routes the unmatched rogue value to a Defect", () => {
     expect(
       smuggled()
-        .flatMapErr((matcher) => matcher.with(tag("A"), (e) => Ok(e.a)))
+        .flatMapErrCases((matcher) => matcher.with(tag("A"), (e) => Ok(e.a)))
         .isDefect(),
     ).toBe(true);
   });
 
-  it("recoverErr routes the unmatched rogue value to a Defect", () => {
+  it("recoverErrCases routes the unmatched rogue value to a Defect", () => {
     expect(
       smuggled()
-        .recoverErr((matcher) => matcher.with(tag("A"), (e) => e.a))
+        .recoverErrCases((matcher) => matcher.with(tag("A"), (e) => e.a))
         .isDefect(),
     ).toBe(true);
   });
 
-  it("tapErr routes the unmatched rogue value to a Defect", () => {
+  it("tapErrCases routes the unmatched rogue value to a Defect", () => {
     expect(
       smuggled()
-        .tapErr((matcher) => matcher.with(tag("A"), () => undefined))
+        .tapErrCases((matcher) => matcher.with(tag("A"), () => undefined))
         .isDefect(),
     ).toBe(true);
   });
 
-  it("flatTapErr routes the unmatched rogue value to a Defect", () => {
+  it("flatTapErrCases routes the unmatched rogue value to a Defect", () => {
     expect(
       smuggled()
-        .flatTapErr((matcher) => matcher.with(tag("A"), () => Ok(1)))
+        .flatTapErrCases((matcher) => matcher.with(tag("A"), () => Ok(1)))
         .isDefect(),
     ).toBe(true);
   });
@@ -641,9 +641,9 @@ describe("Result.tapFailure (the cross-channel observer)", () => {
 });
 
 describe("failure-observer throws preserve the original failure", () => {
-  it("tapErr: a throwing callback yields a Defect aggregating [thrown, original]", () => {
+  it("tapErrCases: a throwing callback yields a Defect aggregating [thrown, original]", () => {
     const boom = new Error("boom");
-    const r = Err("original").tapErr((matcher) =>
+    const r = Err("original").tapErrCases((matcher) =>
       matcher.with(P._, () => {
         throw boom;
       }),
@@ -668,9 +668,9 @@ describe("failure-observer throws preserve the original failure", () => {
     }
   });
 
-  it("flatTapErr: a throwing callback yields a Defect aggregating [thrown, original]", () => {
+  it("flatTapErrCases: a throwing callback yields a Defect aggregating [thrown, original]", () => {
     const boom = new Error("boom");
-    const r = Err("original").flatTapErr((matcher) =>
+    const r = Err("original").flatTapErrCases((matcher) =>
       matcher.with(P._, () => {
         throw boom;
       }),
@@ -784,7 +784,7 @@ describe("Result eliminators on Ok / Err", () => {
     expect((Ok(3) as Result<number, "e">).getOrThrow()).toBe(3);
 
     // Err throws the error value itself, BY REFERENCE (faithful to
-    // `.flatMapErr((e) => { throw e })`). `toThrow(err)` only matches the message,
+    // `.flatMapErrCases((e) => { throw e })`). `toThrow(err)` only matches the message,
     // so assert identity via try/catch instead.
     const err = new Error("modeled");
     try {

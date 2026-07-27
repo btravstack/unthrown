@@ -12,8 +12,8 @@
 | `ok(v)` / `err(e)`                   | `Ok(v)` / `Err(e)`                           | constructors are capitalized                                                                                   |
 | `result.andThen(f)`                  | `result.flatMap(f)`                          | one name per concept                                                                                           |
 | `result.map(f)`                      | same                                         | callbacks must be synchronous                                                                                  |
-| `result.mapErr(f)`                   | `result.mapErr((matcher) => …)`              | an exhaustive [ts-pattern](https://github.com/gvergnaud/ts-pattern) match; `.with(P._, f)` is the uniform form |
-| `result.orElse(f)`                   | `result.flatMapErr((matcher) => …)`          | `flatMap` on the error channel; same exhaustive matcher                                                        |
+| `result.mapErr(f)`                   | `result.mapErrCases((matcher) => …)`         | an exhaustive [ts-pattern](https://github.com/gvergnaud/ts-pattern) match; `.with(P._, f)` is the uniform form |
+| `result.orElse(f)`                   | `result.flatMapErrCases((matcher) => …)`     | `flatMap` on the error channel; same exhaustive matcher                                                        |
 | `result.match(okFn, errFn)`          | `match({ ok, err: (matcher) => …, defect })` | the third channel is new, and `err` takes the same exhaustive matcher — see below                              |
 | `result.unwrapOr(v)`                 | `result.getOr(v)`                            | still throws on a Defect (a bug is not an absent value)                                                        |
 | `ResultAsync`                        | `AsyncResult`                                | `await` collapses it to a `Result`; it never rejects                                                           |
@@ -26,9 +26,9 @@
 
 Most rows are a rename. `andThen` → `flatMap` is unthrown's
 [one-name-per-concept](../explanation/design-decisions#one-name-per-concept-no-aliases)
-rule. The one behavioral change to know up front: `mapErr` (and the other error
+rule. The one behavioral change to know up front: `mapErrCases` (and the other error
 combinators) take an **exhaustive matcher** rather than a plain callback — the
-uniform port is `.mapErr((matcher) => matcher.with(P._, f))`, and the reasoning is
+uniform port is `.mapErrCases((matcher) => matcher.with(P._, f))`, and the reasoning is
 in [Exhaustive error matching](../explanation/exhaustive-error-matching). The rest
 of the table is where the libraries genuinely differ.
 

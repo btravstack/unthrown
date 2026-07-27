@@ -18,8 +18,8 @@ and its binds also accept an `AsyncResult`). The
 ## By intent
 
 The `→ Result<…>` half of each signature is the tell — it shows how the combinator
-moves the channels: `flatMap` widens `E` to `E | E2`, `recoverErr` empties it to
-`never`, `flatMapErr` widens the value to `T | U`. The error combinators take an
+moves the channels: `flatMap` widens `E` to `E | E2`, `recoverErrCases` empties it to
+`never`, `flatMapErrCases` widens the value to `T | U`. The error combinators take an
 [exhaustive ts-pattern matcher](#the-error-channel) rather than a single callback;
 the signatures below abbreviate its callback as `(matcher) => …`.
 
@@ -33,11 +33,11 @@ the signatures below abbreviate its callback as `(matcher) => …`.
 | sequence steps into a named scope              | `Do`/`bind`/`let` | `bind(k, (scope) => Result<U, E2>)` → `Result<{…}, E \| E2>` | Ok           |
 | replace the value with a constant              | `as`              | `(value: U)` → `Result<U, E>`                                | Ok           |
 | drop the value (success type becomes `void`)   | `discard`         | `()` → `Result<void, E>`                                     | Ok           |
-| transform the error (matched)                  | `mapErr`          | `(matcher) => …` → `Result<T, E2>`                           | Err          |
-| try a fallback that returns a `Result`         | `flatMapErr`      | `(matcher) => …` → `Result<T \| U, E2>`                      | Err          |
-| turn an error into a success value             | `recoverErr`      | `(matcher) => …` → `Result<T \| U, never>`                   | Err          |
-| run a side effect on the error                 | `tapErr`          | `(matcher) => …` → `Result<T, E>`                            | Err          |
-| run a **failable** side effect on the error    | `flatTapErr`      | `(matcher) => …` → `Result<T, E \| E2>`                      | Err          |
+| transform the error (matched)                  | `mapErrCases`     | `(matcher) => …` → `Result<T, E2>`                           | Err          |
+| try a fallback that returns a `Result`         | `flatMapErrCases` | `(matcher) => …` → `Result<T \| U, E2>`                      | Err          |
+| turn an error into a success value             | `recoverErrCases` | `(matcher) => …` → `Result<T \| U, never>`                   | Err          |
+| run a side effect on the error                 | `tapErrCases`     | `(matcher) => …` → `Result<T, E>`                            | Err          |
+| run a **failable** side effect on the error    | `flatTapErrCases` | `(matcher) => …` → `Result<T, E \| E2>`                      | Err          |
 | recover from a defect (rare)                   | `recoverDefect`   | `(cause) => Result<U, E2>` → `Result<T \| U, E \| E2>`       | Defect       |
 | observe a defect, e.g. log it                  | `tapDefect`       | `(cause) => void` → `Result<T, E>`                           | Defect       |
 | observe **any** failure (error _or_ defect)    | `tapFailure`      | `(f: FailureView<E>) => void` → `Result<T, E>`               | Err + Defect |
@@ -52,31 +52,31 @@ untouched (`tapFailure` is the one combinator whose "own channel" spans both
 failures). The `Defect` column is "passes ▸" everywhere except `recoverDefect`,
 the observers (`tapDefect` / `tapFailure`), and `match`:
 
-| method                  | on `Ok`  | on `Err`      | on `Defect` | resulting `E`   |
-| ----------------------- | -------- | ------------- | ----------- | --------------- |
-| `map`                   | runs `f` | passes ▸      | passes ▸    | `E`             |
-| `flatMap`               | runs `f` | passes ▸      | passes ▸    | `E \| E2`       |
-| `tap` / `flatTap`       | runs `f` | passes ▸      | passes ▸    | `E` / `E \| E2` |
-| `ensure`                | runs `f` | passes ▸      | passes ▸    | `E \| E2`       |
-| `mapErr`                | passes ▸ | runs a branch | passes ▸    | `E2`            |
-| `flatMapErr`            | passes ▸ | runs a branch | passes ▸    | `E2`            |
-| `recoverErr`            | passes ▸ | branch → `Ok` | passes ▸    | `never`         |
-| `tapErr` / `flatTapErr` | passes ▸ | runs a branch | passes ▸    | `E` / `E \| E2` |
-| `recoverDefect`         | passes ▸ | passes ▸      | runs `f`    | `E \| E2`       |
-| `tapDefect`             | passes ▸ | passes ▸      | runs `f`    | `E`             |
-| `tapFailure`            | passes ▸ | runs `f`      | runs `f`    | `E`             |
-| `match`                 | `ok()`   | `err()`       | `defect()`  | —               |
+| method                            | on `Ok`  | on `Err`      | on `Defect` | resulting `E`   |
+| --------------------------------- | -------- | ------------- | ----------- | --------------- |
+| `map`                             | runs `f` | passes ▸      | passes ▸    | `E`             |
+| `flatMap`                         | runs `f` | passes ▸      | passes ▸    | `E \| E2`       |
+| `tap` / `flatTap`                 | runs `f` | passes ▸      | passes ▸    | `E` / `E \| E2` |
+| `ensure`                          | runs `f` | passes ▸      | passes ▸    | `E \| E2`       |
+| `mapErrCases`                     | passes ▸ | runs a branch | passes ▸    | `E2`            |
+| `flatMapErrCases`                 | passes ▸ | runs a branch | passes ▸    | `E2`            |
+| `recoverErrCases`                 | passes ▸ | branch → `Ok` | passes ▸    | `never`         |
+| `tapErrCases` / `flatTapErrCases` | passes ▸ | runs a branch | passes ▸    | `E` / `E \| E2` |
+| `recoverDefect`                   | passes ▸ | passes ▸      | runs `f`    | `E \| E2`       |
+| `tapDefect`                       | passes ▸ | passes ▸      | runs `f`    | `E`             |
+| `tapFailure`                      | passes ▸ | runs `f`      | runs `f`    | `E`             |
+| `match`                           | `ok()`   | `err()`       | `defect()`  | —               |
 
-::: tip `recoverErr`'s `never` under-describes the runtime
-`recoverErr` empties only the **error** channel to `never` — a `Defect` can still be
+::: tip `recoverErrCases`'s `never` under-describes the runtime
+`recoverErrCases` empties only the **error** channel to `never` — a `Defect` can still be
 present at runtime and flows past it untouched. See
 [The Defect Channel](../explanation/the-defect-channel#recovererr-clears-the-error-channel-not-the-runtime).
 :::
 
 ## The error channel
 
-The error combinators — `mapErr`, `flatMapErr`, `recoverErr`, `tapErr`,
-`flatTapErr` — do not take a single callback. Their callback receives a
+The error combinators — `mapErrCases`, `flatMapErrCases`, `recoverErrCases`, `tapErrCases`,
+`flatTapErrCases` — do not take a single callback. Their callback receives a
 [ts-pattern](https://github.com/gvergnaud/ts-pattern) match builder over the
 error (`match(error)`; the patterns are re-exported from `unthrown` as `P`), and
 you **return the un-terminated builder** — the combinator calls `.exhaustive()`
@@ -85,7 +85,7 @@ for you:
 ```ts
 import { P, tag } from "unthrown";
 
-db.reading.tryFindUniqueOrThrow({ where: { id } }).mapErr(
+db.reading.tryFindUniqueOrThrow({ where: { id } }).mapErrCases(
   (matcher, defect) =>
     matcher
       .with(tag("RecordNotFound"), () => new ReadingNotFoundException(id))
@@ -116,15 +116,15 @@ forget, and no `.otherwise()` to slip in a fallback. The rationale is in
   call site. There is no partial-with-fallback middle ground: a wide union that
   treats several cases identically writes them as grouped patterns or a `P._`,
   never as a silent default.
-- **There is no error-channel identity.** `mapErr((m) => m)` is not a no-op — it
+- **There is no error-channel identity.** `mapErrCases((m) => m)` is not a no-op — it
   only type-checks when `E` is `never` and otherwise fails to compile (see
   [The Defect Channel](../explanation/the-defect-channel#no-identity-on-the-error-channel)).
-  To pass the error through, observe it with `tapErr`, or re-emit it with
+  To pass the error through, observe it with `tapErrCases`, or re-emit it with
   `.with(P._, (e) => e)`.
-- **Observers match exhaustively too.** `tapErr` and `flatTapErr` take the same
+- **Observers match exhaustively too.** `tapErrCases` and `flatTapErrCases` take the same
   builder (use `P._` for a catch-all); the error is observed and then flows
-  through unchanged. Their branch returns are ignored (`tapErr`) or thread only a
-  _new_ effect failure (`flatTapErr`). `tapDefect` / `tapFailure` keep single
+  through unchanged. Their branch returns are ignored (`tapErrCases`) or thread only a
+  _new_ effect failure (`flatTapErrCases`). `tapDefect` / `tapFailure` keep single
   callbacks — their payloads carry no discriminant to match.
 - **A non-exhaustive match is a `Defect` if it ever slips past the types.** Only
   reachable outside the typed contract (a widened cast, a JS caller): ts-pattern
@@ -141,15 +141,15 @@ itself:
 import { P } from "unthrown";
 
 // log whatever the error is, then let it flow through unchanged
-loadUser(id).tapErr((matcher) => matcher.with(P._, (e) => logger.error(e)));
+loadUser(id).tapErrCases((matcher) => matcher.with(P._, (e) => logger.error(e)));
 ```
 
 The same one-branch shape works for every error combinator — transform, recover,
 or fold at the edge:
 
 ```ts
-result.mapErr((matcher) => matcher.with(P._, (e) => new AppError(e))); // any error → AppError
-result.recoverErr((matcher) => matcher.with(P._, () => fallback)); // any error → fallback value
+result.mapErrCases((matcher) => matcher.with(P._, (e) => new AppError(e))); // any error → AppError
+result.recoverErrCases((matcher) => matcher.with(P._, () => fallback)); // any error → fallback value
 result.match({
   ok: (v) => v,
   err: (matcher) => matcher.with(P._, (e) => `failed: ${e}`),
@@ -163,7 +163,7 @@ When you'd rather be forced to revisit a new case, list the variants and omit
 the rest:
 
 ```ts
-result.tapErr((matcher) =>
+result.tapErrCases((matcher) =>
   matcher
     .with(tag("RateLimited"), (e) => metrics.rateLimit(e.retryAfter))
     .with(P._, (e) => logger.error(e)),
@@ -182,7 +182,7 @@ exactly three ways:
   re-entering a boundary and composing it with `flatMap`. (See
   [The async model](../explanation/async-model).)
 - **The `Result`-returning combinators accept `Result` _or_ `AsyncResult`.**
-  `flatMap`, `flatTap`, `flatMapErr`, `flatTapErr`, `bind`, and `recoverDefect` take
+  `flatMap`, `flatTap`, `flatMapErrCases`, `flatTapErrCases`, `bind`, and `recoverDefect` take
   a callback returning either, so you can mix sync and async steps in one chain.
 - **Eliminators return a `Promise`.** `await result.match({ … })` /
   `await result.get()` — or `await` the `AsyncResult` first to collapse it to a
@@ -217,7 +217,7 @@ you nest a `Result<Result<…>>`).
 **`flatMap` vs `flatTap`** — both take a `Result`-returning callback. `flatMap`
 **replaces** the value with the callback's; `flatTap` **discards** it and keeps
 the original (a validation or write whose _outcome_ matters but whose _value_
-you don't need). `tapErr`/`flatTapErr` are the same pair on the error channel.
+you don't need). `tapErrCases`/`flatTapErrCases` are the same pair on the error channel.
 
 **`tap` vs `flatTap`** — decided by what the _effect_ returns, not by what you do
 with its value (both keep the original). An effect that cannot fail — logging, a
@@ -251,15 +251,15 @@ either surface; an `AsyncResult`-returning one only in the **async** `flatTap`:
 
 :::
 
-**`flatMapErr` vs `recoverErr`** — both run on `Err`. `recoverErr` produces a plain
-success value (emptying the error channel to `never`); `flatMapErr` produces another
+**`flatMapErrCases` vs `recoverErrCases`** — both run on `Err`. `recoverErrCases` produces a plain
+success value (emptying the error channel to `never`); `flatMapErrCases` produces another
 `Result` (which may still be an `Err`).
 
-**`recoverErr` vs `recoverDefect`** — `recoverErr` handles a modeled `Err`;
+**`recoverErrCases` vs `recoverDefect`** — `recoverErrCases` handles a modeled `Err`;
 `recoverDefect` is the only combinator that can **consume** a `Defect`. Neither is
-the other's fallback — a defect flows past `recoverErr` untouched.
+the other's fallback — a defect flows past `recoverErrCases` untouched.
 
-**`tapErr` + `tapDefect` vs `tapFailure`** — when the _same_ effect applies to
+**`tapErrCases` + `tapDefect` vs `tapFailure`** — when the _same_ effect applies to
 both failures (a shared logger, a metric, a rollback trigger), `tapFailure` runs
 it once for either. Its callback receives the discriminated **failure variant**
 (`FailureView<E>`, i.e. `ErrView | DefectView`) rather than a payload — so branch
@@ -279,7 +279,7 @@ Reach for an eliminator once you're done chaining:
 - `getOrThrow` — extract `T`, but **throw the modeled error as-is** on `Err`
   (panicking on a defect). A deliberate escape hatch off errors-as-values: its
   point is to move a literal `throw` behind a method so a `no-throw` lint rule can
-  ban raw throws. Prefer `match` / `recoverErr` / `flatMapErr` when the error can stay a
+  ban raw throws. Prefer `match` / `recoverErrCases` / `flatMapErrCases` when the error can stay a
   value.
 
 On an `AsyncResult` every eliminator returns a `Promise` — `await` it (an `Err` or

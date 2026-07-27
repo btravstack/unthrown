@@ -37,12 +37,14 @@ const find = os
   .errors({ NOT_FOUND: {} })
   .handler(
     handlerResult(({ input, errors }) =>
-      repo.findPlanet(input.id).mapErr((matcher) => matcher.with(P._, () => errors.NOT_FOUND())),
+      repo
+        .findPlanet(input.id)
+        .mapErrCases((matcher) => matcher.with(P._, () => errors.NOT_FOUND())),
     ),
   );
 ```
 
-`Ok` becomes the output; `Err` (constrained to `ORPCError` — the `mapErr` at the
+`Ok` becomes the output; `Err` (constrained to `ORPCError` — the `mapErrCases` at the
 endpoint is the explicit triage point) is returned as a value and oRPC marks it
 inferable; a `Defect` rethrows its cause and stays a defect. A handler may also
 be written as `.result(...)` directly, by opting into the builder extension:
@@ -55,7 +57,7 @@ const find = os
   .input(z.object({ id: z.string() }))
   .errors({ NOT_FOUND: {} })
   .result(({ input, errors }) =>
-    repo.findPlanet(input.id).mapErr((matcher) => matcher.with(P._, () => errors.NOT_FOUND())),
+    repo.findPlanet(input.id).mapErrCases((matcher) => matcher.with(P._, () => errors.NOT_FOUND())),
   );
 ```
 

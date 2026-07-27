@@ -124,7 +124,7 @@ const status = authorize(id).match({
 });
 ```
 
-Unlike the error _combinators_ (`mapErr`, `flatMapErr`, …), `match`'s `err`
+Unlike the error _combinators_ (`mapErrCases`, `flatMapErrCases`, …), `match`'s `err`
 handler receives **no `defect` helper** — `match` is total elimination to a value,
 and a `Result` that already carries a defect is handled by the `defect:` case. To
 keep matching _inside_ the pipeline (transforming or recovering the error rather

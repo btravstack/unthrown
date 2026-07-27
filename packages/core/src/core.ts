@@ -185,7 +185,7 @@ class Res<T, E> {
     }
   }
 
-  mapErr<M extends ExhaustiveMatch<unknown>>(
+  mapErrCases<M extends ExhaustiveMatch<unknown>>(
     this: Result<T, E>,
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
   ): Result<T, MatchErrOut<M>> {
@@ -199,7 +199,7 @@ class Res<T, E> {
     }
   }
 
-  flatMapErr<M extends ExhaustiveMatch<Result<unknown, unknown> | Defect>>(
+  flatMapErrCases<M extends ExhaustiveMatch<Result<unknown, unknown> | Defect>>(
     this: Result<T, E>,
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
   ): Result<T | OkOf<MatchOut<M>>, ErrOf<MatchOut<M>>> {
@@ -214,7 +214,7 @@ class Res<T, E> {
     }
   }
 
-  recoverErr<M extends ExhaustiveMatch<unknown>>(
+  recoverErrCases<M extends ExhaustiveMatch<unknown>>(
     this: Result<T, E>,
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
   ): Result<T | MatchErrOut<M>, never> {
@@ -228,7 +228,7 @@ class Res<T, E> {
     }
   }
 
-  tapErr(
+  tapErrCases(
     this: Result<T, E>,
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
   ): Result<T, E> {
@@ -241,7 +241,7 @@ class Res<T, E> {
     }
   }
 
-  flatTapErr<M extends ExhaustiveMatch<Result<unknown, unknown>>>(
+  flatTapErrCases<M extends ExhaustiveMatch<Result<unknown, unknown>>>(
     this: Result<T, E>,
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
   ): Result<T, E | ErrOf<MatchOut<M>>> {
@@ -540,7 +540,7 @@ function runMatch<E>(
 }
 
 /**
- * A throw inside a *failure observer* (`tapErr` / `tapDefect` / `flatTapErr`)
+ * A throw inside a *failure observer* (`tapErrCases` / `tapDefect` / `flatTapErrCases`)
  * must not destroy the failure being observed — that is the exact place (e.g. a
  * failing error-logger) where losing the underlying failure hurts most. The
  * resulting Defect aggregates both: `errors[0]` is the observer's throw,
@@ -746,7 +746,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   // loosely — `never` error channels keep the returns bivariantly compatible —
   // and the interface re-imposes the precision, mirroring how `get`'s `this`
   // gate is re-imposed in `types.ts`.
-  mapErr(
+  mapErrCases(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
   ): AsyncResult<T, never> {
     return new AsyncRes<T, never>(
@@ -763,7 +763,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  flatMapErr(
+  flatMapErrCases(
     f: (
       matcher: ErrMatcher<E>,
       defect: (cause: unknown) => Defect,
@@ -785,7 +785,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  recoverErr(
+  recoverErrCases(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
   ): AsyncResult<T, never> {
     return new AsyncRes<T, never>(
@@ -802,7 +802,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  tapErr(
+  tapErrCases(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
   ): AsyncResult<T, E> {
     return new AsyncRes<T, E>(
@@ -818,7 +818,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     );
   }
 
-  flatTapErr(
+  flatTapErrCases(
     f: (
       matcher: ErrMatcher<E>,
       defect: (cause: unknown) => Defect,

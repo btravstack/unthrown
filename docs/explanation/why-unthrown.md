@@ -57,7 +57,7 @@ the type**. `Result<T, E>` exposes only your anticipated errors in `E`. Anything
 unexpected becomes a defect that short-circuits to the edge, where you log it and
 return a 500. A defect can only be observed by `match`, `recoverDefect`, or the
 `tapDefect` / `tapFailure` observers; it is never silently recovered by `getOr`,
-`getOrNull`, or `recoverErr`.
+`getOrNull`, or `recoverErrCases`.
 
 This is the idea the rest of the library follows from. It has [its own
 page](./the-defect-channel).

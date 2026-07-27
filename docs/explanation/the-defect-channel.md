@@ -47,8 +47,8 @@ const d: Result<number, "boom"> = Ok(1).map((): number => {
 });
 
 d.map((n) => n + 1); // still a Defect — the success callback is skipped
-d.mapErr((m) => m.with("boom", () => "handled")); // still a Defect — the branch never runs
-d.recoverErr((m) => m.with("boom", () => 0)); // still a Defect — see below
+d.mapErrCases((m) => m.with("boom", () => "handled")); // still a Defect — the branch never runs
+d.recoverErrCases((m) => m.with("boom", () => 0)); // still a Defect — see below
 ```
 
 The matchers above are the real, exhaustive form — one branch per modeled error.
@@ -57,8 +57,8 @@ combinators only touch the `Err` channel, and a defect flows straight past them.
 
 ### No identity on the error channel
 
-::: warning `mapErr((m) => m)` is not an identity
-It can be tempting to write `mapErr((matcher) => matcher)` — returning the
+::: warning `mapErrCases((m) => m)` is not an identity
+It can be tempting to write `mapErrCases((matcher) => matcher)` — returning the
 matcher untouched — as a "do nothing" on the error channel. It is **not**. The
 combinator terminates the builder with `.exhaustive()` for you, and a builder
 with no `.with(…)` branch is only exhaustive when `E` is `never`. On any real
@@ -66,13 +66,13 @@ error channel it fails to compile; if it slips past the types (a cast), it
 throws `NonExhaustiveError` at runtime, which becomes a `Defect`. There is no
 "no-op" on the error channel — every branch of the union must be handled, which
 is the whole point (see [Exhaustive error matching](./exhaustive-error-matching)).
-To genuinely pass the error through unchanged, use an observer (`tapErr`) or a
+To genuinely pass the error through unchanged, use an observer (`tapErrCases`) or a
 `P._` catch-all that re-emits it.
 :::
 
-## `recoverErr` clears the error channel, not the runtime
+## `recoverErrCases` clears the error channel, not the runtime
 
-`recoverErr` turns an `Err` into an `Ok`, so its type is `Result<T | U, never>`. But
+`recoverErrCases` turns an `Err` into an `Ok`, so its type is `Result<T | U, never>`. But
 `never` describes only the **error** channel — a defect can still be present at
 runtime:
 
@@ -80,7 +80,7 @@ runtime:
 import { P } from "unthrown";
 
 // the `P._` branch is what supplies the `U` in `Result<T | U, never>`
-const recovered = d.recoverErr((matcher) => matcher.with(P._, () => 99));
+const recovered = d.recoverErrCases((matcher) => matcher.with(P._, () => 99));
 // type: Result<number, never>
 recovered.isDefect(); // => true — `never` does NOT mean "total"
 ```

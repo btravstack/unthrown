@@ -76,17 +76,21 @@ describe("AsyncResult: a throw in any combinator becomes a Defect", () => {
     expect((await asyncOk(1).flatMap(t)).isDefect()).toBe(true);
     expect((await asyncOk(1).tap(t)).isDefect()).toBe(true);
     expect((await asyncOk(1).flatTap(t)).isDefect()).toBe(true);
-    expect((await asyncErr("e").mapErr((matcher) => matcher.with(P._, t))).isDefect()).toBe(true);
-    expect((await asyncErr("e").flatMapErr((matcher) => matcher.with(P._, t))).isDefect()).toBe(
+    expect((await asyncErr("e").mapErrCases((matcher) => matcher.with(P._, t))).isDefect()).toBe(
       true,
     );
-    expect((await asyncErr("e").recoverErr((matcher) => matcher.with(P._, t))).isDefect()).toBe(
+    expect(
+      (await asyncErr("e").flatMapErrCases((matcher) => matcher.with(P._, t))).isDefect(),
+    ).toBe(true);
+    expect(
+      (await asyncErr("e").recoverErrCases((matcher) => matcher.with(P._, t))).isDefect(),
+    ).toBe(true);
+    expect((await asyncErr("e").tapErrCases((matcher) => matcher.with(P._, t))).isDefect()).toBe(
       true,
     );
-    expect((await asyncErr("e").tapErr((matcher) => matcher.with(P._, t))).isDefect()).toBe(true);
-    expect((await asyncErr("e").flatTapErr((matcher) => matcher.with(P._, t))).isDefect()).toBe(
-      true,
-    );
+    expect(
+      (await asyncErr("e").flatTapErrCases((matcher) => matcher.with(P._, t))).isDefect(),
+    ).toBe(true);
     expect((await asyncDefect().recoverDefect(t)).isDefect()).toBe(true);
     expect((await asyncDefect().tapDefect(t)).isDefect()).toBe(true);
     expect((await asyncErr("e").tapFailure(t)).isDefect()).toBe(true);
@@ -223,91 +227,97 @@ describe("AsyncResult success channel", () => {
 });
 
 describe("AsyncResult error channel", () => {
-  it("mapErr transforms the Err", async () => {
+  it("mapErrCases transforms the Err", async () => {
     expect(
-      (await asyncErr("e").mapErr((matcher) => matcher.with(P._, (s) => `${s}!`))).getErr(),
+      (await asyncErr("e").mapErrCases((matcher) => matcher.with(P._, (s) => `${s}!`))).getErr(),
     ).toBe("e!");
   });
 
-  it("flatMapErr recovers an Err", async () => {
+  it("flatMapErrCases recovers an Err", async () => {
     expect(
-      (await asyncErr("e").flatMapErr((matcher) => matcher.with(P._, () => Ok(9)))).get(),
+      (await asyncErr("e").flatMapErrCases((matcher) => matcher.with(P._, () => Ok(9)))).get(),
     ).toBe(9);
   });
 
-  it("flatMapErr composes async recovery via a qualified boundary", async () => {
-    const r = await asyncErr<string>("e").flatMapErr((matcher) =>
+  it("flatMapErrCases composes async recovery via a qualified boundary", async () => {
+    const r = await asyncErr<string>("e").flatMapErrCases((matcher) =>
       matcher.with(P._, () => fromSafePromise(Promise.resolve("recovered"))),
     );
     expect(r.get()).toBe("recovered");
   });
 
-  it("recoverErr turns an Err into an Ok", async () => {
-    expect((await asyncErr("e").recoverErr((matcher) => matcher.with(P._, () => 1))).get()).toBe(1);
+  it("recoverErrCases turns an Err into an Ok", async () => {
+    expect(
+      (await asyncErr("e").recoverErrCases((matcher) => matcher.with(P._, () => 1))).get(),
+    ).toBe(1);
   });
 
   it("a triage branch returning the injected defect(cause) becomes a Defect on every transformer", async () => {
     const boom2 = new Error("boom2");
     expect(
       (
-        await asyncErr("e").mapErr((matcher, defect) => matcher.with(P._, (_e) => defect(boom2)))
-      ).isDefect(),
-    ).toBe(true);
-    expect(
-      (
-        await asyncErr("e").flatMapErr((matcher, defect) =>
+        await asyncErr("e").mapErrCases((matcher, defect) =>
           matcher.with(P._, (_e) => defect(boom2)),
         )
       ).isDefect(),
     ).toBe(true);
     expect(
       (
-        await asyncErr("e").recoverErr((matcher, defect) =>
+        await asyncErr("e").flatMapErrCases((matcher, defect) =>
+          matcher.with(P._, (_e) => defect(boom2)),
+        )
+      ).isDefect(),
+    ).toBe(true);
+    expect(
+      (
+        await asyncErr("e").recoverErrCases((matcher, defect) =>
           matcher.with(P._, (_e) => defect(boom2)),
         )
       ).isDefect(),
     ).toBe(true);
   });
 
-  it("tapErr runs the side effect and preserves the error", async () => {
+  it("tapErrCases runs the side effect and preserves the error", async () => {
     const seen: string[] = [];
-    const r = await asyncErr("e").tapErr((matcher) => matcher.with(P._, (s) => seen.push(s)));
+    const r = await asyncErr("e").tapErrCases((matcher) => matcher.with(P._, (s) => seen.push(s)));
     expect(seen).toEqual(["e"]);
     expect(r.getErr()).toBe("e");
   });
 
-  it("flatTapErr keeps the original error when the effect succeeds", async () => {
-    const r = await asyncErr("e").flatTapErr((matcher) => matcher.with(P._, () => Ok("ignored")));
+  it("flatTapErrCases keeps the original error when the effect succeeds", async () => {
+    const r = await asyncErr("e").flatTapErrCases((matcher) =>
+      matcher.with(P._, () => Ok("ignored")),
+    );
     expect(r.getErr()).toBe("e");
   });
 
-  it("flatTapErr threads the effect's Err", async () => {
+  it("flatTapErrCases threads the effect's Err", async () => {
     expect(
       (
-        await asyncErr("e").flatTapErr((matcher) => matcher.with(P._, () => Err("log_failed")))
+        await asyncErr("e").flatTapErrCases((matcher) => matcher.with(P._, () => Err("log_failed")))
       ).getErr(),
     ).toBe("log_failed");
   });
 
-  it("flatTapErr composes an async effect via a qualified boundary, keeping the error", async () => {
-    const r = await asyncErr("e").flatTapErr((matcher) =>
+  it("flatTapErrCases composes an async effect via a qualified boundary, keeping the error", async () => {
+    const r = await asyncErr("e").flatTapErrCases((matcher) =>
       matcher.with(P._, () => fromSafePromise(Promise.resolve("logged"))),
     );
     expect(r.getErr()).toBe("e");
   });
 
-  it("flatTapErr does not run the effect on Ok or Defect", async () => {
+  it("flatTapErrCases does not run the effect on Ok or Defect", async () => {
     const f = vi.fn(() => Ok(1));
-    expect((await asyncOk(1).flatTapErr((matcher) => matcher.with(P._, f))).get()).toBe(1);
-    expect((await asyncDefect().flatTapErr((matcher) => matcher.with(P._, f))).isDefect()).toBe(
-      true,
-    );
+    expect((await asyncOk(1).flatTapErrCases((matcher) => matcher.with(P._, f))).get()).toBe(1);
+    expect(
+      (await asyncDefect().flatTapErrCases((matcher) => matcher.with(P._, f))).isDefect(),
+    ).toBe(true);
     expect(f).not.toHaveBeenCalled();
   });
 
-  it("tapErr: a throwing callback preserves the original error in an AggregateError", async () => {
+  it("tapErrCases: a throwing callback preserves the original error in an AggregateError", async () => {
     const thrown = new Error("boom");
-    const r = await asyncErr("original").tapErr((matcher) =>
+    const r = await asyncErr("original").tapErrCases((matcher) =>
       matcher.with(P._, () => {
         throw thrown;
       }),
@@ -319,9 +329,9 @@ describe("AsyncResult error channel", () => {
     }
   });
 
-  it("flatTapErr: a throwing callback preserves the original error in an AggregateError", async () => {
+  it("flatTapErrCases: a throwing callback preserves the original error in an AggregateError", async () => {
     const thrown = new Error("boom");
-    const r = await asyncErr("original").flatTapErr((matcher) =>
+    const r = await asyncErr("original").flatTapErrCases((matcher) =>
       matcher.with(P._, () => {
         throw thrown;
       }),
@@ -337,10 +347,12 @@ describe("AsyncResult Defect channel", () => {
   it("a Defect flows through the success and error combinators untouched", async () => {
     const f = vi.fn();
     expect((await asyncDefect().map(f)).isDefect()).toBe(true);
-    expect((await asyncDefect().mapErr((matcher) => matcher.with(P._, f))).isDefect()).toBe(true);
-    expect((await asyncDefect().recoverErr((matcher) => matcher.with(P._, f))).isDefect()).toBe(
+    expect((await asyncDefect().mapErrCases((matcher) => matcher.with(P._, f))).isDefect()).toBe(
       true,
     );
+    expect(
+      (await asyncDefect().recoverErrCases((matcher) => matcher.with(P._, f))).isDefect(),
+    ).toBe(true);
     expect(f).not.toHaveBeenCalled();
   });
 

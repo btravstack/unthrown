@@ -224,13 +224,13 @@ type _errViewNarrow = Expect<
 const flatTapped = r1.flatTap(() => Err<"e2">("e2"));
 type _flatTapped = Expect<Equal<typeof flatTapped, Result<number, "e1" | "e2">>>;
 
-// flatTapErr KEEPS the value type and widens the error channel (error-side mirror);
+// flatTapErrCases KEEPS the value type and widens the error channel (error-side mirror);
 // as an observer it takes the *partial* triage object
-const flatTapErred = r1.flatTapErr((matcher) => matcher.with(P._, () => Err<"e2">("e2")));
+const flatTapErred = r1.flatTapErrCases((matcher) => matcher.with(P._, () => Err<"e2">("e2")));
 type _flatTapErred = Expect<Equal<typeof flatTapErred, Result<number, "e1" | "e2">>>;
 
-// recoverErr empties the error channel (to `never`)
-const recovered = r1.recoverErr((matcher) => matcher.with(P._, () => 0));
+// recoverErrCases empties the error channel (to `never`)
+const recovered = r1.recoverErrCases((matcher) => matcher.with(P._, () => 0));
 type _recovered = Expect<Equal<typeof recovered, Result<number, never>>>;
 
 // discard collapses the success type to `void` (not `undefined`) — and the async mirror
@@ -240,10 +240,10 @@ type _discarded = Expect<Equal<typeof discarded, Result<void, "e1">>>;
 const discardedAsync = ar.discard();
 type _discardedAsync = Expect<Equal<typeof discardedAsync, AsyncResult<void, "e">>>;
 
-// map changes the value type; mapErr changes the error type
+// map changes the value type; mapErrCases changes the error type
 const mapped = r1.map((n) => `${n}`);
 type _mapped = Expect<Equal<typeof mapped, Result<string, "e1">>>;
-const errMapped = r1.mapErr((matcher) => matcher.with(P._, () => 0 as const));
+const errMapped = r1.mapErrCases((matcher) => matcher.with(P._, () => 0 as const));
 type _errMapped = Expect<Equal<typeof errMapped, Result<number, 0>>>;
 
 // --- do-notation: bind/let accumulate a named scope, errors union ------------
@@ -444,18 +444,18 @@ new WithMsg({ ticketId: "t1" });
   // @ts-expect-error — async map callback is banned (sync surface)
   r.map(async (n) => n + 1);
   // A raw Promise / async branch would bypass qualification where the
-  // combinator awaits it — flatMapErr / flatTapErr — so those reject it via
-  // their builder-output constraint; tapErr rejects it too, because its branch
+  // combinator awaits it — flatMapErrCases / flatTapErrCases — so those reject it via
+  // their builder-output constraint; tapErrCases rejects it too, because its branch
   // results are DISCARDED (a rejected Promise would float unobserved). Only
-  // the non-awaiting transformers mapErr / recoverErr run the handler
+  // the non-awaiting transformers mapErrCases / recoverErrCases run the handler
   // synchronously with no await, so an async branch there is merely a visible
   // Promise-valued result, not a rejection bypass.
-  // @ts-expect-error — an async flatMapErr branch is banned
-  r.flatMapErr((matcher) => matcher.with(P._, async () => Ok(1)));
-  // @ts-expect-error — an async flatTapErr branch is banned
-  r.flatTapErr((matcher) => matcher.with(P._, async () => Ok(1)));
-  // @ts-expect-error — an async tapErr branch is banned (discarded, would float)
-  r.tapErr((matcher) => matcher.with(P._, async () => {}));
+  // @ts-expect-error — an async flatMapErrCases branch is banned
+  r.flatMapErrCases((matcher) => matcher.with(P._, async () => Ok(1)));
+  // @ts-expect-error — an async flatTapErrCases branch is banned
+  r.flatTapErrCases((matcher) => matcher.with(P._, async () => Ok(1)));
+  // @ts-expect-error — an async tapErrCases branch is banned (discarded, would float)
+  r.tapErrCases((matcher) => matcher.with(P._, async () => {}));
   // @ts-expect-error — async tapDefect callback is banned
   r.tapDefect(async () => {});
   // @ts-expect-error — async tapFailure callback is banned
@@ -467,12 +467,12 @@ new WithMsg({ ticketId: "t1" });
   ar.tap(async () => {});
   // @ts-expect-error — async map callback is banned (async surface)
   ar.map(async (n) => n + 1);
-  // @ts-expect-error — an async flatMapErr branch is banned (async surface)
-  ar.flatMapErr((matcher) => matcher.with(P._, async () => Ok(1)));
-  // @ts-expect-error — an async flatTapErr branch is banned (async surface)
-  ar.flatTapErr((matcher) => matcher.with(P._, async () => Ok(1)));
-  // @ts-expect-error — an async tapErr branch is banned (async surface)
-  ar.tapErr((matcher) => matcher.with(P._, async () => {}));
+  // @ts-expect-error — an async flatMapErrCases branch is banned (async surface)
+  ar.flatMapErrCases((matcher) => matcher.with(P._, async () => Ok(1)));
+  // @ts-expect-error — an async flatTapErrCases branch is banned (async surface)
+  ar.flatTapErrCases((matcher) => matcher.with(P._, async () => Ok(1)));
+  // @ts-expect-error — an async tapErrCases branch is banned (async surface)
+  ar.tapErrCases((matcher) => matcher.with(P._, async () => {}));
   // @ts-expect-error — async tapDefect callback is banned (async surface)
   ar.tapDefect(async () => {});
   // @ts-expect-error — async tapFailure callback is banned (async surface)
@@ -484,7 +484,7 @@ new WithMsg({ ticketId: "t1" });
   // Synchronous callbacks still infer exactly as before.
   const mapped = r.map((n) => n + 1);
   type _MapKeeps = Expect<Equal<typeof mapped, Result<number, "e">>>;
-  const recovered = r.recoverErr((matcher) => matcher.with(P._, (e) => e.length));
+  const recovered = r.recoverErrCases((matcher) => matcher.with(P._, (e) => e.length));
   type _RecoverKeeps = Expect<Equal<typeof recovered, Result<number, never>>>;
 
   // match handlers may still be async (edge elimination is not a combinator):
@@ -583,7 +583,7 @@ new WithMsg({ ticketId: "t1" });
   type _Widens = Expect<Equal<typeof widened, number | null>>;
 }
 
-// --- error triage: mapErr/flatMapErr/recoverErr take a ts-pattern matcher and
+// --- error triage: mapErrCases/flatMapErrCases/recoverErrCases take a ts-pattern matcher and
 // --- call `.exhaustive()` for you; the callback returns the un-terminated builder
 
 {
@@ -593,7 +593,7 @@ new WithMsg({ ticketId: "t1" });
   const r = Ok(1) as Result<number, NotFound | Conflict>;
 
   // exhaustive per-tag; the outgoing E is the union of the branch returns
-  const triaged = r.mapErr((matcher) =>
+  const triaged = r.mapErrCases((matcher) =>
     matcher
       .with(tag("NotFound"), (e) => `nf:${e.id}` as const)
       .with(tag("Conflict"), () => new Mapped()),
@@ -601,7 +601,7 @@ new WithMsg({ ticketId: "t1" });
   type _Triaged = Expect<Equal<ErrOf<typeof triaged>, `nf:${string}` | Mapped>>;
 
   // each branch receives the narrowed variant
-  r.mapErr((matcher) =>
+  r.mapErrCases((matcher) =>
     matcher
       .with(tag("NotFound"), (e) => {
         type _Narrowed = Expect<Equal<typeof e, NotFound>>;
@@ -611,7 +611,7 @@ new WithMsg({ ticketId: "t1" });
   );
 
   // a throwing branch types as `never` and drops out of the outgoing union
-  const thrown = r.mapErr((matcher) =>
+  const thrown = r.mapErrCases((matcher) =>
     matcher
       .with(tag("NotFound"), () => new Mapped())
       .with(tag("Conflict"), (e) => {
@@ -623,17 +623,17 @@ new WithMsg({ ticketId: "t1" });
   // the sanctioned deliberate-defect form: the injected `defect` helper — its
   // Defect arm is subtracted from the outgoing union (Exclude<O, Defect>, the
   // same inference as a qualify boundary)
-  const defected = r.mapErr((matcher, defect) =>
+  const defected = r.mapErrCases((matcher, defect) =>
     matcher.with(tag("NotFound"), () => new Mapped()).with(tag("Conflict"), (e) => defect(e.key)),
   );
   type _DefectDrops = Expect<Equal<ErrOf<typeof defected>, Mapped>>;
 
   // P._ is the uniform catch-all; a defect-only match empties the channel
-  const allDefected = r.mapErr((matcher, defect) => matcher.with(P._, (e) => defect(e)));
+  const allDefected = r.mapErrCases((matcher, defect) => matcher.with(P._, (e) => defect(e)));
   type _AllDefected = Expect<Equal<typeof allDefected, Result<number, never>>>;
 
   // the P._ catch-all receives the full union
-  const merged = r.mapErr((matcher) =>
+  const merged = r.mapErrCases((matcher) =>
     matcher.with(P._, (e) => {
       type _MergedParam = Expect<Equal<typeof e, NotFound | Conflict>>;
       return e;
@@ -644,37 +644,37 @@ new WithMsg({ ticketId: "t1" });
   // NOT exhaustive: a missing case makes `.exhaustive()` uncallable, so the
   // builder is not an ExhaustiveMatch and the call fails at the call site
   // @ts-expect-error — Conflict is unhandled
-  r.mapErr((matcher) => matcher.with(tag("NotFound"), (e) => e));
+  r.mapErrCases((matcher) => matcher.with(tag("NotFound"), (e) => e));
 
-  // flatMapErr: channels are the unions of the branch-returned Results' channels
-  const flat = r.flatMapErr((matcher) =>
+  // flatMapErrCases: channels are the unions of the branch-returned Results' channels
+  const flat = r.flatMapErrCases((matcher) =>
     matcher.with(tag("NotFound"), (e) => Ok(e.id)).with(tag("Conflict"), () => Err(new Mapped())),
   );
   type _FlatT = Expect<Equal<typeof flat, Result<number | string, Mapped>>>;
 
-  // flatMapErr: a defect branch contributes to neither channel
-  const flatDefected = r.flatMapErr((matcher, defect) =>
+  // flatMapErrCases: a defect branch contributes to neither channel
+  const flatDefected = r.flatMapErrCases((matcher, defect) =>
     matcher.with(tag("NotFound"), (e) => Ok(e.id)).with(tag("Conflict"), (e) => defect(e.key)),
   );
   type _FlatDefected = Expect<Equal<typeof flatDefected, Result<number | string, never>>>;
 
-  // recoverErr: recovers per tag, unioning the recovered values; E empties
-  const rec = r.recoverErr((matcher) =>
+  // recoverErrCases: recovers per tag, unioning the recovered values; E empties
+  const rec = r.recoverErrCases((matcher) =>
     matcher.with(tag("NotFound"), (e) => e.id).with(tag("Conflict"), () => 0 as const),
   );
   type _Rec = Expect<Equal<typeof rec, Result<number | string | 0, never>>>;
 
-  // recoverErr: a defect branch does not widen the recovered success type
-  const recDefected = r.recoverErr((matcher, defect) =>
+  // recoverErrCases: a defect branch does not widen the recovered success type
+  const recDefected = r.recoverErrCases((matcher, defect) =>
     matcher.with(tag("NotFound"), (e) => e.id).with(tag("Conflict"), (e) => defect(e.key)),
   );
   type _RecDefected = Expect<Equal<typeof recDefected, Result<number | string, never>>>;
 
   // observers are exhaustive too (use P._ for a catch-all); the error passes
   // through unchanged
-  const observed = r.tapErr((matcher) => matcher.with(P._, (e) => void e));
+  const observed = r.tapErrCases((matcher) => matcher.with(P._, (e) => void e));
   type _Observed = Expect<Equal<typeof observed, Result<number, NotFound | Conflict>>>;
-  const flatObserved = r.flatTapErr((matcher) =>
+  const flatObserved = r.flatTapErrCases((matcher) =>
     matcher.with(P._, () => Err("audit-failed" as const)),
   );
   type _FlatObserved = Expect<
@@ -683,7 +683,7 @@ new WithMsg({ ticketId: "t1" });
 
   // async surface mirrors the matcher; branches may return AsyncResults
   const ar2 = r.toAsync();
-  const aflat = ar2.flatMapErr((matcher) =>
+  const aflat = ar2.flatMapErrCases((matcher) =>
     matcher
       .with(tag("NotFound"), (e) => OkAsync(e.id))
       .with(tag("Conflict"), () => Err(new Mapped())),
@@ -699,13 +699,13 @@ new WithMsg({ ticketId: "t1" });
 {
   // untagged E (a bare string): match by value, P._ is the catch-all
   const untagged = Ok(1) as Result<number, string>;
-  const mapped = untagged.mapErr((matcher) => matcher.with(P._, (e) => e.length));
+  const mapped = untagged.mapErrCases((matcher) => matcher.with(P._, (e) => e.length));
   type _Mapped = Expect<Equal<ErrOf<typeof mapped>, number>>;
 
   // a `code`-discriminated union (the orpc shape) — no `_tag`, matched on `code`
   type CodeErr = { code: "NOT_FOUND"; x: 1 } | { code: "FORBIDDEN"; y: 2 };
   const coded = Ok(1) as Result<number, CodeErr>;
-  const byCode = coded.mapErr((matcher) =>
+  const byCode = coded.mapErrCases((matcher) =>
     matcher
       .with({ code: "NOT_FOUND" }, () => 404 as const)
       .with({ code: "FORBIDDEN" }, () => 403 as const),
@@ -715,15 +715,15 @@ new WithMsg({ ticketId: "t1" });
   // NOT exhaustive → the builder's `.exhaustive` is a NonExhaustiveError, not a
   // function, so it fails the ExhaustiveMatch constraint at the call site
   // @ts-expect-error — FORBIDDEN is unhandled
-  coded.mapErr((matcher) => matcher.with({ code: "NOT_FOUND" }, () => 1));
+  coded.mapErrCases((matcher) => matcher.with({ code: "NOT_FOUND" }, () => 1));
 
   // an empty channel (`E = never`): `match(never)` is vacuously exhaustive, so
   // even a matcher with no branches type-checks
   const empty = Ok(1) as Result<number, never>;
-  const still = empty.mapErr((matcher) => matcher);
+  const still = empty.mapErrCases((matcher) => matcher);
   type _Still = Expect<Equal<typeof still, Result<number, never>>>;
 
   // observers are exhaustive too, but the error passes through unchanged
-  const observed = coded.tapErr((matcher) => matcher.with(P._, () => undefined));
+  const observed = coded.tapErrCases((matcher) => matcher.with(P._, () => undefined));
   type _Observed = Expect<Equal<typeof observed, Result<number, CodeErr>>>;
 }

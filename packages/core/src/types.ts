@@ -91,7 +91,7 @@ export type MatchErrOut<M> = Exclude<MatchOut<M>, Defect>;
 
 /**
  * The fluent method surface every {@link Result} variant carries — the
- * combinators (`map`, `flatMap`, `mapErr`, `match`, `get`, …), documented one
+ * combinators (`map`, `flatMap`, `mapErrCases`, `match`, `get`, …), documented one
  * per entry below. Factored out so the three variants ({@link OkView},
  * {@link ErrView}, {@link DefectView}) can each intersect it; {@link AsyncResult}
  * mirrors this surface with async signatures.
@@ -274,7 +274,7 @@ export type ResultMethods<out T, out E> = {
    * @remarks
    * The callback receives `match(error)` (an {@link ErrMatcher}) and the
    * injected `defect` helper. Chain `.with(pattern, handler)` and **return the
-   * un-terminated builder** — `mapErr` calls `.exhaustive()` itself, so a
+   * un-terminated builder** — `mapErrCases` calls `.exhaustive()` itself, so a
    * missing case is a compile error at the call site (there is no `.exhaustive()`
    * to forget, and no way to slip in `.otherwise()`). The outgoing error type is
    * the union of the branch returns with the `Defect` arm subtracted
@@ -289,7 +289,7 @@ export type ResultMethods<out T, out E> = {
    * @typeParam M - the exhaustive builder the callback returns.
    * @param f - builds the match over the error (returns the un-terminated builder).
    */
-  mapErr<M extends ExhaustiveMatch<unknown>>(
+  mapErrCases<M extends ExhaustiveMatch<unknown>>(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
   ): Result<T, MatchErrOut<M>>;
 
@@ -305,7 +305,7 @@ export type ResultMethods<out T, out E> = {
    * @typeParam M - the exhaustive builder the callback returns.
    * @param f - builds the match; each branch produces a fallback `Result`.
    */
-  flatMapErr<M extends ExhaustiveMatch<Result<unknown, unknown> | Defect>>(
+  flatMapErrCases<M extends ExhaustiveMatch<Result<unknown, unknown> | Defect>>(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
   ): Result<T | OkOf<MatchOut<M>>, ErrOf<MatchOut<M>>>;
 
@@ -323,7 +323,7 @@ export type ResultMethods<out T, out E> = {
    * @typeParam M - the exhaustive builder the callback returns.
    * @param f - builds the match; each branch produces a success value.
    */
-  recoverErr<M extends ExhaustiveMatch<unknown>>(
+  recoverErrCases<M extends ExhaustiveMatch<unknown>>(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
   ): Result<T | MatchErrOut<M>, never>;
 
@@ -341,11 +341,11 @@ export type ResultMethods<out T, out E> = {
    * because the branch results are discarded, a returned `Promise` would float
    * unobserved and its rejection would vanish. A failable
    * `Result`-returning effect belongs in
-   * {@link ResultMethods.flatTapErr | flatTapErr}.
+   * {@link ResultMethods.flatTapErrCases | flatTapErrCases}.
    *
    * @param f - builds the match; branch returns are ignored.
    */
-  tapErr<R>(
+  tapErrCases<R>(
     f: (
       matcher: ErrMatcher<E>,
       defect: (cause: unknown) => Defect,
@@ -370,7 +370,7 @@ export type ResultMethods<out T, out E> = {
    * @typeParam M - the exhaustive builder the callback returns.
    * @param f - builds the match; each branch is a failable effect (its `Ok` is ignored).
    */
-  flatTapErr<E2>(
+  flatTapErrCases<E2>(
     f: (
       matcher: ErrMatcher<E>,
       defect: (cause: unknown) => Defect,
@@ -406,7 +406,7 @@ export type ResultMethods<out T, out E> = {
    * Run a side effect on **any failure** — `Err` or `Defect` — and pass the
    * `Result` through unchanged. The one cross-channel observer, for the shared
    * "it went KO" concern (logging, metrics, rollback) that would otherwise be
-   * duplicated across {@link ResultMethods.tapErr | tapErr} and
+   * duplicated across {@link ResultMethods.tapErrCases | tapErrCases} and
    * {@link ResultMethods.tapDefect | tapDefect}.
    *
    * @remarks
@@ -417,7 +417,7 @@ export type ResultMethods<out T, out E> = {
    * treat it opaquely for a shared logger. Runs on `Err` and `Defect`; `Ok`
    * passes through. It **observes without consuming**: the failure flows on
    * unchanged — to also recover, use
-   * {@link ResultMethods.recoverErr | recoverErr} /
+   * {@link ResultMethods.recoverErrCases | recoverErrCases} /
    * {@link ResultMethods.recoverDefect | recoverDefect} (deliberately separate
    * acts) or {@link ResultMethods.match | match} at the edge. If `f` throws, the
    * result is a `Defect` whose cause is an `AggregateError` of `[thrown,
@@ -462,7 +462,7 @@ export type ResultMethods<out T, out E> = {
    *
    * @remarks
    * Compiles only when the error channel is empty (`E = never`) — eliminate
-   * modeled errors first (`match` / `recoverErr` / `flatMapErr`), or reach for the
+   * modeled errors first (`match` / `recoverErrCases` / `flatMapErrCases`), or reach for the
    * `getOr` / `getOrElse` / `getOrNull` / `getOrUndefined` family (which
    * recover an `Err`). If you get a `'this' context` type error here, that is
    * the gate: the receiver still has a non-`never` error channel.
@@ -526,8 +526,8 @@ export type ResultMethods<out T, out E> = {
    * `throw` behind a method, so a `no-throw` lint rule can ban raw throws while
    * this one sanctioned extraction remains — _not_ to replace principled
    * handling. When you can keep the error a value, prefer
-   * {@link ResultMethods.match | match} / {@link ResultMethods.recoverErr | recoverErr} /
-   * {@link ResultMethods.flatMapErr | flatMapErr}.
+   * {@link ResultMethods.match | match} / {@link ResultMethods.recoverErrCases | recoverErrCases} /
+   * {@link ResultMethods.flatMapErrCases | flatMapErrCases}.
    *
    * Type-gated as the **complement** of {@link ResultMethods.get | get}: it
    * compiles only when the error channel is **non-empty** (`E` is not `never`) —
@@ -701,7 +701,7 @@ export type Awaitable<out T> = {
 
 /**
  * The async method surface every {@link AsyncResult} carries — the combinators
- * (`map`, `flatMap`, `mapErr`, `match`, `get`, …) with their asynchronous
+ * (`map`, `flatMap`, `mapErrCases`, `match`, `get`, …) with their asynchronous
  * signatures, documented one per entry below. The async mirror of
  * {@link ResultMethods}: each entry links its synchronous counterpart and states
  * only the async delta.
@@ -807,19 +807,19 @@ export type AsyncResultMethods<out T, out E> = {
   ): AsyncResult<T, E | E2>;
 
   /**
-   * Asynchronous {@link ResultMethods.mapErr | mapErr} — the same exhaustive
+   * Asynchronous {@link ResultMethods.mapErrCases | mapErrCases} — the same exhaustive
    * {@link ErrMatcher} form; the combinator calls `.exhaustive()`.
    */
-  mapErr<M extends ExhaustiveMatch<unknown>>(
+  mapErrCases<M extends ExhaustiveMatch<unknown>>(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
   ): AsyncResult<T, MatchErrOut<M>>;
 
   /**
-   * Asynchronous {@link ResultMethods.flatMapErr | flatMapErr} — the same
+   * Asynchronous {@link ResultMethods.flatMapErrCases | flatMapErrCases} — the same
    * exhaustive {@link ErrMatcher} form. Unlike the sync form, a branch may
    * return a `Result` **or** an `AsyncResult`.
    */
-  flatMapErr<
+  flatMapErrCases<
     M extends ExhaustiveMatch<Result<unknown, unknown> | AsyncResult<unknown, unknown> | Defect>,
   >(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
@@ -829,16 +829,16 @@ export type AsyncResultMethods<out T, out E> = {
   >;
 
   /**
-   * Asynchronous {@link ResultMethods.recoverErr | recoverErr} — the same
+   * Asynchronous {@link ResultMethods.recoverErrCases | recoverErrCases} — the same
    * exhaustive {@link ErrMatcher} form. Branches are synchronous; a throw
    * becomes a `Defect`.
    */
-  recoverErr<M extends ExhaustiveMatch<unknown>>(
+  recoverErrCases<M extends ExhaustiveMatch<unknown>>(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
   ): AsyncResult<T | MatchErrOut<M>, never>;
 
   /**
-   * Asynchronous {@link ResultMethods.tapErr | tapErr}. `f` is synchronous; if it
+   * Asynchronous {@link ResultMethods.tapErrCases | tapErrCases}. `f` is synchronous; if it
    * throws, the result is a `Defect` whose cause is an `AggregateError` of
    * `[thrown, original failure]` — observing a failure never destroys it. An
    * async branch is rejected at compile time ({@link NotThenable} on the
@@ -846,9 +846,9 @@ export type AsyncResultMethods<out T, out E> = {
    * would float unobserved. The
    * {@link AsyncResultMethods.tap | tap} fire-and-forget caveat applies here
    * too — a failable effect belongs in
-   * {@link AsyncResultMethods.flatTapErr | flatTapErr}.
+   * {@link AsyncResultMethods.flatTapErrCases | flatTapErrCases}.
    */
-  tapErr<R>(
+  tapErrCases<R>(
     f: (
       matcher: ErrMatcher<E>,
       defect: (cause: unknown) => Defect,
@@ -856,14 +856,14 @@ export type AsyncResultMethods<out T, out E> = {
   ): AsyncResult<T, E>;
 
   /**
-   * Asynchronous {@link ResultMethods.flatTapErr | flatTapErr} — the
+   * Asynchronous {@link ResultMethods.flatTapErrCases | flatTapErrCases} — the
    * error-channel mirror of `flatTap`. `f` may return a `Result` **or** an
    * `AsyncResult`; its `Ok` value is discarded, an `Err`/`Defect` from `f`
    * threads through, and if `f` throws, the result is a `Defect` whose cause is
    * an `AggregateError` of `[thrown, original failure]` — observing a failure
    * never destroys it.
    */
-  flatTapErr<E2>(
+  flatTapErrCases<E2>(
     f: (
       matcher: ErrMatcher<E>,
       defect: (cause: unknown) => Defect,
@@ -946,7 +946,7 @@ export type AsyncResultMethods<out T, out E> = {
  * {@link fromPromise} forces. To do further async work, re-enter through a
  * qualified boundary and compose it: `ar.flatMap((v) => fromPromise(work(v),
  * qualify))`. The eliminators (`get`, …) return promises; the binds
- * (`flatMap`, `flatTap`, `flatMapErr`, `recoverDefect`) additionally accept an
+ * (`flatMap`, `flatTap`, `flatMapErrCases`, `recoverDefect`) additionally accept an
  * `AsyncResult`. Its combinators are documented one per entry on
  * {@link AsyncResultMethods}.
  *
