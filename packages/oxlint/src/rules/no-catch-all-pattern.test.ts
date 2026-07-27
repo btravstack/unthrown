@@ -26,6 +26,10 @@ ruleTester.run("no-catch-all-pattern", noCatchAllPattern, {
     {
       code: `import { P } from "unthrown";\nconst _ = 1;\nconsole.log(_);`,
     },
+    // Computed access with a DYNAMIC key can't be resolved statically — left alone.
+    {
+      code: `import { P } from "unthrown";\nconst k = "_";\nm.with(P[k], (e) => e);`,
+    },
   ],
   invalid: [
     // `P._` from unthrown — the catch-all.
@@ -56,6 +60,15 @@ ruleTester.run("no-catch-all-pattern", noCatchAllPattern, {
     // Matching a whole Result with the wildcard is caught as well.
     {
       code: `import { match, P } from "unthrown";\nmatch(result).with(P._, () => 0).exhaustive();`,
+      errors: [{ messageId: "noCatchAll" }],
+    },
+    // Computed access with a string literal is the same catch-all — no bypass.
+    {
+      code: `import { P } from "unthrown";\nm.with(P["_"], (e) => e);`,
+      errors: [{ messageId: "noCatchAll" }],
+    },
+    {
+      code: `import { P } from "unthrown";\nm.with(P["any"], (e) => e);`,
       errors: [{ messageId: "noCatchAll" }],
     },
   ],

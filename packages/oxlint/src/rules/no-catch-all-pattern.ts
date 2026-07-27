@@ -46,11 +46,21 @@ export const noCatchAllPattern = defineRule({
   createOnce: (context) => {
     return {
       MemberExpression: (node) => {
-        // Only bare `P._` / `P.any`: a non-computed property on an identifier.
-        if (node.computed) return;
         if (node.object.type !== "Identifier") return;
-        if (node.property.type !== "Identifier") return;
-        if (!CATCH_ALL_PROPS.has(node.property.name)) return;
+
+        // The catch-all is written `P._` / `P.any` (dot access) or `P["_"]` /
+        // `P["any"]` (computed access with a string literal) — both are the same
+        // pattern, so both are flagged. A computed access with a dynamic key
+        // (`P[k]`) is left alone: it can't be resolved statically.
+        const prop =
+          !node.computed && node.property.type === "Identifier"
+            ? node.property.name
+            : node.computed &&
+                node.property.type === "Literal" &&
+                typeof node.property.value === "string"
+              ? node.property.value
+              : undefined;
+        if (prop === undefined || !CATCH_ALL_PROPS.has(prop)) return;
 
         const scope = context.sourceCode.getScope(node);
         const binding = getImportBinding(scope, node.object);
@@ -59,7 +69,7 @@ export const noCatchAllPattern = defineRule({
         context.report({
           node,
           messageId: "noCatchAll",
-          data: { prop: node.property.name },
+          data: { prop },
         });
       },
     };
