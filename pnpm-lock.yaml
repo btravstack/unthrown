@@ -40,8 +40,8 @@ catalogs:
       specifier: 2.0.0-beta.15
       version: 2.0.0-beta.15
     '@orpc/server':
-      specifier: 2.0.0-beta.15
-      version: 2.0.0-beta.15
+      specifier: 2.0.0-beta.18
+      version: 2.0.0-beta.18
     '@prisma/adapter-better-sqlite3':
       specifier: 7.8.0
       version: 7.8.0
@@ -356,7 +356,7 @@ importers:
         version: 2.0.0-beta.15
       '@orpc/server':
         specifier: 'catalog:'
-        version: 2.0.0-beta.15
+        version: 2.0.0-beta.18
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.1
@@ -1262,11 +1262,11 @@ packages:
   '@orpc/contract@2.0.0-beta.15':
     resolution: {integrity: sha512-uwDxU40T8AQ5OwNfCuR0ORx0uYG21+zkVcBq++70t1d6La9bZttbowO+S26Vw3nFbBF4LvyNI7VSYc5wmxgknA==}
 
-  '@orpc/interop@2.0.0-beta.15':
-    resolution: {integrity: sha512-iI3bjjlLuDtM+0Vej0P5LSiuJaO5q2rwBuR/M3dxpwAdktQaFEYuGIFgoal0y/Ktmow8S+K/WiK2G0ydsokgvA==}
+  '@orpc/contract@2.0.0-beta.18':
+    resolution: {integrity: sha512-IAA3L5GCtnScsLqapJ+nJkfFK1T4YBJgR+aYbJQJdX4Gu+8Eb1u10kqddurZUWKk7wJgx7yuA0VNfzB0IPlC+g==}
 
-  '@orpc/server@2.0.0-beta.15':
-    resolution: {integrity: sha512-tmu2iy6Pugkfl1gKk4hopesoImYItsdo0UrPB8Aogu7CdCtJm0+aQVFmCAmc+B7eysIeqtoeLFz0Llf9rvkg6w==}
+  '@orpc/server@2.0.0-beta.18':
+    resolution: {integrity: sha512-5GwkBpGYd5ekSFs/PNd5T9VXt02PA1HM1zgOOnIXZvHE2RWHqI4pcZQpnjEPrto70e14xHBg+OTNlbrbt7dyUQ==}
     peerDependencies:
       crossws: '>=0.3.4'
     peerDependenciesMeta:
@@ -2208,8 +2208,8 @@ packages:
   '@standardserver/fetch@0.5.0':
     resolution: {integrity: sha512-0Sosn0v2Cl2Vhcc1st2FKGxwdK0qPq84K40TtZFAePLGq+Zu6hJZ4VsrwOWfm3S7iZ0EeRo9OByp0oUhm8NiPw==}
 
-  '@standardserver/node@0.0.32':
-    resolution: {integrity: sha512-/QrX6yvM23odYp6/3lt+BSxXida4Eo8E9Sq1kuDKaJDSg20t0WEt714dBWKsf0s2api+wDq+bmz1x9LcBRRHaw==}
+  '@standardserver/node@0.5.0':
+    resolution: {integrity: sha512-4OYFeVyVUZzWOjw9g2qf1lpWTNtjOYTr68w0zOy+AXEq3BiXoQweepoP7WgdYVJ4kmpmOwk1LOrJRqeqPrpTcQ==}
 
   '@standardserver/peer@0.0.32':
     resolution: {integrity: sha512-vSPxnNw3rajr/cNXIJrr5LhjyzF2p9uXxm2IAGMBf1BJExr3Gb9F1V5hdK7dVZAhoC2IhEleIlxhRlZ2m2tgtw==}
@@ -4813,18 +4813,23 @@ snapshots:
     transitivePeerDependencies:
       - '@opentelemetry/api'
 
-  '@orpc/interop@2.0.0-beta.15': {}
-
-  '@orpc/server@2.0.0-beta.15':
+  '@orpc/contract@2.0.0-beta.18':
     dependencies:
-      '@orpc/client': 2.0.0-beta.15
-      '@orpc/contract': 2.0.0-beta.15
-      '@orpc/interop': 2.0.0-beta.15
-      '@orpc/shared': 2.0.0-beta.15
-      '@standardserver/core': 0.0.32
-      '@standardserver/fetch': 0.0.32
-      '@standardserver/node': 0.0.32
-      '@standardserver/peer': 0.0.32
+      '@orpc/client': 2.0.0-beta.18
+      '@orpc/shared': 2.0.0-beta.18
+      '@standard-schema/spec': 1.1.0
+    transitivePeerDependencies:
+      - '@opentelemetry/api'
+
+  '@orpc/server@2.0.0-beta.18':
+    dependencies:
+      '@orpc/client': 2.0.0-beta.18
+      '@orpc/contract': 2.0.0-beta.18
+      '@orpc/shared': 2.0.0-beta.18
+      '@standardserver/core': 0.5.0
+      '@standardserver/fetch': 0.5.0
+      '@standardserver/node': 0.5.0
+      '@standardserver/peer': 0.5.0
       cookie: 2.0.1
     transitivePeerDependencies:
       - '@opentelemetry/api'
@@ -5421,11 +5426,11 @@ snapshots:
       '@standardserver/core': 0.5.0
       '@standardserver/shared': 0.5.0
 
-  '@standardserver/node@0.0.32':
+  '@standardserver/node@0.5.0':
     dependencies:
-      '@standardserver/core': 0.0.32
-      '@standardserver/fetch': 0.0.32
-      '@standardserver/shared': 0.0.32
+      '@standardserver/core': 0.5.0
+      '@standardserver/fetch': 0.5.0
+      '@standardserver/shared': 0.5.0
 
   '@standardserver/peer@0.0.32':
     dependencies:
