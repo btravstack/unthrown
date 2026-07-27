@@ -180,7 +180,7 @@ importers:
     devDependencies:
       '@btravstack/theme':
         specifier: 'catalog:'
-        version: 1.7.0(vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.1)(jiti@2.7.0)(postcss@8.5.18)(tsx@4.23.1)(typescript@6.0.3)(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))
+        version: 1.7.0(vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.1)(jiti@2.7.0)(postcss@8.5.20)(tsx@4.23.1)(typescript@6.0.3)(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.1
@@ -189,7 +189,7 @@ importers:
         version: 4.23.1
       vitepress:
         specifier: 'catalog:'
-        version: 1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.1)(jiti@2.7.0)(postcss@8.5.18)(tsx@4.23.1)(typescript@6.0.3)(yaml@2.9.0)
+        version: 1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.1)(jiti@2.7.0)(postcss@8.5.20)(tsx@4.23.1)(typescript@6.0.3)(yaml@2.9.0)
 
   packages/boxed:
     dependencies:
@@ -385,8 +385,8 @@ importers:
   packages/oxlint:
     dependencies:
       '@oxlint/plugins':
-        specifier: ^1.73.0
-        version: 1.73.0
+        specifier: ^1.74.0
+        version: 1.74.0
     devDependencies:
       '@btravstack/tsconfig':
         specifier: 'catalog:'
@@ -1758,8 +1758,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@oxlint/plugins@1.73.0':
-    resolution: {integrity: sha512-OhgMQeMmZA0dcFcX4/priaJZWdFECxiClgq6mRX6aatZEcV9PbKC3P3/v8U1hVjviT1i5U+vR8lAtBV6m4FXAA==}
+  '@oxlint/plugins@1.74.0':
+    resolution: {integrity: sha512-3tQlMDPt5hrRYedKl+M+Xq+fRjAEocMCRJaXH6ypLWu8+Oui5GMj51vjaYf/rzj6HT+JzQoUlY/I7Im2VNXzbw==}
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
 
   '@prisma/adapter-better-sqlite3@7.8.0':
@@ -3424,8 +3424,8 @@ packages:
   pkg-types@2.3.1:
     resolution: {integrity: sha512-y+ichcgc2LrADuhLNAx8DFjVfgz91pRxfZdI3UDhxHvcVEZsenLO+7XaU5vOp0u/7V/wZ+plyuQxtrDlZJ+yeg==}
 
-  postcss@8.5.18:
-    resolution: {integrity: sha512-xdB1oSLHbz1vRWgCDalrCqEFTWzFlhqFC5tIHLMOSUIjhm3XXQ1qrFy8S/ESr1JYRRXqM3c1QFiMZUJdUTqyMQ==}
+  postcss@8.5.20:
+    resolution: {integrity: sha512-lW616l85ucIQL+FocMmL7pQFPqBmwejrCMg+iPxyImlrANNJG9NHq/RkyCZopDhd8C3LA03PHRJDjkbGu8vvug==}
     engines: {node: ^10 || ^12 || >=14}
 
   postgres@3.4.7:
@@ -4178,9 +4178,9 @@ snapshots:
     dependencies:
       oxlint: 1.74.0
 
-  '@btravstack/theme@1.7.0(vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.1)(jiti@2.7.0)(postcss@8.5.18)(tsx@4.23.1)(typescript@6.0.3)(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))':
+  '@btravstack/theme@1.7.0(vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.1)(jiti@2.7.0)(postcss@8.5.20)(tsx@4.23.1)(typescript@6.0.3)(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))':
     dependencies:
-      vitepress: 1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.1)(jiti@2.7.0)(postcss@8.5.18)(tsx@4.23.1)(typescript@6.0.3)(yaml@2.9.0)
+      vitepress: 1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.1)(jiti@2.7.0)(postcss@8.5.20)(tsx@4.23.1)(typescript@6.0.3)(yaml@2.9.0)
     optionalDependencies:
       vue: 3.5.38(typescript@6.0.3)
 
@@ -5046,7 +5046,7 @@ snapshots:
   '@oxlint/binding-win32-x64-msvc@1.74.0':
     optional: true
 
-  '@oxlint/plugins@1.73.0': {}
+  '@oxlint/plugins@1.74.0': {}
 
   '@prisma/adapter-better-sqlite3@7.8.0':
     dependencies:
@@ -5530,7 +5530,7 @@ snapshots:
       '@vue/shared': 3.5.38
       estree-walker: 2.0.2
       magic-string: 0.30.21
-      postcss: 8.5.18
+      postcss: 8.5.20
       source-map-js: 1.2.1
 
   '@vue/compiler-ssr@3.5.38':
@@ -6601,7 +6601,7 @@ snapshots:
       exsolve: 1.1.0
       pathe: 2.0.3
 
-  postcss@8.5.18:
+  postcss@8.5.20:
     dependencies:
       nanoid: 3.3.16
       picocolors: 1.1.1
@@ -7065,7 +7065,7 @@ snapshots:
       esbuild: 0.25.12
       fdir: 6.5.0(picomatch@4.0.5)
       picomatch: 4.0.5
-      postcss: 8.5.18
+      postcss: 8.5.20
       rollup: 4.62.2
       tinyglobby: 0.2.17
     optionalDependencies:
@@ -7075,7 +7075,7 @@ snapshots:
       tsx: 4.23.1
       yaml: 2.9.0
 
-  vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.1)(jiti@2.7.0)(postcss@8.5.18)(tsx@4.23.1)(typescript@6.0.3)(yaml@2.9.0):
+  vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.1)(jiti@2.7.0)(postcss@8.5.20)(tsx@4.23.1)(typescript@6.0.3)(yaml@2.9.0):
     dependencies:
       '@docsearch/css': 3.8.2
       '@docsearch/js': 3.8.2(@algolia/client-search@5.55.1)
@@ -7096,7 +7096,7 @@ snapshots:
       vite: 6.4.3(@types/node@26.1.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
       vue: 3.5.38(typescript@6.0.3)
     optionalDependencies:
-      postcss: 8.5.18
+      postcss: 8.5.20
     transitivePeerDependencies:
       - '@algolia/client-search'
       - '@types/node'
