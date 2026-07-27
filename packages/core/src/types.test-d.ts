@@ -411,6 +411,28 @@ type _foldedObjects = Expect<
   Equal<typeof foldedObjects, { ok: number } | { bug: boolean } | { err: "TagA" | "TagB" }>
 >;
 
+// Generic-E limitation (documented in the exhaustive-error-matching guide): inside
+// a helper whose error type is still a type parameter, ts-pattern cannot prove any
+// builder exhaustive — not even `.with(P._, …)` — so `match`/`…Cases` do not
+// compile there. Generic boundary helpers use the narrowing guards instead. If a
+// future ts-pattern makes the generic case provable, this @ts-expect-error flips
+// and the guide note can be revisited.
+function _genericMatch<T, E>(result: Result<T, E>): void {
+  result.match({
+    ok: () => undefined,
+    // @ts-expect-error - P._ is not provably exhaustive over an unresolved E
+    errCases: (matcher) => matcher.with(P._, () => undefined),
+    defect: () => undefined,
+  });
+}
+// The guard-based form compiles for any E — the sanctioned generic boundary shape.
+function _genericGuards<T, E>(result: Result<T, E>): T {
+  if (result.isErr()) throw result.error;
+  if (result.isDefect()) throw result.cause;
+  return result.value;
+}
+type _genericGuardsT = Expect<Equal<ReturnType<typeof _genericGuards>, unknown>>;
+
 // `_tag` is the literal; `options.name` is independent (still a literal `_tag`)
 class Named extends TaggedError("@scope/Named", { name: "Named" }) {}
 type _namedTag = Expect<Equal<(typeof Named)["prototype"]["_tag"], "@scope/Named">>;
