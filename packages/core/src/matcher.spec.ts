@@ -153,6 +153,39 @@ describe("the built-in matcher engine", () => {
     }
   });
 
+  it("a non-plain object pattern never matches structurally — identity only", () => {
+    // A keyless class instance (Date, Error) or a foreign symbol-keyed pattern
+    // object (e.g. a real ts-pattern matcher) must NOT vacuously match every
+    // object via empty Object.entries — only reference identity matches.
+    const value = { anything: true } as unknown as "fallback";
+    const datePattern = new Date(0) as unknown as "fallback";
+    const errorPattern = new Error("x") as unknown as "fallback";
+    const foreignPattern = { [Symbol.for("@ts-pattern/matcher")]: () => ({ matched: true }) };
+    expect(
+      match(value)
+        .with(datePattern, () => "date")
+        .with(errorPattern, () => "error")
+        .with(foreignPattern as unknown as "fallback", () => "foreign")
+        .with(P._, () => "catch-all")
+        .run(),
+    ).toBe("catch-all");
+    // Identity still matches a non-plain object pattern:
+    const exact = new Date(0);
+    expect(
+      match(exact as unknown as "x")
+        .with(exact as unknown as "x", () => "same")
+        .run(),
+    ).toBe("same");
+    // Object.create(null) counts as plain (a null-prototype record):
+    const bare = Object.create(null) as Record<string, unknown>;
+    bare["k"] = 1;
+    expect(
+      match({ k: 1 } as unknown as "x")
+        .with(bare as unknown as "x", () => "bare")
+        .run(),
+    ).toBe("bare");
+  });
+
   it("arms after a match are inert (builder short-circuits)", () => {
     let sideEffect = 0;
     const out = match({ _tag: "A" } as { _tag: "A" } | { _tag: "B" })

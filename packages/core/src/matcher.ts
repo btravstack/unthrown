@@ -162,10 +162,27 @@ export class NonExhaustiveError extends Error {
 }
 
 /**
+ * Is `x` a *plain* object (prototype `Object.prototype` or `null`) — an object
+ * literal, the only object shape that acts as a structural pattern?
+ *
+ * @internal
+ */
+function isPlainObject(x: object): x is Record<string, unknown> {
+  const proto: unknown = Object.getPrototypeOf(x);
+  return proto === Object.prototype || proto === null;
+}
+
+/**
  * Runtime test: does `pattern` match `value`? A branded `P.*` pattern applies
- * its predicate; a plain object matches when every key matches recursively
+ * its predicate; a **plain-object** pattern (an object literal, e.g. the
+ * `{ _tag }` produced by `tag()`) matches when every key matches recursively
  * (extra keys on the value are ignored — matching is structural); anything
- * else is compared with `Object.is`.
+ * else — primitives, but also class instances, arrays, and foreign pattern
+ * objects (e.g. a real ts-pattern matcher, whose keys are symbols) — is
+ * compared with `Object.is`. Restricting structural matching to plain objects
+ * is load-bearing: a keyless non-plain object (`new Date()`, `new Error()`, a
+ * symbol-keyed foreign pattern) would otherwise vacuously match *every* object
+ * via an empty `Object.entries`.
  *
  * @internal
  */
@@ -173,6 +190,12 @@ function matches(pattern: unknown, value: unknown): boolean {
   if (typeof pattern === "object" && pattern !== null) {
     const predicate = (pattern as PatternMatcher<unknown>)[PATTERN_BRAND];
     if (typeof predicate === "function") return predicate(value);
+    // A symbol-keyed plain object is a *foreign* pattern protocol (e.g. a raw
+    // ts-pattern matcher object) — it would look empty to `Object.entries` and
+    // vacuously match everything. Fail closed: identity only.
+    if (!isPlainObject(pattern) || Object.getOwnPropertySymbols(pattern).length > 0) {
+      return Object.is(pattern, value);
+    }
     if (typeof value !== "object" || value === null) return false;
     return Object.entries(pattern).every(([key, sub]) =>
       matches(sub, (value as Record<string, unknown>)[key]),
