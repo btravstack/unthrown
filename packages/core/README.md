@@ -7,13 +7,11 @@
 [API Reference](https://btravstack.github.io/unthrown/api/core/)
 
 ```sh
-pnpm add unthrown ts-pattern
+pnpm add unthrown
 ```
 
-`ts-pattern` (`^5`) is a peer dependency — it powers the exhaustive error
-matchers and is re-exported as `match` / `P`. Declaring it a peer means you own
-the single copy, so `import { P } from "ts-pattern"` composes with unthrown's
-matchers.
+No peer dependencies — the exhaustive error matcher is built-in and exported as
+`match` / `P` / `tag`.
 
 ```ts
 import { fromPromise, P, TaggedError } from "unthrown";
@@ -38,8 +36,8 @@ const status = await user.match({
 - **Qualification at every boundary** — `fromPromise` / `fromThrowable` force you
   to triage each failure into a modeled error or a defect.
 - **Tagged errors** — `TaggedError(tag)` + `tag(t)`, folded exhaustively through
-  `match`'s ts-pattern error matcher.
-- One tiny runtime dependency (`ts-pattern`, a peer you share), ESM-first, dual
+  `match`'s built-in error matcher.
+- **Zero runtime dependencies** (the matcher is built-in), ESM-first, dual
   CJS/ESM.
 
 See the [full documentation](https://btravstack.github.io/unthrown/) for the guide

@@ -20,7 +20,7 @@ and its binds also accept an `AsyncResult`). The
 The `→ Result<…>` half of each signature is the tell — it shows how the combinator
 moves the channels: `flatMap` widens `E` to `E | E2`, `recoverErrCases` empties it to
 `never`, `flatMapErrCases` widens the value to `T | U`. The error combinators take an
-[exhaustive ts-pattern matcher](#the-error-channel) rather than a single callback;
+[exhaustive matcher](#the-error-channel) rather than a single callback;
 the signatures below abbreviate its callback as `(matcher) => …`.
 
 | I want to…                                     | use               | signature                                                    | channel      |
@@ -77,7 +77,7 @@ present at runtime and flows past it untouched. See
 
 The error combinators — `mapErrCases`, `flatMapErrCases`, `recoverErrCases`, `tapErrCases`,
 `flatTapErrCases` — do not take a single callback. Their callback receives a
-[ts-pattern](https://github.com/gvergnaud/ts-pattern) match builder over the
+built-in match builder over the
 error (`match(error)`; the patterns are re-exported from `unthrown` as `P`), and
 you **return the un-terminated builder** — the combinator calls `.exhaustive()`
 for you:
@@ -97,7 +97,7 @@ A match that misses a case **does not compile** — there is no `.exhaustive()` 
 forget, and no `.otherwise()` to slip in a fallback. The rationale is in
 [Exhaustive error matching](../explanation/exhaustive-error-matching). The rules:
 
-- **Match on anything, not just `_tag`.** ts-pattern matches by structure, so a
+- **Match on anything, not just `_tag`.** The matcher matches by structure, so a
   `code`-discriminated union (the oRPC shape), a plain string, a guard
   (`.with({ code: "NOT_FOUND", id: "special" }, …)`), or grouped patterns
   (`.with(a, b, handler)` — one strategy for several cases) all work. `tag("X")`
@@ -127,7 +127,7 @@ forget, and no `.otherwise()` to slip in a fallback. The rationale is in
   _new_ effect failure (`flatTapErrCases`). `tapDefect` / `tapFailure` keep single
   callbacks — their payloads carry no discriminant to match.
 - **A non-exhaustive match is a `Defect` if it ever slips past the types.** Only
-  reachable outside the typed contract (a widened cast, a JS caller): ts-pattern
+  reachable outside the typed contract (a widened cast, a JS caller): the matcher
   throws `NonExhaustiveError`, which the combinator's throw-to-defect net turns
   into a `Defect`.
 

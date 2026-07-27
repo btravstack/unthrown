@@ -10,7 +10,7 @@ This reference is generated from the source with
   boundaries), guards, boundary interop (`fromNullable`, `fromThrowable`,
   `fromSafeThrowable`, `fromPromise`, `fromSafePromise`), aggregation (`all` /
   `allFromDict`), the tagged-error utilities (`TaggedError`, `tag`), and the
-  re-exported `ts-pattern` `match` / `P` that drive the exhaustive error matcher.
+  built-in `match` / `P` that drive the exhaustive error matcher.
 - [**@unthrown/vitest**](./vitest/) — custom Vitest matchers (`toBeOk`,
   `toBeOkWith`, `toBeErr`, `toBeErrWith`, `toBeErrTagged`, `toBeDefect`).
 - [**@unthrown/effect**](./effect/) — bijective `Result ↔ Exit` bridges

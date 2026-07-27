@@ -1,8 +1,7 @@
 // unthrown — public type surface. Pure types, no runtime.
 
-import type { match } from "ts-pattern";
-
 import type { Defect } from "./defect.js";
+import type { match } from "./matcher.js";
 
 /**
  * Flatten an intersection into a single object literal so accumulated `bind` /
@@ -43,14 +42,14 @@ export type NotThenable<R> = [R] extends [PromiseLike<unknown>]
   : unknown;
 
 /**
- * The ts-pattern match builder over an error union `E`, as produced by
+ * The built-in match builder over an error union `E`, as produced by
  * `match(error)`. This is what an error combinator's callback receives — chain
  * `.with(pattern, handler)` on it; the combinator itself calls `.exhaustive()`,
  * so the callback returns the **un-terminated** builder.
  *
  * @remarks
- * Named via `ReturnType<typeof match<E>>` so the internal ts-pattern `Match`
- * type (not part of ts-pattern's public exports) never has to be imported.
+ * Named via `ReturnType<typeof match<E>>` (i.e. `Matcher<E, E, never>`),
+ * keeping this alias stable however the builder evolves.
  *
  * @typeParam E - the error union being matched.
  * @category Types
@@ -59,8 +58,8 @@ export type ErrMatcher<E> = ReturnType<typeof match<E>>;
 
 /**
  * The shape an error-combinator callback must return: an **exhaustive**
- * ts-pattern builder. `exhaustive` is required to be *callable* — on a builder
- * that hasn't covered every case ts-pattern types it as a `NonExhaustiveError`
+ * match builder. `exhaustive` is required to be *callable* — on a builder
+ * that hasn't covered every case the matcher types it as a branded diagnostic
  * (not a function), so a non-exhaustive chain fails to satisfy this and errors
  * at the call site. `run` carries the output type.
  *
@@ -269,7 +268,7 @@ export type ResultMethods<out T, out E> = {
   ): Result<T, E | E2>;
 
   /**
-   * Transform the modeled error by **matching it exhaustively** with ts-pattern.
+   * Transform the modeled error by **matching it exhaustively**.
    *
    * @remarks
    * The callback receives `match(error)` (an {@link ErrMatcher}) and the
@@ -283,7 +282,7 @@ export type ResultMethods<out T, out E> = {
    * pass through. A branch that throws also becomes a `Defect`.
    *
    * `.with(P._, …)` is the deliberate uniform/catch-all (it makes the match
-   * exhaustive). Match on anything ts-pattern supports — `_tag`, `code`,
+   * exhaustive). Match on anything the matcher supports — `_tag`, `code`,
    * structural shape, guards, or grouped patterns `.with(a, b, handler)`.
    *
    * @typeParam M - the exhaustive builder the callback returns.
@@ -657,7 +656,7 @@ export type FailureView<E, T = never> = ErrView<E, T> | DefectView<T, E>;
  *   never appears in `E`; it is the library's third, out-of-band channel.
  *
  * Because it is a real union, you can match it natively (a `switch` on `tag`, or
- * `ts-pattern`'s `match(...).with({ tag: "Ok" }, …).exhaustive()`), *and* it
+ * the built-in `match(...).with({ tag: "Ok" }, …).exhaustive()`), *and* it
  * carries the full method surface ({@link ResultMethods}) for fluent chaining.
  * Either way, the payload (`value`/`error`/`cause`) is only reachable after you
  * narrow — so "check before you access" still holds.

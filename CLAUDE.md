@@ -64,15 +64,15 @@ was planned).
    string.
 5. **The error channel is matched exhaustively, never blanket-handled.** The
    error combinators (`mapErrCases`, `flatMapErrCases`, `recoverErrCases`, `tapErrCases`,
-   `flatTapErrCases`) do not take a single callback: their callback receives a
-   **ts-pattern match builder** over the error (`match(error)`, typed
+   `flatTapErrCases`) do not take a single callback: their callback receives the
+   **built-in match builder** over the error (`match(error)`, typed
    `ErrMatcher<E>`) plus the injected `defect` helper, and **returns the
    un-terminated builder** — the combinator calls `.exhaustive()` itself. So a
    match that misses a case **does not compile** (there is no `.exhaustive()`
    to forget, and no `.otherwise()` to smuggle in a fallback), and enriching
    `E` — a new tag, a new `code` — is a compile error at _every_ consuming
    site until each is handled. This is the payoff of errors-as-values: the
-   values cannot be silently dropped. ts-pattern matches by structure, so this
+   values cannot be silently dropped. The matcher matches by structure, so this
    works on any discriminant (`_tag`, `code`, guards, grouped patterns), not
    only `TaggedError`. `P._` is the deliberate catch-all (the uniform "handle
    everything else" branch, replacing the old single callback). Each branch
@@ -106,10 +106,15 @@ was planned).
    `matchTags` fold — per-tag folding at the edge is now `match` with the
    matcher and `tag(t)`, and it works on any discriminant, not only `_tag`.) The
    value-surrendering extractors (`getOr` / `getOrElse` / `getOrNull` /
-   `getOrUndefined`) stay exempt — the value is being surrendered anyway. **Core
-   depends on `ts-pattern`** (a light, types-heavy, dual-copy-safe library —
-   its matcher protocol keys off a global `Symbol.for`), re-exporting `match`
-   and `P` so the matcher is first-class in one import.
+   `getOrUndefined`) stay exempt — the value is being surrendered anyway. **The
+   matcher is built-in** (`matcher.ts` — it replaced the former `ts-pattern`
+   peer, keeping its call-site shape): a purpose-built, shallow matcher whose
+   exhaustiveness is plain `Exclude` over a tracked `Remaining` parameter, with
+   `match`, `P` (`_`/`any`, `instanceOf`, `when`, `union`, `string`, `number`),
+   and `NonExhaustiveError` exported from core — first-class in one import,
+   dual-copy-safe (patterns carry a `Symbol.for` brand). Deliberately **not**
+   supported: deep structural inversion, `P.select`, array patterns — the
+   complexity (and cross-version instability) the replacement removed.
 
 ## Load-bearing runtime invariants (tests must guard these)
 
@@ -130,21 +135,22 @@ was planned).
   does the same with a non-`Result` callback return, instead of letting a
   poison value throw a raw `TypeError` further down the pipeline.
 - **A non-exhaustive error match becomes a `Defect` (in the combinators).** In
-  the error combinators, the callback returns a ts-pattern builder and the
+  the error combinators, the callback returns the match builder and the
   combinator runs `.run()` (which executes `.exhaustive()`). For well-typed
   callers the match is exhaustive by construction; a value that slips past the
-  types (a widened cast, a JS caller) with no matching case throws ts-pattern's
-  `NonExhaustiveError`, which the throw-to-defect net turns into a `Defect` — an
-  unmodeled failure. In **`match`** (an edge eliminator, exempt from
+  types (a widened cast, a JS caller) with no matching case throws the matcher's
+  `NonExhaustiveError` (exported from core), which the throw-to-defect net turns
+  into a `Defect` — an unmodeled failure. In **`match`** (an edge eliminator, exempt from
   throw→defect) the same non-exhaustive rogue value instead **throws**
   `NonExhaustiveError` outright — a genuinely unmodeled tag at the edge is a
   bug, not a routed value.
 - **Exhaustiveness is type-enforced, with no forgettable step.** `mapErrCases` /
   `flatMapErrCases` / `recoverErrCases` / `tapErrCases` / `flatTapErrCases` require the callback to
-  return an `ExhaustiveMatch` — `.exhaustive` is typed callable only when
-  ts-pattern has narrowed the input to `never` (all cases covered); a
-  non-exhaustive builder types `.exhaustive` as `NonExhaustiveError` and fails
-  the constraint at the call site. For code that builds the match through the
+  return an `ExhaustiveMatch` — `.exhaustive` is typed callable only when the
+  builder's tracked `Remaining` parameter has been excluded down to `never`
+  (all cases covered); a non-exhaustive builder types `.exhaustive` as the
+  branded `NonExhaustive<Remaining>` diagnostic (naming the unhandled cases)
+  and fails the constraint at the call site. For code that builds the match through the
   provided matcher there is no path where a case slips past an error combinator
   uncovered without a compile error, and no `.exhaustive()` / `.otherwise()`
   for a caller to reach (the combinator owns termination). One honest caveat:
@@ -189,15 +195,19 @@ was planned).
   combinators can't be swapped out from under every instance), `AsyncRes`'s
   wrapped promise is a native `#private` field, and the qualify-time `defect`
   marker is frozen.
-- **`match`'s `errCases` matcher is type-forced exhaustive, and library code generic
-  in `E` uses the guards instead.** For well-typed concrete callers a missing
-  branch does not compile; a rogue value slipping past the types throws
-  `NonExhaustiveError` (see above). Because ts-pattern cannot prove `.with(P._,
-…)` exhaustive over an **unresolved type parameter**, code that folds a
-  generic `Result<T, E>` (the interop `to*` bridges, `@unthrown/orpc`'s
-  `handlerResult`) branches via the `isOk` / `isErr` / `isDefect` guards rather
-  than `match` — the guards narrow to `OkView` / `ErrView` / `DefectView` with
-  no exhaustiveness obligation. Concrete application code uses `match` normally.
+- **`match`'s `errCases` matcher is type-forced exhaustive — and the catch-all
+  is provably exhaustive even over a generic `E`.** For well-typed concrete
+  callers a missing branch does not compile; a rogue value slipping past the
+  types throws `NonExhaustiveError` (see above). The catch-all `.with(P._, …)`
+  arm is a **state transition** (an overload keyed on the statically-universal
+  `UniversalPattern` type returning `Matcher<E, never, …>` — literal `never`,
+  no deferred `Exclude`), so a catch-all-terminated builder compiles inside
+  code **generic in `E`** — the fix for #145; tag/pattern arms alone remain
+  correctly unprovable over an unresolved type parameter. Library code that
+  folds a generic `Result<T, E>` per-channel (the interop `to*` bridges,
+  `@unthrown/orpc`'s `handlerResult`) still uses the `isOk` / `isErr` /
+  `isDefect` guards — the simplest shape when no per-case branching is needed.
+  Concrete application code uses `match` normally.
 - **`get()` / `getErr()` are type-gated.** `get()` compiles only when the
   error channel is empty (`this: Result<T, never>`); `getErr()` only when the
   success channel is empty (`this: Result<never, E>`). Eliminate the opposite
@@ -220,8 +230,8 @@ was planned).
 
 `Result<T, E>` is a **discriminated union** — `{ tag: "Ok"; value } | { tag:
 "Err"; error } | { tag: "Defect"; cause }`, each intersected with the shared
-method surface — so it matches **natively** (a `switch` on `tag`, or
-`ts-pattern`'s `match(r).with({ tag: "Ok" }, …).exhaustive()`) **and** chains
+method surface — so it matches **natively** (a `switch` on `tag`, or the
+built-in `match(r).with({ tag: "Ok" }, …).exhaustive()`) **and** chains
 fluently. The payload is reachable only after narrowing, so "check before you
 access" still holds.
 
@@ -249,7 +259,7 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   `AsyncResult`. A throw in either becomes a `Defect`; `Err`/`Defect`
   short-circuits/passes through. To go async, lift with `toAsync()`.
 - error: `mapErrCases`, `flatMapErrCases`, `recoverErrCases`, `tapErrCases`, `flatTapErrCases` all take
-  the Thesis-#5 **ts-pattern matcher callback** `(m: ErrMatcher<E>, defect) => M`
+  the Thesis-#5 **matcher callback** `(m: ErrMatcher<E>, defect) => M`
   where `M extends ExhaustiveMatch<…>` (the callback returns the un-terminated
   builder; the combinator runs `.run()`). Outgoing types are computed from the
   builder output `MatchOut<M>` — mapErrCases: `MatchErrOut<M>` (= `Exclude<MatchOut,
@@ -272,7 +282,7 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
   good is `match`), and no channel-moving operators (`Err`→`Defect` erases the
   modeled type; `Defect`→`Err` would put `unknown` in `E`, violating Thesis #1)
 - eliminate: `match` (the `{ ok, defect }` handlers plus an `errCases` handler that
-  takes the **exhaustive ts-pattern matcher** `(matcher) => matcher.with(…)` —
+  takes the **exhaustive matcher** `(matcher) => matcher.with(…)` —
   same as the error combinators, but with no `defect` helper since `match` folds
   to a value; the folded type unions all branch returns), `get`/`getErr`
   (type-gated — `get` only compiles on
@@ -300,11 +310,13 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
   (they were runtime-identical delegates); the error-channel aliases
   `orElse`/`recover` were removed earlier in the same major. One concept, one
   name — no deprecated surface survives into v5.
-- ts-pattern re-exports: `match` and `P` are re-exported from `ts-pattern` (core
-  depends on it), and `tag(t)` (the `{ _tag: t }` pattern, narrowing to the
-  variant + payload) lives in `tagged.ts`. These make the error matcher, and
-  matching a whole `Result` (`match(r).with(P.…)`), first-class in one import —
-  the former `@unthrown/pattern` package, now folded in.
+- matcher exports: `match`, `P`, and `NonExhaustiveError` come from the
+  built-in `matcher.ts` (plus the types `Matcher`/`PatternMatcher`/
+  `UniversalPattern`), and `tag(t)` (the `{ _tag: t }` pattern, narrowing to
+  the variant + payload) lives in `tagged.ts`. These make the error matcher,
+  and matching a whole `Result` (`match(r).with({ tag: "Ok" }, …)`),
+  first-class in one import — the former `@unthrown/pattern` package and the
+  former `ts-pattern` re-exports, now one owned module.
 - guards: methods `isOk`/`isErr`/`isDefect` **and** standalone
   `isOk`/`isErr`/`isDefect` both narrow (to `OkView`/`ErrView`/`DefectView`) — the
   methods are `this is …` type predicates, so `if (r.isErr()) r.error` compiles.
@@ -318,16 +330,18 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
   combinator callback that returns one is a compile error instead of a silently
   unqualified rejection. `FailureView<E, T>` — the exported `ErrView | DefectView`
   union a `tapFailure` callback receives (error-type-first, like `ErrView`).
-  `ErrMatcher<E>` — the ts-pattern builder over the error (`ReturnType<typeof
-match<E>>`, so ts-pattern's non-exported `Match` type is never imported).
+  `ErrMatcher<E>` — the built-in match builder over the error
+  (`ReturnType<typeof match<E>>`, i.e. `Matcher<E, E, never>`).
   The supporting `ExhaustiveMatch`/`MatchOut`/`MatchErrOut` are exported for the
   d.ts but not re-exported from `index.ts`. `ExhaustiveMatch<O>` requires
-  `.exhaustive` to be _callable_ (ts-pattern types it as `NonExhaustiveError` on
-  a non-exhaustive builder) and carries the output via `run: () => O`, from which
-  `MatchOut`/`MatchErrOut` extract. Note `ErrMatcher<E>` must appear only as a
-  callback **parameter** type (contravariant), never combined with the class `E`
-  in a covariant return — ts-pattern's `Match` is invariant in its input, which
-  would poison `E` inference (why `flatTapErrCases` infers a plain `E2` instead).
+  `.exhaustive` to be _callable_ (the builder types it as the branded
+  `NonExhaustive<Remaining>` diagnostic while cases remain) and carries the
+  output via `run: () => O`, from which `MatchOut`/`MatchErrOut` extract. Note
+  `ErrMatcher<E>` should still appear only as a callback **parameter** type,
+  never combined with the class `E` in a covariant return — the historical
+  ts-pattern `Match` invariance forced that rule (and `flatTapErrCases`'s plain
+  `E2` inference); the built-in `Matcher` is kinder but the discipline is kept,
+  guarded by the `combine` inference regression test.
 - constructors: `Ok` (a no-arg overload — `Ok()` — constructs a `void` success,
   `Result<void, never>`, sparing `Ok(undefined)`; `OkAsync()` mirrors it),
   `Err` (there is **no** `Defect` constructor — a defect-state
@@ -403,7 +417,7 @@ match<E>>`, so ts-pattern's non-exported `Match` type is never imported).
   name; the payload reserves `name`, `message`, **and** `stack` via `?: never`
   (`cause` stays allowed — see Thesis #4), so the
   message is set per subclass with `override message = "…"`, never as a payload
-  field) and `tag(t)` (the `{ _tag: t }` ts-pattern pattern, for use in the
+  field) and `tag(t)` (the `{ _tag: t }` matcher pattern, for use in the
   error matchers, in `match`'s `errCases` handler, and in `match(result)`); see the
   `TaggedError` convention in Thesis #4. **There is no `matchTags`** — a per-tag
   exhaustive fold over a tagged error union is `result.match({ ok, defect, errCases:
@@ -455,7 +469,7 @@ library can be "done".
   neverthrow's class surface widens without annotations); the exhaustive matcher
   is what made declared variance mandatory. TS **verifies** every annotation
   (TS2636 if unprovable); `Result` (a union of the annotated views) inherits the
-  fast path. **`ErrMatcher<E>` (ts-pattern's `Match`,
+  fast path. **`ErrMatcher<E>` (the built-in `Matcher`,
   invariant in its input) must stay in a callback parameter position only**: it
   is contravariant there and harmless, but unioning an `M`-derived output with
   the class `E` in a covariant return re-invaded `E`'s variance and collapsed
@@ -533,18 +547,17 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   `constructors.ts` (`Ok`/`Err` + guards), `do.ts` (the `Do()` do-notation entry
   — the `bind`/`let` steps themselves live on the method surface in `core.ts`),
   `interop.ts` (`from*`/`qualify`/`all`), `facade.ts` (the `Result` object),
-  `tagged.ts` (`TaggedError`/`tag`), and `index.ts` (the curated
-  public re-exports, including `match`/`P` from `ts-pattern` — the one place the
-  API is decided).
+  `tagged.ts` (`TaggedError`/`tag`), `matcher.ts` (the built-in matcher —
+  `match`/`P`/`NonExhaustiveError` + the `Matcher` types), and `index.ts` (the
+  curated public re-exports — the one place the API is decided).
 
 ## Monorepo layout
 
-- `packages/core` → `unthrown` (one runtime peer dependency: `ts-pattern`
-  `^5`, which powers the exhaustive error matchers and is re-exported as
-  `match`/`P`. A **peer**, not a plain dependency, so a consumer that already
-  uses ts-pattern shares one copy — two copies' declarations don't unify, and
-  mixing them is a type error. Kept as a `devDependency` (catalog) for the
-  workspace's own build/test.)
+- `packages/core` → `unthrown` (**zero runtime dependencies** — the exhaustive
+  error matcher is built-in (`matcher.ts`, exported as `match`/`P`/
+  `NonExhaustiveError`); it replaced the former `ts-pattern` peer so the
+  exhaustiveness guarantee can never vary with a consumer-resolved third-party
+  version, and nothing needs installing alongside `unthrown`)
 - `packages/vitest` → `@unthrown/vitest` (peerDep `vitest`)
 - `packages/effect` → `@unthrown/effect` (peerDep `effect`)
 - `packages/neverthrow` → `@unthrown/neverthrow` (peerDep `neverthrow`)
@@ -648,9 +661,9 @@ code: "NOT_FOUND" }, …))`); non-inferable →
   `.github/scripts/inject-docs-version-nav.ts`). With no prerelease, main
   deploys alone to the root as before
 
-Core takes `ts-pattern` as a **peer** dependency (it powers the error matchers).
-Never pull `vitest` or any interop peer (`effect`, `neverthrow`,
-`@bloodyowl/boxed`, `@orpc/*`) into core.
+Core has **no runtime dependencies** (the error matcher is built-in). Never
+pull `vitest` or any interop peer (`effect`, `neverthrow`, `@bloodyowl/boxed`,
+`@orpc/*`) into core.
 
 Every satellite package depends on core via `workspace:^` (an exact pin would
 create a dual-copy hazard with the `instanceof`-based `isResult`); for the same
@@ -689,8 +702,8 @@ channel?**
 2. ✅ **`packages/core/src/tagged.ts`** — Done. `TaggedError(tag)` factory
    (extends `Error`, `_tag`, no-arg constructor when payload is empty via the
    `keyof A extends never ? void : A` trick) and `tag(t)` (the `{ _tag: t }`
-   ts-pattern pattern). A per-tag exhaustive fold is `match`'s `errCases` handler
-   with the ts-pattern matcher (`matcher.with(tag("…"), …)`), not a dedicated
+   matcher pattern). A per-tag exhaustive fold is `match`'s `errCases` handler
+   with the matcher (`matcher.with(tag("…"), …)`), not a dedicated
    `matchTags` — that former helper was folded into `match` when the matcher
    became the error-channel convention.
 3. ✅ **`packages/vitest`** — Done. Custom matchers `toBeOk`, `toBeOkWith`,
@@ -706,12 +719,15 @@ channel?**
    (`failOnForgottenAwait`) fails the test at its end, naming the pending
    matchers — the abandoned assertion is reported exactly once, correctly
    attributed, and can never late-fire as an unhandled rejection.
-4. ✅ **ts-pattern integration** — Done. `ts-pattern` is a core dependency: it
-   powers the exhaustive error matchers (Thesis #5) and is re-exported as
-   `match`/`P`, plus `tag(t)` (the `{ _tag: t }` pattern). Because `Result` is a
-   discriminated union (Thesis #1), `match(result).with(P.…)` also matches a
-   whole `Result` natively. (The former standalone `@unthrown/pattern` package
-   was folded into core when the dependency was taken.)
+4. ✅ **The built-in matcher** — Done. `matcher.ts` powers the exhaustive error
+   matchers (Thesis #5), exporting `match`/`P`/`NonExhaustiveError`, plus
+   `tag(t)` (the `{ _tag: t }` pattern). Because `Result` is a discriminated
+   union (Thesis #1), `match(result).with({ tag: "Ok" }, …)` also matches a
+   whole `Result` natively. (History: the standalone `@unthrown/pattern`
+   package was folded into core when a `ts-pattern` dependency was taken in
+   early v5; the built-in matcher then replaced that dependency entirely —
+   same call-site shape, owned type machinery, catch-all provable over a
+   generic `E` (#145), zero runtime deps.)
 
 Also shipped: a root `README` + `LICENSE`, per-package READMEs, and the VitePress
 docs site (guide + generated API reference). Both the npm packages and the
@@ -755,7 +771,7 @@ configured outside the repo).
 - One concept = one name. Resist convenience aliases.
 - **The error-matcher combinators carry a `*Cases` suffix** (`mapErrCases`,
   `flatMapErrCases`, `recoverErrCases`, `tapErrCases`, `flatTapErrCases`) —
-  **not** the bare `mapErr`/`tapErr`. The callback receives a ts-pattern matcher
+  **not** the bare `mapErr`/`tapErr`. The callback receives a matcher
   over the error's _cases_, not the value, so the suffix names the protocol and
   keeps it distinct from the value-taking success surface (`map`/`tap`). This
   reverses the earlier plan to keep the bare `map*`/`tap*` names (weighed and
@@ -764,9 +780,9 @@ configured outside the repo).
   that would reopen the blanket-handling hole the matcher closes. Do not
   re-litigate or add bare aliases. Documented user-side in the
   exhaustive-error-matching guide.
-- The core has **one runtime dependency, `ts-pattern`**, declared as a
-  **peerDependency** (`^5`) so a consumer already using ts-pattern shares a
-  single copy (two copies' declarations don't unify — a type error five layers
-  deep in a conditional type; the same dual-copy hazard `isResult` guards
-  against at runtime). It powers the error matchers and is re-exported. Add no
-  others — protect that minimalism.
+- The core has **zero runtime dependencies** — the error matcher is built-in
+  (`matcher.ts`). It replaced the former `ts-pattern` peer deliberately: the
+  exhaustiveness guarantee (unthrown's central promise) must not vary with a
+  consumer-resolved third-party version (ts-pattern changed exhaustiveness
+  semantics in a _minor_, 5.8), and a peer imposed install friction plus a
+  dual-copy type hazard. Add no dependencies — protect that zero.

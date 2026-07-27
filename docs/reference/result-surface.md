@@ -37,7 +37,7 @@ Every `Result` shares one method surface, grouped by the channel it touches:
 - **do-notation** (runs on `Ok`): `bind`, `let` — accumulate a named scope; see
   [Sequence dependent steps](../how-to/sequence-dependent-steps)
 - **error** (runs on `Err`): `mapErrCases`, `flatMapErrCases`, `recoverErrCases`, `tapErrCases`,
-  `flatTapErrCases` — all take an **exhaustive ts-pattern matcher** over the error
+  `flatTapErrCases` — all take an **exhaustive matcher** over the error
 - **defect** (the only door to a `Defect`): `recoverDefect`, `tapDefect`
 - **failure** (runs on `Err` **or** `Defect`): `tapFailure` — observe either
   failing channel without consuming it

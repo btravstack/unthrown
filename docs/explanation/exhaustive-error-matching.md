@@ -1,7 +1,7 @@
 # Exhaustive error matching
 
 > **Explanation.** This page explains _why_ the error combinators take a
-> ts-pattern matcher instead of a plain callback, and why they carry a `*Cases`
+> matcher instead of a plain callback, and why they carry a `*Cases`
 > suffix (`mapErrCases`, `tapErrCases`, …) rather than a bare `map`/`tap`-style
 > name. For the mechanics — the rules, the `P._` catch-all, the per-method
 > signatures — see the [combinator reference](../reference/combinators#the-error-channel).
@@ -30,7 +30,7 @@ values is so the compiler forces you to _account for each one_.
 
 So the error combinators — `mapErrCases`, `flatMapErrCases`, `recoverErrCases`, `tapErrCases`,
 `flatTapErrCases` — do not take a single callback. Their callback receives a
-[ts-pattern](https://github.com/gvergnaud/ts-pattern) **match builder** over the
+built-in **match builder** over the
 error, and you **return the un-terminated builder**. The combinator calls
 `.exhaustive()` itself:
 
@@ -126,16 +126,17 @@ left to silently drop a case. Its `errCases` handler receives the matcher but **
 channel, and a `Result` that already carries a defect is handled by the separate
 `defect:` case.
 
-## Generic boundary helpers: use the guards, not the matcher
+## Generic boundary helpers: the catch-all works, tags don't
 
-The exhaustiveness that makes the matcher safe is proven by ts-pattern _at the
-call site_, from the concrete error union. Inside a **generic** helper — one
-whose error type is still a type parameter `E` — ts-pattern cannot prove any
-builder exhaustive, **not even `.with(P._, …)`**, because `E` is unresolved. So
-this does not compile:
+Exhaustiveness is proven _at the call site_, from the error union. Inside a
+**generic** helper — one whose error type is still a type parameter `E` — no
+list of tag arms can prove coverage, because the compiler cannot know what `E`
+will contain. But the **catch-all can**: `.with(P._, …)` is a state transition
+to "nothing remains" that does not depend on `E` at all, so a
+catch-all-terminated builder compiles even in fully generic code:
 
 ```ts
-// ❌ Won't compile: E is a type parameter, so no builder is provably exhaustive.
+// ✅ Compiles for any E: the catch-all is provably exhaustive by construction.
 function toPromise<T, E>(result: Result<T, E>): T {
   return result.match({
     ok: (value) => value,
@@ -150,28 +151,29 @@ function toPromise<T, E>(result: Result<T, E>): T {
 }
 ```
 
-This is a real limitation, not a bug you can pattern your way around: the same
-body compiles the moment `E` is a concrete union. It means the `…Cases` / `match`
-API is effectively unavailable to code that is generic in the error — a library
-boundary helper, a generic HTTP responder, a test utility.
+```ts
+// ❌ Still won't compile — and shouldn't: tag arms can never be shown to cover
+// an unresolved E. Only the catch-all (or a concrete union) can.
+function partial<T, E>(result: Result<T, E>) {
+  return result.mapErrCases((matcher) => matcher.with(tag("NotFound"), () => 404));
+}
+```
 
-At such a boundary you are usually **leaving** the `Result` world anyway, so
-reach for the narrowing guards instead — they narrow to `OkView` / `ErrView` /
-`DefectView` with no exhaustiveness obligation, and read clearly:
+(Earlier v5 betas, which delegated matching to ts-pattern, rejected even the
+catch-all form here — the original issue #145. The built-in matcher fixed it.)
+
+The narrowing guards remain a fine alternative when a boundary just splits by
+channel with no per-case branching — it is what unthrown's own interop bridges
+use, simply because nothing there needs a matcher:
 
 ```ts
-// ✅ Guards carry no exhaustiveness obligation, so they work for any E.
+// ✅ Also fine: guards carry no exhaustiveness obligation.
 function toPromise<T, E>(result: Result<T, E>): T {
   if (result.isErr()) throw result.error;
   if (result.isDefect()) throw result.cause;
   return result.value;
 }
 ```
-
-This is exactly what unthrown's own generic code does — the interop `to*`
-bridges and `@unthrown/orpc`'s `handlerResult` all branch on the guards, not
-`match`, for the same reason. Concrete application code, where `E` is a known
-union, uses `match` and the `…Cases` combinators normally.
 
 ## Where to go next
 

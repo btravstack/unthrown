@@ -81,9 +81,6 @@ catalogs:
     prisma:
       specifier: 7.8.0
       version: 7.8.0
-    ts-pattern:
-      specifier: 5.9.0
-      version: 5.9.0
     tsdown:
       specifier: 0.22.12
       version: 0.22.12
@@ -242,9 +239,6 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.10(vitest@4.1.10)
-      ts-pattern:
-        specifier: 'catalog:'
-        version: 5.9.0
       tsdown:
         specifier: 'catalog:'
         version: 0.22.12(oxc-resolver@11.21.3)(tsx@4.23.1)(typescript@6.0.3)
@@ -3738,9 +3732,6 @@ packages:
   trim-lines@3.0.1:
     resolution: {integrity: sha512-kRj8B+YHZCc9kQYdWfJB2/oUl9rA99qbowYYBtr4ui4mZyAQ2JpvVBd/6U2YloATfqBhBTSMhTpgBHtU0Mf3Rg==}
 
-  ts-pattern@5.9.0:
-    resolution: {integrity: sha512-6s5V71mX8qBUmlgbrfL33xDUwO0fq48rxAu2LBE11WBeGdpCPOsXksQbZJHvHwhrd3QjUusd3mAOM5Gg0mFBLg==}
-
   tsdown@0.22.12:
     resolution: {integrity: sha512-IzGRfGwSsufXJWOcQ0tmECKMG/dbxhUwDOySTS7JE1AM8pkB9+bpcTPs8bTxxSNrSvGocSczrBlOh97tZObq9Q==}
     engines: {node: ^22.18.0 || >=24.11.0}
@@ -6929,8 +6920,6 @@ snapshots:
   tree-kill@1.2.2: {}
 
   trim-lines@3.0.1: {}
-
-  ts-pattern@5.9.0: {}
 
   tsdown@0.22.12(oxc-resolver@11.21.3)(tsx@4.23.1)(typescript@6.0.3):
     dependencies:

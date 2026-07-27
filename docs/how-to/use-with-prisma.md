@@ -64,7 +64,7 @@ error you want to model (`RecordNotFound`).
 ## Handle the errors
 
 Because the errors are [tagged](./model-errors), driving `match`'s `errCases` handler
-with the ts-pattern matcher gives you an exhaustive fold — the compiler lists
+with the matcher gives you an exhaustive fold — the compiler lists
 exactly the cases the operation can hit:
 
 ```ts

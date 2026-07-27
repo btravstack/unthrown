@@ -82,7 +82,7 @@ e.name; // "RetryableError"          — clean stack-trace label
 
 To fold a `Result` whose error is a tagged union straight to a value, use
 `match`. Its `ok` and `defect` handlers are plain callbacks; its **`errCases` handler
-receives the ts-pattern matcher** — add one branch per tag with `tag(t)` and
+receives the matcher** — add one branch per tag with `tag(t)` and
 **return the un-terminated builder** (`match` calls `.exhaustive()` for you):
 
 ```ts
@@ -110,7 +110,7 @@ no `.exhaustive()` to forget. For an `AsyncResult`, `match` resolves to a
 
 ## Match on more than `_tag`
 
-Because ts-pattern matches by structure, you can also branch on a `code`, on a
+Because the matcher matches by structure, you can also branch on a `code`, on a
 guard, or on grouped patterns, and `.with(P._, …)` is the deliberate catch-all
 when every error is handled the same way:
 

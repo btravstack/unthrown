@@ -1,5 +1,5 @@
 // The TaggedError convention (à la Effect's `Data.TaggedError`) and the
-// `tag(t)` ts-pattern pattern for matching a tagged error union.
+// `tag(t)` matcher pattern for matching a tagged error union.
 
 type Props = Record<string, unknown>;
 
@@ -148,7 +148,7 @@ export function TaggedError<Tag extends string>(
 }
 
 /**
- * A `ts-pattern` pattern matching any value whose `_tag` equals `value` — a
+ * A matcher pattern matching any value whose `_tag` equals `value` — a
  * {@link TaggedError}, or any discriminated member. Equivalent to the object
  * pattern `{ _tag: value }`, but reads better inside an error-matching
  * combinator and narrows to the matching variant, payload included.

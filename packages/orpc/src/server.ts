@@ -91,7 +91,7 @@ export function handlerResult<
     const result = await handler(opts, input);
     // Branch via the guards rather than `match`: this library code is generic in
     // the error type `TError`, and `match`'s exhaustive `errCases` matcher cannot be
-    // proven exhaustive by ts-pattern over an unresolved type parameter. The
+    // proven exhaustive by tag arms over an unresolved type parameter. The
     // concrete triage (`.mapErrCases((matcher) => …)`) still happens at the endpoint.
     if (result.isOk()) return result.value;
     if (result.isErr()) {

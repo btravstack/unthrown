@@ -411,21 +411,55 @@ type _foldedObjects = Expect<
   Equal<typeof foldedObjects, { ok: number } | { bug: boolean } | { err: "TagA" | "TagB" }>
 >;
 
-// Generic-E limitation (documented in the exhaustive-error-matching guide): inside
-// a helper whose error type is still a type parameter, ts-pattern cannot prove any
-// builder exhaustive — not even `.with(P._, …)` — so `match`/`…Cases` do not
-// compile there. Generic boundary helpers use the narrowing guards instead. If a
-// future ts-pattern makes the generic case provable, this @ts-expect-error flips
-// and the guide note can be revisited.
+// Generic-E catch-all (issue #145, fixed by the built-in matcher): the catch-all
+// `.with` arm is a STATE TRANSITION to `Remaining = never` (an overload keyed on
+// the statically-universal `P._` type), not a lazily-deferred `Exclude` — so a
+// catch-all-terminated builder is provably exhaustive even when `E` is an
+// unresolved type parameter, and a generic boundary helper can use `match`.
 function _genericMatch<T, E>(result: Result<T, E>): void {
   result.match({
     ok: () => undefined,
-    // @ts-expect-error - P._ is not provably exhaustive over an unresolved E
     errCases: (matcher) => matcher.with(P._, () => undefined),
     defect: () => undefined,
   });
 }
-// The guard-based form compiles for any E — the sanctioned generic boundary shape.
+void _genericMatch;
+// The issue #145 repro verbatim: a generic boundary helper (bounded E, catch-all
+// terminated) folding an AsyncResult — must compile.
+class _AppFailure extends Error {}
+async function _resultToPromise<T, E extends _AppFailure = never>(
+  ar: AsyncResult<T, E>,
+): Promise<T> {
+  const result = await ar;
+  return result.match({
+    ok: (value) => value,
+    errCases: (matcher) =>
+      matcher.with(P._, (error) => {
+        throw error;
+      }),
+    defect: (cause) => {
+      throw cause;
+    },
+  });
+}
+void _resultToPromise;
+// A generic catch-all in a combinator position re-emits the error unchanged.
+function _genericReemit<T, E>(r: Result<T, E>): Result<T, E> {
+  return r.mapErrCases((matcher) => matcher.with(P._, (e) => e));
+}
+void _genericReemit;
+// …but tag arms alone still cannot prove exhaustiveness over an unresolved E —
+// only the statically-universal catch-all can.
+function _genericMatchTags<T, E>(result: Result<T, E>): void {
+  result.match({
+    ok: () => undefined,
+    // @ts-expect-error - tag arms are not provably exhaustive over an unresolved E
+    errCases: (matcher) => matcher.with(tag("X"), () => undefined),
+    defect: () => undefined,
+  });
+}
+void _genericMatchTags;
+// The guard-based form also works for any E — the pre-#145-fix boundary shape.
 function _genericGuards<T, E>(result: Result<T, E>): T {
   if (result.isErr()) throw result.error;
   if (result.isDefect()) throw result.cause;
@@ -622,7 +656,7 @@ new WithMsg({ ticketId: "t1" });
   type _Widens = Expect<Equal<typeof widened, number | null>>;
 }
 
-// --- error triage: mapErrCases/flatMapErrCases/recoverErrCases take a ts-pattern matcher and
+// --- error triage: mapErrCases/flatMapErrCases/recoverErrCases take a matcher and
 // --- call `.exhaustive()` for you; the callback returns the un-terminated builder
 
 {
@@ -731,7 +765,7 @@ new WithMsg({ ticketId: "t1" });
 }
 
 // --- error matching works on ANY discriminant, and is always exhaustive -------
-// ts-pattern matches by structure, so a non-`_tag` union (untagged, or the
+// The matcher matches by structure, so a non-`_tag` union (untagged, or the
 // `code`-discriminated orpc shape) is handled the same way — and the builder is
 // exhaustive-by-construction (a missing case makes `.exhaustive()` uncallable).
 

@@ -131,7 +131,7 @@ The error channel is the raw inferable `ORPCError` union, discriminated by `code
 — deliberately **not** re-wrapped into [tagged errors](./model-errors): oRPC
 already ships a discriminated error type, and one concept should have one name.
 Branch on `code` — in `match`'s `errCases` matcher (as above), a `switch`, or a
-standalone ts-pattern `match`. Because these are plain `ORPCError`s rather than
+standalone `match`. Because these are plain `ORPCError`s rather than
 `TaggedError`s, `tag(...)` doesn't apply — match on the `code` field instead.
 
 Anything non-inferable — a network failure, an undeclared throw collapsed to
