@@ -12,7 +12,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[**Documentation**](https://btravstack.github.io/unthrown/) · [**Get Started**](https://btravstack.github.io/unthrown/guide/getting-started) · [**Why unthrown?**](https://btravstack.github.io/unthrown/guide/why-unthrown)
+[**Documentation**](https://btravstack.github.io/unthrown/) · [**Get Started**](https://btravstack.github.io/unthrown/tutorial/getting-started) · [**Why unthrown?**](https://btravstack.github.io/unthrown/explanation/why-unthrown)
 
 </div>
 
@@ -40,7 +40,7 @@ defect that short-circuits to the edge, where you log it and return a 500.
 - 🪶 **Small and done-able** — one tiny runtime dependency (`ts-pattern`, which
   powers the exhaustive error matchers), ESM-first, dual CJS/ESM, fully typed.
 
-See [Why unthrown?](https://btravstack.github.io/unthrown/guide/why-unthrown) for
+See [Why unthrown?](https://btravstack.github.io/unthrown/explanation/why-unthrown) for
 the comparison with `neverthrow`, `boxed`, and `effect`.
 
 ## Install

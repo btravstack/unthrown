@@ -5,7 +5,7 @@
 > `Result`-returning procedure handlers on the server, an `AsyncResult` client
 > on the caller side — with oRPC's end-to-end typed errors as the error channel.
 
-📖 **[Documentation](https://btravstack.github.io/unthrown/guide/orpc)** ·
+📖 **[Documentation](https://btravstack.github.io/unthrown/how-to/use-with-orpc)** ·
 [API Reference](https://btravstack.github.io/unthrown/api/orpc/)
 
 ```sh

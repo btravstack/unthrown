@@ -30,6 +30,60 @@ const VERSION_NAV = DOCS_VERSIONS
   ? [{ text: DOCS_VERSIONS.current, items: DOCS_VERSIONS.items }]
   : [];
 
+// The guide is structured by the four Diátaxis modes
+// (https://diataxis.fr/): a learning-oriented Tutorial, task-oriented How-to
+// guides, information-oriented Reference, and understanding-oriented
+// Explanation. One shared sidebar carries all four so any page can reach any
+// other.
+const GUIDE_SIDEBAR = [
+  {
+    text: "Tutorial",
+    items: [
+      { text: "Getting started", link: "/tutorial/getting-started" },
+      { text: "Crossing an async boundary", link: "/tutorial/crossing-an-async-boundary" },
+    ],
+  },
+  {
+    text: "How-to guides",
+    items: [
+      { text: "Migrate from try/catch", link: "/how-to/migrate-from-try-catch" },
+      { text: "Migrate from neverthrow", link: "/how-to/migrate-from-neverthrow" },
+      { text: "Qualify a boundary", link: "/how-to/qualify-a-boundary" },
+      { text: "Model errors", link: "/how-to/model-errors" },
+      { text: "Sequence dependent steps", link: "/how-to/sequence-dependent-steps" },
+      { text: "Combine parallel results", link: "/how-to/combine-parallel-results" },
+      { text: "Handle results at the edge", link: "/how-to/handle-results-at-the-edge" },
+      { text: "Validate with Standard Schema", link: "/how-to/validate-with-standard-schema" },
+      { text: "Use with Prisma", link: "/how-to/use-with-prisma" },
+      { text: "Use with oRPC", link: "/how-to/use-with-orpc" },
+      { text: "Test with Vitest", link: "/how-to/test-with-vitest" },
+      { text: "Lint your codebase", link: "/how-to/lint-your-codebase" },
+      { text: "Interoperate with libraries", link: "/how-to/interoperate-with-libraries" },
+    ],
+  },
+  {
+    text: "Reference",
+    items: [
+      { text: "Combinators", link: "/reference/combinators" },
+      { text: "Result & AsyncResult surface", link: "/reference/result-surface" },
+      { text: "Glossary", link: "/reference/glossary" },
+      { text: "API reference", link: "/api/" },
+    ],
+  },
+  {
+    text: "Explanation",
+    items: [
+      { text: "Why unthrown?", link: "/explanation/why-unthrown" },
+      { text: "The Defect Channel", link: "/explanation/the-defect-channel" },
+      { text: "Qualification", link: "/explanation/qualification" },
+      { text: "The async model", link: "/explanation/async-model" },
+      { text: "Exhaustive error matching", link: "/explanation/exhaustive-error-matching" },
+      { text: "Comparison", link: "/explanation/comparison" },
+      { text: "Design decisions", link: "/explanation/design-decisions" },
+    ],
+  },
+];
+
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
   title: "unthrown",
@@ -89,7 +143,17 @@ export default defineConfig({
     logo: { light: "/logo-light.svg", dark: "/logo-dark.svg" },
 
     nav: [
-      { text: "Guide", link: "/guide/why-unthrown" },
+      // The guide is organised by the four Diátaxis modes; the dropdown links
+      // the entry page of each. See the sidebar for the full contents.
+      {
+        text: "Guide",
+        items: [
+          { text: "Tutorial", link: "/tutorial/getting-started" },
+          { text: "How-to guides", link: "/how-to/qualify-a-boundary" },
+          { text: "Reference", link: "/reference/combinators" },
+          { text: "Explanation", link: "/explanation/why-unthrown" },
+        ],
+      },
       { text: "API", link: "/api/" },
       {
         text: "Changelog",
@@ -102,51 +166,14 @@ export default defineConfig({
     ],
 
     sidebar: {
-      "/guide/": [
-        {
-          text: "Introduction",
-          items: [
-            { text: "Why unthrown?", link: "/guide/why-unthrown" },
-            { text: "Comparison", link: "/guide/comparison" },
-            {
-              text: "Migrating from neverthrow",
-              link: "/guide/migrating-from-neverthrow",
-            },
-            { text: "From try/catch", link: "/guide/from-try-catch" },
-            { text: "Getting Started", link: "/guide/getting-started" },
-            { text: "Core Concepts", link: "/guide/core-concepts" },
-          ],
-        },
-        {
-          text: "Working with Results",
-          items: [
-            { text: "The Defect Channel", link: "/guide/the-defect-channel" },
-            { text: "Boundaries & Qualification", link: "/guide/boundaries" },
-            { text: "Async Results", link: "/guide/async-results" },
-            { text: "Do Notation", link: "/guide/do-notation" },
-            { text: "Choosing a Combinator", link: "/guide/choosing-a-combinator" },
-            { text: "Recipes", link: "/guide/recipes" },
-          ],
-        },
-        {
-          text: "Error Modeling",
-          items: [{ text: "Tagged Errors", link: "/guide/tagged-errors" }],
-        },
-        {
-          text: "Ecosystem",
-          items: [
-            { text: "Testing", link: "/guide/testing" },
-            { text: "Prisma", link: "/guide/prisma" },
-            { text: "oRPC", link: "/guide/orpc" },
-            { text: "Linting", link: "/guide/linting" },
-            { text: "Interop", link: "/guide/interop" },
-            {
-              text: "Validation (standard-schema)",
-              link: "/guide/interop#standard-schema-—-validators-as-results",
-            },
-          ],
-        },
-      ],
+      // One shared sidebar across all four Diátaxis sections, so a reader can
+      // move between Tutorial / How-to / Reference / Explanation from any page.
+      ...Object.fromEntries(
+        ["/tutorial/", "/how-to/", "/reference/", "/explanation/"].map((prefix) => [
+          prefix,
+          GUIDE_SIDEBAR,
+        ]),
+      ),
       "/api/": [
         {
           text: "API Reference",

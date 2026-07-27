@@ -3,7 +3,7 @@
 > [Vitest](https://vitest.dev) matchers for [unthrown](https://github.com/btravstack/unthrown)'s
 > `Result` and `AsyncResult`.
 
-📖 **[Documentation](https://btravstack.github.io/unthrown/guide/testing)** ·
+📖 **[Documentation](https://btravstack.github.io/unthrown/how-to/test-with-vitest)** ·
 [API Reference](https://btravstack.github.io/unthrown/api/vitest/)
 
 ```sh

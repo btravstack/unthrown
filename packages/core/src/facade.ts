@@ -71,7 +71,7 @@ export const Result = {
  * alias. Its fluent combinators (`map`, `flatMap`, `match`, `get`, …) are
  * documented one per entry on {@link ResultMethods} — the shared method surface
  * every variant carries. For "which one do I reach for?", see the
- * [Choosing a combinator](/guide/choosing-a-combinator) guide.
+ * [Choosing a combinator](/reference/combinators) guide.
  *
  * @category Facade
  */
@@ -127,7 +127,7 @@ export const AsyncResult = {
  * `AsyncResult` carries the async fluent surface; its combinators (`map`,
  * `flatMap`, `match`, `get`, …) are documented one per entry — with their
  * async signatures — on {@link AsyncResultMethods}. For "which one do I reach
- * for?", see the [Choosing a combinator](/guide/choosing-a-combinator) guide.
+ * for?", see the [Choosing a combinator](/reference/combinators) guide.
  *
  * @category Facade
  */

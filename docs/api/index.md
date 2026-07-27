@@ -35,4 +35,4 @@ This reference is generated from the source with
 
 `@unthrown/oxlint` (the lint rules `no-ambiguous-error-type` and
 `prefer-async-result`) has no generated API page — it is documented in the
-[Linting guide](../guide/linting).
+[Linting guide](../how-to/lint-your-codebase).
