@@ -65,12 +65,12 @@ the observers (`tapDefect` / `tapFailure`), and `match`:
 | `recoverDefect`                   | passes ▸ | passes ▸      | runs `f`    | `E \| E2`       |
 | `tapDefect`                       | passes ▸ | passes ▸      | runs `f`    | `E`             |
 | `tapFailure`                      | passes ▸ | runs `f`      | runs `f`    | `E`             |
-| `match`                           | `ok()`   | `err()`       | `defect()`  | —               |
+| `match`                           | `ok()`   | `errCases()`  | `defect()`  | —               |
 
 ::: tip `recoverErrCases`'s `never` under-describes the runtime
 `recoverErrCases` empties only the **error** channel to `never` — a `Defect` can still be
 present at runtime and flows past it untouched. See
-[The Defect Channel](../explanation/the-defect-channel#recovererr-clears-the-error-channel-not-the-runtime).
+[The Defect Channel](../explanation/the-defect-channel#recovererrcases-clears-the-error-channel-not-the-runtime).
 :::
 
 ## The error channel
