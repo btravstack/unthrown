@@ -1,5 +1,37 @@
 # unthrown
 
+## 5.0.0-beta.5
+
+### Major Changes
+
+- 5364caa: **`ts-pattern` is now a `peerDependency` (`^5`), not a plain dependency.** Core
+  re-exports `match` / `P` / `tag` and its error matchers speak ts-pattern's
+  builder type. When ts-pattern was a nested, exact-pinned dependency, a consumer
+  who already used ts-pattern at another version ended up with two copies whose
+  declarations don't unify — feeding a `P.union(...)` built by one copy into an
+  unthrown matcher failed five layers deep in a conditional type.
+
+  Declaring it as a peer guarantees a single copy the consumer owns, so
+  `import { P } from "ts-pattern"` composes with unthrown's matchers as expected.
+
+  **Action required:** add `ts-pattern` (`^5`) to your own dependencies if you
+  don't already depend on it. Most package managers surface this as a missing-peer
+  warning on install.
+
+### Patch Changes
+
+- 5364caa: **`getOrThrow()`'s never-channel gate now explains itself.** When the error
+  channel is already empty (`E = never`) `getOrThrow()` is unnecessary — there is
+  nothing to throw, so `get()` is the tool. The gate previously surfaced as an
+  opaque `The 'this' context of type '…' is not assignable to method's 'this' of
+type 'never'`. The `never` receiver now carries a message, so the diagnostic
+  reads:
+
+  > unthrown: getOrThrow is unnecessary here — the Err channel is empty (E =
+  > never), so there is nothing to throw. Use get() instead.
+
+  Behaviour is unchanged; only the compile-time message improves.
+
 ## 5.0.0-beta.4
 
 ### Major Changes

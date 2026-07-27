@@ -1,5 +1,13 @@
 # @unthrown/standard-schema
 
+## 5.0.0-beta.5
+
+### Patch Changes
+
+- Updated dependencies [5364caa]
+- Updated dependencies [5364caa]
+  - unthrown@5.0.0-beta.5
+
 ## 5.0.0-beta.4
 
 ### Patch Changes

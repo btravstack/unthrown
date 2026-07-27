@@ -18,6 +18,7 @@
     "exhaustive-error-matcher",
     "fix-async-flatmap-inference",
     "fix-variance-and-frompromise-inference",
+    "getorthrow-never-gate-message",
     "orpc-sync-throw-defect",
     "oxlint-four-rules",
     "prisma-transaction-defect",
@@ -26,6 +27,7 @@
     "runtime-hardening",
     "standard-schema-orphan-adoption",
     "synchronous-qualify-and-taperr",
+    "ts-pattern-peer-dependency",
     "v5-extractor-cleanup",
     "vitest-loud-forgotten-await"
   ]
