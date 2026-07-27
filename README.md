@@ -73,8 +73,8 @@ const user = fromPromise(fetchUser(id), (cause, defect) =>
 // Handle every channel once, at the edge — no surrounding try/catch.
 const status = await user.match({
   ok: () => 200,
-  // `err` receives the exhaustive ts-pattern matcher; `.with(P._, …)` handles every error:
-  err: (matcher) => matcher.with(P._, () => 404), // your modeled NotFound
+  // `errCases` receives the exhaustive ts-pattern matcher; `.with(P._, …)` handles every error:
+  errCases: (matcher) => matcher.with(P._, () => 404), // your modeled NotFound
   defect: (cause) => {
     logger.error(cause); // everything unexpected
     return 500;

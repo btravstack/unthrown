@@ -42,7 +42,7 @@ import type { AsyncResult, Result } from "unthrown";
  */
 export function toExit<T, E>(result: Result<T, E>): Exit.Exit<T, E> {
   // Guard-based (not `match`): this bridge is generic in `E`, and `match`'s
-  // exhaustive `err` matcher cannot be proven exhaustive over an unresolved
+  // exhaustive `errCases` matcher cannot be proven exhaustive over an unresolved
   // type parameter.
   if (result.isOk()) return Exit.succeed(result.value);
   if (result.isErr()) return Exit.fail(result.error);

@@ -207,7 +207,7 @@ describe("createResultClient", () => {
       .map((planet) => `Hello, ${planet.name}!`)
       .match({
         ok: (msg) => msg,
-        err: (matcher) => matcher.with(P._, () => "not found"),
+        errCases: (matcher) => matcher.with(P._, () => "not found"),
         defect: () => "bug",
       });
     expect(greeting).toBe("Hello, Mars!");

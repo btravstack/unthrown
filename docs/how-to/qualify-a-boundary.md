@@ -136,7 +136,7 @@ the edge of your program needs no `try`/`catch` — just one exhaustive `match`:
 ```ts
 const status = await user.match({
   ok: () => 200,
-  err: (matcher) => matcher.with({ _tag: "NotFound" }, () => 404), // your modeled NotFound
+  errCases: (matcher) => matcher.with({ _tag: "NotFound" }, () => 404), // your modeled NotFound
   defect: (cause) => {
     logger.error(cause);
     return 500; // everything unexpected

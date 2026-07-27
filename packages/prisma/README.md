@@ -31,7 +31,7 @@ const users = db.user.tryFindMany({ select: { id: true } });
 
 await db.user.tryCreate({ data }).match({
   ok: (user) => created(user),
-  err: (matcher) =>
+  errCases: (matcher) =>
     matcher
       .with(tag("UniqueConstraintViolation"), (e) => conflict(e.fields))
       .with(P._, (e) => serverError(e)),

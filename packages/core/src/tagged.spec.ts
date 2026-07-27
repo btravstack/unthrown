@@ -119,20 +119,20 @@ describe("TaggedError", () => {
     const out = (Err(new Retryable()) as Result<number, Retryable>).match({
       ok: (n) => `ok:${n}`,
       defect: () => "defect",
-      err: (matcher) => matcher.with(tag("@my-lib/Retryable"), (e) => `retry:${e.name}`),
+      errCases: (matcher) => matcher.with(tag("@my-lib/Retryable"), (e) => `retry:${e.name}`),
     });
     expect(out).toBe("retry:Retryable");
   });
 });
 
 // The per-tag exhaustive fold that `matchTags` used to provide is now `match`
-// with its `err` handler driven by the ts-pattern error matcher and `tag(t)`.
+// with its `errCases` handler driven by the ts-pattern error matcher and `tag(t)`.
 describe("match — per-tag error matching", () => {
   const fold = (r: Result<number, ApiError>): string =>
     r.match({
       ok: (n) => `ok:${n}`,
       defect: (cause) => `defect:${String(cause)}`,
-      err: (matcher) =>
+      errCases: (matcher) =>
         matcher
           .with(tag("NotFound"), () => "not-found")
           .with(tag("Forbidden"), (e) => `forbidden:${e.user}`)
@@ -168,7 +168,7 @@ describe("match — per-tag error matching", () => {
     const out = await r.match({
       ok: (n) => `ok:${n}`,
       defect: () => "defect",
-      err: (matcher) =>
+      errCases: (matcher) =>
         matcher
           .with(tag("NotFound"), () => "nf")
           .with(tag("Forbidden"), () => "fb")
@@ -182,7 +182,7 @@ describe("match — per-tag error matching", () => {
       r.match({
         ok: (n) => `ok:${n}`,
         defect: () => "defect",
-        err: (matcher) => matcher.with(P._, (e) => `err:${e._tag}`),
+        errCases: (matcher) => matcher.with(P._, (e) => `err:${e._tag}`),
       });
     expect(uniform(Err(new NotFound()))).toBe("err:NotFound");
     expect(uniform(Err(new HttpError({ status: 500 })))).toBe("err:HttpError");
@@ -195,7 +195,7 @@ describe("match — per-tag error matching", () => {
       (Err(rogue) as Result<number, Known>).match({
         ok: () => "ok",
         defect: () => "defect",
-        err: (matcher) => matcher.with(tag("Known"), () => "known"),
+        errCases: (matcher) => matcher.with(tag("Known"), () => "known"),
       }),
     ).toThrow();
   });

@@ -48,7 +48,7 @@ export function toBoxed<T, E>(
   onDefect: (cause: unknown) => E,
 ): BoxedResult<T, E> {
   // Guard-based (not `match`): this bridge is generic in `E`, and `match`'s
-  // exhaustive `err` matcher cannot be proven exhaustive over an unresolved
+  // exhaustive `errCases` matcher cannot be proven exhaustive over an unresolved
   // type parameter.
   if (result.isOk()) return BoxedResult.Ok(result.value);
   if (result.isErr()) return BoxedResult.Error(result.error);

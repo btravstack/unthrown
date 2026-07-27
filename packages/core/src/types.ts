@@ -436,25 +436,26 @@ export type ResultMethods<out T, out E> = {
    * is typically the single place a pipeline is handled at the edge — mapping
    * `Ok`/`Err`/`Defect` to (for example) 2xx / 4xx / 5xx with no `try`/`catch`.
    *
-   * The `err` handler does not take a single blanket callback: it receives
+   * The `errCases` handler does not take a single blanket callback: it receives
    * `match(error)` (an {@link ErrMatcher}) and **matches the error exhaustively**,
-   * exactly like the error combinators. Chain `.with(pattern, handler)` and
-   * **return the un-terminated builder** — `match` calls `.exhaustive()` itself,
-   * so a missing case is a compile error at the call site (no `.exhaustive()` to
-   * forget). Use `.with(P._, …)` for a uniform catch-all. Unlike the combinators
-   * the branches receive **no `defect` helper** — `match` is total elimination
-   * to a value, with no `Defect` output channel; the `defect` case handles a
-   * `Result` that already carries one. (A `Result` is also a discriminated
-   * union — for richer whole-`Result` matching, `match(result).with(…)`.)
+   * exactly like the error combinators — which is why the key carries the same
+   * `…Cases` suffix. Chain `.with(pattern, handler)` and **return the
+   * un-terminated builder** — `match` calls `.exhaustive()` itself, so a missing
+   * case is a compile error at the call site (no `.exhaustive()` to forget). Use
+   * `.with(P._, …)` for a uniform catch-all. Unlike the combinators the branches
+   * receive **no `defect` helper** — `match` is total elimination to a value,
+   * with no `Defect` output channel; the `defect` case handles a `Result` that
+   * already carries one. (A `Result` is also a discriminated union — for richer
+   * whole-`Result` matching, `match(result).with(…)`.)
    *
    * @typeParam ROk - the `ok` handler return type.
    * @typeParam RDefect - the `defect` handler return type.
-   * @typeParam M - the exhaustive builder the `err` handler returns.
-   * @param cases - the `ok`/`defect` handlers plus the `err` matcher builder.
+   * @typeParam M - the exhaustive builder the `errCases` handler returns.
+   * @param cases - the `ok`/`defect` handlers plus the `errCases` matcher builder.
    */
   match<ROk, RDefect, M extends ExhaustiveMatch<unknown>>(cases: {
     ok: (value: T) => ROk;
-    err: (matcher: ErrMatcher<E>) => M;
+    errCases: (matcher: ErrMatcher<E>) => M;
     defect: (cause: unknown) => RDefect;
   }): ROk | RDefect | MatchOut<M>;
   /**
@@ -674,7 +675,7 @@ export type FailureView<E, T = never> = ErrView<E, T> | DefectView<T, E>;
  *
  * const message = half(10).match({
  *   ok: (n) => `got ${n}`,
- *   err: (matcher) => matcher.with(P._, (e) => `failed: ${e}`),
+ *   errCases: (matcher) => matcher.with(P._, (e) => `failed: ${e}`),
  *   defect: (cause) => `bug: ${String(cause)}`,
  * });
  * ```
@@ -901,12 +902,12 @@ export type AsyncResultMethods<out T, out E> = {
 
   /**
    * Asynchronous {@link ResultMethods.match | match}. Handlers are synchronous
-   * (the `err` handler returns an exhaustive {@link ErrMatcher} builder, no
+   * (the `errCases` handler returns an exhaustive {@link ErrMatcher} builder, no
    * `defect` helper); resolves to a `Promise` of the folded value.
    */
   match<ROk, RDefect, M extends ExhaustiveMatch<unknown>>(cases: {
     ok: (value: T) => ROk;
-    err: (matcher: ErrMatcher<E>) => M;
+    errCases: (matcher: ErrMatcher<E>) => M;
     defect: (cause: unknown) => RDefect;
   }): Promise<ROk | RDefect | MatchOut<M>>;
   /**

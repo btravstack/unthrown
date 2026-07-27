@@ -296,7 +296,7 @@ class Res<T, E> {
     this: Result<T, E>,
     cases: {
       ok: (value: T) => ROk;
-      err: (matcher: ErrMatcher<E>) => M;
+      errCases: (matcher: ErrMatcher<E>) => M;
       defect: (cause: unknown) => RDefect;
     },
   ): ROk | RDefect | MatchOut<M> {
@@ -304,12 +304,12 @@ class Res<T, E> {
       case "Ok":
         return cases.ok(this.value);
       case "Err":
-        // The `err` handler returns the un-terminated builder; `.run()` executes
-        // `.exhaustive()`. Type-forced exhaustive for well-typed callers; a value
-        // slipping past the types (widened cast, JS caller) with no matching case
-        // throws ts-pattern's `NonExhaustiveError` — `match` is an edge eliminator,
-        // so it surfaces rather than being caught into a Defect.
-        return cases.err(match(this.error) as ErrMatcher<E>).run() as MatchOut<M>;
+        // The `errCases` handler returns the un-terminated builder; `.run()`
+        // executes `.exhaustive()`. Type-forced exhaustive for well-typed
+        // callers; a value slipping past the types (widened cast, JS caller) with
+        // no matching case throws ts-pattern's `NonExhaustiveError` — `match` is
+        // an edge eliminator, so it surfaces rather than being caught into a Defect.
+        return cases.errCases(match(this.error) as ErrMatcher<E>).run() as MatchOut<M>;
       case "Defect":
         return cases.defect(this.cause);
     }
@@ -469,7 +469,8 @@ export function defectRes<T, E>(cause: unknown): Result<T, E> {
  * isResult(Ok(1).toAsync()); // => false (an AsyncResult is not a Result)
  *
  * const x: unknown = Ok(1);
- * if (isResult(x)) x.match({ ok: () => 1, err: () => 0, defect: () => -1 });
+ * if (isResult(x))
+ *   x.match({ ok: () => 1, errCases: (m) => m.with(P._, () => 0), defect: () => -1 });
  * ```
  *
  * @category Guards
@@ -887,7 +888,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
 
   match<ROk, RDefect, M extends ExhaustiveMatch<unknown>>(cases: {
     ok: (value: T) => ROk;
-    err: (matcher: ErrMatcher<E>) => M;
+    errCases: (matcher: ErrMatcher<E>) => M;
     defect: (cause: unknown) => RDefect;
   }): Promise<ROk | RDefect | MatchOut<M>> {
     return this.#promise.then((r) => r.match(cases));

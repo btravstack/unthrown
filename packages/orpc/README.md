@@ -78,8 +78,8 @@ const greeting = await rc.planet
   .map((planet) => `Hello, ${planet.name}!`)
   .match({
     ok: (msg) => msg,
-    // `err` takes the exhaustive matcher — branch on the ORPCError `code`
-    err: (matcher) =>
+    // `errCases` takes the exhaustive matcher — branch on the ORPCError `code`
+    errCases: (matcher) =>
       matcher.with({ code: "NOT_FOUND" }, () => "Hello, void!").with(P._, () => "Hello, trouble!"),
     defect: () => "Hello, bug tracker!",
   });

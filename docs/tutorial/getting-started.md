@@ -96,9 +96,9 @@ _unexpected_ (you'll meet it in the next step):
 ```ts
 const message = parseAge("-3").match({
   ok: (age) => `age is ${age}`,
-  // `err` receives an exhaustive matcher — one branch per error. ts-pattern
+  // `errCases` receives an exhaustive matcher — one branch per error. ts-pattern
   // matches plain strings too (no tag required), and a missing case won't compile.
-  err: (matcher) =>
+  errCases: (matcher) =>
     matcher.with("negative", () => "must be positive").with("not_a_number", () => "not a number"),
   defect: (cause) => {
     console.error(cause); // a bug slipped through — log it, don't leak it

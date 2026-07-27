@@ -152,7 +152,7 @@ result.mapErrCases((matcher) => matcher.with(P._, (e) => new AppError(e))); // a
 result.recoverErrCases((matcher) => matcher.with(P._, () => fallback)); // any error → fallback value
 result.match({
   ok: (v) => v,
-  err: (matcher) => matcher.with(P._, (e) => `failed: ${e}`),
+  errCases: (matcher) => matcher.with(P._, (e) => `failed: ${e}`),
   defect: (c) => `bug: ${c}`,
 });
 ```
@@ -205,7 +205,7 @@ const status = await findUser(id) // Result<User, NotFound>  (sync)
   .toAsync() // AsyncResult<User, NotFound>
   .flatMap((user) => fromPromise(loadOrders(user.id), qualify)) // async step
   .map((orders) => orders.length) // sync callback, still AsyncResult
-  .match({ ok: (n) => n, err: (matcher) => matcher.with(P._, () => 0), defect: () => -1 }); // await collapses it
+  .match({ ok: (n) => n, errCases: (matcher) => matcher.with(P._, () => 0), defect: () => -1 }); // await collapses it
 ```
 
 ## The pairs that are easy to confuse

@@ -120,8 +120,8 @@ export type ResultClient<T extends AnyNestedClient> =
  *   .map((planet) => `Hello, ${planet.name}!`)
  *   .match({
  *     ok: (msg) => msg,
- *     // the `err` handler matches the error exhaustively (here on `code`)
- *     err: (matcher) =>
+ *     // the `errCases` handler matches the error exhaustively (here on `code`)
+ *     errCases: (matcher) =>
  *       matcher
  *         .with({ code: "NOT_FOUND" }, () => "Hello, void!")
  *         .with(P._, () => "Hello, trouble!"),

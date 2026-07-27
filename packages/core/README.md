@@ -27,7 +27,7 @@ const user = fromPromise(fetchUser(id), (cause, defect) =>
 
 const status = await user.match({
   ok: () => 200,
-  err: (matcher) => matcher.with(P._, () => 404), // `err` takes the exhaustive matcher
+  errCases: (matcher) => matcher.with(P._, () => 404), // `errCases` takes the exhaustive matcher
   defect: () => 500,
 });
 ```

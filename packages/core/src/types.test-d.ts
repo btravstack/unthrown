@@ -354,7 +354,7 @@ type _errOf = Expect<Equal<ErrOf<Result<number, "e">>, "e">>;
 type _asyncOkOf = Expect<Equal<AsyncOkOf<AsyncResult<number, "e">>, number>>;
 type _asyncErrOf = Expect<Equal<AsyncErrOf<AsyncResult<number, "e">>, "e">>;
 
-// --- tagged errors: match's `err` matcher is exhaustive ----------------------
+// --- tagged errors: match's `errCases` matcher is exhaustive ----------------------
 
 class TagA extends TaggedError("TagA") {}
 class TagB extends TaggedError("TagB") {}
@@ -364,21 +364,38 @@ declare const tagged: Result<number, TagA | TagB>;
 tagged.match({
   ok: () => 1,
   defect: () => 2,
-  err: (matcher) => matcher.with(tag("TagA"), () => 3).with(tag("TagB"), () => 4),
+  errCases: (matcher) => matcher.with(tag("TagA"), () => 3).with(tag("TagB"), () => 4),
 });
 
 tagged.match({
   ok: () => 1,
   defect: () => 2,
   // @ts-expect-error - the TagB branch is missing, so the builder is not exhaustive
-  err: (matcher) => matcher.with(tag("TagA"), () => 3),
+  errCases: (matcher) => matcher.with(tag("TagA"), () => 3),
+});
+
+// The 4.x call shape — an `err` key taking the error value — no longer compiles:
+// the matcher handler is now `errCases`, so a leftover `err` key is an excess
+// property. This is the loud replacement for the former silent runtime break (a
+// throwing `err` handler returned `never`, vacuously satisfying the matcher
+// constraint, then threw the matcher object at runtime).
+tagged.match({
+  ok: (value) => value,
+  errCases: (matcher) => matcher.with(P._, (e) => e),
+  // @ts-expect-error - `err` is not a valid handler key (renamed to `errCases` in 5.0)
+  err: (error: unknown) => {
+    throw error;
+  },
+  defect: (cause) => {
+    throw cause;
+  },
 });
 
 // The folded type unions the ok/defect returns with the err branches' returns.
 const folded = tagged.match({
   ok: () => "ok" as const,
   defect: () => "defect" as const,
-  err: (matcher) =>
+  errCases: (matcher) =>
     matcher.with(tag("TagA"), () => "a" as const).with(tag("TagB"), () => "b" as const),
 });
 type _folded = Expect<Equal<typeof folded, "ok" | "defect" | "a" | "b">>;
@@ -388,7 +405,7 @@ type _folded = Expect<Equal<typeof folded, "ok" | "defect" | "a" | "b">>;
 const foldedObjects = tagged.match({
   ok: (n) => ({ ok: n }),
   defect: () => ({ bug: true }),
-  err: (matcher) => matcher.with(P._, (e) => ({ err: e._tag })),
+  errCases: (matcher) => matcher.with(P._, (e) => ({ err: e._tag })),
 });
 type _foldedObjects = Expect<
   Equal<typeof foldedObjects, { ok: number } | { bug: boolean } | { err: "TagA" | "TagB" }>
@@ -491,7 +508,7 @@ new WithMsg({ ticketId: "t1" });
   // ok/defect directly, and the err matcher's branches too (no NotThenable here).
   void r.match({
     ok: async (n) => n,
-    err: (matcher) => matcher.with(P._, async (e) => e.length),
+    errCases: (matcher) => matcher.with(P._, async (e) => e.length),
     defect: async () => 0,
   });
 }

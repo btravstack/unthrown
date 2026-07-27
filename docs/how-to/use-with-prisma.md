@@ -63,7 +63,7 @@ error you want to model (`RecordNotFound`).
 
 ## Handle the errors
 
-Because the errors are [tagged](./model-errors), driving `match`'s `err` handler
+Because the errors are [tagged](./model-errors), driving `match`'s `errCases` handler
 with the ts-pattern matcher gives you an exhaustive fold — the compiler lists
 exactly the cases the operation can hit:
 
@@ -74,7 +74,7 @@ const created = await db.user.tryCreate({ data: { email, name } });
 
 return created.match({
   ok: (user) => resp.created(user),
-  err: (matcher) =>
+  errCases: (matcher) =>
     matcher
       .with(tag("UniqueConstraintViolation"), (e) => resp.conflict(`taken: ${e.fields.join(", ")}`))
       .with(tag("ForeignKeyViolation"), () => resp.badRequest("unknown reference"))
@@ -84,7 +84,7 @@ return created.match({
 // No RecordNotFound arm — a create can't raise it, and the type knows.
 ```
 
-When you don't need per-tag branches, collapse the `err` matcher to a single
+When you don't need per-tag branches, collapse the `errCases` matcher to a single
 `.with(P._, …)` catch-all.
 
 ## Transactions
@@ -130,7 +130,7 @@ const page = await db.user
 
 page.match({
   ok: ([users, meta]) => json({ users, nextCursor: meta.endCursor, hasMore: meta.hasNextPage }),
-  err: (matcher) => matcher.with(P._, (e) => serverError(e)),
+  errCases: (matcher) => matcher.with(P._, (e) => serverError(e)),
   defect: serverError,
 });
 ```

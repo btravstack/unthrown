@@ -110,18 +110,18 @@ matcher exists to eliminate.
 
 ## The one eliminator that still folds the error: `match`
 
-`match` applies the same exhaustive matcher to its `err` handler:
+`match` applies the same exhaustive matcher to its `errCases` handler:
 
 ```ts
 result.match({
   ok: (v) => v,
-  err: (matcher) => matcher.with(tag("NotFound"), () => 404).with(tag("Forbidden"), () => 403),
+  errCases: (matcher) => matcher.with(tag("NotFound"), () => 404).with(tag("Forbidden"), () => 403),
   defect: (cause) => 500,
 });
 ```
 
-so folding at the edge is exhaustive too — there is no blanket `err` callback
-left to silently drop a case. Its `err` handler receives the matcher but **no
+so folding at the edge is exhaustive too — there is no blanket error callback
+left to silently drop a case. Its `errCases` handler receives the matcher but **no
 `defect` helper**: `match` folds to a plain value, with no `Defect` output
 channel, and a `Result` that already carries a defect is handled by the separate
 `defect:` case.

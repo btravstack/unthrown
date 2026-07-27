@@ -93,11 +93,14 @@ was planned).
    result, not a rejection bypass. `tapDefect` / `tapFailure` keep single callbacks — their payloads
    carry no discriminant to match (a defect's cause is `unknown`; `tapFailure`
    splits on channel, not tag). The one eliminator that still handles the error
-   channel, **`match`**, applies the **same exhaustive matcher** to its `err`
-   handler (`(matcher) => matcher.with(…)`, returning the un-terminated builder;
-   `match` runs `.exhaustive()`) — so folding at the edge is exhaustive too, and
-   there is no blanket `err` callback left to silently drop a value. Its `err`
-   handler receives the matcher but **no `defect` helper** — `match` folds to a
+   channel, **`match`**, applies the **same exhaustive matcher** to its
+   `errCases` handler (`(matcher) => matcher.with(…)`, returning the
+   un-terminated builder; `match` runs `.exhaustive()`) — so folding at the edge
+   is exhaustive too, and there is no blanket `err` callback left to silently
+   drop a value. The handler key carries the same `…Cases` suffix as the
+   combinators (and a leftover 4.x `err:` handler is now an excess-property
+   compile error, not a silent runtime break). Its `errCases` handler receives
+   the matcher but **no `defect` helper** — `match` folds to a
    plain value, with no `Defect` output channel; the separate `defect` case
    handles a `Result` that already carries one. (This subsumes the former
    `matchTags` fold — per-tag folding at the edge is now `match` with the
@@ -115,7 +118,7 @@ was planned).
   `flatMapErrCases`,
   `recoverErrCases`, `tap*`, `flatTapErrCases`, `recoverDefect`) is caught and converted to a
   `Defect`. Nothing escapes a pipeline as a raw throw.
-  This is what lets an HTTP adapter do a single `match({ ok, err, defect })`
+  This is what lets an HTTP adapter do a single `match({ ok, errCases, defect })`
   with **no surrounding `try/catch`**.
 - **An out-of-contract non-`Result` surfaces as a `Defect`, never a raw
   throw/rejection.** Reachable only from untyped/cast callers: the aggregates
@@ -186,7 +189,7 @@ was planned).
   combinators can't be swapped out from under every instance), `AsyncRes`'s
   wrapped promise is a native `#private` field, and the qualify-time `defect`
   marker is frozen.
-- **`match`'s `err` matcher is type-forced exhaustive, and library code generic
+- **`match`'s `errCases` matcher is type-forced exhaustive, and library code generic
   in `E` uses the guards instead.** For well-typed concrete callers a missing
   branch does not compile; a rogue value slipping past the types throws
   `NonExhaustiveError` (see above). Because ts-pattern cannot prove `.with(P._,
@@ -268,7 +271,7 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
   meaning — recovering stays the separate `recoverDefect`; handling both for
   good is `match`), and no channel-moving operators (`Err`→`Defect` erases the
   modeled type; `Defect`→`Err` would put `unknown` in `E`, violating Thesis #1)
-- eliminate: `match` (the `{ ok, defect }` handlers plus an `err` handler that
+- eliminate: `match` (the `{ ok, defect }` handlers plus an `errCases` handler that
   takes the **exhaustive ts-pattern matcher** `(matcher) => matcher.with(…)` —
   same as the error combinators, but with no `defect` helper since `match` folds
   to a value; the folded type unions all branch returns), `get`/`getErr`
@@ -401,9 +404,9 @@ match<E>>`, so ts-pattern's non-exported `Match` type is never imported).
   (`cause` stays allowed — see Thesis #4), so the
   message is set per subclass with `override message = "…"`, never as a payload
   field) and `tag(t)` (the `{ _tag: t }` ts-pattern pattern, for use in the
-  error matchers, in `match`'s `err` handler, and in `match(result)`); see the
+  error matchers, in `match`'s `errCases` handler, and in `match(result)`); see the
   `TaggedError` convention in Thesis #4. **There is no `matchTags`** — a per-tag
-  exhaustive fold over a tagged error union is `result.match({ ok, defect, err:
+  exhaustive fold over a tagged error union is `result.match({ ok, defect, errCases:
 (matcher) => matcher.with(tag("…"), …) })`, which generalises beyond `_tag` to
   any discriminant.
 
@@ -680,7 +683,7 @@ channel?**
 2. ✅ **`packages/core/src/tagged.ts`** — Done. `TaggedError(tag)` factory
    (extends `Error`, `_tag`, no-arg constructor when payload is empty via the
    `keyof A extends never ? void : A` trick) and `tag(t)` (the `{ _tag: t }`
-   ts-pattern pattern). A per-tag exhaustive fold is `match`'s `err` handler
+   ts-pattern pattern). A per-tag exhaustive fold is `match`'s `errCases` handler
    with the ts-pattern matcher (`matcher.with(tag("…"), …)`), not a dedicated
    `matchTags` — that former helper was folded into `match` when the matcher
    became the error-channel convention.
@@ -728,7 +731,7 @@ configured outside the repo).
 - **Type-level tests:** `packages/core/src/types.test-d.ts` asserts the
   type-level behaviour the runtime can't (the conditional `all`/`allFromDict`
   shapes, `Exclude<R, Defect>` boundary inference, `flatTap`/`recoverErrCases` channel
-  widening, the `this is …` guard narrowing, `match`'s `err`-matcher
+  widening, the `this is …` guard narrowing, `match`'s `errCases`-matcher
   exhaustiveness (a missing tag does not compile; the folded type unions the
   branch returns), and the
   error-matcher semantics — narrowing, defect/throw-branch subtraction,

@@ -35,7 +35,7 @@ if (bad.isErr()) bad.error; // readonly StandardSchemaV1.Issue[]
 
 ## Reduce issues to per-field messages
 
-The error channel is the issues array — map it in the `err` arm. Here a `P._`
+The error channel is the issues array — map it in the `errCases` arm. Here a `P._`
 catch-all hands the whole array to one branch that reduces it to per-field
 messages:
 
@@ -64,7 +64,7 @@ type ValidationResult =
 function validateSignup(input: unknown): ValidationResult {
   return parseSignup(input).match({
     ok: (data) => ({ ok: true, data }),
-    err: (matcher) =>
+    errCases: (matcher) =>
       matcher.with(P._, (issues) => ({
         ok: false as const,
         fieldErrors: issues.reduce<Record<string, string[]>>((byField, issue) => {
