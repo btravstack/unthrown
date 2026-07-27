@@ -4,8 +4,8 @@
 > written, chained, and folded your first `Result`s. We keep explanation to a
 > minimum here and link out to it — the goal is to _do_, not to study.
 
-By the end you will have a small program that parses a value, handles every
-outcome, and never throws. It takes about ten minutes.
+By the end you will have a small program that parses a value and handles every
+outcome as a value — with no `try`/`catch` to write. It takes about ten minutes.
 
 ## Step 1 — Install
 
@@ -62,12 +62,14 @@ Success combinators run only on `Ok`; an `Err` passes straight through, so you
 can chain without checking at every step:
 
 ```ts
-parseAge("42")
+const adult = parseAge("42")
   .map((n) => n + 1) // => Ok(43)   — map: callback returns a plain value
-  .flatMap((n) => (n >= 18 ? Ok(n) : Err("underage"))) // => Ok(43) — flatMap: callback returns a Result
-  .getOrThrow(); // => 43
-// the error type widens to AgeError | "underage" — flatMap unions the channels
+  .flatMap((n) => (n >= 18 ? Ok(n) : Err("underage"))); // => Ok(43) — flatMap: callback returns a Result
+// adult: Result<number, AgeError | "underage">  — flatMap unioned the error channels
 ```
+
+The value stays wrapped in a `Result` the whole way — you extract it once, at the
+edge, in Step 4. Nothing is thrown along the way.
 
 And when a step fails, the rest of the chain is skipped:
 
