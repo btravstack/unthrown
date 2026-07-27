@@ -14,6 +14,7 @@
   },
   "changesets": [
     "adopt-btravstack-0.2",
+    "built-in-matcher",
     "ensure-and-do-async",
     "exhaustive-error-matcher",
     "fix-async-flatmap-inference",
@@ -21,6 +22,7 @@
     "getorthrow-never-gate-message",
     "orpc-sync-throw-defect",
     "oxlint-four-rules",
+    "oxlint-no-catch-all-pattern",
     "prisma-transaction-defect",
     "remove-tools-packages",
     "rename-err-combinators-cases",
