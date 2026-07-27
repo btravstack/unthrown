@@ -26,7 +26,7 @@ toExit(Err("e")); // Exit.fail("e")        — a modeled Cause.fail
 // Run an Effect and collect its outcome (die/interrupt become a Defect):
 await fromEffect(Effect.succeed(1)).match({
   ok: (n) => n,
-  err: (matcher) => matcher.with(P._, (e) => e), // the error channel, matched exhaustively
+  errCases: (matcher) => matcher.with(P._, (e) => e), // the error channel, matched exhaustively
   defect: String,
 });
 ```

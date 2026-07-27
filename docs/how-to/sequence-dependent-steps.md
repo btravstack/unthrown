@@ -44,7 +44,7 @@ Do()
   .let("doubled", ({ n }) => n * 2)
   .match({
     ok: ({ n, doubled }) => `${n} → ${doubled}`,
-    err: (matcher) => matcher.with(P._, (e) => `failed: ${e}`),
+    errCases: (matcher) => matcher.with(P._, (e) => `failed: ${e}`),
     defect: (cause) => `bug: ${String(cause)}`,
   });
 ```
@@ -63,7 +63,11 @@ const profile = await Do()
   .bind("user", () => fromPromise(fetchUser(id), (c, defect) => defect(c)))
   .bind("posts", ({ user }) => fromPromise(fetchPosts(user.id), (c, defect) => defect(c)))
   .let("count", ({ posts }) => posts.length)
-  .match({ ok: (s) => s, err: (matcher) => matcher.with(P._, () => null), defect: () => null });
+  .match({
+    ok: (s) => s,
+    errCases: (matcher) => matcher.with(P._, () => null),
+    defect: () => null,
+  });
 ```
 
 ## When to reach for named functions instead

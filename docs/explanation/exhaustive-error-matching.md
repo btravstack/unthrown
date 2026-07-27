@@ -110,21 +110,68 @@ matcher exists to eliminate.
 
 ## The one eliminator that still folds the error: `match`
 
-`match` applies the same exhaustive matcher to its `err` handler:
+`match` applies the same exhaustive matcher to its `errCases` handler:
 
 ```ts
 result.match({
   ok: (v) => v,
-  err: (matcher) => matcher.with(tag("NotFound"), () => 404).with(tag("Forbidden"), () => 403),
+  errCases: (matcher) => matcher.with(tag("NotFound"), () => 404).with(tag("Forbidden"), () => 403),
   defect: (cause) => 500,
 });
 ```
 
-so folding at the edge is exhaustive too — there is no blanket `err` callback
-left to silently drop a case. Its `err` handler receives the matcher but **no
+so folding at the edge is exhaustive too — there is no blanket error callback
+left to silently drop a case. Its `errCases` handler receives the matcher but **no
 `defect` helper**: `match` folds to a plain value, with no `Defect` output
 channel, and a `Result` that already carries a defect is handled by the separate
 `defect:` case.
+
+## Generic boundary helpers: use the guards, not the matcher
+
+The exhaustiveness that makes the matcher safe is proven by ts-pattern _at the
+call site_, from the concrete error union. Inside a **generic** helper — one
+whose error type is still a type parameter `E` — ts-pattern cannot prove any
+builder exhaustive, **not even `.with(P._, …)`**, because `E` is unresolved. So
+this does not compile:
+
+```ts
+// ❌ Won't compile: E is a type parameter, so no builder is provably exhaustive.
+function toPromise<T, E>(result: Result<T, E>): T {
+  return result.match({
+    ok: (value) => value,
+    errCases: (matcher) =>
+      matcher.with(P._, (error) => {
+        throw error;
+      }),
+    defect: (cause) => {
+      throw cause;
+    },
+  });
+}
+```
+
+This is a real limitation, not a bug you can pattern your way around: the same
+body compiles the moment `E` is a concrete union. It means the `…Cases` / `match`
+API is effectively unavailable to code that is generic in the error — a library
+boundary helper, a generic HTTP responder, a test utility.
+
+At such a boundary you are usually **leaving** the `Result` world anyway, so
+reach for the narrowing guards instead — they narrow to `OkView` / `ErrView` /
+`DefectView` with no exhaustiveness obligation, and read clearly:
+
+```ts
+// ✅ Guards carry no exhaustiveness obligation, so they work for any E.
+function toPromise<T, E>(result: Result<T, E>): T {
+  if (result.isErr()) throw result.error;
+  if (result.isDefect()) throw result.cause;
+  return result.value;
+}
+```
+
+This is exactly what unthrown's own generic code does — the interop `to*`
+bridges and `@unthrown/orpc`'s `handlerResult` all branch on the guards, not
+`match`, for the same reason. Concrete application code, where `E` is a known
+union, uses `match` and the `…Cases` combinators normally.
 
 ## Where to go next
 

@@ -74,7 +74,7 @@ bug in a `.map` — lands in `defect`:
 ```ts
 const status = await user.match({
   ok: () => 200,
-  err: (matcher) => matcher.with({ _tag: "NotFound" }, () => 404),
+  errCases: (matcher) => matcher.with({ _tag: "NotFound" }, () => 404),
   defect: (cause) => {
     logger.error(cause);
     return 500; // everything unexpected

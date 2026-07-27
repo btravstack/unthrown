@@ -67,7 +67,7 @@ The call site becomes an ordinary `Result`, `await`ed once:
 const user = await getUser(id); // Result<User, "not_found">
 user.match({
   ok: (u) => render(u),
-  err: (matcher) => matcher.with("not_found", () => render404()), // the one modeled error
+  errCases: (matcher) => matcher.with("not_found", () => render404()), // the one modeled error
   defect: (cause) => render500(cause),
 });
 ```
@@ -130,7 +130,7 @@ result.match({
     connection.close();
     return v;
   },
-  err: (matcher) =>
+  errCases: (matcher) =>
     matcher.with(P._, (e) => {
       connection.close();
       return handleErr(e);

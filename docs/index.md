@@ -58,7 +58,7 @@ const profile = fromPromise(db.loadProfile(id), (cause, defect) =>
 // Handle every channel once, at the edge — no surrounding try/catch.
 const status = await profile.match({
   ok: () => 200,
-  err: (matcher) => matcher.with(P._, () => 404), // `err` takes the exhaustive matcher
+  errCases: (matcher) => matcher.with(P._, () => 404), // `errCases` takes the exhaustive matcher
   defect: () => 500,
 });
 ```

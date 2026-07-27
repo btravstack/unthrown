@@ -46,8 +46,13 @@ the comparison with `neverthrow`, `boxed`, and `effect`.
 ## Install
 
 ```sh
-pnpm add unthrown
+pnpm add unthrown ts-pattern
 ```
+
+`ts-pattern` (`^5`) is a peer dependency — it powers the exhaustive error
+matchers and is re-exported by `unthrown` as `match` / `P`. Owning the single
+copy yourself means `import { P } from "ts-pattern"` composes with unthrown's
+matchers instead of colliding with a second, nested copy.
 
 ## Quick Example
 
@@ -68,8 +73,8 @@ const user = fromPromise(fetchUser(id), (cause, defect) =>
 // Handle every channel once, at the edge — no surrounding try/catch.
 const status = await user.match({
   ok: () => 200,
-  // `err` receives the exhaustive ts-pattern matcher; `.with(P._, …)` handles every error:
-  err: (matcher) => matcher.with(P._, () => 404), // your modeled NotFound
+  // `errCases` receives the exhaustive ts-pattern matcher; `.with(P._, …)` handles every error:
+  errCases: (matcher) => matcher.with(P._, () => 404), // your modeled NotFound
   defect: (cause) => {
     logger.error(cause); // everything unexpected
     return 500;

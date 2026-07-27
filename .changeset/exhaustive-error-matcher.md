@@ -54,10 +54,12 @@ into core; the `P.Ok`/`P.Err`/`P.Defect` sugar is dropped (match the union
 structurally instead).
 
 **`match` now matches the error channel exhaustively too, and `matchTags` is
-removed.** `match`'s `err` handler no longer takes a blanket `(error) => R`
+removed.** `match`'s error handler no longer takes a blanket `(error) => R`
 callback — it receives the same ts-pattern matcher and returns the un-terminated
 builder (no `defect` helper: `match` folds to a value, with no `Defect` output
-channel). This subsumes the old `matchTags` fold — a per-tag fold over a tagged
+channel). It is also **renamed `err` → `errCases`** to match the combinators and
+to make the change loud (a leftover 4.x `err:` handler is now an
+excess-property compile error). This subsumes the old `matchTags` fold — a per-tag fold over a tagged
 union is now `match` with the matcher and `tag(t)`, and it generalises to any
 discriminant, not only `_tag`:
 
@@ -76,7 +78,7 @@ matchTags(result, {
 result.match({
   ok: (n) => `got ${n}`,
   defect: (cause) => `bug: ${String(cause)}`,
-  err: (matcher) =>
+  errCases: (matcher) =>
     matcher.with(tag("NotFound"), () => "404").with(tag("Forbidden"), (e) => `403 for ${e.user}`),
 });
 ```

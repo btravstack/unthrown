@@ -39,7 +39,7 @@ const loadProfile = (id: string) =>
 async function handler(id: string): Promise<HttpResponse> {
   return (await loadProfile(id)).match({
     ok: (profile) => ({ status: 200, body: profile }),
-    err: (matcher) =>
+    errCases: (matcher) =>
       matcher
         .with(tag("NotFound"), (e) => ({ status: 404, body: e }))
         .with(tag("Forbidden"), (e) => ({ status: 403, body: e })),
@@ -93,7 +93,7 @@ app.get("/users/:id", (c) => {
 
   return user.match({
     ok: (u) => c.json(u, 200),
-    err: (matcher) =>
+    errCases: (matcher) =>
       matcher
         .with(tag("InvalidId"), () => c.json({ error: "invalid id" }, 400))
         .with(tag("NotFound"), (e) => c.json({ error: `no user ${e.id}` }, 404)),

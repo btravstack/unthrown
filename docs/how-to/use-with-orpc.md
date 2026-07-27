@@ -121,7 +121,7 @@ const greeting = await rc.planet
   .match({
     ok: (msg) => msg,
     // the matcher branches on the ORPCError `code`, not a `_tag`
-    err: (matcher) =>
+    errCases: (matcher) =>
       matcher.with({ code: "NOT_FOUND" }, () => "Hello, void!").with(P._, () => "Hello, trouble!"),
     defect: () => "Hello, bug tracker!",
   });
@@ -130,7 +130,7 @@ const greeting = await rc.planet
 The error channel is the raw inferable `ORPCError` union, discriminated by `code`
 — deliberately **not** re-wrapped into [tagged errors](./model-errors): oRPC
 already ships a discriminated error type, and one concept should have one name.
-Branch on `code` — in `match`'s `err` matcher (as above), a `switch`, or a
+Branch on `code` — in `match`'s `errCases` matcher (as above), a `switch`, or a
 standalone ts-pattern `match`. Because these are plain `ORPCError`s rather than
 `TaggedError`s, `tag(...)` doesn't apply — match on the `code` field instead.
 

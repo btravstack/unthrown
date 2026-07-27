@@ -65,12 +65,12 @@ the observers (`tapDefect` / `tapFailure`), and `match`:
 | `recoverDefect`                   | passes ▸ | passes ▸      | runs `f`    | `E \| E2`       |
 | `tapDefect`                       | passes ▸ | passes ▸      | runs `f`    | `E`             |
 | `tapFailure`                      | passes ▸ | runs `f`      | runs `f`    | `E`             |
-| `match`                           | `ok()`   | `err()`       | `defect()`  | —               |
+| `match`                           | `ok()`   | `errCases()`  | `defect()`  | —               |
 
 ::: tip `recoverErrCases`'s `never` under-describes the runtime
 `recoverErrCases` empties only the **error** channel to `never` — a `Defect` can still be
 present at runtime and flows past it untouched. See
-[The Defect Channel](../explanation/the-defect-channel#recovererr-clears-the-error-channel-not-the-runtime).
+[The Defect Channel](../explanation/the-defect-channel#recovererrcases-clears-the-error-channel-not-the-runtime).
 :::
 
 ## The error channel
@@ -152,7 +152,7 @@ result.mapErrCases((matcher) => matcher.with(P._, (e) => new AppError(e))); // a
 result.recoverErrCases((matcher) => matcher.with(P._, () => fallback)); // any error → fallback value
 result.match({
   ok: (v) => v,
-  err: (matcher) => matcher.with(P._, (e) => `failed: ${e}`),
+  errCases: (matcher) => matcher.with(P._, (e) => `failed: ${e}`),
   defect: (c) => `bug: ${c}`,
 });
 ```
@@ -205,7 +205,7 @@ const status = await findUser(id) // Result<User, NotFound>  (sync)
   .toAsync() // AsyncResult<User, NotFound>
   .flatMap((user) => fromPromise(loadOrders(user.id), qualify)) // async step
   .map((orders) => orders.length) // sync callback, still AsyncResult
-  .match({ ok: (n) => n, err: (matcher) => matcher.with(P._, () => 0), defect: () => -1 }); // await collapses it
+  .match({ ok: (n) => n, errCases: (matcher) => matcher.with(P._, () => 0), defect: () => -1 }); // await collapses it
 ```
 
 ## The pairs that are easy to confuse

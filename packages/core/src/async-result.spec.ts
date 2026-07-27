@@ -425,7 +425,7 @@ describe("AsyncResult eliminators", () => {
     const fold = (r: AsyncResult<number, string>) =>
       r.match({
         ok: (v) => `ok:${v}`,
-        err: (matcher) => matcher.with(P._, (e) => `err:${e}`),
+        errCases: (matcher) => matcher.with(P._, (e) => `err:${e}`),
         defect: () => "defect",
       });
     expect(await fold(asyncOk(1))).toBe("ok:1");

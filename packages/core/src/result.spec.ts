@@ -719,7 +719,7 @@ describe("Result.match", () => {
     const fold = (r: Result<number, string>) =>
       r.match({
         ok: (v) => `ok:${v}`,
-        err: (matcher) => matcher.with(P._, (e) => `err:${e}`),
+        errCases: (matcher) => matcher.with(P._, (e) => `err:${e}`),
         defect: (c) => `defect:${(c as Error).message}`,
       });
     expect(fold(Ok(1))).toBe("ok:1");

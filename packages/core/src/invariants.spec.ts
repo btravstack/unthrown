@@ -157,7 +157,7 @@ describe("Invariant 2: a Defect flows through every method except match() and re
     expect(
       defectOf(boom).match({
         ok: () => "o",
-        err: (matcher) => matcher.with(P._, () => "e"),
+        errCases: (matcher) => matcher.with(P._, () => "e"),
         defect: () => "d",
       }),
     ).toBe("d");

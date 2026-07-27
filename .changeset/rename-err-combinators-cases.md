@@ -19,5 +19,21 @@ Migration is a rename at every call site:
 + result.mapErrCases((m) => m.with(P._, wrap))
 ```
 
-`match`'s `err` handler and the `getErr` extractor are unchanged — they are not
-matcher combinators.
+**`match`'s error handler is renamed the same way — `err` → `errCases`** — for
+the same reason: it takes the exhaustive ts-pattern matcher, not a plain
+`(error) => …` callback. This also makes the change **loud** where it would
+otherwise be silent: a leftover 4.x `err: (error) => …` handler still compiled
+under the matcher constraint (a throwing handler returns `never`, which
+vacuously satisfies it) and then threw the _matcher object_ at runtime. Renaming
+the key turns that into an excess-property compile error.
+
+```diff
+  result.match({
+    ok: (value) => value,
+-   err: (matcher) => matcher.with(P._, wrap),
++   errCases: (matcher) => matcher.with(P._, wrap),
+    defect: (cause) => report(cause),
+  })
+```
+
+The `getErr` extractor is unchanged — it is not a matcher combinator.

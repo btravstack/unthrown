@@ -32,7 +32,7 @@ function getUser(id: string): Result<User, NotFound | Timeout>;
 
 getUser(id)
   .map((u) => u.emial.trim()) // typo — TypeError → Defect, NOT an Err
-  .match({ ok: render, err: (matcher) => matcher.with(P._, showMessage), defect: report500 });
+  .match({ ok: render, errCases: (matcher) => matcher.with(P._, showMessage), defect: report500 });
 ```
 
 ## The gap: unexpected failures
