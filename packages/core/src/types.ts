@@ -540,7 +540,11 @@ export type ResultMethods<out T, out E> = {
    * @throws the modeled `error` on `Err`; re-throws the original `cause` on a
    * `Defect` (a panic, like the rest of the `getOr…` family).
    */
-  getOrThrow(this: [E] extends [never] ? never : Result<T, E>): T;
+  getOrThrow(
+    this: [E] extends [never]
+      ? "unthrown: getOrThrow is unnecessary here — the Err channel is empty (E = never), so there is nothing to throw. Use get() instead."
+      : Result<T, E>,
+  ): T;
 
   /** Whether this result is `Ok` — narrows `this` to its {@link OkView} on `true`. */
   isOk(): this is OkView<T, E>;
@@ -931,7 +935,11 @@ export type AsyncResultMethods<out T, out E> = {
    * on a `Defect`), rather than throwing synchronously. Gated the same way: it
    * compiles only when the error channel is non-empty (`E` is not `never`).
    */
-  getOrThrow(this: [E] extends [never] ? never : AsyncResult<T, E>): Promise<T>;
+  getOrThrow(
+    this: [E] extends [never]
+      ? "unthrown: getOrThrow is unnecessary here — the Err channel is empty (E = never), so there is nothing to throw. Use get() instead."
+      : AsyncResult<T, E>,
+  ): Promise<T>;
 };
 
 /**
