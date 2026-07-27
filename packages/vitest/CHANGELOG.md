@@ -1,5 +1,7 @@
 # @unthrown/vitest
 
+## 5.0.0-beta.4
+
 ## 5.0.0-beta.3
 
 ## 5.0.0-beta.2
