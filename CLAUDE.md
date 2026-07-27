@@ -555,7 +555,7 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   `Result` via `fromSchema` / `fromSchemaAsync`, with the validation issues as
   the modeled `E`)
 - `packages/oxlint` → `@unthrown/oxlint` (an oxlint **JS plugin**, peerDep
-  `oxlint`, dep `@oxlint/plugins`; ships **four rules**: `no-ambiguous-error-type`
+  `oxlint`, dep `@oxlint/plugins`; ships **five rules**: `no-ambiguous-error-type`
   — enforces Thesis #1 against `unknown`/`any`/`Error`/`{}` **and the primitive
   keywords** (`void` included) in `E`; `prefer-async-result` (reports
   `Promise<Result<T, E>>` in favour of `AsyncResult<T, E>`, but withholds the
@@ -569,7 +569,13 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   method _chain_ like `r.map(f);` is type-dependent and out of scope); and
   `no-throw` (**opt-in**, not in the preset — reports every `throw` statement,
   pointing at `Err`/`getOrThrow`/`fromSafeThrowable`; this is the `no-throw`
-  rule the `getOrThrow` rationale references). Purely syntactic AST rules that
+  rule the `getOrThrow` rationale references); and `no-catch-all-pattern`
+  (**opt-in**, not in the preset — reports the ts-pattern catch-all `P._` / its
+  alias `P.any` where `P` is imported from `unthrown` or `ts-pattern`, so every
+  error case must be enumerated by name; **stricter than the library's own
+  default**, which documents `P._` as the sanctioned catch-all — hence opt-in,
+  like `no-throw`; a deliberate wildcard carries a targeted `oxlint-disable`).
+  Purely syntactic AST rules that
   resolve bindings via scope analysis keyed by the **imported** name (renamed
   and namespace imports resolve; alias indirection like `type E = unknown` is a
   documented limit) so they only fire on unthrown's `Result`. No TypeDoc API
