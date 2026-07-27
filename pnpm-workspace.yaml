@@ -18,7 +18,7 @@ catalog:
   "@btravstack/typedoc": 0.1.0
   "@changesets/cli": 2.31.0
   "@commitlint/cli": 21.2.1
-  "@orpc/client": 2.0.0-beta.15
+  "@orpc/client": 2.0.0-beta.18
   "@orpc/contract": 2.0.0-beta.15
   "@orpc/server": 2.0.0-beta.15
   "@prisma/adapter-better-sqlite3": 7.8.0

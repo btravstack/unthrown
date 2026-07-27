@@ -34,8 +34,8 @@ catalogs:
       specifier: 21.2.1
       version: 21.2.1
     '@orpc/client':
-      specifier: 2.0.0-beta.15
-      version: 2.0.0-beta.15
+      specifier: 2.0.0-beta.18
+      version: 2.0.0-beta.18
     '@orpc/contract':
       specifier: 2.0.0-beta.15
       version: 2.0.0-beta.15
@@ -350,7 +350,7 @@ importers:
         version: 0.1.0(typedoc-plugin-markdown@4.12.0(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3))
       '@orpc/client':
         specifier: 'catalog:'
-        version: 2.0.0-beta.15
+        version: 2.0.0-beta.18
       '@orpc/contract':
         specifier: 'catalog:'
         version: 2.0.0-beta.15
@@ -1250,6 +1250,9 @@ packages:
   '@orpc/client@2.0.0-beta.15':
     resolution: {integrity: sha512-gwYdkWiT80Kri28rRRzhP1PfUUyT9beYE603LTUzyiRmjZEcLH15sXrn5pW1E9Hl7hVEbA8RJDWSWaur6SNx0w==}
 
+  '@orpc/client@2.0.0-beta.18':
+    resolution: {integrity: sha512-PZengUM+bbElAV/ci+cxvpjbeQkxFYj+c72IfktOp5hz0gekq5hkdVPiz/YTsvGxqe4H1yjwRBOmDoeQOTWGNg==}
+
   '@orpc/contract@2.0.0-beta.15':
     resolution: {integrity: sha512-uwDxU40T8AQ5OwNfCuR0ORx0uYG21+zkVcBq++70t1d6La9bZttbowO+S26Vw3nFbBF4LvyNI7VSYc5wmxgknA==}
 
@@ -1266,6 +1269,14 @@ packages:
 
   '@orpc/shared@2.0.0-beta.15':
     resolution: {integrity: sha512-Dhttcc6YMpVsKzsRP8QViY/jH5An9E5LM8b7FsbCS0u1H4n9Ta5gYHv+lTfiO/wN5IQxD2jmn+SfSb7vPu10wA==}
+    peerDependencies:
+      '@opentelemetry/api': '>=1.9.0'
+    peerDependenciesMeta:
+      '@opentelemetry/api':
+        optional: true
+
+  '@orpc/shared@2.0.0-beta.18':
+    resolution: {integrity: sha512-b7CTKKCmHutKAGKxFu9Gd4T1JEZ0yknLZbpQAbhrphcujkKFSdIBKBr4cDRP+Rif56phJ+2qmfVDbJ6fjj1D8A==}
     peerDependencies:
       '@opentelemetry/api': '>=1.9.0'
     peerDependenciesMeta:
@@ -2182,8 +2193,14 @@ packages:
   '@standardserver/core@0.0.32':
     resolution: {integrity: sha512-2d1EnjbTqM25A9+ry7uURfjoQfHkDoj4qBx+FulZtqI7im1j4TSKBsAwTAhko6MOzfXAeD+lLXmy6d21wjiR0w==}
 
+  '@standardserver/core@0.5.0':
+    resolution: {integrity: sha512-c6vIXiJtQNVHm0G8vJCCdZ7G4ObgWj71n89HvKvVR5RnajxEEb+wVcIn10rvrMJmd9sR9RtHR6HCubeCFY214A==}
+
   '@standardserver/fetch@0.0.32':
     resolution: {integrity: sha512-ipONyEOmoVfOxo+Mr6a0sT3IA98GRijUH81wA7tJaXBMLlfeV8AvGiRPZjQedZnB6AwNA/Tr3Wx7FHendQPTyw==}
+
+  '@standardserver/fetch@0.5.0':
+    resolution: {integrity: sha512-0Sosn0v2Cl2Vhcc1st2FKGxwdK0qPq84K40TtZFAePLGq+Zu6hJZ4VsrwOWfm3S7iZ0EeRo9OByp0oUhm8NiPw==}
 
   '@standardserver/node@0.0.32':
     resolution: {integrity: sha512-/QrX6yvM23odYp6/3lt+BSxXida4Eo8E9Sq1kuDKaJDSg20t0WEt714dBWKsf0s2api+wDq+bmz1x9LcBRRHaw==}
@@ -2191,8 +2208,14 @@ packages:
   '@standardserver/peer@0.0.32':
     resolution: {integrity: sha512-vSPxnNw3rajr/cNXIJrr5LhjyzF2p9uXxm2IAGMBf1BJExr3Gb9F1V5hdK7dVZAhoC2IhEleIlxhRlZ2m2tgtw==}
 
+  '@standardserver/peer@0.5.0':
+    resolution: {integrity: sha512-gsOgvknhj8XirAqJksDZlrzkppGU2WH4PyxzISwfG8Ug3TJyOYwWvNCY81HNe5PJWjDdelIkgHSyjb2apkN2CA==}
+
   '@standardserver/shared@0.0.32':
     resolution: {integrity: sha512-OTZkjAn01IBYrKC6HwcNeh1+R3D3fiXnGCRPEPfG0A0nM/he71iPxlOTfurTQq7XzveeIz2maTpmBJCYSXt8QQ==}
+
+  '@standardserver/shared@0.5.0':
+    resolution: {integrity: sha512-YPkkdqyKQ+6tvtP2pPLzIIrvhjrsvnI006tTTSWqFc2US6X8r1zfYVhfHf9Zpn4HsdhyhwpWwF4fIsN+nlr1Ow==}
 
   '@turbo/darwin-64@2.10.5':
     resolution: {integrity: sha512-ENvPwy3x5yS7MwNYHeWjqOBXkwIMp39Pd+/zXC6PoiNzF8EIvvLZOZZ+ny6L9x4WgS5vxUii2LM5gM+zjPdnWw==}
@@ -4741,6 +4764,15 @@ snapshots:
     transitivePeerDependencies:
       - '@opentelemetry/api'
 
+  '@orpc/client@2.0.0-beta.18':
+    dependencies:
+      '@orpc/shared': 2.0.0-beta.18
+      '@standardserver/core': 0.5.0
+      '@standardserver/fetch': 0.5.0
+      '@standardserver/peer': 0.5.0
+    transitivePeerDependencies:
+      - '@opentelemetry/api'
+
   '@orpc/contract@2.0.0-beta.15':
     dependencies:
       '@orpc/client': 2.0.0-beta.15
@@ -4768,6 +4800,12 @@ snapshots:
   '@orpc/shared@2.0.0-beta.15':
     dependencies:
       '@standardserver/shared': 0.0.32
+      radash: 12.1.1
+      type-fest: 5.7.0
+
+  '@orpc/shared@2.0.0-beta.18':
+    dependencies:
+      '@standardserver/shared': 0.5.0
       radash: 12.1.1
       type-fest: 5.7.0
 
@@ -5337,10 +5375,19 @@ snapshots:
     dependencies:
       '@standardserver/shared': 0.0.32
 
+  '@standardserver/core@0.5.0':
+    dependencies:
+      '@standardserver/shared': 0.5.0
+
   '@standardserver/fetch@0.0.32':
     dependencies:
       '@standardserver/core': 0.0.32
       '@standardserver/shared': 0.0.32
+
+  '@standardserver/fetch@0.5.0':
+    dependencies:
+      '@standardserver/core': 0.5.0
+      '@standardserver/shared': 0.5.0
 
   '@standardserver/node@0.0.32':
     dependencies:
@@ -5353,7 +5400,14 @@ snapshots:
       '@standardserver/core': 0.0.32
       '@standardserver/shared': 0.0.32
 
+  '@standardserver/peer@0.5.0':
+    dependencies:
+      '@standardserver/core': 0.5.0
+      '@standardserver/shared': 0.5.0
+
   '@standardserver/shared@0.0.32': {}
+
+  '@standardserver/shared@0.5.0': {}
 
   '@turbo/darwin-64@2.10.5':
     optional: true
