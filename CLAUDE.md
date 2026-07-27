@@ -740,5 +740,19 @@ configured outside the repo).
 - Public API carries full **TSDoc**; `pnpm --filter <pkg> build:docs` must stay
   typedoc-warning-free.
 - One concept = one name. Resist convenience aliases.
+- **The error combinators keep their conventional `map*`/`flatMap*`/`tap*`
+  names despite the matcher protocol — a weighed, settled decision (2026-07,
+  do not re-litigate).** The names nominally promise the FP functor contract
+  (callback receives the value) while the callback actually receives the
+  matcher; that break is deliberate: `E` is a union, and a direct `(e: E) => …`
+  callback over a union is the blanket handler Thesis #5 exists to eliminate.
+  The names were kept because they state the channel and the pipeline effect,
+  preserve the operator × channel symmetry with the success surface, and stay
+  greppable for migrants from neverthrow/fp-ts. Alternatives considered and
+  rejected: plural channel names (`mapErrs` — singular-gives-entity /
+  plural-gives-matcher rule; too subtle), explicit `*ErrCases` (too long), and
+  collapsing to `catchErrs` + observers (loses the verb symmetry). Do NOT add
+  plain-callback variants alongside (reopens blanket handling). The break is
+  documented user-side in the core-concepts guide.
 - The core has **one runtime dependency, `ts-pattern`** (it powers the error
   matchers and is re-exported). Add no others — protect that minimalism.

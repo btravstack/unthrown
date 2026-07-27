@@ -32,12 +32,28 @@ Every `Result` shares one method surface, grouped by the channel it touches:
   every case is handled explicitly and a new error type is a compile error at
   every consuming site (see
   [Choosing a combinator](./choosing-a-combinator#triaging-the-error-channel))
+
 - **defect** (the only door to a `Defect`): `recoverDefect`, `tapDefect`
 - **failure** (runs on `Err` **or** `Defect`): `tapFailure` — observe either
   failing channel without consuming it
 - **eliminate**: `match`, `get`, `getErr`, `getOr`, `getOrElse`,
   `getOrNull`, `getOrUndefined`, `getOrThrow` (gated as `get`'s complement — it
   compiles only while the error channel is non-empty)
+
+::: info A deliberate convention break
+In functional-programming convention, `map`/`tap` names promise a callback that
+receives the contained value directly — and on the success channel they keep
+that promise. The error combinators **break it on purpose**: their callback
+receives the _matcher_, not the error. The reason is the channels' shapes. `T`
+is one type, so there is a single value to hand you; `E` is a **union of
+possibilities**, and a plain `(e: E) => …` callback over a union is precisely
+the blanket handler this library exists to eliminate — it keeps compiling,
+silently incomplete, when `E` grows. Each matcher _branch_ still hands you the
+error directly, narrowed to its exact case. The conventional names are kept
+because they say _which channel and what happens to the pipeline_ (`mapErr`
+transforms the error channel, `tapErr` observes it) — only the callback
+protocol differs, and the signature teaches that on first use.
+:::
 
 A combinator only runs its callback on its own channel — the other states flow
 through untouched:
