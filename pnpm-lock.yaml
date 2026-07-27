@@ -37,8 +37,8 @@ catalogs:
       specifier: 2.0.0-beta.18
       version: 2.0.0-beta.18
     '@orpc/contract':
-      specifier: 2.0.0-beta.15
-      version: 2.0.0-beta.15
+      specifier: 2.0.0-beta.18
+      version: 2.0.0-beta.18
     '@orpc/server':
       specifier: 2.0.0-beta.15
       version: 2.0.0-beta.15
@@ -353,7 +353,7 @@ importers:
         version: 2.0.0-beta.18
       '@orpc/contract':
         specifier: 'catalog:'
-        version: 2.0.0-beta.15
+        version: 2.0.0-beta.18
       '@orpc/server':
         specifier: 'catalog:'
         version: 2.0.0-beta.15
@@ -1261,6 +1261,9 @@ packages:
 
   '@orpc/contract@2.0.0-beta.15':
     resolution: {integrity: sha512-uwDxU40T8AQ5OwNfCuR0ORx0uYG21+zkVcBq++70t1d6La9bZttbowO+S26Vw3nFbBF4LvyNI7VSYc5wmxgknA==}
+
+  '@orpc/contract@2.0.0-beta.18':
+    resolution: {integrity: sha512-IAA3L5GCtnScsLqapJ+nJkfFK1T4YBJgR+aYbJQJdX4Gu+8Eb1u10kqddurZUWKk7wJgx7yuA0VNfzB0IPlC+g==}
 
   '@orpc/interop@2.0.0-beta.15':
     resolution: {integrity: sha512-iI3bjjlLuDtM+0Vej0P5LSiuJaO5q2rwBuR/M3dxpwAdktQaFEYuGIFgoal0y/Ktmow8S+K/WiK2G0ydsokgvA==}
@@ -4809,6 +4812,14 @@ snapshots:
     dependencies:
       '@orpc/client': 2.0.0-beta.15
       '@orpc/shared': 2.0.0-beta.15
+      '@standard-schema/spec': 1.1.0
+    transitivePeerDependencies:
+      - '@opentelemetry/api'
+
+  '@orpc/contract@2.0.0-beta.18':
+    dependencies:
+      '@orpc/client': 2.0.0-beta.18
+      '@orpc/shared': 2.0.0-beta.18
       '@standard-schema/spec': 1.1.0
     transitivePeerDependencies:
       - '@opentelemetry/api'
