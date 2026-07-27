@@ -10,7 +10,7 @@
 //   Defect     → rethrow the cause     (oRPC collapses it to INTERNAL_SERVER_ERROR)
 //
 // The handler's `Err` channel is constrained to `ORPCError`: mapping a domain
-// error into one (`mapErr((e) => errors.NOT_FOUND({...}))`) is the explicit
+// error into one (`mapErrCases((m) => m.with(P._, () => errors.NOT_FOUND({...})))`) is the explicit
 // triage point at the transport boundary (Thesis #3).
 
 import {
@@ -49,7 +49,7 @@ export type ResultHandler<
  * @remarks
  * The elimination boundary of the server half: `Ok` becomes the procedure's
  * output; `Err` (constrained to `ORPCError` — build one with the injected
- * `errors.CODE(...)` constructors, or map a domain error via `mapErr` first)
+ * `errors.CODE(...)` constructors, or map a domain error via `mapErrCases` first)
  * is returned as a value, which oRPC marks *inferable* so the client sees it
  * fully typed; a `Defect` rethrows its original cause, which oRPC collapses
  * to `INTERNAL_SERVER_ERROR` — a bug stays a defect, never a typed error.
@@ -73,7 +73,7 @@ export type ResultHandler<
  *   .errors({ NOT_FOUND: {} })
  *   .handler(
  *     handlerResult(({ input, errors }) =>
- *       repo.findPlanet(input.id).mapErr((matcher) => matcher.with(P._, () => errors.NOT_FOUND())),
+ *       repo.findPlanet(input.id).mapErrCases((matcher) => matcher.with(P._, () => errors.NOT_FOUND())),
  *     ),
  *   );
  * ```
@@ -92,7 +92,7 @@ export function handlerResult<
     // Branch via the guards rather than `match`: this library code is generic in
     // the error type `TError`, and `match`'s exhaustive `err` matcher cannot be
     // proven exhaustive by ts-pattern over an unresolved type parameter. The
-    // concrete triage (`.mapErr((matcher) => …)`) still happens at the endpoint.
+    // concrete triage (`.mapErrCases((matcher) => …)`) still happens at the endpoint.
     if (result.isOk()) return result.value;
     if (result.isErr()) {
       // Unreachable through well-typed code (`TError extends AnyORPCError`); a

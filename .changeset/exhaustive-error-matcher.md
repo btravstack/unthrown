@@ -3,8 +3,8 @@
 ---
 
 **The error channel is now matched exhaustively with ts-pattern** (Thesis #5).
-The error combinators — `mapErr`, `flatMapErr`, `recoverErr`, `tapErr`,
-`flatTapErr` — no longer take a plain callback. Their callback receives a
+The error combinators — `mapErrCases`, `flatMapErrCases`, `recoverErrCases`, `tapErrCases`,
+`flatTapErrCases` — no longer take a plain callback. Their callback receives a
 ts-pattern match builder over the error (`match(error)`) plus the injected
 `defect` helper, and **returns the un-terminated builder** — the combinator
 calls `.exhaustive()` for you:
@@ -19,7 +19,7 @@ result.mapErr((error) => {
 });
 
 // after — exhaustive; the type checker forces every case to be handled
-result.mapErr((matcher, defect) =>
+result.mapErrCases((matcher, defect) =>
   matcher
     .with(tag("RecordNotFound"), () => new NotFoundException(id))
     .with(tag("DriverError"), (e) => defect(e.cause)),
@@ -43,7 +43,7 @@ no `.exhaustive()` to forget and no `.otherwise()` to smuggle in a fallback.
   (`.with(tag("X"), (e) => defect(e.cause))`); its `Defect` arm is subtracted
   from the outgoing `E` (`Exclude<O, Defect>`, the boundary inference). A
   throwing branch also becomes a `Defect` (the safety net).
-- **Observers match exhaustively too** (`tapErr`/`flatTapErr`, use `P._` for a
+- **Observers match exhaustively too** (`tapErrCases`/`flatTapErrCases`, use `P._` for a
   catch-all); the error is observed and flows through unchanged.
 
 **Core now depends on `ts-pattern`** (a small, types-heavy, dual-copy-safe

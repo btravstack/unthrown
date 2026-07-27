@@ -36,27 +36,27 @@ describe("Invariant 1: throw inside any combinator becomes a Defect", () => {
     expect(Do().let("a", t).isDefect()).toBe(true);
     expect(
       Err("e")
-        .mapErr((matcher) => matcher.with(P._, t))
+        .mapErrCases((matcher) => matcher.with(P._, t))
         .isDefect(),
     ).toBe(true);
     expect(
       Err("e")
-        .flatMapErr((matcher) => matcher.with(P._, t))
+        .flatMapErrCases((matcher) => matcher.with(P._, t))
         .isDefect(),
     ).toBe(true);
     expect(
       Err("e")
-        .recoverErr((matcher) => matcher.with(P._, t))
+        .recoverErrCases((matcher) => matcher.with(P._, t))
         .isDefect(),
     ).toBe(true);
     expect(
       Err("e")
-        .tapErr((matcher) => matcher.with(P._, t))
+        .tapErrCases((matcher) => matcher.with(P._, t))
         .isDefect(),
     ).toBe(true);
     expect(
       Err("e")
-        .flatTapErr((matcher) => matcher.with(P._, t))
+        .flatTapErrCases((matcher) => matcher.with(P._, t))
         .isDefect(),
     ).toBe(true);
     expect(defectOf(boom).recoverDefect(t).isDefect()).toBe(true);
@@ -73,13 +73,13 @@ describe("Invariant 1b: a Result-constrained callback returning a non-Result bec
   // that throws a raw TypeError later in the pipeline.
   const rogue = (() => 42) as never;
 
-  it("sync: flatMap / flatTap / bind / flatMapErr / flatTapErr / recoverDefect", () => {
+  it("sync: flatMap / flatTap / bind / flatMapErrCases / flatTapErrCases / recoverDefect", () => {
     const hardened = [
       Ok(1).flatMap(rogue),
       Ok(1).flatTap(rogue),
       Do().bind("a", rogue),
-      Err("e").flatMapErr((matcher) => matcher.with(P._, () => 42 as never)),
-      Err("e").flatTapErr((matcher) => matcher.with(P._, () => 42 as never)),
+      Err("e").flatMapErrCases((matcher) => matcher.with(P._, () => 42 as never)),
+      Err("e").flatTapErrCases((matcher) => matcher.with(P._, () => 42 as never)),
       defectOf(boom).recoverDefect(rogue),
     ];
     for (const r of hardened) {
@@ -98,10 +98,10 @@ describe("Invariant 1b: a Result-constrained callback returning a non-Result bec
       Do().toAsync().bind("a", rogue),
       Err("e")
         .toAsync()
-        .flatMapErr((matcher) => matcher.with(P._, () => 42 as never)),
+        .flatMapErrCases((matcher) => matcher.with(P._, () => 42 as never)),
       Err("e")
         .toAsync()
-        .flatTapErr((matcher) => matcher.with(P._, () => 42 as never)),
+        .flatTapErrCases((matcher) => matcher.with(P._, () => 42 as never)),
       defectOf(boom).toAsync().recoverDefect(rogue),
     ]);
     for (const r of hardened) {
@@ -135,11 +135,11 @@ describe("Invariant 2: a Defect flows through every method except match() and re
         f(v);
         return true;
       }, f),
-      defectOf(boom).mapErr((matcher) => matcher.with(P._, f)),
-      defectOf(boom).flatMapErr((matcher) => matcher.with(P._, f)),
-      defectOf(boom).recoverErr((matcher) => matcher.with(P._, f)),
-      defectOf(boom).tapErr((matcher) => matcher.with(P._, f)),
-      defectOf(boom).flatTapErr((matcher) => matcher.with(P._, f)),
+      defectOf(boom).mapErrCases((matcher) => matcher.with(P._, f)),
+      defectOf(boom).flatMapErrCases((matcher) => matcher.with(P._, f)),
+      defectOf(boom).recoverErrCases((matcher) => matcher.with(P._, f)),
+      defectOf(boom).tapErrCases((matcher) => matcher.with(P._, f)),
+      defectOf(boom).flatTapErrCases((matcher) => matcher.with(P._, f)),
     ];
     for (const r of passesThrough) expect(r.isDefect()).toBe(true);
     expect(f).not.toHaveBeenCalled();
@@ -202,9 +202,9 @@ describe("Invariant 3: get() is asymmetric", () => {
   });
 });
 
-describe("Invariant 4: recoverErr empties the error channel in the type, not the runtime", () => {
-  it("recoverErr() returns a value whose type is Result<_, never> but may still be a Defect", () => {
-    const recovered = defectOf(boom).recoverErr((matcher) => matcher.with(P._, () => 1));
+describe("Invariant 4: recoverErrCases empties the error channel in the type, not the runtime", () => {
+  it("recoverErrCases() returns a value whose type is Result<_, never> but may still be a Defect", () => {
+    const recovered = defectOf(boom).recoverErrCases((matcher) => matcher.with(P._, () => 1));
     // `never` in the type does not mean total — a Defect survives at runtime.
     expect(recovered.isDefect()).toBe(true);
   });

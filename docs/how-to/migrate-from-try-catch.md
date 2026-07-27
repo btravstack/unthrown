@@ -97,25 +97,25 @@ throwing until it earns the conversion.
 
 ## `try`/`catch` idioms → combinators
 
-| `try`/`catch` idiom       | unthrown combinator                             | Example                                                                               |
-| ------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------- |
-| catch-and-default         | `getOr(fallback)`                               | `parseConfig(text).getOr(DEFAULT_CONFIG)`                                             |
-| catch-and-rethrow-wrapped | `mapErr((matcher) => …)`                        | `parseConfig(text).mapErr((matcher) => matcher.with(P._, (e) => new ConfigError(e)))` |
-| catch-log-rethrow         | `tapErr((matcher) => …)`                        | `parseConfig(text).tapErr((matcher) => matcher.with(P._, (e) => logger.warn(e)))`     |
-| `finally` cleanup         | run before eliminating, or in every `match` arm | see below                                                                             |
+| `try`/`catch` idiom       | unthrown combinator                             | Example                                                                                    |
+| ------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| catch-and-default         | `getOr(fallback)`                               | `parseConfig(text).getOr(DEFAULT_CONFIG)`                                                  |
+| catch-and-rethrow-wrapped | `mapErrCases((matcher) => …)`                   | `parseConfig(text).mapErrCases((matcher) => matcher.with(P._, (e) => new ConfigError(e)))` |
+| catch-log-rethrow         | `tapErrCases((matcher) => …)`                   | `parseConfig(text).tapErrCases((matcher) => matcher.with(P._, (e) => logger.warn(e)))`     |
+| `finally` cleanup         | run before eliminating, or in every `match` arm | see below                                                                                  |
 
 `catch-and-rethrow-wrapped` — turn a caught error into a modeled `Err`:
 
 ```ts
 // before: throw new ConfigError(cause)
 // after:  ConfigError becomes a modeled Err, not a throw
-parseConfig(text).mapErr((matcher) => matcher.with(P._, (e) => new ConfigError(e)));
+parseConfig(text).mapErrCases((matcher) => matcher.with(P._, (e) => new ConfigError(e)));
 ```
 
 `catch-log-rethrow` — log, keep the original error, still propagate as an `Err`:
 
 ```ts
-parseConfig(text).tapErr((matcher) => matcher.with(P._, (e) => logger.warn("bad config", e)));
+parseConfig(text).tapErrCases((matcher) => matcher.with(P._, (e) => logger.warn("bad config", e)));
 ```
 
 `finally` has no combinator counterpart — a `Result` pipeline has no single point

@@ -1,4 +1,4 @@
-// ts-pattern powers the error-matching combinators (`mapErr`/`flatMapErr`/…),
+// ts-pattern powers the error-matching combinators (`mapErrCases`/`flatMapErrCases`/…),
 // and is re-exported so `P` (wildcards, `P.union`, guards) and `match` (for
 // eliminating a `Result` directly) are available from one import.
 export { match, P } from "ts-pattern";

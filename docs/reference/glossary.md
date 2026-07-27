@@ -70,7 +70,7 @@ rejecting promise, a nullable API. Each is crossed with a `from*` constructor
 that forces qualification. See [Qualify a boundary](../how-to/qualify-a-boundary).
 
 **combinator**
-: Any method on the fluent surface (`map`, `flatMap`, `mapErr`, `tap`, …) that
+: Any method on the fluent surface (`map`, `flatMap`, `mapErrCases`, `tap`, …) that
 transforms or observes a channel and returns another `Result` / `AsyncResult`. A
 throw inside a combinator becomes a `Defect`.
 

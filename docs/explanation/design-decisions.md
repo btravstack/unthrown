@@ -99,10 +99,12 @@ the old `unwrap*` aliases were removed. Convenience aliases multiply the surface
 and force every reader to learn that two names mean one thing. Resisting them is
 part of staying "done".
 
-The one place a conventional name is kept _despite_ a protocol change is the
-error combinators (`mapErr`, `tapErr`, …), whose callback receives a matcher
-rather than the value — a settled trade-off explained in
-[Exhaustive error matching](./exhaustive-error-matching#why-keep-the-map-tap-names).
+Naming follows behavior, even when that breaks symmetry with the success surface:
+the error-matcher combinators carry a `*Cases` suffix (`mapErrCases`,
+`flatMapErrCases`, `recoverErrCases`, `tapErrCases`, `flatTapErrCases`) rather than
+the bare `mapErr` / `tapErr`, because their callback receives a matcher over the
+error's _cases_, not the value. The suffix is the honest name — see
+[Exhaustive error matching](./exhaustive-error-matching#why-the-cases-suffix).
 
 ## Where to go next
 

@@ -5,7 +5,7 @@
 **Runtime hardening** — none of these change well-typed behavior:
 
 - Every combinator whose callback must return a `Result` (`flatMap`,
-  `flatTap`, `bind`, `flatMapErr`, `flatTapErr`, `recoverDefect` — both
+  `flatTap`, `bind`, `flatMapErrCases`, `flatTapErrCases`, `recoverDefect` — both
   surfaces) now turns an out-of-contract non-`Result` return (untyped or cast
   callers) into a `TypeError`-caused `Defect` instead of letting a poison
   value throw a raw `TypeError` further down the pipeline — the same policy

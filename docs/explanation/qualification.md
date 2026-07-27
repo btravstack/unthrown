@@ -21,7 +21,7 @@ fromPromise(p): AsyncResult<T, unknown>;
 ```
 
 That single `unknown` is the leak. It flows into your error type, and from there
-into every consumer. You reach for a `match` or a `mapErr`, discover the error is
+into every consumer. You reach for a `match` or a `mapErrCases`, discover the error is
 `unknown`, and now you either cast it (a lie the compiler can't check) or widen
 `E` to `unknown` all the way up. The type that was supposed to be a precise
 contract quietly became "something went wrong."

@@ -63,8 +63,8 @@ was planned).
    lives in typed fields, defined per error type, never baked into a per-call
    string.
 5. **The error channel is matched exhaustively, never blanket-handled.** The
-   error combinators (`mapErr`, `flatMapErr`, `recoverErr`, `tapErr`,
-   `flatTapErr`) do not take a single callback: their callback receives a
+   error combinators (`mapErrCases`, `flatMapErrCases`, `recoverErrCases`, `tapErrCases`,
+   `flatTapErrCases`) do not take a single callback: their callback receives a
    **ts-pattern match builder** over the error (`match(error)`, typed
    `ErrMatcher<E>`) plus the injected `defect` helper, and **returns the
    un-terminated builder** — the combinator calls `.exhaustive()` itself. So a
@@ -82,13 +82,13 @@ was planned).
    the outgoing type is the builder's output **with the `Defect` arm
    subtracted** (`Exclude<O, Defect>`, exactly the boundary inference), so a
    defect branch — or a throwing one, the safety net — contributes nothing.
-   The **observers** (`tapErr`, `flatTapErr`) take the same exhaustive builder
+   The **observers** (`tapErrCases`, `flatTapErrCases`) take the same exhaustive builder
    (the error passes through unchanged); a branch that returns a raw
    `Promise`/`AsyncResult` is rejected where the combinator awaits it
-   (`flatMapErr`/`flatTapErr`, via the builder-output constraint) **and** in
-   `tapErr` (its branch results are discarded, so a rejected `Promise` would
+   (`flatMapErrCases`/`flatTapErrCases`, via the builder-output constraint) **and** in
+   `tapErrCases` (its branch results are discarded, so a rejected `Promise` would
    float unobserved — its builder output is `NotThenable`-constrained) — only
-   the non-awaiting transformers `mapErr`/`recoverErr` run the branch
+   the non-awaiting transformers `mapErrCases`/`recoverErrCases` run the branch
    synchronously with an async branch remaining a visible Promise-valued
    result, not a rejection bypass. `tapDefect` / `tapFailure` keep single callbacks — their payloads
    carry no discriminant to match (a defect's cause is `unknown`; `tapFailure`
@@ -111,9 +111,9 @@ was planned).
 ## Load-bearing runtime invariants (tests must guard these)
 
 - **Throw → defect.** Any value thrown by a callback (or match branch) inside
-  a combinator (`map`, `flatMap`, `flatTap`, `ensure`, `bind`, `let`, `mapErr`,
-  `flatMapErr`,
-  `recoverErr`, `tap*`, `flatTapErr`, `recoverDefect`) is caught and converted to a
+  a combinator (`map`, `flatMap`, `flatTap`, `ensure`, `bind`, `let`, `mapErrCases`,
+  `flatMapErrCases`,
+  `recoverErrCases`, `tap*`, `flatTapErrCases`, `recoverDefect`) is caught and converted to a
   `Defect`. Nothing escapes a pipeline as a raw throw.
   This is what lets an HTTP adapter do a single `match({ ok, err, defect })`
   with **no surrounding `try/catch`**.
@@ -121,8 +121,8 @@ was planned).
   throw/rejection.** Reachable only from untyped/cast callers: the aggregates
   (`all` / `allFromDict` and their async pair) turn a non-`Result` element into
   a `TypeError`-caused `Defect`, and every combinator whose callback is
-  constrained to return a `Result` (`flatMap`, `flatTap`, `bind`, `flatMapErr`,
-  `flatTapErr`, `recoverDefect` — both surfaces; the async ones check the
+  constrained to return a `Result` (`flatMap`, `flatTap`, `bind`, `flatMapErrCases`,
+  `flatTapErrCases`, `recoverDefect` — both surfaces; the async ones check the
   **awaited** value, so a legitimately returned `AsyncResult` still passes)
   does the same with a non-`Result` callback return, instead of letting a
   poison value throw a raw `TypeError` further down the pipeline.
@@ -136,8 +136,8 @@ was planned).
   throw→defect) the same non-exhaustive rogue value instead **throws**
   `NonExhaustiveError` outright — a genuinely unmodeled tag at the edge is a
   bug, not a routed value.
-- **Exhaustiveness is type-enforced, with no forgettable step.** `mapErr` /
-  `flatMapErr` / `recoverErr` / `tapErr` / `flatTapErr` require the callback to
+- **Exhaustiveness is type-enforced, with no forgettable step.** `mapErrCases` /
+  `flatMapErrCases` / `recoverErrCases` / `tapErrCases` / `flatTapErrCases` require the callback to
   return an `ExhaustiveMatch` — `.exhaustive` is typed callable only when
   ts-pattern has narrowed the input to `never` (all cases covered); a
   non-exhaustive builder types `.exhaustive` as `NonExhaustiveError` and fails
@@ -156,7 +156,7 @@ was planned).
   the modeled `Err`, never an unmodeled defect (a defect is a bug, not an
   absent value).
 - **A failure-observer throw preserves the original failure.** A throw inside
-  `tapErr` / `tapDefect` / `tapFailure` / `flatTapErr` produces a `Defect` whose
+  `tapErrCases` / `tapDefect` / `tapFailure` / `flatTapErrCases` produces a `Defect` whose
   cause is an `AggregateError([thrown, original])` — observing a failure never
   destroys it. (A throw in the success-channel `tap`/`map` keeps the plain
   thrown cause.)
@@ -167,12 +167,12 @@ was planned).
   `NotThenable<R>`, so an `async` callback is a compile error (an async
   `ensure` predicate already fails its `boolean` return type — a `Promise`
   would be always-truthy). Among the error-matcher combinators, the
-  **awaiting** ones — `flatMapErr` / `flatTapErr` — reject an async branch via
+  **awaiting** ones — `flatMapErrCases` / `flatTapErrCases` — reject an async branch via
   their builder-output constraint (an awaited rejection would bypass
-  qualification), and so does the observer **`tapErr`** (its branch results are
+  qualification), and so does the observer **`tapErrCases`** (its branch results are
   **discarded**, so a rejected `Promise` would float unobserved; same
   builder-output `NotThenable` constraint). The **non-awaiting** transformers
-  `mapErr` / `recoverErr` run
+  `mapErrCases` / `recoverErrCases` run
   the matched branch **synchronously with no await**, so an async branch is
   merely a visible `Promise`-valued result, not a rejection bypass — they do
   not ban it. The boundary `qualify` is constrained the same way, with a
@@ -198,14 +198,14 @@ was planned).
 - **`get()` / `getErr()` are type-gated.** `get()` compiles only when the
   error channel is empty (`this: Result<T, never>`); `getErr()` only when the
   success channel is empty (`this: Result<never, E>`). Eliminate the opposite
-  channel first (`match` / `recoverErr` / `flatMapErr`), or use the `getOr` /
+  channel first (`match` / `recoverErrCases` / `flatMapErrCases`), or use the `getOr` /
   `getOrElse` / `getOrNull` / `getOrUndefined` family (which recover an `Err`).
   On a `Defect` they still **rethrow the original `cause`** (they _panic_) with its
   original stack — so `Result<T, never>` means the modeled error channel is empty,
   **not** that `get()` cannot throw. The `GetError`-on-wrong-variant branch
   remains at runtime as a defensive guard but is **unreachable through well-typed
   code** (only a cast or a raw-JS caller can reach it).
-- **`recoverErr` returns `Result<T | U, never>`, and `never` means only the _error_
+- **`recoverErrCases` returns `Result<T | U, never>`, and `never` means only the _error_
   channel is empty — a `Defect` can still be present at runtime.** This is the one
   place the type intentionally under-describes the runtime. Do not read `never`
   as "total".
@@ -245,18 +245,18 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   pure value). On `AsyncResult`, `bind`'s `f` may return a `Result` or an
   `AsyncResult`. A throw in either becomes a `Defect`; `Err`/`Defect`
   short-circuits/passes through. To go async, lift with `toAsync()`.
-- error: `mapErr`, `flatMapErr`, `recoverErr`, `tapErr`, `flatTapErr` all take
+- error: `mapErrCases`, `flatMapErrCases`, `recoverErrCases`, `tapErrCases`, `flatTapErrCases` all take
   the Thesis-#5 **ts-pattern matcher callback** `(m: ErrMatcher<E>, defect) => M`
   where `M extends ExhaustiveMatch<…>` (the callback returns the un-terminated
   builder; the combinator runs `.run()`). Outgoing types are computed from the
-  builder output `MatchOut<M>` — mapErr: `MatchErrOut<M>` (= `Exclude<MatchOut,
-Defect>`); flatMapErr: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on the
-  async surface — over it; recoverErr: `T | MatchErrOut<M>` with `E = never`.
-  `flatTapErr` is the exception: it infers a plain `E2` from the builder output
+  builder output `MatchOut<M>` — mapErrCases: `MatchErrOut<M>` (= `Exclude<MatchOut,
+Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on the
+  async surface — over it; recoverErrCases: `T | MatchErrOut<M>` with `E = never`.
+  `flatTapErrCases` is the exception: it infers a plain `E2` from the builder output
   and returns `E | E2` (the `MatchOut<M>` shape unioned with the class `E`
   defeats variance measurement of the intersection `AsyncResult` — see internal
   design). The `defect` helper is passed to every branch (the deliberate
-  `Err`→`Defect`); `tapErr`/`flatTapErr` keep the same exhaustive builder (the
+  `Err`→`Defect`); `tapErrCases`/`flatTapErrCases` keep the same exhaustive builder (the
   error passes through), the error-channel mirror of `tap`/`flatTap`
 - defect: `recoverDefect`, `tapDefect`
 - failure (both KO channels): `tapFailure` — the one cross-channel combinator:
@@ -274,7 +274,7 @@ Defect>`); flatMapErr: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on the
   to a value; the folded type unions all branch returns), `get`/`getErr`
   (type-gated — `get` only compiles on
   `Result<T, never>`, `getErr` only on `Result<never, E>`; use `match` /
-  `recoverErr` / `flatMapErr` to empty the opposite channel first), `getOr` (signature
+  `recoverErrCases` / `flatMapErrCases` to empty the opposite channel first), `getOr` (signature
   `getOr<U>(fallback: U): T | U` — widening, not narrowed to `T`), `getOrElse`
   (same `T | U` widening), `getOrNull`, `getOrUndefined` — the `getOr…`
   family extracts from a still-fallible `Result` with a fallback, since
@@ -283,9 +283,9 @@ Defect>`); flatMapErr: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on the
   as-is** on `Err` (and panics on a `Defect`, like the rest of the family). It
   exists so a `no-throw` lint rule can ban raw `throw` while this one sanctioned
   extraction remains — the faithful, lint-clean form of
-  `.flatMapErr((matcher) => matcher.with(P._, (e) => { throw e })).get()`; it is
-  **off the errors-as-values thesis** by design, so reach for `match` / `recoverErr`
-  / `flatMapErr` whenever the error can stay a value. It is type-gated as the
+  `.flatMapErrCases((matcher) => matcher.with(P._, (e) => { throw e })).get()`; it is
+  **off the errors-as-values thesis** by design, so reach for `match` / `recoverErrCases`
+  / `flatMapErrCases` whenever the error can stay a value. It is type-gated as the
   **complement of `get`**: it compiles only when the error channel is **non-empty**
   (`E` is not `never`, spelled `this: [E] extends [never] ? never : Result<T,E>`) —
   on a `Result<T, never>` there is nothing to throw, so `getOrThrow` does not
@@ -324,7 +324,7 @@ match<E>>`, so ts-pattern's non-exported `Match` type is never imported).
   `MatchOut`/`MatchErrOut` extract. Note `ErrMatcher<E>` must appear only as a
   callback **parameter** type (contravariant), never combined with the class `E`
   in a covariant return — ts-pattern's `Match` is invariant in its input, which
-  would poison `E` inference (why `flatTapErr` infers a plain `E2` instead).
+  would poison `E` inference (why `flatTapErrCases` infers a plain `E2` instead).
 - constructors: `Ok` (a no-arg overload — `Ok()` — constructs a `void` success,
   `Result<void, never>`, sparing `Ok(undefined)`; `OkAsync()` mirrors it),
   `Err` (there is **no** `Defect` constructor — a defect-state
@@ -457,7 +457,7 @@ library can be "done".
   is contravariant there and harmless, but unioning an `M`-derived output with
   the class `E` in a covariant return re-invaded `E`'s variance and collapsed
   inference (`combine<T,E>(rs: AsyncResult<T,E>[])` inferring `unknown`) — which
-  is exactly why `flatTapErr` infers a plain `E2` from the builder output and
+  is exactly why `flatTapErrCases` infers a plain `E2` from the builder output and
   returns `E | E2` rather than `E | ErrOf<MatchOut<M>>`.
 - **Inference-bearing parameters stay free of conditional types.** The
   async-qualify ban on `fromPromise` is a **phantom rest-tuple guard** (an async
@@ -494,7 +494,7 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   keeps a bare `Promise<Result>` out (a Promise has no `flatMap`, so a raw
   rejection still can't bypass qualification). The error channel stays a **plain**
   `E | E2` — deriving it as `E | ErrOf<R> | AsyncErrOf<R>` re-invaded `E`'s
-  variance (the same `out E` collapse `flatTapErr` avoids), so `flatMap` keeps
+  variance (the same `out E` collapse `flatTapErrCases` avoids), so `flatMap` keeps
   the plain `E2`. Keeping the `<U, E2>` shape (rather than inferring a whole
   `R`) also means the precise `AsyncRes` impl signatures conform to the public
   type unchanged — no loosening needed for these three.
@@ -600,7 +600,7 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   output, `Err` ↔ returned inferable `ORPCError`, `Defect` ↔ the rest. Three
   entry points, **no root export**: `./server` — `handlerResult(fn)` adapts a
   `Result`-returning handler (`Err` is constrained to `ORPCError`, so the
-  `mapErr` into `errors.CODE(...)` at the endpoint is the Thesis-#3 triage
+  `mapErrCases` into `errors.CODE(...)` at the endpoint is the Thesis-#3 triage
   point; a `Defect` rethrows its cause; a non-`ORPCError` `Err` smuggled past
   the types routes to the defect path — it must never be served as a
   successful output; the callback may be async — an elimination edge, exempt
@@ -613,7 +613,7 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   server-side `call(...)`), `createResultClient(client)` recursively wraps a
   router (the `createSafeClient` mirror): `E` is the raw inferable `ORPCError`
   union discriminated by `code` — deliberately NOT re-wrapped into
-  `TaggedError` (match it on `code`, e.g. `.mapErr((matcher) => matcher.with({
+  `TaggedError` (match it on `code`, e.g. `.mapErrCases((matcher) => matcher.with({
 code: "NOT_FOUND" }, …))`); non-inferable →
   `Defect`. Event-iterator (streaming) procedures are deliberately out of
   scope — the raw client is the escape hatch. Tested end-to-end against real
@@ -723,14 +723,14 @@ configured outside the repo).
   enforced by thresholds in its `vitest.config.ts`.
 - **Type-level tests:** `packages/core/src/types.test-d.ts` asserts the
   type-level behaviour the runtime can't (the conditional `all`/`allFromDict`
-  shapes, `Exclude<R, Defect>` boundary inference, `flatTap`/`recoverErr` channel
+  shapes, `Exclude<R, Defect>` boundary inference, `flatTap`/`recoverErrCases` channel
   widening, the `this is …` guard narrowing, `match`'s `err`-matcher
   exhaustiveness (a missing tag does not compile; the folded type unions the
   branch returns), and the
   error-matcher semantics — narrowing, defect/throw-branch subtraction,
   `P._` catch-all, grouped patterns, `code`-discriminated and untagged unions,
   forced exhaustiveness (a missing case does not compile), the `E`-inference
-  regression guard (`combine` still infers), and the `flatMapErr`/`flatTapErr`
+  regression guard (`combine` still infers), and the `flatMapErrCases`/`flatTapErrCases`
   async-branch rejection) with a
   `Expect<Equal<…>>` helper plus `@ts-expect-error` for must-not-compile cases.
   They are checked by `tsc` via `tsconfig.test-d.json` (which relaxes
@@ -740,5 +740,16 @@ configured outside the repo).
 - Public API carries full **TSDoc**; `pnpm --filter <pkg> build:docs` must stay
   typedoc-warning-free.
 - One concept = one name. Resist convenience aliases.
+- **The error-matcher combinators carry a `*Cases` suffix** (`mapErrCases`,
+  `flatMapErrCases`, `recoverErrCases`, `tapErrCases`, `flatTapErrCases`) —
+  **not** the bare `mapErr`/`tapErr`. The callback receives a ts-pattern matcher
+  over the error's _cases_, not the value, so the suffix names the protocol and
+  keeps it distinct from the value-taking success surface (`map`/`tap`). This
+  reverses the earlier plan to keep the bare `map*`/`tap*` names (weighed and
+  changed 2026-07): the functor-style name promised a `(e) => …` callback the
+  combinators never accept. There is **no** plain-callback `mapErr` variant —
+  that would reopen the blanket-handling hole the matcher closes. Do not
+  re-litigate or add bare aliases. Documented user-side in the
+  exhaustive-error-matching guide.
 - The core has **one runtime dependency, `ts-pattern`** (it powers the error
   matchers and is re-exported). Add no others — protect that minimalism.

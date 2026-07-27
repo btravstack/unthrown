@@ -86,7 +86,7 @@ const app = new Hono();
 
 app.get("/users/:id", (c) => {
   const user = parseId(c.req.param("id"))
-    .mapErr((matcher) => matcher.with(P._, () => new InvalidId()))
+    .mapErrCases((matcher) => matcher.with(P._, () => new InvalidId()))
     .toAsync()
     .flatMap((id) => userRepo.findById(id));
   // AsyncResult<User, InvalidId | NotFound>
@@ -121,8 +121,8 @@ result.getOrThrow(); // Err → throws the modeled error as-is; Defect → throw
 ```
 
 Use `getOrThrow` only as a deliberate escape hatch back into throw-land (it exists
-so a `no-throw` lint rule can ban raw `throw`). Prefer `match` / `recoverErr` /
-`flatMapErr` whenever the error can stay a value. Full family in the
+so a `no-throw` lint rule can ban raw `throw`). Prefer `match` / `recoverErrCases` /
+`flatMapErrCases` whenever the error can stay a value. Full family in the
 [combinator reference](../reference/combinators#eliminating-a-result).
 
 ## Where to go next

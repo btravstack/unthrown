@@ -36,8 +36,8 @@ Every `Result` shares one method surface, grouped by the channel it touches:
   `discard`
 - **do-notation** (runs on `Ok`): `bind`, `let` — accumulate a named scope; see
   [Sequence dependent steps](../how-to/sequence-dependent-steps)
-- **error** (runs on `Err`): `mapErr`, `flatMapErr`, `recoverErr`, `tapErr`,
-  `flatTapErr` — all take an **exhaustive ts-pattern matcher** over the error
+- **error** (runs on `Err`): `mapErrCases`, `flatMapErrCases`, `recoverErrCases`, `tapErrCases`,
+  `flatTapErrCases` — all take an **exhaustive ts-pattern matcher** over the error
 - **defect** (the only door to a `Defect`): `recoverDefect`, `tapDefect`
 - **failure** (runs on `Err` **or** `Defect`): `tapFailure` — observe either
   failing channel without consuming it
@@ -52,11 +52,11 @@ import { P } from "unthrown";
 
 Ok(2).map((n) => n + 1); // => Ok(3)
 Err("boom").map((n) => n + 1); // => Err("boom") — the success callback is skipped
-Ok(2 as number).mapErr((m) => m.with(P._, (e) => `wrapped: ${e}`)); // => Ok(2) — the error branch is skipped
+Ok(2 as number).mapErrCases((m) => m.with(P._, (e) => `wrapped: ${e}`)); // => Ok(2) — the error branch is skipped
 ```
 
-The `mapErr` above carries a real, exhaustive matcher; on an `Ok` it simply never
-runs. (There is no error-channel identity — `mapErr((m) => m)` is not a no-op; see
+The `mapErrCases` above carries a real, exhaustive matcher; on an `Ok` it simply never
+runs. (There is no error-channel identity — `mapErrCases((m) => m)` is not a no-op; see
 [Exhaustive error matching](../explanation/exhaustive-error-matching#no-identity-on-the-error-channel).)
 
 The full behavior grid and per-method signatures are in the

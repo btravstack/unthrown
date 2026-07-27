@@ -93,7 +93,7 @@ type ImplErrCode = Expect<Equal<AsyncErrOf<typeof implCall>["code"], "GONE">>;
 
 // --- must-NOT-compile ----------------------------------------------------------
 
-// @ts-expect-error — the Err channel must be ORPCError; map a domain error via `mapErr` first.
+// @ts-expect-error — the Err channel must be ORPCError; map a domain error via `mapErrCases` first.
 handlerResult(() => Err("domain-error"));
 
 // @ts-expect-error — same constraint on the extension path.
