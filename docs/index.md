@@ -14,10 +14,10 @@ hero:
   actions:
     - theme: brand
       text: Get Started
-      link: /guide/getting-started
+      link: /tutorial/getting-started
     - theme: alt
       text: Why unthrown?
-      link: /guide/why-unthrown
+      link: /explanation/why-unthrown
     - theme: alt
       text: GitHub
       link: https://github.com/btravstack/unthrown

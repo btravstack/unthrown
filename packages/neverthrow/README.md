@@ -3,7 +3,7 @@
 > [neverthrow](https://github.com/supermacro/neverthrow) interop for
 > [unthrown](https://github.com/btravstack/unthrown)'s `Result`.
 
-📖 **[Documentation](https://btravstack.github.io/unthrown/guide/interop)** ·
+📖 **[Documentation](https://btravstack.github.io/unthrown/how-to/interoperate-with-libraries)** ·
 [API Reference](https://btravstack.github.io/unthrown/api/neverthrow/)
 
 ```sh

@@ -356,7 +356,7 @@ export { toBeDefect, toBeErr, toBeErrTagged, toBeErrWith, toBeOk, toBeOkWith };
  * });
  * ```
  *
- * @see {@link https://btravstack.github.io/unthrown/guide/testing | The Testing guide}
+ * @see {@link https://btravstack.github.io/unthrown/how-to/test-with-vitest | The Testing guide}
  */
 export type UnthrownMatchers<R = unknown> = {
   /** `expect(Ok(1)).toBeOk()` asserts the result is `Ok`, regardless of value. */
