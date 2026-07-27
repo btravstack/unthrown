@@ -45,6 +45,9 @@ const status = await user.match({
 See the [full documentation](https://btravstack.github.io/unthrown/) for the guide
 and complete API.
 
+**Upgrading from 4.x?** See
+[Upgrade from 4.x to 5.0](https://btravstack.github.io/unthrown/how-to/upgrade-to-v5).
+
 ## License
 
 [MIT](https://github.com/btravstack/unthrown/blob/main/LICENSE) © Benoit TRAVERS
