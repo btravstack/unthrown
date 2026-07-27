@@ -14,6 +14,24 @@ updates:
         patterns:
           - "@vitest/*"
           - "vitest"
+      orpc:
+        patterns:
+          - "@orpc/*"
+      prisma:
+        patterns:
+          - "@prisma/*"
+          - "prisma"
+      oxlint:
+        patterns:
+          - "oxlint"
+          - "oxfmt"
+      typedoc:
+        patterns:
+          - "typedoc"
+          - "typedoc-*"
+      btravstack:
+        patterns:
+          - "@btravstack/*"
       dev-dependencies:
         dependency-type: "development"
     ignore:
