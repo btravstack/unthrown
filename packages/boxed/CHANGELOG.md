@@ -1,5 +1,12 @@
 # @unthrown/boxed
 
+## 5.0.0-beta.6
+
+### Patch Changes
+
+- Updated dependencies [a899858]
+  - unthrown@5.0.0-beta.6
+
 ## 5.0.0-beta.5
 
 ### Patch Changes
