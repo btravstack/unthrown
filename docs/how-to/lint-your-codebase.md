@@ -20,14 +20,16 @@ Register the plugin and turn its rules on in your `.oxlintrc.json`:
     "unthrown/no-ambiguous-error-type": "error",
     "unthrown/no-unhandled-result": "error",
     "unthrown/prefer-async-result": "error",
-    "unthrown/no-throw": "error"
+    "unthrown/no-throw": "error",
+    "unthrown/no-catch-all-pattern": "error"
   }
 }
 ```
 
 The default export also exposes a `recommended` preset — an oxlint config that
 registers the plugin and enables `no-ambiguous-error-type`, `no-unhandled-result`,
-and `prefer-async-result` (`no-throw` stays an explicit opt-in) — for setups that
+and `prefer-async-result` (`no-throw` and `no-catch-all-pattern` stay explicit
+opt-ins) — for setups that
 build their config programmatically (`import unthrown from "@unthrown/oxlint"` →
 `unthrown.recommended`).
 
@@ -121,6 +123,26 @@ known-technical precondition throw → keep it in a plain helper wrapped **once*
 `throw` → a targeted `// oxlint-disable-next-line unthrown/no-throw -- <reason>`
 comment. The rule has no options and no autofix — the disable comment is the escape
 hatch.
+
+### `unthrown/no-catch-all-pattern` {#no-catch-all-pattern}
+
+**Opt-in** — not part of the `recommended` preset. It is **stricter than
+unthrown's own default**: the library documents `P._` as the sanctioned
+"handle everything else" branch, but some teams want _every_ error enumerated by
+name, with no wildcard that could silently absorb a case the union grows later.
+This rule enforces that stricter stance by banning the ts-pattern catch-all `P._`
+(and its alias `P.any`) wherever `P` is imported from `unthrown` or `ts-pattern`.
+
+```ts
+result.mapErrCases((m) => m.with(P._, (e) => e)); // ✗ — the catch-all
+// ✓ — enumerate every case; group cases that share a handler
+result.mapErrCases((m) => m.with(tag("NotFound"), tag("Forbidden"), (e) => e));
+```
+
+Because a matched builder must still be exhaustive, removing `P._` makes the
+compiler point at each unhandled case until every one is named — the rule and the
+type checker push the same way. A deliberate wildcard carries a targeted
+`// oxlint-disable-next-line unthrown/no-catch-all-pattern -- <reason>`.
 
 ## Import resolution
 
