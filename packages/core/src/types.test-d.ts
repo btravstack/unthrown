@@ -851,7 +851,9 @@ new WithMsg({ ticketId: "t1" });
     .with(tag("Conflict"), () => "c")
     .exhaustive();
 
-  // `.returnType` is only allowed directly after `match(…)`
+  // `.returnType` is callable only before any arm has produced an output, and
+  // only once — not tied to position (see `afterNever` below); here an arm has
+  // already produced an output, so pinning after it is rejected
   match(e)
     .with(tag("NotFound"), () => "a")
     .with(tag("Conflict"), () => "c")
@@ -1102,11 +1104,11 @@ new WithMsg({ ticketId: "t1" });
   // `ExhaustiveMatch<Result<…>>` constraint — but the rejection still fires.
   r.flatTapErrCases((matcher) =>
     // @ts-expect-error — an async flatTapErrCases branch is banned, pin or no pin
-    matcher.returnType<Result<never, AuditFailed>>().with(P._, async () => Ok(1)),
+    matcher.returnType<Result<number, AuditFailed>>().with(P._, async () => Ok(1)),
   );
   r.toAsync().flatTapErrCases((matcher) =>
     // @ts-expect-error — …the same on the async surface, which awaits the branch
-    matcher.returnType<Result<never, AuditFailed>>().with(P._, async () => Ok(1)),
+    matcher.returnType<Result<number, AuditFailed>>().with(P._, async () => Ok(1)),
   );
 
   // THE MOTIVATING CASE: generic in E, catch-all terminated, output DECLARED by
