@@ -23,6 +23,7 @@
     "matcher-return-type",
     "orpc-sync-throw-defect",
     "oxlint-ambiguous-return-type-pin",
+    "oxlint-catch-all-recommended",
     "oxlint-four-rules",
     "oxlint-no-catch-all-pattern",
     "prisma-transaction-defect",
