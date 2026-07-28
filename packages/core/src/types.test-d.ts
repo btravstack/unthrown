@@ -707,11 +707,11 @@ new WithMsg({ ticketId: "t1" });
   );
   type _DefectDrops = Expect<Equal<ErrOf<typeof defected>, Mapped>>;
 
-  // P._ is the uniform catch-all; a defect-only match empties the channel
+  // the P._ escape hatch reaches every case; a defect-only match empties the channel
   const allDefected = r.mapErrCases((matcher, defect) => matcher.with(P._, (e) => defect(e)));
   type _AllDefected = Expect<Equal<typeof allDefected, Result<number, never>>>;
 
-  // the P._ catch-all receives the full union
+  // the P._ escape hatch receives the full union
   const merged = r.mapErrCases((matcher) =>
     matcher.with(P._, (e) => {
       type _MergedParam = Expect<Equal<typeof e, NotFound | Conflict>>;

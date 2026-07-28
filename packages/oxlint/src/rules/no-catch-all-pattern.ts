@@ -23,10 +23,12 @@ const CATCH_ALL_PROPS: ReadonlySet<string> = new Set(["_", "any"]);
  * handler), and `P._` is an **escape hatch**, not the sanctioned way to handle
  * the error channel. Hence its place in the `recommended` preset.
  *
- * The one irreducible use of the catch-all is a helper **generic in `E`**: no
- * list of arms can prove exhaustiveness against an unresolved type parameter,
- * and only `P._`'s state transition can. Silence the rule there — and at any
- * other deliberate wildcard — with a targeted disable and a reason:
+ * Two uses are irreducible. A helper **generic in `E`**: no list of arms can
+ * prove exhaustiveness against an unresolved type parameter, and only `P._`'s
+ * state transition can. And an **`E` that is a single type** rather than a
+ * union of cases — a validator's issues array, say — where one arm *is* the
+ * enumeration. Silence the rule there — and at any other deliberate wildcard —
+ * with a targeted disable and a reason:
  *
  * ```ts
  * const toApiError = <T, E>(result: Result<T, E>): Result<T, ApiError> =>

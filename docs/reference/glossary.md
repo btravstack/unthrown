@@ -59,9 +59,9 @@ combinator runs `.exhaustive()`, so a missing case does not compile. See
 : `P` is unthrown's pattern namespace (`P._`, `P.instanceOf`, `P.when`, `P.union`, `P.string`, `P.number`).
 `tag(t)` is sugar for the `{ _tag: t }` pattern, narrowing to a tagged variant
 and its payload — the everyday way to write an arm. `P._` is the universal
-catch-all; it makes any match exhaustive, so it is reserved for the case
-enumeration cannot express (a helper generic in `E`) rather than used as a
-default. See
+catch-all; it makes any match exhaustive, so it is reserved for the two cases
+enumeration cannot express — a helper generic in `E`, or an `E` that is a single
+type rather than a union of cases — rather than used as a default. See
 [Exhaustive error matching](../explanation/exhaustive-error-matching#generic-boundary-helpers-the-catch-all-is-the-only-form-that-compiles).
 
 **`Awaitable<R>`**

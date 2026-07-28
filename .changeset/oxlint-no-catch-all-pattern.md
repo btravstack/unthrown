@@ -10,5 +10,5 @@ handler)`, grouping cases that share a handler).
 Resolves `P` by its imported name via scope analysis (a rename still fires; a
 decoy does not); a namespace import (`ns.P._`) is a documented limit. It is part
 of the `recommended` preset — see the accompanying entry for what that flags and
-for the one case (a helper generic in `E`) that keeps the catch-all behind a
-targeted `oxlint-disable`.
+for the two cases (a helper generic in `E`; an `E` that is a single type rather
+than a union) that keep the catch-all behind a targeted `oxlint-disable`.

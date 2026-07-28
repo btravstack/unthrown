@@ -40,6 +40,7 @@ and a thrown callback still becomes a `Defect`:
 import { Do, Ok, Err, tag, TaggedError } from "unthrown";
 
 class TooSmall extends TaggedError("TooSmall") {}
+declare const input: number;
 
 Do()
   .bind("n", () => (input >= 2 ? Ok(input) : Err(new TooSmall())))
@@ -61,6 +62,7 @@ To sequence asynchronous steps, lift the chain with `toAsync()` (or start from
 import { Do, fromPromise, tag, TaggedError } from "unthrown";
 
 class UserNotFound extends TaggedError("UserNotFound") {}
+declare class MissingRowError extends Error {}
 
 const profile = await Do()
   .toAsync()

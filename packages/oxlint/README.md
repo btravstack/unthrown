@@ -61,10 +61,12 @@ import unthrown from "@unthrown/oxlint";
 ## The catch-all escape hatch
 
 `no-catch-all-pattern` is on by default, so `P._` needs a reason wherever it
-survives. There is exactly one place it is _irreducible_: a helper **generic in
-`E`**. No list of arms can prove exhaustiveness against an unresolved type
-parameter — only the catch-all can, because it is a state transition to "nothing
-remains" rather than a subtraction from `E`. Keep it, and say why:
+survives. Two cases are legitimate. The first is a helper **generic in `E`**: no
+list of arms can prove exhaustiveness against an unresolved type parameter —
+only the catch-all can, because it is a state transition to "nothing remains"
+rather than a subtraction from `E`. The second is an **`E` that is a single
+type** rather than a union of cases — a validator's issues array, say — where
+one arm _is_ the enumeration. Keep the catch-all there, and say which it is:
 
 ```ts
 import { P, type Result } from "unthrown";

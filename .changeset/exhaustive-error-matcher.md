@@ -37,14 +37,17 @@ no `.exhaustive()` to forget and no `.otherwise()` to smuggle in a fallback.
   union (the oRPC shape), structural shapes, guards, and grouped patterns
   (`.with(a, b, handler)` — one strategy for several cases). `tag("X")` is sugar
   for the `{ _tag: "X" }` pattern.
-- **`P._` is the deliberate catch-all** — the uniform "handle everything else"
-  branch that replaces the old single callback, made explicit and greppable.
+- **Name the cases; group the ones that share a handler** — `.with(a, b, handler)`
+  writes the handler once and still spells every case out, which is what keeps a
+  new case a compile error. `P._` remains available as an **escape hatch**
+  (principally a helper generic in `E`, where no arm list can prove coverage),
+  not as a drop-in for the old single callback.
 - Each branch receives the narrowed variant **and the injected `defect` helper**
   (`.with(tag("X"), (e) => defect(e.cause))`); its `Defect` arm is subtracted
   from the outgoing `E` (`Exclude<O, Defect>`, the boundary inference). A
   throwing branch also becomes a `Defect` (the safety net).
-- **Observers match exhaustively too** (`tapErrCases`/`flatTapErrCases`, use `P._` for a
-  catch-all); the error is observed and flows through unchanged.
+- **Observers match exhaustively too** (`tapErrCases`/`flatTapErrCases`, with the
+  same named arms); the error is observed and flows through unchanged.
 
 **Core now depends on `ts-pattern`** (a small, types-heavy, dual-copy-safe
 library), and re-exports `match` and `P`, plus `tag` — so the matcher, and
@@ -83,11 +86,12 @@ result.match({
 });
 ```
 
-Use `.with(P._, …)` for a uniform catch-all. `matchTags` and its `TagHandlers`
-type are gone; `TaggedError` and `tag` are unchanged. **Library code generic in
-the error type `E`** (which ts-pattern can't prove exhaustive over an unresolved
-type parameter) should fold with the `isOk` / `isErr` / `isDefect` guards
-instead of `match`.
+Name every case here too, grouping the ones that share a handler; `.with(P._, …)`
+stays an escape hatch, not the shape to reach for first. `matchTags` and its
+`TagHandlers` type are gone; `TaggedError` and `tag` are unchanged. **Library
+code generic in the error type `E`** (which ts-pattern can't prove exhaustive
+over an unresolved type parameter) should fold with the `isOk` / `isErr` /
+`isDefect` guards instead of `match`.
 
 **Also breaking:** the deprecated error-channel aliases `orElse` and `recover`
 are removed; the extractor aliases (`unwrap`, `unwrapErr`, `unwrapOr`,

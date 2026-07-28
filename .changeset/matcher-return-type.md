@@ -16,6 +16,7 @@ combinators (sync and async), `match`'s `errCases` handler, and standalone
 ```ts
 const toApiError = <T, E>(result: Result<T, E>): Result<T, ApiError> =>
   result.mapErrCases((matcher) =>
+    // oxlint-disable-next-line unthrown/no-catch-all-pattern -- generic in `E`: no arm list can prove exhaustiveness
     matcher.returnType<ApiError>().with(P._, (error) => new ApiError({ status: 500, error })),
   );
 ```

@@ -481,7 +481,8 @@ export function defectRes<T, E>(cause: unknown): Result<T, E> {
  * const x: unknown = Ok(1);
  * if (isResult(x))
  *   // `E` is `unknown` here — an untyped boundary has no cases to enumerate,
- *   // so the `P._` escape hatch is the only arm that can terminate the match.
+ *   // so the `P._` escape hatch is the only arm that can terminate the match:
+ *   // oxlint-disable-next-line unthrown/no-catch-all-pattern -- untyped boundary: `E` is `unknown`
  *   x.match({ ok: () => 1, errCases: (m) => m.with(P._, () => 0), defect: () => -1 });
  * ```
  *

@@ -45,6 +45,7 @@ import { Effect } from "effect";
 
 class NotFound extends TaggedError("NotFound") {}
 class Timeout extends TaggedError("Timeout") {}
+type User = { name: string };
 
 toExit(Ok(1)); // Exit.succeed(1)
 toExit(Err("e")); // Exit.fail("e")  — a modeled Cause.fail

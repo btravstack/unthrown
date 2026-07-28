@@ -177,7 +177,7 @@ describe("match — per-tag error matching", () => {
     expect(out).toBe("ok:1");
   });
 
-  it("handles every error uniformly through the P._ catch-all", () => {
+  it("the P._ escape hatch reaches every error when no case is named", () => {
     const uniform = (r: Result<number, ApiError>): string =>
       r.match({
         ok: (n) => `ok:${n}`,

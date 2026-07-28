@@ -28,10 +28,12 @@ result.mapErrCases((matcher) =>
 );
 ```
 
-**The one case that must keep the catch-all** is a helper generic in `E`: no arm
-list can prove exhaustiveness against an unresolved type parameter, and only
-`P._` can, because it is a state transition to "nothing remains" rather than a
-subtraction from `E`. Keep it and silence the rule with a reason:
+**Two cases keep the catch-all.** A helper generic in `E`: no arm list can prove
+exhaustiveness against an unresolved type parameter, and only `P._` can, because
+it is a state transition to "nothing remains" rather than a subtraction from
+`E`. And an `E` that is a single type rather than a union of cases — a
+validator's issues array, say — where one arm _is_ the enumeration. Keep the
+catch-all there and silence the rule with a reason:
 
 ```ts
 const toApiError = <T, E>(result: Result<T, E>): Result<T, ApiError> =>

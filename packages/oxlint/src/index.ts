@@ -46,10 +46,12 @@ const plugin = eslintCompatPlugin({
 // is unthrown's default position — the exhaustive matcher exists so a failure
 // mode cannot be absorbed unnamed, and `P._` re-opens exactly the
 // blanket-handling hole it closes. `P._` remains an escape hatch, not the
-// sanctioned default: its one irreducible use is a helper generic in `E`, where
-// no list of arms can prove exhaustiveness and only the catch-all's state
-// transition can. That site silences the rule with a targeted
-// `oxlint-disable-next-line unthrown/no-catch-all-pattern` and a reason.
+// sanctioned default: its two irreducible uses are a helper generic in `E`,
+// where no list of arms can prove exhaustiveness and only the catch-all's state
+// transition can, and an `E` that is a single type rather than a union of
+// cases, where one arm IS the enumeration. Such a site silences the rule with a
+// targeted `oxlint-disable-next-line unthrown/no-catch-all-pattern` and a
+// reason.
 plugin.recommended = defineConfig({
   jsPlugins: [{ name: "unthrown", specifier: "@unthrown/oxlint" }],
   rules: {

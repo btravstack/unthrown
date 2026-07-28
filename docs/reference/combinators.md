@@ -232,7 +232,8 @@ Use this table to move between the two:
 // A chain that crosses an async boundary stays an AsyncResult to the end.
 const status = await findUser(id) // Result<User, NotFound>  (sync)
   .toAsync() // AsyncResult<User, NotFound>
-  .flatMap((user) => fromPromise(loadOrders(user.id), qualify)) // async step — adds LoadFailed to E
+  // the boundary's qualify decides what it adds to E — here, LoadFailed
+  .flatMap((user) => fromPromise(loadOrders(user.id), () => new LoadFailed()))
   .map((orders) => orders.length) // sync callback, still AsyncResult
   .match({
     ok: (n) => n,
