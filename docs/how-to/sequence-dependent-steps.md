@@ -37,7 +37,7 @@ normal surface, so you can mix in `map`, `flatMap`, `match`, and the rest freely
 and a thrown callback still becomes a `Defect`:
 
 ```ts
-import { Do, Ok, Err, tag, TaggedError } from "unthrown";
+import { Do, Ok, Err, P, TaggedError } from "unthrown";
 
 class TooSmall extends TaggedError("TooSmall") {}
 declare const input: number;
@@ -47,7 +47,7 @@ Do()
   .let("doubled", ({ n }) => n * 2)
   .match({
     ok: ({ n, doubled }) => `${n} → ${doubled}`,
-    errCases: (matcher) => matcher.with(tag("TooSmall"), () => "too small"),
+    errCases: (matcher) => matcher.with(P.tag("TooSmall"), () => "too small"),
     defect: (cause) => `bug: ${String(cause)}`,
   });
 ```
@@ -59,7 +59,7 @@ To sequence asynchronous steps, lift the chain with `toAsync()` (or start from
 (never a raw `Promise` — see [Qualify a boundary](./qualify-a-boundary)):
 
 ```ts
-import { Do, fromPromise, tag, TaggedError } from "unthrown";
+import { Do, fromPromise, P, TaggedError } from "unthrown";
 
 class UserNotFound extends TaggedError("UserNotFound") {}
 declare class MissingRowError extends Error {}
@@ -75,7 +75,7 @@ const profile = await Do()
   .let("count", ({ posts }) => posts.length)
   .match({
     ok: (s) => s,
-    errCases: (matcher) => matcher.with(tag("UserNotFound"), () => null),
+    errCases: (matcher) => matcher.with(P.tag("UserNotFound"), () => null),
     defect: () => null,
   });
 ```

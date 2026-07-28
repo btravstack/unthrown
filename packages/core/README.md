@@ -11,10 +11,10 @@ pnpm add unthrown
 ```
 
 No peer dependencies — the exhaustive error matcher is built-in and exported as
-`match` / `P` / `tag`.
+`match` / `P`.
 
 ```ts
-import { fromPromise, tag, TaggedError } from "unthrown";
+import { fromPromise, P, TaggedError } from "unthrown";
 
 class NotFound extends TaggedError("NotFound") {} // our modeled domain failure
 class NotFoundError extends Error {} // what `fetchUser` rejects with on a 404
@@ -26,7 +26,7 @@ const user = fromPromise(fetchUser(id), (cause, defect) =>
 const status = await user.match({
   ok: () => 200,
   // `errCases` takes the exhaustive matcher — every case of E named:
-  errCases: (matcher) => matcher.with(tag("NotFound"), () => 404),
+  errCases: (matcher) => matcher.with(P.tag("NotFound"), () => 404),
   defect: () => 500,
 });
 ```
@@ -36,7 +36,7 @@ const status = await user.match({
   observable only via `match` / `recoverDefect`.
 - **Qualification at every boundary** — `fromPromise` / `fromThrowable` force you
   to triage each failure into a modeled error or a defect.
-- **Tagged errors** — `TaggedError(tag)` + `tag(t)`, folded exhaustively through
+- **Tagged errors** — `TaggedError(tag)` + `P.tag(t)`, folded exhaustively through
   `match`'s built-in error matcher.
 - **Zero runtime dependencies** (the matcher is built-in), ESM-first, dual
   CJS/ESM.

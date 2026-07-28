@@ -83,13 +83,13 @@ you **return the un-terminated builder** — the combinator calls `.exhaustive()
 for you:
 
 ```ts
-import { P, tag } from "unthrown";
+import { P } from "unthrown";
 
 db.reading.tryFindUniqueOrThrow({ where: { id } }).mapErrCases(
   (matcher, defect) =>
     matcher
-      .with(tag("RecordNotFound"), () => new ReadingNotFoundException(id))
-      .with(tag("DriverError"), (e) => defect(e.cause)), // deliberate defect — the tag leaves E
+      .with(P.tag("RecordNotFound"), () => new ReadingNotFoundException(id))
+      .with(P.tag("DriverError"), (e) => defect(e.cause)), // deliberate defect — the tag leaves E
 );
 ```
 
@@ -100,7 +100,7 @@ forget, and no `.otherwise()` to slip in a fallback. The rationale is in
 - **Match on anything, not just `_tag`.** The matcher matches by structure, so a
   `code`-discriminated union (the oRPC shape), a plain string, a guard
   (`.with({ code: "NOT_FOUND", id: "special" }, …)`), or grouped patterns
-  (`.with(a, b, handler)` — one strategy for several cases) all work. `tag("X")`
+  (`.with(a, b, handler)` — one strategy for several cases) all work. `P.tag("X")`
   is sugar for the `{ _tag: "X" }` pattern, narrowing to the variant and its
   payload.
 - **The outgoing `E` is the union of the branch returns.** A branch receives the
@@ -134,7 +134,7 @@ forget, and no `.otherwise()` to slip in a fallback. The rationale is in
   only type-checks when `E` is `never` and otherwise fails to compile (see
   [The Defect Channel](../explanation/the-defect-channel#no-identity-on-the-error-channel)).
   To pass the error through, observe it with `tapErrCases`, or re-emit each case
-  by name (`.with(tag("NotFound"), (e) => e)…`).
+  by name (`.with(P.tag("NotFound"), (e) => e)…`).
 - **Observers match exhaustively too.** `tapErrCases` and `flatTapErrCases` take the same
   builder; the error is observed and then flows through unchanged. Their branch
   returns are ignored (`tapErrCases`) or thread only a
@@ -154,13 +154,13 @@ When several cases deserve the same handling — logging is the classic case —
 the day `E` grows the call site still lights up:
 
 ```ts
-import { tag } from "unthrown";
+import { P } from "unthrown";
 
 // loadUser: (id: string) => Result<User, NotFound | Forbidden | DriverError>
 
 // log whatever the error is, then let it flow through unchanged
 loadUser(id).tapErrCases((matcher) =>
-  matcher.with(tag("NotFound"), tag("Forbidden"), tag("DriverError"), (e) => logger.error(e)),
+  matcher.with(P.tag("NotFound"), P.tag("Forbidden"), P.tag("DriverError"), (e) => logger.error(e)),
 );
 ```
 
@@ -173,22 +173,22 @@ the edge — and mixes freely with per-case arms:
 // one case handled specially, the rest sharing a strategy
 result.tapErrCases((matcher) =>
   matcher
-    .with(tag("RateLimited"), (e) => metrics.rateLimit(e.retryAfter))
-    .with(tag("NotFound"), tag("Forbidden"), (e) => logger.error(e)),
+    .with(P.tag("RateLimited"), (e) => metrics.rateLimit(e.retryAfter))
+    .with(P.tag("NotFound"), P.tag("Forbidden"), (e) => logger.error(e)),
 );
 
 result.recoverErrCases((matcher) =>
   matcher
-    .with(tag("RateLimited"), (e) => e.retryAfter)
-    .with(tag("NotFound"), tag("Forbidden"), () => fallback),
+    .with(P.tag("RateLimited"), (e) => e.retryAfter)
+    .with(P.tag("NotFound"), P.tag("Forbidden"), () => fallback),
 );
 
 result.match({
   ok: (v) => v,
   errCases: (matcher) =>
     matcher
-      .with(tag("RateLimited"), (e) => `retry in ${e.retryAfter}`)
-      .with(tag("NotFound"), tag("Forbidden"), (e) => `failed: ${e}`),
+      .with(P.tag("RateLimited"), (e) => `retry in ${e.retryAfter}`)
+      .with(P.tag("NotFound"), P.tag("Forbidden"), (e) => `failed: ${e}`),
   defect: (c) => `bug: ${c}`,
 });
 ```
@@ -238,7 +238,8 @@ const status = await findUser(id) // Result<User, NotFound>  (sync)
   .match({
     ok: (n) => n,
     // the boundary widened E, so both cases are named here
-    errCases: (matcher) => matcher.with(tag("NotFound"), () => 0).with(tag("LoadFailed"), () => -2),
+    errCases: (matcher) =>
+      matcher.with(P.tag("NotFound"), () => 0).with(P.tag("LoadFailed"), () => -2),
     defect: () => -1,
   }); // await collapses it
 ```

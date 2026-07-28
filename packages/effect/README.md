@@ -16,7 +16,7 @@ failure (`Cause.fail` ↔ `Err`) from an unexpected one (`Cause.die` ↔ `Defect
 So `Result ↔ Exit` is a genuine **bijection**.
 
 ```ts
-import { Ok, Err, tag, TaggedError } from "unthrown";
+import { Ok, Err, P, TaggedError } from "unthrown";
 import { toExit, fromEffect, toEither } from "@unthrown/effect";
 import { Effect } from "effect";
 
@@ -32,7 +32,7 @@ const load = (id: string): Effect.Effect<string, NotFound> =>
 await fromEffect(load("1")).match({
   ok: (value) => value,
   // the error channel, matched exhaustively — every case named
-  errCases: (matcher) => matcher.with(tag("NotFound"), () => "missing"),
+  errCases: (matcher) => matcher.with(P.tag("NotFound"), () => "missing"),
   defect: String,
 });
 ```

@@ -40,7 +40,7 @@ features:
 ## At a glance
 
 ```ts
-import { Ok, Err, fromPromise, tag, TaggedError, type Result } from "unthrown";
+import { Ok, Err, fromPromise, P, TaggedError, type Result } from "unthrown";
 
 class NotFound extends TaggedError("NotFound") {}
 
@@ -58,7 +58,7 @@ const profile = fromPromise(db.loadProfile(id), (cause, defect) =>
 // Handle every channel once, at the edge — no surrounding try/catch.
 const status = await profile.match({
   ok: () => 200,
-  errCases: (matcher) => matcher.with(tag("NotFound"), () => 404), // every case, named
+  errCases: (matcher) => matcher.with(P.tag("NotFound"), () => 404), // every case, named
   defect: () => 500,
 });
 ```

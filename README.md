@@ -50,12 +50,12 @@ pnpm add unthrown
 ```
 
 No peer dependencies — the exhaustive error matcher is built-in and exported as
-`match` / `P` / `tag`.
+`match` / `P`.
 
 ## Quick Example
 
 ```ts
-import { fromPromise, tag, TaggedError } from "unthrown";
+import { fromPromise, P, TaggedError } from "unthrown";
 
 // Our modeled domain failure:
 class NotFound extends TaggedError("NotFound") {}
@@ -73,7 +73,7 @@ const status = await user.match({
   ok: () => 200,
   // `errCases` receives the exhaustive matcher — name every case of E; adding
   // one to E is a compile error here until you handle it:
-  errCases: (matcher) => matcher.with(tag("NotFound"), () => 404),
+  errCases: (matcher) => matcher.with(P.tag("NotFound"), () => 404),
   defect: (cause) => {
     logger.error(cause); // everything unexpected
     return 500;

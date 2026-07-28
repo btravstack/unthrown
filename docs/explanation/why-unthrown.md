@@ -37,8 +37,8 @@ getUser(id)
     // every case in E is named — add a third and this stops compiling
     errCases: (matcher) =>
       matcher
-        .with(tag("NotFound"), () => showMessage("not found"))
-        .with(tag("Timeout"), () => showMessage("timed out")),
+        .with(P.tag("NotFound"), () => showMessage("not found"))
+        .with(P.tag("Timeout"), () => showMessage("timed out")),
     defect: report500,
   });
 ```

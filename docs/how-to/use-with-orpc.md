@@ -39,7 +39,7 @@ your service layer keeps speaking `Result`, and the endpoint stops needing to
 unwrap it into throws:
 
 ```ts
-import { tag } from "unthrown";
+import { P } from "unthrown";
 import { handlerResult } from "@unthrown/orpc/server";
 import { os } from "@orpc/server";
 import * as z from "zod";
@@ -54,9 +54,9 @@ const find = os
       repo.findPlanet(input.id).mapErrCases(
         (matcher, defect) =>
           matcher
-            .with(tag("NotFound"), () => errors.NOT_FOUND()) // modeled → typed for the client
-            .with(tag("Conflict"), () => errors.CONFLICT())
-            .with(tag("DriverError"), (e) => defect(e.cause)), // infrastructure → defect
+            .with(P.tag("NotFound"), () => errors.NOT_FOUND()) // modeled → typed for the client
+            .with(P.tag("Conflict"), () => errors.CONFLICT())
+            .with(P.tag("DriverError"), (e) => defect(e.cause)), // infrastructure → defect
       ),
     ),
   );
@@ -98,7 +98,7 @@ If you prefer a builder method over wrapping, opt into the extension — one
 side-effectful import:
 
 ```ts
-import { tag } from "unthrown";
+import { P } from "unthrown";
 import "@unthrown/orpc/extensions/result";
 
 const find = os
@@ -107,9 +107,9 @@ const find = os
   .result(({ input, errors }) =>
     repo.findPlanet(input.id).mapErrCases((matcher, defect) =>
       matcher
-        .with(tag("NotFound"), () => errors.NOT_FOUND())
-        .with(tag("Conflict"), () => errors.CONFLICT())
-        .with(tag("DriverError"), (e) => defect(e.cause)),
+        .with(P.tag("NotFound"), () => errors.NOT_FOUND())
+        .with(P.tag("Conflict"), () => errors.CONFLICT())
+        .with(P.tag("DriverError"), (e) => defect(e.cause)),
     ),
   );
 ```
@@ -184,7 +184,7 @@ Both halves compose into one error vocabulary across layers — a
 browser consumes it, all in `Result`:
 
 ```ts
-import { tag } from "unthrown";
+import { P } from "unthrown";
 
 // server — the one mapErrCases is the whole edge, and it is exhaustive: a new P-code
 // in the union becomes a compile error here, never a silent 500.
@@ -197,10 +197,10 @@ const createUser = os
         .tryCreate({ data: input })
         .mapErrCases((matcher) =>
           matcher
-            .with(tag("UniqueConstraintViolation"), () => errors.EMAIL_TAKEN())
+            .with(P.tag("UniqueConstraintViolation"), () => errors.EMAIL_TAKEN())
             .with(
-              tag("ForeignKeyViolation"),
-              tag("DriverError"),
+              P.tag("ForeignKeyViolation"),
+              P.tag("DriverError"),
               (e) => new ORPCError("INTERNAL_SERVER_ERROR", { cause: e }),
             ),
         ),

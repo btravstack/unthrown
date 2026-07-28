@@ -82,11 +82,11 @@ e.name; // "RetryableError"          — clean stack-trace label
 
 To fold a `Result` whose error is a tagged union straight to a value, use
 `match`. Its `ok` and `defect` handlers are plain callbacks; its **`errCases` handler
-receives the matcher** — add one branch per tag with `tag(t)` and
+receives the matcher** — add one branch per tag with `P.tag(t)` and
 **return the un-terminated builder** (`match` calls `.exhaustive()` for you):
 
 ```ts
-import { tag } from "unthrown";
+import { P } from "unthrown";
 
 const status = authorize(id).match({
   ok: () => 200,
@@ -96,8 +96,8 @@ const status = authorize(id).match({
   },
   errCases: (matcher) =>
     matcher
-      .with(tag("NotFound"), () => 404)
-      .with(tag("Forbidden"), (e) => {
+      .with(P.tag("NotFound"), () => 404)
+      .with(P.tag("Forbidden"), (e) => {
         audit(e.user); // narrowed to Forbidden — `user` is available
         return 403;
       }),
