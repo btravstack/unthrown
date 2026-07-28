@@ -27,6 +27,7 @@ import {
   isErr,
   isOk,
   isResult,
+  match,
   tag,
   P,
   Ok,
@@ -799,4 +800,70 @@ new WithMsg({ ticketId: "t1" });
   // observers are exhaustive too, but the error passes through unchanged
   const observed = coded.tapErrCases((matcher) => matcher.with(P._, () => undefined));
   type _Observed = Expect<Equal<typeof observed, Result<number, CodeErr>>>;
+}
+
+// --- matcher: returnType<R>() declares the output, and binds every branch ----
+// Pinning is what lets code that must DECLARE its output type (a signature, a
+// generic helper) stop the branches from deciding it by inference.
+
+{
+  class NotFound extends TaggedError("NotFound")<{ id: string }> {}
+  class Conflict extends TaggedError("Conflict")<{ key: string }> {}
+  const e = new NotFound({ id: "1" }) as NotFound | Conflict;
+
+  // pinned: the fold type is the DECLARED one, not the union of branch returns
+  const pinned = match(e)
+    .returnType<string>()
+    .with(tag("NotFound"), (n) => n.id)
+    .with(tag("Conflict"), () => "conflict")
+    .exhaustive();
+  type _Pinned = Expect<Equal<typeof pinned, string>>;
+
+  // REGRESSION GUARD: unpinned, branch returns still infer exactly as before
+  // (the `BranchReturn` conditional must not defer inference and collapse O2 —
+  // the `fromPromise`-qualify hazard, see CLAUDE.md's internal design)
+  const inferred = match(e)
+    .with(tag("NotFound"), () => 1 as const)
+    .with(tag("Conflict"), () => "x" as const)
+    .exhaustive();
+  type _Inferred = Expect<Equal<typeof inferred, 1 | "x">>;
+
+  // narrowing is preserved under a pin
+  match(e)
+    .returnType<string>()
+    .with(tag("NotFound"), (n) => {
+      type _Narrowed = Expect<Equal<typeof n, NotFound>>;
+      return n.id;
+    })
+    .with(tag("Conflict"), () => "c")
+    .exhaustive();
+
+  // a branch that violates the pin fails ON THE BRANCH, not downstream
+  match(e)
+    .returnType<string>()
+    // @ts-expect-error — 42 is not assignable to the declared `string`
+    .with(tag("NotFound"), () => 42)
+    .with(tag("Conflict"), () => "c")
+    .exhaustive();
+
+  // `.returnType` is only allowed directly after `match(…)`
+  match(e)
+    .with(tag("NotFound"), () => "a")
+    .with(tag("Conflict"), () => "c")
+    // @ts-expect-error — not callable: an arm has already run
+    .returnType<string>();
+
+  // re-pinning is rejected by the same gate
+  match(e)
+    .returnType<string>()
+    .with(tag("NotFound"), () => "a")
+    // @ts-expect-error — not callable: the builder is already pinned
+    .returnType<number>();
+
+  // a missing case under a pin still makes `.exhaustive` uncallable
+  const partial = match(e)
+    .returnType<string>()
+    .with(tag("NotFound"), (n) => n.id);
+  // @ts-expect-error — Conflict is unhandled
+  partial.exhaustive();
 }
