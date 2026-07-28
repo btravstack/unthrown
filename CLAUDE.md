@@ -384,6 +384,9 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
   matcher, and matching a whole `Result` (`match(r).with({ tag: "Ok" }, …)`),
   first-class in one import — the former `@unthrown/pattern` package and the
   former `ts-pattern` re-exports, now one owned module.
+- errors: `GetError` (from `core.ts`) is also a public export — the defensive
+  wrong-variant error `get`/`getErr` throw, reachable only through a cast or a
+  raw-JS caller (see the type-gated extractor invariant).
 - guards: methods `isOk`/`isErr`/`isDefect` **and** standalone
   `isOk`/`isErr`/`isDefect` both narrow (to `OkView`/`ErrView`/`DefectView`) — the
   methods are `this is …` type predicates, so `if (r.isErr()) r.error` compiles.
@@ -399,6 +402,10 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
   union a `tapFailure` callback receives (error-type-first, like `ErrView`).
   `ErrMatcher<E>` — the built-in match builder over the error
   (`ReturnType<typeof match<E>>`, i.e. `Matcher<E, E, never>`).
+  `OkOf<R>` / `ErrOf<R>` / `AsyncOkOf<R>` / `AsyncErrOf<R>` — public
+  derive-a-type utilities extracting a `Result`/`AsyncResult`'s channels from a
+  function's return type (also the machinery behind `flatMapErrCases`'s
+  outgoing types).
   The supporting `ExhaustiveMatch`/`MatchOut`/`MatchErrOut` are exported for the
   d.ts but not re-exported from `index.ts`. `ExhaustiveMatch<O>` requires
   `.exhaustive` to be _callable_ (the builder types it as the branded
@@ -408,7 +415,9 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
   never combined with the class `E` in a covariant return — the historical
   ts-pattern `Match` invariance forced that rule (and `flatTapErrCases`'s plain
   `E2` inference); the built-in `Matcher` is kinder but the discipline is kept,
-  guarded by the `combine` inference regression test.
+  guarded by the `combine` inference regression guard — a compile-guard helper
+  in `aggregate.spec.ts` (its `r.get()` only compiles while `E` infers `never`)
+  plus the variance widen-guards in `types.test-d.ts`.
 - constructors: `Ok` (a no-arg overload — `Ok()` — constructs a `void` success,
   `Result<void, never>`, sparing `Ok(undefined)`; `OkAsync()` mirrors it),
   `Err` (there is **no** `Defect` constructor — a defect-state
@@ -473,9 +482,10 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
   documented on the separate `*Methods` types, which the `Result` / `AsyncResult`
   aliases and the `OkView`/`ErrView`/`DefectView` variants link to. The async
   method docs link back to their sync `ResultMethods` counterpart and state the
-  async delta. The `docs/guide/choosing-a-combinator.md` guide remains the "by
-  intent" selection cheat-sheet — one table covering both — and links to these API
-  sections. The core `typedoc.json` sets an explicit `categoryOrder` (`Facade`,
+  async delta. The `docs/reference/combinators.md` page (the docs site follows
+  the Diátaxis layout — `tutorial/`, `how-to/`, `reference/`, `explanation/`)
+  remains the "by intent" selection cheat-sheet — one table covering both — and
+  links to these API sections. The core `typedoc.json` sets an explicit `categoryOrder` (`Facade`,
   `Types`, `Methods`, `Constructors`, … then `Aggregate`, `Errors`) so the core
   surface leads the API reference instead of the default alphabetical order.
 - tagged errors: `TaggedError(tag, options?)` (the error-class factory; optional
@@ -488,7 +498,9 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
   for use in the error matchers, in `match`'s `errCases` handler, and in
   `match(result)`) — it sits with the other pattern constructors, not with
   `TaggedError`; see the
-  `TaggedError` convention in Thesis #4. **There is no `matchTags`** — a per-tag
+  `TaggedError` convention in Thesis #4. The supporting types
+  `TaggedErrorConstructor` / `TaggedErrorInstance` are exported too — they type
+  an `extends TaggedError(…)` site from the outside. **There is no `matchTags`** — a per-tag
   exhaustive fold over a tagged error union is `result.match({ ok, defect, errCases:
 (matcher) => matcher.with(P.tag("…"), …) })`, which generalises beyond `_tag` to
   any discriminant.
@@ -628,7 +640,10 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   `NonExhaustiveError`); it replaced the former `ts-pattern` peer so the
   exhaustiveness guarantee can never vary with a consumer-resolved third-party
   version, and nothing needs installing alongside `unthrown`)
-- `packages/vitest` → `@unthrown/vitest` (peerDep `vitest`)
+- `packages/vitest` → `@unthrown/vitest` (peerDep `vitest`; besides the
+  `expect.extend` registration it also exports the six raw matcher functions,
+  `failOnForgottenAwait`, and the `UnthrownMatchers` type — for manual
+  `expect.extend` wiring)
 - `packages/effect` → `@unthrown/effect` (peerDep `effect`)
 - `packages/neverthrow` → `@unthrown/neverthrow` (peerDep `neverthrow`)
 - `packages/boxed` → `@unthrown/boxed` (peerDep `@bloodyowl/boxed` — Boxed's
@@ -771,6 +786,9 @@ channel?**
   never a `Defect`. Going _out_, every `to*` takes a **mandatory `onDefect:
 (cause) => E`** (forced triage, Thesis #3): a defect is never silently folded
   into `E`. There is no one-arg form.
+- The async-direction names are **deliberately asymmetric** —
+  `toNeverthrowAsync` / `toBoxedFuture` — because each names the neighbour's
+  own async type (`ResultAsync` vs `Future<Result>`). Do not uniformise them.
 - A `Defect` `Result` has no public constructor (defects arise at boundaries).
   The only place one is minted is `@unthrown/effect`'s `fromExit`, which replays
   Effect's `die` cause through the `fromThrowable` boundary — itself a genuine
@@ -823,7 +841,10 @@ configured outside the repo).
 
 ## Toolchain & conventions
 
-- **Stack:** pnpm (catalog) + turbo; build with **tsdown** (dual CJS/ESM + d.ts);
+- **Stack:** pnpm (catalog) + turbo; build with **tsdown** (dual CJS/ESM + d.ts;
+  **no sourcemaps or declaration maps** — each package tsconfig sets
+  `declarationMap: false` over the shared base, because `files: ["dist"]`
+  excludes `src/` and published maps would be dead-ends);
   lint/format with **oxlint** / **oxfmt**; **knip** for dead-code/deps; **vitest**
   (+ v8 coverage); **typedoc** (markdown) feeding **vitepress**; **changesets**
   for releases; **lefthook** + **commitlint** (conventional commits) on commit.

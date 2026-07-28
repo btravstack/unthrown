@@ -23,7 +23,10 @@ catalog:
   "@orpc/server": 2.0.0-beta.18
   "@prisma/adapter-better-sqlite3": 7.8.0
   "@prisma/client": 7.8.0
-  "@standard-schema/spec": 1.1.0
+  # Ranged, not pinned: published as a regular dependency of
+  # @unthrown/standard-schema — an exact pin would block dedupe with a
+  # consumer's own copy of the (types-only) spec package.
+  "@standard-schema/spec": ^1.1.0
   "@types/node": 26.1.1
   "@vitest/coverage-v8": 4.1.10
   better-sqlite3: 12.11.1

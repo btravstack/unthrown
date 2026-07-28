@@ -192,6 +192,12 @@ type _flatMapped = Expect<Equal<typeof flatMapped, Result<never, "e1" | "e2">>>;
 declare const ar: AsyncResult<number, "e">;
 // @ts-expect-error - a raw Promise callback return is not assignable
 ar.flatMap((n) => Promise.resolve(Ok(n)));
+// @ts-expect-error - a raw Promise callback return is not assignable
+ar.flatTap(() => Promise.resolve(Ok(1)));
+// bind: same ban, from a Do-scope AsyncResult so the call otherwise typechecks
+declare const arDo: AsyncResult<{ a: number }, "e">;
+// @ts-expect-error - a raw Promise callback return is not assignable
+arDo.bind("x", () => Promise.resolve(Ok(1)));
 
 // REGRESSION GUARD: chaining a callback that returns a value typed as the
 // opaque `AsyncResult<U, E2>` alias (not a freshly-minted Ok/fromPromise) must
@@ -1055,6 +1061,12 @@ new WithMsg({ ticketId: "t1" });
   type _FlatObservedDefect = Expect<
     Equal<typeof flatObservedDefect, Result<number, NotFound | DriverError>>
   >;
+
+  // …and UNPINNED the marker is rejected: the builder's output must satisfy
+  // `ExhaustiveMatch<Result<…>>`, which admits no `defect(…)` marker — the
+  // `returnType` pin above is the only way to write a defect branch here.
+  // @ts-expect-error — an unpinned flatTapErrCases branch may not return the defect(…) marker
+  r.flatTapErrCases((matcher, defect) => matcher.with(P._, (e) => defect(e)));
 
   // the async surface mirrors it
   const apinned = r.toAsync().mapErrCases((matcher) =>

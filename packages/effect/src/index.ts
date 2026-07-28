@@ -10,7 +10,7 @@
 //   import { toExit, fromEffect } from "@unthrown/effect";
 //
 //   toExit(Ok(1));                 // Exit.succeed(1)
-//   await fromEffect(Effect.succeed(1)).match({ ok, err, defect });
+//   await fromEffect(Effect.succeed(1)).match({ ok, errCases, defect });
 //
 // `Either` has only two channels, so converting a `Result` *into* an `Either`
 // forces you to triage the Defect with `onDefect` (Thesis #3): there is no

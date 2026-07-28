@@ -133,7 +133,7 @@ exists for what enumeration cannot express — a helper generic in `E`, or an `E
 that is a single type rather than a union — and is covered in
 [Exhaustive error matching](../explanation/exhaustive-error-matching#generic-boundary-helpers-the-catch-all-is-the-only-form-that-compiles).
 
-Unlike the error _combinators_ (`mapErrCases`, `flatMapErrCases`, …), `match`'s `err`
+Unlike the error _combinators_ (`mapErrCases`, `flatMapErrCases`, …), `match`'s `errCases`
 handler receives **no `defect` helper** — `match` is total elimination to a value,
 and a `Result` that already carries a defect is handled by the `defect:` case. To
 keep matching _inside_ the pipeline (transforming or recovering the error rather

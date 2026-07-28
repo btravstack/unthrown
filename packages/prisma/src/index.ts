@@ -10,8 +10,8 @@
 //
 //   const db = new PrismaClient({ adapter }).$extends(unthrownPrisma);
 //
-//   await db.user.tryCreate({ data }).match({ ok, err, defect });
-//   // err is UniqueConstraintViolation | ForeignKeyViolation | DriverError
+//   await db.user.tryCreate({ data }).match({ ok, errCases, defect });
+//   // errCases matches UniqueConstraintViolation | ForeignKeyViolation | DriverError
 //
 // The raw promise methods stay available on purpose: they are the escape hatch
 // for batch `$transaction([...])`, which needs unexecuted `PrismaPromise`s.
