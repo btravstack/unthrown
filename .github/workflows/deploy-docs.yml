@@ -1,8 +1,27 @@
 name: Deploy Documentation
 
-# Publish docs when a version is released (changesets creates a GitHub Release on publish), so the
-# site documents the latest *released* library — and also when the docs themselves change on main
-# (theme bumps, content edits), since those need no library release to be worth shipping.
+# Publish docs after the Release workflow publishes a version, so the site documents the latest
+# *released* library — and also when the docs themselves change on main (theme bumps, content
+# edits), since those need no library release to be worth shipping.
+#
+# Why `workflow_run` on Release and NOT the obvious `release` / `types: [published]` trigger: the
+# Deploy job targets the `github-pages` environment, whose protection rules use custom branch
+# policies with a single `main` policy and NO tag policies. A `release` event runs against the
+# release *tag*, so the deploy is rejected before a single step runs — `Tag "unthrown@5.0.0-beta.9"
+# is not allowed to deploy to github-pages due to environment protection rules`. A `workflow_run`
+# event runs against the default branch, so the ref is `main`, the policy passes, and no new secret
+# or repository setting is needed. (Having Release dispatch this workflow instead is not an option:
+# GitHub does not create new workflow runs from `GITHUB_TOKEN`-triggered events, and RELEASE_PAT
+# carries only Contents + Pull requests write, not Actions write.)
+#
+# CAVEAT — Release is itself `workflow_run`-triggered (on CI), so this is a chain:
+# CI -> Release -> Deploy Documentation. GitHub restricts some workflow-triggered events to prevent
+# recursion, and a chained `workflow_run` is not guaranteed to fire. Verify on the next real
+# release that this workflow starts once Release completes. If it does not, the fallback is to add
+# tag policies to the `github-pages` environment — TWO patterns are required, `unthrown@*` and
+# `@unthrown/*@*`, since the publishing run's tag varies per release and `*` does not match the `/`
+# in a scoped tag — and to restore the `release: [published]` trigger. Meanwhile (and always),
+# `workflow_dispatch` deploys the site manually from main.
 #
 # Versioned deploys: while a prerelease is in progress (`.changeset/pre.json` on main), the site is
 # built TWICE — the latest stable tag's docs at the root (the default a visitor lands on) and
@@ -10,8 +29,10 @@ name: Deploy Documentation
 # progress, main IS the stable line and deploys alone to the root, exactly as before. Pages deploys
 # replace the whole site, so every run assembles all versions into one artifact.
 on:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+    branches: [main]
   push:
     branches: [main]
     paths:
@@ -27,9 +48,25 @@ permissions:
   id-token: write
 
 concurrency:
-  # A version bump can publish several Releases at once (monorepo); collapse that burst of events
-  # for the same commit into a single Pages deploy — the latest run cancels earlier ones.
-  group: pages
+  # A Pages deploy replaces the whole site, so only one may be in flight: serialize them. A Release
+  # now yields exactly one `workflow_run` event (no monorepo burst to collapse), but a `docs/**`
+  # push or a manual dispatch can still overlap it — the latest run cancels earlier ones.
+  #
+  # Why the group is CONDITIONAL: `workflow_run` has no conclusion filter in `on:`, so a failed or
+  # cancelled Release still STARTS a run here. Workflow-level concurrency is evaluated when the run
+  # is created — before any job-level `if:` — so such a run would join `pages` and cancel a real
+  # in-flight deploy, and only then skip its own `build`. A failed release would silently leave the
+  # site stale. So a run that cannot deploy gets its own throwaway group keyed by `github.run_id`,
+  # where it contends with nothing (not even other no-op runs — they do nothing anyway). This only
+  # governs CONTENTION; the `build` job's `if:` below is what actually stops the deploy. The two are
+  # complementary — keep both.
+  #
+  # The `A && B || C` idiom yields `B` when `A && B` is truthy, else `C`; `format(...)` is always a
+  # non-empty string, so the group is the throwaway one for an unsuccessful `workflow_run` and
+  # plain `pages` otherwise (`github.event.workflow_run` is null for `push`/`workflow_dispatch`).
+  group: >-
+    ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success'
+    && format('pages-noop-{0}', github.run_id) || 'pages' }}
   cancel-in-progress: true
 
 env:
@@ -37,6 +74,14 @@ env:
 
 jobs:
   build:
+    # A `workflow_run` fires on ANY Release conclusion (failure, cancelled); deploy only after a
+    # successful one. `push` and `workflow_dispatch` are unconditional. `deploy` needs `build`, so
+    # a skipped build skips the deploy with it — this one gate covers both jobs.
+    #
+    # This is the gate that PREVENTS the deploy; the conditional `concurrency` group above only
+    # keeps the run this gate is about to skip from cancelling a real one. Neither replaces the
+    # other: drop this `if:` and a failed Release would build and publish the site.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
