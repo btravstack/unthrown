@@ -258,11 +258,15 @@ was planned).
   no deferred `Exclude`), so a catch-all-terminated builder compiles inside
   code **generic in `E`** — the fix for #145; tag/pattern arms alone remain
   correctly unprovable over an unresolved type parameter. This is why `P._`
-  survives the de-promotion in Thesis #5: it is the **only** arm that can
-  terminate a match over an unresolved `E` (even a universal `P.when` guard is
-  excluded from the overload by the `UniversalPattern` marker), so the
-  generic-`E` helper keeps it behind a targeted
-  `oxlint-disable … unthrown/no-catch-all-pattern` naming that reason.
+  survives the de-promotion in Thesis #5 for the generic-`E` case: it is the
+  **only** arm that can terminate a match over an unresolved `E` (even a
+  universal `P.when` guard is excluded from the overload by the
+  `UniversalPattern` marker), so the generic-`E` helper keeps it behind a
+  targeted `oxlint-disable … unthrown/no-catch-all-pattern` naming that
+  reason. (The other sanctioned use — an `E` that is a single type, not a
+  union of cases, with no discriminant to name arms against — needs no such
+  proof: there is nothing to enumerate, so the one catch-all arm already **is**
+  the enumeration, disabled the same way.)
   Library code that
   folds a generic `Result<T, E>` per-channel (the interop `to*` bridges,
   `@unthrown/orpc`'s `handlerResult`) still uses the `isOk` / `isErr` /
@@ -655,8 +659,9 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   `P._` / its alias `P.any` where `P` is imported from `unthrown` or
   `ts-pattern`, so every error case must be enumerated by name; this **states
   the library's own default** (Thesis #5: `P._` is an escape hatch, not the
-  sanctioned catch-all), and the sites that must keep the wildcard — chiefly a
-  helper generic in `E` — carry a targeted `oxlint-disable` with a reason); and
+  sanctioned catch-all), and the sites that must keep the wildcard — a helper
+  generic in `E`, or an `E` that is a single type rather than a union of
+  cases — carry a targeted `oxlint-disable` with a reason); and
   `no-throw` (**the one opt-in**, not in the preset — reports every `throw`
   statement, pointing at `Err`/`getOrThrow`/`fromSafeThrowable`; this is the
   `no-throw` rule the `getOrThrow` rationale references).

@@ -233,7 +233,7 @@ Use this table to move between the two:
 const status = await findUser(id) // Result<User, NotFound>  (sync)
   .toAsync() // AsyncResult<User, NotFound>
   // the boundary's qualify decides what it adds to E — here, LoadFailed
-  .flatMap((user) => fromPromise(loadOrders(user.id), () => new LoadFailed()))
+  .flatMap((user) => fromPromise(loadOrders(user.id), () => ({ _tag: "LoadFailed" as const })))
   .map((orders) => orders.length) // sync callback, still AsyncResult
   .match({
     ok: (n) => n,

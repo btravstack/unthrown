@@ -285,10 +285,11 @@ export type ResultMethods<out T, out E> = {
    * `code`, structural shape, guards — and group the cases that share a handler
    * with `.with(a, b, handler)`. `.with(P._, …)` is the wildcard **escape
    * hatch**, not the default: it makes any match exhaustive, so it also absorbs
-   * every case `E` grows later. Its one irreducible use is a helper generic in
+   * every case `E` grows later. Two uses are sanctioned — a helper generic in
    * `E`, where no arm list can prove exhaustiveness against an unresolved type
-   * parameter. `@unthrown/oxlint`'s `no-catch-all-pattern` (in its
-   * `recommended` preset) flags the rest.
+   * parameter, and an `E` that is a single type rather than a union of cases
+   * (see {@link P} for both). `@unthrown/oxlint`'s `no-catch-all-pattern` (in
+   * its `recommended` preset) flags the rest.
    *
    * @typeParam M - the exhaustive builder the callback returns.
    * @param f - builds the match over the error (returns the un-terminated builder).
