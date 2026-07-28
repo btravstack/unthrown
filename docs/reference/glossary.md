@@ -56,9 +56,13 @@ combinator runs `.exhaustive()`, so a missing case does not compile. See
 [Exhaustive error matching](../explanation/exhaustive-error-matching).
 
 **`P` / `tag(t)`**
-: `P` is unthrown's pattern namespace (`P._`, `P.instanceOf`, `P.when`, `P.union`, `P.string`, `P.number`); `P._` is the
-catch-all pattern. `tag(t)` is sugar for the `{ _tag: t }` pattern, narrowing to
-a tagged variant and its payload.
+: `P` is unthrown's pattern namespace (`P._`, `P.instanceOf`, `P.when`, `P.union`, `P.string`, `P.number`).
+`tag(t)` is sugar for the `{ _tag: t }` pattern, narrowing to a tagged variant
+and its payload — the everyday way to write an arm. `P._` is the universal
+catch-all; it makes any match exhaustive, so it is reserved for the case
+enumeration cannot express (a helper generic in `E`) rather than used as a
+default. See
+[Exhaustive error matching](../explanation/exhaustive-error-matching#generic-boundary-helpers-the-catch-all-is-the-only-form-that-compiles).
 
 **`Awaitable<R>`**
 : A success-only thenable type — resolves to `R`, models no rejection channel.

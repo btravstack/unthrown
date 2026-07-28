@@ -40,7 +40,7 @@ features:
 ## At a glance
 
 ```ts
-import { Ok, Err, fromPromise, P, TaggedError, type Result } from "unthrown";
+import { Ok, Err, fromPromise, tag, TaggedError, type Result } from "unthrown";
 
 class NotFound extends TaggedError("NotFound") {}
 
@@ -58,7 +58,7 @@ const profile = fromPromise(db.loadProfile(id), (cause, defect) =>
 // Handle every channel once, at the edge — no surrounding try/catch.
 const status = await profile.match({
   ok: () => 200,
-  errCases: (matcher) => matcher.with(P._, () => 404), // `errCases` takes the exhaustive matcher
+  errCases: (matcher) => matcher.with(tag("NotFound"), () => 404), // every case, named
   defect: () => 500,
 });
 ```
@@ -66,6 +66,9 @@ const status = await profile.match({
 Ordinary errors travel as values through `map` / `flatMap` / `match`. A thrown
 bug becomes a **defect** that short-circuits to the edge — never silently folded
 into your domain errors.
+
+`errCases` takes an **exhaustive matcher**: every case in `E` is named, so the
+day you add one, this call site stops compiling until you decide what it maps to.
 
 <script setup>
 import { withBase } from "vitepress";

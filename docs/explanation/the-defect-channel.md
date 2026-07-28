@@ -37,7 +37,7 @@ without consuming it). The success **and** error combinators never see it — ev
 when the error channel is fully typed:
 
 ```ts
-import { Ok, P, type Result } from "unthrown";
+import { Ok, type Result } from "unthrown";
 
 // A pipeline whose error channel is modeled as "boom", but whose success
 // callback throws — so at runtime `d` is a Defect. (`never` widens to "boom",
@@ -66,8 +66,8 @@ error channel it fails to compile; if it slips past the types (a cast), it
 throws `NonExhaustiveError` at runtime, which becomes a `Defect`. There is no
 "no-op" on the error channel — every branch of the union must be handled, which
 is the whole point (see [Exhaustive error matching](./exhaustive-error-matching)).
-To genuinely pass the error through unchanged, use an observer (`tapErrCases`) or a
-`P._` catch-all that re-emits it.
+To genuinely pass the error through unchanged, use an observer (`tapErrCases`) —
+or re-emit each case by name (`.with(tag("NotFound"), (e) => e)…`).
 :::
 
 ## `recoverErrCases` clears the error channel, not the runtime
@@ -77,10 +77,8 @@ To genuinely pass the error through unchanged, use an observer (`tapErrCases`) o
 runtime:
 
 ```ts
-import { P } from "unthrown";
-
-// the `P._` branch is what supplies the `U` in `Result<T | U, never>`
-const recovered = d.recoverErrCases((matcher) => matcher.with(P._, () => 99));
+// the "boom" branch is what supplies the `U` in `Result<T | U, never>`
+const recovered = d.recoverErrCases((matcher) => matcher.with("boom", () => 99));
 // type: Result<number, never>
 recovered.isDefect(); // => true — `never` does NOT mean "total"
 ```

@@ -117,20 +117,27 @@ forget, and no `.otherwise()` to slip in a fallback. The rationale is in
   decides the type — most sharply in code generic in `E`. A `defect(…)` branch
   stays legal under a pin. See
   [Exhaustive error matching](../explanation/exhaustive-error-matching#declaring-the-output-returntype-r).
-- **`P._` is the deliberate catch-all.** Uniform handling — the equivalent of the
-  old single callback — is one wildcard branch: `matcher.with(P._, (e) => wrap(e))`.
-  It makes the match exhaustive and reads as an explicit "everything else" at the
-  call site. There is no partial-with-fallback middle ground: a wide union that
-  treats several cases identically writes them as grouped patterns or a `P._`,
-  never as a silent default.
+- **Cases that share a strategy are _grouped_, not wildcarded.** `.with(a, b, handler)`
+  runs one handler for several patterns while keeping both named, so the union
+  stays written out and a new case still breaks the build. This is the answer
+  whenever you'd reach for "and everything else the same way".
+- **`P._` is the catch-all of last resort.** One wildcard branch —
+  `matcher.with(P._, (e) => wrap(e))` — makes any match exhaustive, which is
+  exactly why it is not the default shape: it keeps compiling when `E` grows,
+  and that is the guarantee the matcher exists to provide. Reserve it for the
+  one place enumeration _cannot_ work — a helper still generic in `E` (see
+  [Generic boundary helpers](../explanation/exhaustive-error-matching#generic-boundary-helpers-the-catch-all-is-the-only-form-that-compiles))
+  — or for an `E` that is a single type with no cases to list. `@unthrown/oxlint`'s
+  [`no-catch-all-pattern`](../how-to/lint-your-codebase#no-catch-all-pattern),
+  in its recommended preset, enforces that.
 - **There is no error-channel identity.** `mapErrCases((m) => m)` is not a no-op — it
   only type-checks when `E` is `never` and otherwise fails to compile (see
   [The Defect Channel](../explanation/the-defect-channel#no-identity-on-the-error-channel)).
-  To pass the error through, observe it with `tapErrCases`, or re-emit it with
-  `.with(P._, (e) => e)`.
+  To pass the error through, observe it with `tapErrCases`, or re-emit each case
+  by name (`.with(tag("NotFound"), (e) => e)…`).
 - **Observers match exhaustively too.** `tapErrCases` and `flatTapErrCases` take the same
-  builder (use `P._` for a catch-all); the error is observed and then flows
-  through unchanged. Their branch returns are ignored (`tapErrCases`) or thread only a
+  builder; the error is observed and then flows through unchanged. Their branch
+  returns are ignored (`tapErrCases`) or thread only a
   _new_ effect failure (`flatTapErrCases`) — the one exception being a branch that
   returns the injected `defect(cause)`, which in either observer behaves like the
   `throw` it stands for. `tapDefect` / `tapFailure` keep single
@@ -140,44 +147,50 @@ forget, and no `.otherwise()` to slip in a fallback. The rationale is in
   throws `NonExhaustiveError`, which the combinator's throw-to-defect net turns
   into a `Defect`.
 
-### Doing one thing for every error
+### Doing one thing for several errors
 
-When you genuinely want the same handling for _any_ error — logging is the
-classic case — a single `P._` branch covers the whole union and is exhaustive by
-itself:
+When several cases deserve the same handling — logging is the classic case —
+**group** them in one arm. The handler is written once; the cases stay named, so
+the day `E` grows the call site still lights up:
 
 ```ts
-import { P } from "unthrown";
+import { tag } from "unthrown";
+
+// loadUser: (id: string) => Result<User, NotFound | Forbidden | DriverError>
 
 // log whatever the error is, then let it flow through unchanged
-loadUser(id).tapErrCases((matcher) => matcher.with(P._, (e) => logger.error(e)));
+loadUser(id).tapErrCases((matcher) =>
+  matcher.with(tag("NotFound"), tag("Forbidden"), tag("DriverError"), (e) => logger.error(e)),
+);
 ```
 
-The same one-branch shape works for every error combinator — transform, recover,
-or fold at the edge:
+The same shape works for every error combinator — transform, recover, or fold at
+the edge — and mixes freely with per-case arms:
 
 ```ts
-result.mapErrCases((matcher) => matcher.with(P._, (e) => new AppError(e))); // any error → AppError
-result.recoverErrCases((matcher) => matcher.with(P._, () => fallback)); // any error → fallback value
+// one case handled specially, the rest sharing a strategy
+result.tapErrCases((matcher) =>
+  matcher
+    .with(tag("RateLimited"), (e) => metrics.rateLimit(e.retryAfter))
+    .with(tag("NotFound"), tag("Forbidden"), (e) => logger.error(e)),
+);
+
+result.recoverErrCases((matcher) =>
+  matcher.with(tag("NotFound"), tag("Forbidden"), () => fallback),
+);
+
 result.match({
   ok: (v) => v,
-  errCases: (matcher) => matcher.with(P._, (e) => `failed: ${e}`),
+  errCases: (matcher) => matcher.with(tag("NotFound"), tag("Forbidden"), (e) => `failed: ${e}`),
   defect: (c) => `bug: ${c}`,
 });
 ```
 
-Unlike listing the cases, a `P._` branch **keeps compiling when you enrich `E`**.
-When you'd rather be forced to revisit a new case, list the variants and omit
-`P._`. You can also mix the two — handle a few cases specially, then `P._` for
-the rest:
-
-```ts
-result.tapErrCases((matcher) =>
-  matcher
-    .with(tag("RateLimited"), (e) => metrics.rateLimit(e.retryAfter))
-    .with(P._, (e) => logger.error(e)),
-);
-```
+A `P._` branch would be shorter, and that is the trade it makes: it **keeps
+compiling when you enrich `E`**, silently absorbing the new case. Grouping costs
+one identifier per case and keeps the compiler on your side. Reach for `P._` only
+where enumeration is impossible — see
+[Generic boundary helpers](../explanation/exhaustive-error-matching#generic-boundary-helpers-the-catch-all-is-the-only-form-that-compiles).
 
 ## Result and AsyncResult
 
@@ -212,9 +225,14 @@ Use this table to move between the two:
 // A chain that crosses an async boundary stays an AsyncResult to the end.
 const status = await findUser(id) // Result<User, NotFound>  (sync)
   .toAsync() // AsyncResult<User, NotFound>
-  .flatMap((user) => fromPromise(loadOrders(user.id), qualify)) // async step
+  .flatMap((user) => fromPromise(loadOrders(user.id), qualify)) // async step — adds LoadFailed to E
   .map((orders) => orders.length) // sync callback, still AsyncResult
-  .match({ ok: (n) => n, errCases: (matcher) => matcher.with(P._, () => 0), defect: () => -1 }); // await collapses it
+  .match({
+    ok: (n) => n,
+    // the boundary widened E, so both cases are named here
+    errCases: (matcher) => matcher.with(tag("NotFound"), () => 0).with(tag("LoadFailed"), () => -2),
+    defect: () => -1,
+  }); // await collapses it
 ```
 
 ## The pairs that are easy to confuse

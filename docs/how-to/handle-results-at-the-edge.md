@@ -86,6 +86,7 @@ const app = new Hono();
 
 app.get("/users/:id", (c) => {
   const user = parseId(c.req.param("id"))
+    // oxlint-disable-next-line unthrown/no-catch-all-pattern -- E is a single issues array, not a union
     .mapErrCases((matcher) => matcher.with(P._, () => new InvalidId()))
     .toAsync()
     .flatMap((id) => userRepo.findById(id));
