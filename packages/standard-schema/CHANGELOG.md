@@ -1,5 +1,22 @@
 # @unthrown/standard-schema
 
+## 5.0.0-beta.10
+
+### Patch Changes
+
+- 92c848b: Stop shipping sourcemaps and declaration maps: `files: ["dist"]` excludes
+  `src/`, so the published maps were dead-ends (silently broken go-to-definition
+  and stack mapping). Each package now sets `declarationMap: false`; consumers
+  land on the fully TSDoc'd `.d.ts` instead, and tarballs shrink.
+- 92c848b: Update stale v4 `match({ ok, err, defect })` doc examples to the v5
+  `{ ok, errCases, defect }` shape (including `fromSchemaAsync`'s `@example`,
+  which renders into the API reference).
+- 92c848b: Publish the `@standard-schema/spec` dependency as `^1.1.0` instead of an exact
+  pin, so it can dedupe with a consumer's own copy of the (types-only) spec
+  package.
+- Updated dependencies [92c848b]
+  - unthrown@5.0.0-beta.10
+
 ## 5.0.0-beta.9
 
 ### Patch Changes

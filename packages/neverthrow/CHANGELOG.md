@@ -1,5 +1,16 @@
 # @unthrown/neverthrow
 
+## 5.0.0-beta.10
+
+### Patch Changes
+
+- 92c848b: Stop shipping sourcemaps and declaration maps: `files: ["dist"]` excludes
+  `src/`, so the published maps were dead-ends (silently broken go-to-definition
+  and stack mapping). Each package now sets `declarationMap: false`; consumers
+  land on the fully TSDoc'd `.d.ts` instead, and tarballs shrink.
+- Updated dependencies [92c848b]
+  - unthrown@5.0.0-beta.10
+
 ## 5.0.0-beta.9
 
 ### Patch Changes
