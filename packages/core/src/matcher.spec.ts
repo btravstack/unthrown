@@ -210,6 +210,19 @@ describe("the built-in matcher engine", () => {
     ).toBe(1);
   });
 
+  it("freezes the P namespace — its members cannot be swapped out", () => {
+    // `P` is part of the exhaustiveness machinery (the catch-all's phantom
+    // universality above all), so a member swapped out from under every call
+    // site would silently change what "exhaustive" means at runtime.
+    expect(Object.isFrozen(P)).toBe(true);
+    expect(Object.isFrozen(P._)).toBe(true);
+    expect(Object.isFrozen(P.string)).toBe(true);
+    expect(() => {
+      (P as unknown as { string: unknown }).string = P.number;
+    }).toThrow(TypeError);
+    expect(P.string).not.toBe(P.number);
+  });
+
   it("still throws NonExhaustiveError under a pin when no arm matches", () => {
     // A rogue value that slipped past the types: pinning must not swallow the
     // non-exhaustive throw (the combinators' throw-to-defect net relies on it).
