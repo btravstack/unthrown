@@ -1,5 +1,17 @@
 # @unthrown/oxlint
 
+## 5.0.0-beta.10
+
+### Patch Changes
+
+- 92c848b: Stop shipping sourcemaps and declaration maps: `files: ["dist"]` excludes
+  `src/`, so the published maps were dead-ends (silently broken go-to-definition
+  and stack mapping). Each package now sets `declarationMap: false`; consumers
+  land on the fully TSDoc'd `.d.ts` instead, and tarballs shrink.
+- 92c848b: Raise the `oxlint` peerDependency floor from `^1.69.0` to `^1.74.0`, matching
+  the `@oxlint/plugins` runtime the rules are built against — a host older than
+  the plugin runtime was never a supported combination.
+
 ## 5.0.0-beta.9
 
 ### Patch Changes
