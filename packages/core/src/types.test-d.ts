@@ -907,3 +907,123 @@ new WithMsg({ ticketId: "t1" });
     .exhaustive();
   type _Unioned = Expect<Equal<typeof unioned, string>>;
 }
+
+// --- returnType<R>() reaches every combinator that hands out a matcher -------
+// Nothing in core.ts/types.ts needed changing: the combinators read the
+// builder's output through ExhaustiveMatch/MatchOut, which picks up the pin.
+
+{
+  class NotFound extends TaggedError("NotFound")<{ id: string }> {}
+  class DriverError extends TaggedError("DriverError")<{ cause: unknown }> {}
+  class ApiError extends TaggedError("ApiError")<{ status: number }> {}
+  const r = Ok(1) as Result<number, NotFound | DriverError>;
+
+  // mapErrCases: the outgoing E is the DECLARED type
+  const pinned = r.mapErrCases((matcher) =>
+    matcher
+      .returnType<ApiError>()
+      .with(tag("NotFound"), () => new ApiError({ status: 404 }))
+      .with(tag("DriverError"), () => new ApiError({ status: 500 })),
+  );
+  type _Pinned = Expect<Equal<typeof pinned, Result<number, ApiError>>>;
+
+  // the injected `defect` helper stays legal under a pin, and never reaches
+  // the outgoing modeled channel
+  const withDefect = r.mapErrCases((matcher, defect) =>
+    matcher
+      .returnType<ApiError>()
+      .with(tag("NotFound"), () => new ApiError({ status: 404 }))
+      .with(tag("DriverError"), (d) => defect(d.cause)),
+  );
+  type _WithDefect = Expect<Equal<typeof withDefect, Result<number, ApiError>>>;
+
+  // flatMapErrCases: the declared Result's channels drive both outgoing channels
+  const flat = r.flatMapErrCases((matcher) =>
+    matcher
+      .returnType<Result<string, ApiError>>()
+      .with(tag("NotFound"), (n) => Ok(n.id))
+      .with(tag("DriverError"), () => Err(new ApiError({ status: 500 }))),
+  );
+  type _Flat = Expect<Equal<typeof flat, Result<number | string, ApiError>>>;
+
+  // recoverErrCases: the declared type is the recovered success type
+  const rec = r.recoverErrCases((matcher) => matcher.returnType<number>().with(P._, () => 0));
+  type _Rec = Expect<Equal<typeof rec, Result<number, never>>>;
+
+  // THE REPORTED CALL SITE (issue #152): a typed HTTP layer folds its error
+  // channel into a route's declared response union. Each arm is checked
+  // against that union — which is the whole point: a mistyped body
+  // discriminant, or a status the route does not declare, must be a compile
+  // error rather than a silently widened result.
+  type Response =
+    | { status: 404; body: { code: "NOT_FOUND" } }
+    | { status: 409; body: { code: "CONFLICT" } };
+
+  const responded = r.recoverErrCases((matcher) =>
+    matcher
+      .returnType<Response>()
+      .with(tag("NotFound"), () => ({
+        status: 404 as const,
+        body: { code: "NOT_FOUND" as const },
+      }))
+      .with(tag("DriverError"), () => ({
+        status: 409 as const,
+        body: { code: "CONFLICT" as const },
+      })),
+  );
+  type _Responded = Expect<Equal<typeof responded, Result<number | Response, never>>>;
+
+  // the check has teeth: a discriminant the union does not declare fails
+  r.recoverErrCases((matcher) =>
+    matcher
+      .returnType<Response>()
+      // @ts-expect-error — "GONE" is not a declared body code
+      .with(tag("NotFound"), () => ({
+        status: 404 as const,
+        body: { code: "GONE" as const },
+      }))
+      .with(tag("DriverError"), () => ({
+        status: 409 as const,
+        body: { code: "CONFLICT" as const },
+      })),
+  );
+
+  // observers: the error still passes through unchanged under a pin
+  const observed = r.tapErrCases((matcher) =>
+    matcher.returnType<void>().with(P._, () => undefined),
+  );
+  type _Observed = Expect<Equal<typeof observed, Result<number, NotFound | DriverError>>>;
+
+  // the async surface mirrors it
+  const apinned = r.toAsync().mapErrCases((matcher) =>
+    matcher
+      .returnType<ApiError>()
+      .with(tag("NotFound"), () => new ApiError({ status: 404 }))
+      .with(tag("DriverError"), () => new ApiError({ status: 500 })),
+  );
+  type _APinned = Expect<Equal<typeof apinned, AsyncResult<number, ApiError>>>;
+
+  // match's errCases handler: the fold type is the declared one
+  const folded = r.match({
+    ok: (n) => `ok:${n}`,
+    errCases: (matcher) => matcher.returnType<string>().with(P._, (err) => err._tag),
+    defect: () => "defect",
+  });
+  type _Folded = Expect<Equal<typeof folded, string>>;
+
+  // an async branch is STILL rejected where the combinator awaits it
+  r.flatMapErrCases((matcher) =>
+    // @ts-expect-error — an async flatMapErrCases branch is banned, pin or no pin
+    matcher.returnType<Result<number, ApiError>>().with(P._, async () => Ok(1)),
+  );
+
+  // THE MOTIVATING CASE: generic in E, catch-all terminated, output DECLARED by
+  // the signature rather than inferred from the branch (issue #145 territory —
+  // the catch-all is a state transition, so it is provably exhaustive here)
+  const lock = <T, E>(res: Result<T, E>): Result<T, ApiError> =>
+    res.mapErrCases((matcher) =>
+      matcher.returnType<ApiError>().with(P._, () => new ApiError({ status: 500 })),
+    );
+  const locked = lock(r);
+  type _Locked = Expect<Equal<typeof locked, Result<number, ApiError>>>;
+}
