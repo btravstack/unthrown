@@ -20,7 +20,9 @@
     "fix-async-flatmap-inference",
     "fix-variance-and-frompromise-inference",
     "getorthrow-never-gate-message",
+    "matcher-return-type",
     "orpc-sync-throw-defect",
+    "oxlint-ambiguous-return-type-pin",
     "oxlint-four-rules",
     "oxlint-no-catch-all-pattern",
     "prisma-transaction-defect",
@@ -29,6 +31,7 @@
     "runtime-hardening",
     "standard-schema-orphan-adoption",
     "synchronous-qualify-and-taperr",
+    "taperrcases-defect-branch",
     "ts-pattern-peer-dependency",
     "v5-extractor-cleanup",
     "vitest-loud-forgotten-await"
