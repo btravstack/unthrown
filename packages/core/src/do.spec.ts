@@ -136,6 +136,16 @@ describe("Do / bind / let — async", () => {
     expect(fromLet.isDefect()).toBe(true);
   });
 
+  it("passes a Defect-state scope through bind and let without running the callback", async () => {
+    const later = vi.fn(() => Ok(1));
+    const fromBind = await defectOf(boom).toAsync().bind("a", later);
+    expect(fromBind.isDefect()).toBe(true);
+
+    const fromLet = await defectOf(boom).toAsync().let("a", later);
+    expect(fromLet.isDefect()).toBe(true);
+    expect(later).not.toHaveBeenCalled();
+  });
+
   it("turns an async bind/let on a non-object scope into a Defect", async () => {
     const fromBind = await Ok(5)
       .toAsync()

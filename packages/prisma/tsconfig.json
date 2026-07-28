@@ -3,6 +3,9 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
+    // `files: ["dist"]` excludes `src/`, so published declaration maps would be
+    // dead-ends (broken go-to-definition); consumers get the TSDoc'd d.ts.
+    "declarationMap": false,
     // The generated test client (src/generated, gitignored) imports its own
     // files with explicit `.ts` extensions; `noEmit` in the base config makes
     // this legal.

@@ -107,7 +107,7 @@ export function fromSchema<S extends StandardSchemaV1>(
  * ```ts
  * import { fromSchemaAsync } from "@unthrown/standard-schema";
  * const parse = fromSchemaAsync(asyncSchema);
- * (await parse(input)).match({ ok, err, defect });
+ * (await parse(input)).match({ ok, errCases, defect });
  * ```
  */
 export function fromSchemaAsync<S extends StandardSchemaV1>(

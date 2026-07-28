@@ -104,4 +104,4 @@ beta) and its majors track oRPC's cadence, not the unthrown family's.
 
 ## License
 
-[MIT](./LICENSE)
+[MIT](https://github.com/btravstack/unthrown/blob/main/LICENSE) © Benoit TRAVERS

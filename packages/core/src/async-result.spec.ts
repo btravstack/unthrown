@@ -1,6 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { type AsyncResult, Err, fromPromise, fromSafePromise, P, Ok, OkAsync } from "./index.js";
+import {
+  type AsyncResult,
+  Err,
+  fromPromise,
+  fromSafePromise,
+  NonExhaustiveError,
+  P,
+  Ok,
+  OkAsync,
+  type Result,
+} from "./index.js";
 
 const boom = new Error("boom");
 const asyncOk = <T>(v: T): AsyncResult<T, never> => Ok(v).toAsync();
@@ -343,16 +353,90 @@ describe("AsyncResult error channel", () => {
   });
 });
 
+describe("a rogue value past the types: NonExhaustiveError → Defect in EVERY async error combinator", () => {
+  // The sync probes live in result.spec.ts; the async five dispatch through the
+  // same runMatch, but the invariant claims both surfaces — so each gets its
+  // own probe, asserting the Defect's cause is the matcher's NonExhaustiveError.
+  type TagA = { _tag: "A"; a: number };
+  const smuggled = () => asyncErr({ _tag: "C" }) as unknown as AsyncResult<never, TagA>;
+
+  const expectRogueDefect = (r: Result<unknown, unknown>) => {
+    expect(r.isDefect()).toBe(true);
+    if (r.isDefect()) expect(r.cause).toBeInstanceOf(NonExhaustiveError);
+  };
+
+  // In the two OBSERVERS the throw takes the failure-observer route: the
+  // NonExhaustiveError aggregates with the observed rogue error instead of
+  // destroying it, so it sits at errors[0] of the AggregateError cause.
+  const expectRogueObserverDefect = (r: Result<unknown, unknown>) => {
+    expect(r.isDefect()).toBe(true);
+    if (r.isDefect()) {
+      expect(r.cause).toBeInstanceOf(AggregateError);
+      expect((r.cause as AggregateError).errors[0]).toBeInstanceOf(NonExhaustiveError);
+      expect((r.cause as AggregateError).errors[1]).toEqual({ _tag: "C" });
+    }
+  };
+
+  it("mapErrCases routes the unmatched rogue value to a Defect", async () => {
+    expectRogueDefect(
+      await smuggled().mapErrCases((matcher) => matcher.with(P.tag("A"), (e) => e.a)),
+    );
+  });
+
+  it("flatMapErrCases routes the unmatched rogue value to a Defect", async () => {
+    expectRogueDefect(
+      await smuggled().flatMapErrCases((matcher) => matcher.with(P.tag("A"), (e) => Ok(e.a))),
+    );
+  });
+
+  it("recoverErrCases routes the unmatched rogue value to a Defect", async () => {
+    expectRogueDefect(
+      await smuggled().recoverErrCases((matcher) => matcher.with(P.tag("A"), (e) => e.a)),
+    );
+  });
+
+  it("tapErrCases routes the unmatched rogue value to a Defect", async () => {
+    expectRogueObserverDefect(
+      await smuggled().tapErrCases((matcher) => matcher.with(P.tag("A"), () => undefined)),
+    );
+  });
+
+  it("flatTapErrCases routes the unmatched rogue value to a Defect", async () => {
+    expectRogueObserverDefect(
+      await smuggled().flatTapErrCases((matcher) => matcher.with(P.tag("A"), () => Ok(1))),
+    );
+  });
+});
+
 describe("AsyncResult Defect channel", () => {
   it("a Defect flows through the success and error combinators untouched", async () => {
     const f = vi.fn();
     expect((await asyncDefect().map(f)).isDefect()).toBe(true);
+    expect((await asyncDefect().flatMap(f)).isDefect()).toBe(true);
+    expect((await asyncDefect().tap(f)).isDefect()).toBe(true);
     expect((await asyncDefect().mapErrCases((matcher) => matcher.with(P._, f))).isDefect()).toBe(
       true,
     );
     expect(
+      (await asyncDefect().flatMapErrCases((matcher) => matcher.with(P._, f))).isDefect(),
+    ).toBe(true);
+    expect(
       (await asyncDefect().recoverErrCases((matcher) => matcher.with(P._, f))).isDefect(),
     ).toBe(true);
+    expect((await asyncDefect().tapErrCases((matcher) => matcher.with(P._, f))).isDefect()).toBe(
+      true,
+    );
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("recoverDefect passes Ok and Err through and does not call the callback", async () => {
+    const f = vi.fn();
+    const okR = await asyncOk(1).recoverDefect(f);
+    expect(okR.isOk()).toBe(true);
+    if (okR.isOk()) expect(okR.value).toBe(1);
+    const errR = await asyncErr("e").recoverDefect(f);
+    expect(errR.isErr()).toBe(true);
+    if (errR.isErr()) expect(errR.error).toBe("e");
     expect(f).not.toHaveBeenCalled();
   });
 

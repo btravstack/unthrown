@@ -77,9 +77,8 @@ This isn't a clean sweep — pick the tool for the job:
 
 - **byethrow** — if you want a lightweight, pipe-idiomatic Result with **one**
   failure axis and don't need the defect distinction, it's an excellent, smaller,
-  more mature choice. It also ships niceties unthrown deliberately omits
-  (error-accumulating `collect`, lightweight `do`/`bind` notation, a Standard
-  Schema adapter, an oxlint plugin).
+  more mature choice. It also ships error-accumulating `collect`, which unthrown
+  deliberately omits.
 - **neverthrow** — the established, widely-adopted class-based option; reach for
   it if ecosystem maturity outweighs the defect channel.
 - **boxed** — if you specifically want an `Option` type and a broader functional

@@ -3,6 +3,9 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
+    // `files: ["dist"]` excludes `src/`, so published declaration maps would be
+    // dead-ends (broken go-to-definition); consumers get the TSDoc'd d.ts.
+    "declarationMap": false,
     "types": ["node"]
   },
   "include": ["src/**/*"],

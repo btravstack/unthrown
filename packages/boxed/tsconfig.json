@@ -3,6 +3,9 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
+    // `files: ["dist"]` excludes `src/`, so published declaration maps would be
+    // dead-ends (broken go-to-definition); consumers get the TSDoc'd d.ts.
+    "declarationMap": false,
     // @btravstack/tsconfig@0.2.0 dropped `types: ["node"]` from the base;
     // re-declare it here for the Node globals used in source/tests.
     "types": ["node"]

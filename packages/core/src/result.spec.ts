@@ -488,6 +488,9 @@ describe("Result.flatTapErrCases (matcher, exhaustive)", () => {
   it("propagates a Defect from the effect", () => {
     const r = Err("e").flatTapErrCases((matcher) => matcher.with(P._, () => defectOf(boom)));
     expect(r.isDefect()).toBe(true);
+    // an effect that blew up on its own REPLACES the error, unaggregated: the
+    // cause is the raw thrown value, not an AggregateError (unlike an observer throw)
+    if (r.isDefect()) expect(r.cause).toBe(boom);
   });
 
   it("does not run on Ok or Defect", () => {

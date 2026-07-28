@@ -4,6 +4,7 @@ import {
   type AsyncResult,
   Err,
   fromSafePromise,
+  NonExhaustiveError,
   Ok,
   P,
   type Result,
@@ -196,6 +197,6 @@ describe("match — per-tag error matching", () => {
         defect: () => "defect",
         errCases: (matcher) => matcher.with(P.tag("Known"), () => "known"),
       }),
-    ).toThrow();
+    ).toThrow(NonExhaustiveError);
   });
 });

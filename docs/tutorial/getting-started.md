@@ -88,8 +88,8 @@ when it returns another `Result`. (The full picture is in the
 ## Step 4 — Handle every outcome with `match`
 
 At the edge of your program, fold a `Result` into a single value with `match`.
-You handle three runtime channels — `ok`, `err`, and a `defect` channel for the
-_unexpected_ (you'll meet it in the next step):
+You handle three runtime channels — `ok`, `errCases`, and a `defect` channel for
+the _unexpected_ (you'll meet it in the next step):
 
 ```ts
 const message = parseAge("-3").match({

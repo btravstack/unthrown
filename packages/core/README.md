@@ -33,7 +33,8 @@ const status = await user.match({
 
 - **Errors as values** via `Result<T, E>` / `AsyncResult<T, E>`.
 - **A separate defect channel** for the unexpected — invisible to the type,
-  observable only via `match` / `recoverDefect`.
+  observable only via `match` / `recoverDefect` and the `tapDefect` /
+  `tapFailure` observers.
 - **Qualification at every boundary** — `fromPromise` / `fromThrowable` force you
   to triage each failure into a modeled error or a defect.
 - **Tagged errors** — `TaggedError(tag)` + `P.tag(t)`, folded exhaustively through

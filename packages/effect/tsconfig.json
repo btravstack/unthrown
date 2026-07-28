@@ -2,7 +2,10 @@
   "extends": "@btravstack/tsconfig/base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    // `files: ["dist"]` excludes `src/`, so published declaration maps would be
+    // dead-ends (broken go-to-definition); consumers get the TSDoc'd d.ts.
+    "declarationMap": false
   },
   "include": ["src/**/*"]
 }

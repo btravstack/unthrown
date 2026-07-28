@@ -31,7 +31,7 @@ function getUser(id: string): User; // throws NotFoundError? TimeoutError? TypeE
 function getUser(id: string): Result<User, NotFound | Timeout>;
 
 getUser(id)
-  .map((u) => u.emial.trim()) // typo — TypeError → Defect, NOT an Err
+  .map((u) => new URL(u.website).host) // malformed URL — TypeError → Defect, NOT an Err
   .match({
     ok: render,
     // every case in E is named — add a third and this stops compiling

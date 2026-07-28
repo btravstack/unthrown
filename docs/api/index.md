@@ -33,6 +33,7 @@ This reference is generated from the source with
   (each an `AsyncResult` whose error channel is exactly the P-codes it can
   raise), plus `$tryTransaction` and `tryPaginate(...).withCursor(...)`.
 
-`@unthrown/oxlint` (the lint rules `no-ambiguous-error-type` and
-`prefer-async-result`) has no generated API page — it is documented in the
+`@unthrown/oxlint` (the lint rules `no-ambiguous-error-type`,
+`no-catch-all-pattern`, `no-unhandled-result`, `prefer-async-result`, and the
+opt-in `no-throw`) has no generated API page — it is documented in the
 [Linting guide](../how-to/lint-your-codebase).

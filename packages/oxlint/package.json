@@ -62,7 +62,7 @@
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "oxlint": "^1.69.0"
+    "oxlint": "^1.74.0"
   },
   "engines": {
     "node": ">=20"

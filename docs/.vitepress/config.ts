@@ -226,7 +226,7 @@ export default defineConfig({
   },
 
   head: [
-    ["link", { rel: "icon", type: "image/svg+xml", href: "/unthrown/logo.svg" }],
+    ["link", { rel: "icon", type: "image/svg+xml", href: `${BASE}logo.svg` }],
     ["meta", { name: "author", content: "Benoit TRAVERS" }],
     ["meta", { name: "robots", content: "index, follow" }],
     ["meta", { name: "application-name", content: "unthrown" }],
