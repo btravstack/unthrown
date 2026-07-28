@@ -51,7 +51,22 @@ concurrency:
   # A Pages deploy replaces the whole site, so only one may be in flight: serialize them. A Release
   # now yields exactly one `workflow_run` event (no monorepo burst to collapse), but a `docs/**`
   # push or a manual dispatch can still overlap it — the latest run cancels earlier ones.
-  group: pages
+  #
+  # Why the group is CONDITIONAL: `workflow_run` has no conclusion filter in `on:`, so a failed or
+  # cancelled Release still STARTS a run here. Workflow-level concurrency is evaluated when the run
+  # is created — before any job-level `if:` — so such a run would join `pages` and cancel a real
+  # in-flight deploy, and only then skip its own `build`. A failed release would silently leave the
+  # site stale. So a run that cannot deploy gets its own throwaway group keyed by `github.run_id`,
+  # where it contends with nothing (not even other no-op runs — they do nothing anyway). This only
+  # governs CONTENTION; the `build` job's `if:` below is what actually stops the deploy. The two are
+  # complementary — keep both.
+  #
+  # The `A && B || C` idiom yields `B` when `A && B` is truthy, else `C`; `format(...)` is always a
+  # non-empty string, so the group is the throwaway one for an unsuccessful `workflow_run` and
+  # plain `pages` otherwise (`github.event.workflow_run` is null for `push`/`workflow_dispatch`).
+  group: >-
+    ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success'
+    && format('pages-noop-{0}', github.run_id) || 'pages' }}
   cancel-in-progress: true
 
 env:
@@ -62,6 +77,10 @@ jobs:
     # A `workflow_run` fires on ANY Release conclusion (failure, cancelled); deploy only after a
     # successful one. `push` and `workflow_dispatch` are unconditional. `deploy` needs `build`, so
     # a skipped build skips the deploy with it — this one gate covers both jobs.
+    #
+    # This is the gate that PREVENTS the deploy; the conditional `concurrency` group above only
+    # keeps the run this gate is about to skip from cancelling a real one. Neither replaces the
+    # other: drop this `if:` and a failed Release would build and publish the site.
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
