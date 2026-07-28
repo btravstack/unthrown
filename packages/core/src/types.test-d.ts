@@ -6,6 +6,11 @@
 // `Expect<Equal<A, B>>` is a hard error when `A` and `B` differ; `@ts-expect-error`
 // guards the cases that must NOT compile.
 
+// `defect` is deliberately NOT re-exported from index.ts (Thesis #5 — it is
+// injected at triage sites only). Imported directly from its internal module,
+// for the returnType()-under-a-pin assertion below only; the public surface
+// stays untouched.
+import { defect } from "./defect.js";
 import {
   all,
   allAsync,
@@ -27,6 +32,7 @@ import {
   isErr,
   isOk,
   isResult,
+  match,
   tag,
   P,
   Ok,
@@ -799,4 +805,346 @@ new WithMsg({ ticketId: "t1" });
   // observers are exhaustive too, but the error passes through unchanged
   const observed = coded.tapErrCases((matcher) => matcher.with(P._, () => undefined));
   type _Observed = Expect<Equal<typeof observed, Result<number, CodeErr>>>;
+}
+
+// --- matcher: returnType<R>() declares the output, and binds every branch ----
+// Pinning is what lets code that must DECLARE its output type (a signature, a
+// generic helper) stop the branches from deciding it by inference.
+
+{
+  class NotFound extends TaggedError("NotFound")<{ id: string }> {}
+  class Conflict extends TaggedError("Conflict")<{ key: string }> {}
+  const e = new NotFound({ id: "1" }) as NotFound | Conflict;
+
+  // pinned: the fold type is the DECLARED one, not the union of branch returns
+  const pinned = match(e)
+    .returnType<string>()
+    .with(tag("NotFound"), (n) => n.id)
+    .with(tag("Conflict"), () => "conflict")
+    .exhaustive();
+  type _Pinned = Expect<Equal<typeof pinned, string>>;
+
+  // REGRESSION GUARD: unpinned, branch returns still infer exactly as before
+  // (the `BranchReturn` conditional must not defer inference and collapse O2 —
+  // the `fromPromise`-qualify hazard, see CLAUDE.md's internal design)
+  const inferred = match(e)
+    .with(tag("NotFound"), () => 1 as const)
+    .with(tag("Conflict"), () => "x" as const)
+    .exhaustive();
+  type _Inferred = Expect<Equal<typeof inferred, 1 | "x">>;
+
+  // narrowing is preserved under a pin
+  match(e)
+    .returnType<string>()
+    .with(tag("NotFound"), (n) => {
+      type _Narrowed = Expect<Equal<typeof n, NotFound>>;
+      return n.id;
+    })
+    .with(tag("Conflict"), () => "c")
+    .exhaustive();
+
+  // a branch that violates the pin fails ON THE BRANCH, not downstream
+  match(e)
+    .returnType<string>()
+    // @ts-expect-error — 42 is not assignable to the declared `string`
+    .with(tag("NotFound"), () => 42)
+    .with(tag("Conflict"), () => "c")
+    .exhaustive();
+
+  // `.returnType` is callable only before any arm has produced an output, and
+  // only once — not tied to position (see `afterNever` below); here an arm has
+  // already produced an output, so pinning after it is rejected
+  match(e)
+    .with(tag("NotFound"), () => "a")
+    .with(tag("Conflict"), () => "c")
+    // @ts-expect-error — not callable: an arm has already run
+    .returnType<string>();
+
+  // re-pinning is rejected by the same gate
+  match(e)
+    .returnType<string>()
+    .with(tag("NotFound"), () => "a")
+    // @ts-expect-error — not callable: the builder is already pinned
+    .returnType<number>();
+
+  // re-pinning is rejected even with no arm in between
+  match(e)
+    .returnType<string>()
+    // @ts-expect-error — not callable: the builder is already pinned
+    .returnType<number>();
+
+  // …but the gate is `[O] extends [never]` — "no arm has produced an output" —
+  // not position: an arm whose handler returns `never` (it always throws)
+  // contributes nothing, so a pin after it still compiles. Sound, since a
+  // `never` branch can contradict no declared type.
+  const afterNever = match(e)
+    .with(tag("NotFound"), (): never => {
+      throw new Error("always throws");
+    })
+    .returnType<string>()
+    .with(tag("Conflict"), () => "c")
+    .exhaustive();
+  type _AfterNever = Expect<Equal<typeof afterNever, string>>;
+
+  // a missing case under a pin still makes `.exhaustive` uncallable
+  const partial = match(e)
+    .returnType<string>()
+    .with(tag("NotFound"), (n) => n.id);
+  // @ts-expect-error — Conflict is unhandled
+  partial.exhaustive();
+
+  // a defect branch stays legal under a pin, and the marker does not reach the
+  // output type — the same subtraction the unpinned path does with Exclude
+  const pinnedDefect = match(e)
+    .returnType<string>()
+    .with(tag("NotFound"), (n) => n.id)
+    .with(tag("Conflict"), (c) => defect(c))
+    .exhaustive();
+  type _PinnedDefect = Expect<Equal<typeof pinnedDefect, string>>;
+
+  // grouped patterns under a pin: the variadic form and P.union
+  const grouped = match(e)
+    .returnType<string>()
+    .with(tag("NotFound"), tag("Conflict"), (both) => {
+      type _Both = Expect<Equal<typeof both, NotFound | Conflict>>;
+      return both._tag;
+    })
+    .exhaustive();
+  type _Grouped = Expect<Equal<typeof grouped, string>>;
+
+  const unioned = match(e)
+    .returnType<string>()
+    .with(P.union(tag("NotFound"), tag("Conflict")), (both) => {
+      type _UnionNarrowed = Expect<Equal<typeof both, NotFound | Conflict>>;
+      return both._tag;
+    })
+    .exhaustive();
+  type _Unioned = Expect<Equal<typeof unioned, string>>;
+}
+
+// --- returnType<R>() reaches every combinator that hands out a matcher -------
+// The typing needed no change: the combinators read the builder's output
+// through ExhaustiveMatch/MatchOut, which picks up the pin. The one runtime
+// change the pin forced is in `flatTapErrCases`, which a pin newly lets a
+// `defect(…)` branch reach — see the defect-branch cases below and
+// `invariants.spec.ts`.
+
+{
+  class NotFound extends TaggedError("NotFound")<{ id: string }> {}
+  class DriverError extends TaggedError("DriverError")<{ cause: unknown }> {}
+  class ApiError extends TaggedError("ApiError")<{ status: number }> {}
+  class AuditFailed extends TaggedError("AuditFailed") {}
+  const r = Ok(1) as Result<number, NotFound | DriverError>;
+
+  // mapErrCases: the outgoing E is the DECLARED type
+  const pinned = r.mapErrCases((matcher) =>
+    matcher
+      .returnType<ApiError>()
+      .with(tag("NotFound"), () => new ApiError({ status: 404 }))
+      .with(tag("DriverError"), () => new ApiError({ status: 500 })),
+  );
+  type _Pinned = Expect<Equal<typeof pinned, Result<number, ApiError>>>;
+
+  // the injected `defect` helper stays legal under a pin, and never reaches
+  // the outgoing modeled channel
+  const withDefect = r.mapErrCases((matcher, defect) =>
+    matcher
+      .returnType<ApiError>()
+      .with(tag("NotFound"), () => new ApiError({ status: 404 }))
+      .with(tag("DriverError"), (d) => defect(d.cause)),
+  );
+  type _WithDefect = Expect<Equal<typeof withDefect, Result<number, ApiError>>>;
+
+  // flatMapErrCases: the declared Result's channels drive both outgoing channels
+  const flat = r.flatMapErrCases((matcher) =>
+    matcher
+      .returnType<Result<string, ApiError>>()
+      .with(tag("NotFound"), (n) => Ok(n.id))
+      .with(tag("DriverError"), () => Err(new ApiError({ status: 500 }))),
+  );
+  type _Flat = Expect<Equal<typeof flat, Result<number | string, ApiError>>>;
+
+  // recoverErrCases: the declared type is the recovered success type
+  const rec = r.recoverErrCases((matcher) => matcher.returnType<number>().with(P._, () => 0));
+  type _Rec = Expect<Equal<typeof rec, Result<number, never>>>;
+
+  // THE REPORTED CALL SITE (issue #152): a typed HTTP layer folds its error
+  // channel into a route's declared response union. Each arm is checked
+  // against that union — which is the whole point: a mistyped body
+  // discriminant, or a status the route does not declare, must be a compile
+  // error rather than a silently widened result.
+  type Response =
+    | { status: 404; body: { code: "NOT_FOUND" } }
+    | { status: 409; body: { code: "CONFLICT" } };
+
+  const responded = r.recoverErrCases((matcher) =>
+    matcher
+      .returnType<Response>()
+      .with(tag("NotFound"), () => ({
+        status: 404 as const,
+        body: { code: "NOT_FOUND" as const },
+      }))
+      .with(tag("DriverError"), () => ({
+        status: 409 as const,
+        body: { code: "CONFLICT" as const },
+      })),
+  );
+  type _Responded = Expect<Equal<typeof responded, Result<number | Response, never>>>;
+
+  // the check has teeth: a discriminant the union does not declare fails
+  r.recoverErrCases((matcher) =>
+    matcher
+      .returnType<Response>()
+      // @ts-expect-error — "GONE" is not a declared body code
+      .with(tag("NotFound"), () => ({
+        status: 404 as const,
+        body: { code: "GONE" as const },
+      }))
+      .with(tag("DriverError"), () => ({
+        status: 409 as const,
+        body: { code: "CONFLICT" as const },
+      })),
+  );
+
+  // observers: the error still passes through unchanged under a pin
+  const observed = r.tapErrCases((matcher) =>
+    matcher.returnType<void>().with(P._, () => undefined),
+  );
+  type _Observed = Expect<Equal<typeof observed, Result<number, NotFound | DriverError>>>;
+
+  // a `defect(…)` branch is legal in tapErrCases pinned OR unpinned (the marker
+  // is unthenable, so it satisfies the `NotThenable` builder-output constraint)
+  // and, this being an OBSERVER, changes nothing in the type. At runtime it is
+  // NOT discarded like an ordinary branch value: it takes the observer route,
+  // aggregating with the observed error (invariants.spec.ts).
+  const observedDefect = r.tapErrCases((matcher, defect) =>
+    matcher.returnType<void>().with(P._, (e) => defect(e)),
+  );
+  type _ObservedDefect = Expect<
+    Equal<typeof observedDefect, Result<number, NotFound | DriverError>>
+  >;
+
+  const observedDefectUnpinned = r.tapErrCases((matcher, defect) =>
+    matcher.with(P._, (e) => defect(e)),
+  );
+  type _ObservedDefectUnpinned = Expect<
+    Equal<typeof observedDefectUnpinned, Result<number, NotFound | DriverError>>
+  >;
+
+  // flatTapErrCases: the observer's own failure channel is the declared type,
+  // unioned with the untouched incoming E (this combinator infers a plain E2 —
+  // see CLAUDE.md on why it does not derive the channel through MatchOut)
+  const flatObserved = r.flatTapErrCases((matcher) =>
+    matcher.returnType<Result<never, AuditFailed>>().with(P._, () => Err(new AuditFailed())),
+  );
+  type _FlatObserved = Expect<
+    Equal<typeof flatObserved, Result<number, NotFound | DriverError | AuditFailed>>
+  >;
+
+  // a `defect(…)` branch is accepted in flatTapErrCases under a pin (unpinned
+  // the marker fails the `ExhaustiveMatch<Result<…>>` constraint) and, this
+  // being an OBSERVER, changes nothing in the type: the error passes through and
+  // the marker reaches no channel. At runtime it takes the observer route — the
+  // observed error survives, aggregated with the caller's cause (invariants.spec.ts).
+  const flatObservedDefect = r.flatTapErrCases((matcher, defect) =>
+    matcher.returnType<Result<never, never>>().with(P._, (e) => defect(e)),
+  );
+  type _FlatObservedDefect = Expect<
+    Equal<typeof flatObservedDefect, Result<number, NotFound | DriverError>>
+  >;
+
+  // the async surface mirrors it
+  const apinned = r.toAsync().mapErrCases((matcher) =>
+    matcher
+      .returnType<ApiError>()
+      .with(tag("NotFound"), () => new ApiError({ status: 404 }))
+      .with(tag("DriverError"), () => new ApiError({ status: 500 })),
+  );
+  type _APinned = Expect<Equal<typeof apinned, AsyncResult<number, ApiError>>>;
+
+  // async flatMapErrCases: mirrors the sync channel derivation
+  const aflat = r.toAsync().flatMapErrCases((matcher) =>
+    matcher
+      .returnType<Result<string, ApiError>>()
+      .with(tag("NotFound"), (n) => Ok(n.id))
+      .with(tag("DriverError"), () => Err(new ApiError({ status: 500 }))),
+  );
+  type _AFlat = Expect<Equal<typeof aflat, AsyncResult<number | string, ApiError>>>;
+
+  // async recoverErrCases: mirrors the sync recovered-success-type derivation
+  const arec = r
+    .toAsync()
+    .recoverErrCases((matcher) => matcher.returnType<number>().with(P._, () => 0));
+  type _ARec = Expect<Equal<typeof arec, AsyncResult<number, never>>>;
+
+  // async tapErrCases: the error still passes through unchanged under a pin
+  const aobserved = r
+    .toAsync()
+    .tapErrCases((matcher) => matcher.returnType<void>().with(P._, () => undefined));
+  type _AObserved = Expect<Equal<typeof aobserved, AsyncResult<number, NotFound | DriverError>>>;
+
+  // async flatTapErrCases: mirrors the sync plain-E2 channel derivation
+  const aflatObserved = r
+    .toAsync()
+    .flatTapErrCases((matcher) =>
+      matcher.returnType<Result<never, AuditFailed>>().with(P._, () => Err(new AuditFailed())),
+    );
+  type _AFlatObserved = Expect<
+    Equal<typeof aflatObserved, AsyncResult<number, NotFound | DriverError | AuditFailed>>
+  >;
+
+  // async tapErrCases: the defect branch mirrors the sync surface
+  const aobservedDefect = r
+    .toAsync()
+    .tapErrCases((matcher, defect) => matcher.with(P._, (e) => defect(e)));
+  type _AObservedDefect = Expect<
+    Equal<typeof aobservedDefect, AsyncResult<number, NotFound | DriverError>>
+  >;
+
+  // async flatTapErrCases: the defect branch mirrors the sync surface
+  const aflatObservedDefect = r
+    .toAsync()
+    .flatTapErrCases((matcher, defect) =>
+      matcher.returnType<Result<never, never>>().with(P._, (e) => defect(e)),
+    );
+  type _AFlatObservedDefect = Expect<
+    Equal<typeof aflatObservedDefect, AsyncResult<number, NotFound | DriverError>>
+  >;
+
+  // match's errCases handler: the fold type is the declared one
+  const folded = r.match({
+    ok: (n) => `ok:${n}`,
+    errCases: (matcher) => matcher.returnType<string>().with(P._, (err) => err._tag),
+    defect: () => "defect",
+  });
+  type _Folded = Expect<Equal<typeof folded, string>>;
+
+  // an async branch is STILL rejected where the combinator awaits it
+  r.flatMapErrCases((matcher) =>
+    // @ts-expect-error — an async flatMapErrCases branch is banned, pin or no pin
+    matcher.returnType<Result<number, ApiError>>().with(P._, async () => Ok(1)),
+  );
+
+  // …and in flatTapErrCases, the other awaiting matcher combinator. Under a pin
+  // the mechanism differs — the branch return is checked against `Declared |
+  // Defect`, so a `Promise` fails ON THE BRANCH rather than via the builder's
+  // `ExhaustiveMatch<Result<…>>` constraint — but the rejection still fires.
+  r.flatTapErrCases((matcher) =>
+    // @ts-expect-error — an async flatTapErrCases branch is banned, pin or no pin
+    matcher.returnType<Result<number, AuditFailed>>().with(P._, async () => Ok(1)),
+  );
+  r.toAsync().flatTapErrCases((matcher) =>
+    // @ts-expect-error — …the same on the async surface, which awaits the branch
+    matcher.returnType<Result<number, AuditFailed>>().with(P._, async () => Ok(1)),
+  );
+
+  // THE MOTIVATING CASE: generic in E, catch-all terminated, output DECLARED by
+  // the signature rather than inferred from the branch (issue #145 territory —
+  // the catch-all is a state transition, so it is provably exhaustive here)
+  const lock = <T, E>(res: Result<T, E>): Result<T, ApiError> =>
+    res.mapErrCases((matcher) =>
+      matcher.returnType<ApiError>().with(P._, () => new ApiError({ status: 500 })),
+    );
+  const locked = lock(r);
+  type _Locked = Expect<Equal<typeof locked, Result<number, ApiError>>>;
 }

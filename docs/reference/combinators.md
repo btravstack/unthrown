@@ -41,7 +41,7 @@ the signatures below abbreviate its callback as `(matcher) => …`.
 | recover from a defect (rare)                   | `recoverDefect`   | `(cause) => Result<U, E2>` → `Result<T \| U, E \| E2>`       | Defect       |
 | observe a defect, e.g. log it                  | `tapDefect`       | `(cause) => void` → `Result<T, E>`                           | Defect       |
 | observe **any** failure (error _or_ defect)    | `tapFailure`      | `(f: FailureView<E>) => void` → `Result<T, E>`               | Err + Defect |
-| handle all three channels at the edge          | `match`           | `{ ok, err, defect }` → `R`                                  | all          |
+| handle all three channels at the edge          | `match`           | `{ ok, errCases, defect }` → `R`                             | all          |
 | combine an array of `Result`s                  | `all`             | `Result<T, E>[]` → `Result<T[], E>`                          | —            |
 | combine a record of `Result`s                  | `allFromDict`     | `{ [k]: Result<T, E> }` → `Result<{ [k]: T }, E>`            | —            |
 
@@ -110,6 +110,13 @@ forget, and no `.otherwise()` to slip in a fallback. The rationale is in
   so defecting a case removes it from the modeled channel. A branch that `throw`s
   also becomes a defect, but `defect(...)` is the lint-clean, expression-position
   form.
+- **…unless you declare it.** `matcher.returnType<R>()`, called directly after
+  the matcher is handed to you, pins the output to `R`: every branch is checked
+  against it (a mismatch is reported on that branch) and the outgoing channel is
+  `R` rather than the union of the branch returns. Reach for it when a signature
+  decides the type — most sharply in code generic in `E`. A `defect(…)` branch
+  stays legal under a pin. See
+  [Exhaustive error matching](../explanation/exhaustive-error-matching#declaring-the-output-returntype-r).
 - **`P._` is the deliberate catch-all.** Uniform handling — the equivalent of the
   old single callback — is one wildcard branch: `matcher.with(P._, (e) => wrap(e))`.
   It makes the match exhaustive and reads as an explicit "everything else" at the
@@ -124,7 +131,9 @@ forget, and no `.otherwise()` to slip in a fallback. The rationale is in
 - **Observers match exhaustively too.** `tapErrCases` and `flatTapErrCases` take the same
   builder (use `P._` for a catch-all); the error is observed and then flows
   through unchanged. Their branch returns are ignored (`tapErrCases`) or thread only a
-  _new_ effect failure (`flatTapErrCases`). `tapDefect` / `tapFailure` keep single
+  _new_ effect failure (`flatTapErrCases`) — the one exception being a branch that
+  returns the injected `defect(cause)`, which in either observer behaves like the
+  `throw` it stands for. `tapDefect` / `tapFailure` keep single
   callbacks — their payloads carry no discriminant to match.
 - **A non-exhaustive match is a `Defect` if it ever slips past the types.** Only
   reachable outside the typed contract (a widened cast, a JS caller): the matcher

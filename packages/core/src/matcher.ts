@@ -22,6 +22,8 @@
 // NOT supported: deep structural inversion, selections, array/variadic
 // patterns — that is the complexity (and instability) being left behind.
 
+import type { Defect } from "./defect.js";
+
 /**
  * Cross-copy brand for `P.*` pattern objects: `Symbol.for` yields the same
  * symbol in every copy of the library (dual CJS/ESM, duplicated install,
@@ -87,6 +89,52 @@ export type NonExhaustive<Remaining> = {
 };
 
 /**
+ * The "no output type declared" sentinel for a builder's `Declared` parameter.
+ * A `unique symbol` so no user type can collide with it. Declaration-only —
+ * `tsc` emits it into the `.d.ts` without it needing to be exported.
+ *
+ * @internal
+ */
+declare const UNSET: unique symbol;
+
+/** @internal */
+type Unset = typeof UNSET;
+
+/**
+ * A branch handler's return position: free inference (`O2`) while the builder
+ * is unpinned — today's behaviour, unchanged — or the declared type once
+ * `.returnType<R>()` has pinned it.
+ *
+ * `Defect` stays legal under a pin: the injected `defect` helper is the
+ * sanctioned deliberate `Err`→`Defect` form (Thesis #5), and `Defect` is not a
+ * nameable public type, so `returnType<R | Defect>()` cannot be spelled. The
+ * marker is subtracted from the output by {@link PinnedOut} — the same net
+ * result as the unpinned `Exclude<O, Defect>`, decided up front.
+ *
+ * @internal
+ */
+type BranchReturn<Declared, O2> = [Declared] extends [Unset] ? O2 : Declared | Defect;
+
+/**
+ * The builder's output: the accumulated union of branch returns while
+ * unpinned, or the declared type once pinned.
+ *
+ * @internal
+ */
+type PinnedOut<Declared, O> = [Declared] extends [Unset] ? O : Declared;
+
+/**
+ * The diagnostic type of `.returnType` on a builder that already has an output
+ * to contradict — an arm has contributed a return type, or it is already
+ * pinned: not callable, so the mistake is caught where it is written.
+ *
+ * @internal
+ */
+type PinTooLate = {
+  readonly "unthrown: `.returnType<R>()` must come before any arm produces an output, and only once": true;
+};
+
+/**
  * The match builder over an input union `E`. `Remaining` tracks the cases not
  * yet covered by a `.with(…)` arm; `O` accumulates the branch output union.
  * `.exhaustive` is callable only once `Remaining` is `never` — which is what
@@ -97,7 +145,7 @@ export type NonExhaustive<Remaining> = {
  * @typeParam O - the union of branch return types so far.
  * @category Types
  */
-export type Matcher<E, Remaining, O> = {
+export type Matcher<E, Remaining, O, Declared = Unset> = {
   /**
    * The catch-all arm: `.with(P._, handler)` / `.with(P.any, handler)`. A
    * **state transition**, not a computation — it returns `Matcher<E, never, …>`
@@ -106,7 +154,10 @@ export type Matcher<E, Remaining, O> = {
    * `Exclude<E, unknown>` would not resolve there). This is what lets a
    * boundary helper generic in `E` terminate with the catch-all (issue #145).
    */
-  with<O2>(pattern: UniversalPattern, handler: (value: Remaining) => O2): Matcher<E, never, O | O2>;
+  with<O2>(
+    pattern: UniversalPattern,
+    handler: (value: Remaining) => BranchReturn<Declared, O2>,
+  ): Matcher<E, never, O | O2, Declared>;
   /**
    * Add an arm: one or more patterns sharing a single handler (grouped
    * patterns — `matcher.with(tag("A"), tag("B"), handler)`). The handler
@@ -115,8 +166,44 @@ export type Matcher<E, Remaining, O> = {
    * matched cases are subtracted from `Remaining`.
    */
   with<const Pts extends readonly [unknown, ...unknown[]], O2>(
-    ...args: [...patterns: Pts, handler: (value: Extract<Remaining, MatchedOf<Pts[number]>>) => O2]
-  ): Matcher<E, Exclude<Remaining, MatchedOf<Pts[number]>>, O | O2>;
+    ...args: [
+      ...patterns: Pts,
+      handler: (value: Extract<Remaining, MatchedOf<Pts[number]>>) => BranchReturn<Declared, O2>,
+    ]
+  ): Matcher<E, Exclude<Remaining, MatchedOf<Pts[number]>>, O | O2, Declared>;
+
+  /**
+   * Declare the match's output type up front: every subsequent branch handler
+   * is checked against `R`, and the match evaluates to `R` instead of the
+   * union of whatever the branches happened to return.
+   *
+   * @remarks
+   * Reach for it when the output is **decided by a signature rather than by
+   * the branches** — most sharply in code generic in `E`, where the fold's type
+   * has to be declared. It also stops a drifting branch from silently widening
+   * the outgoing type, reports the mismatch **on the offending branch**, and
+   * gives branch returns a contextual type (so object literals need no
+   * annotation).
+   *
+   * A branch may still return the injected `defect` helper's marker; the defect
+   * channel is not part of the declared output.
+   *
+   * Callable **before any arm has produced an output**, and only once
+   * (mirroring ts-pattern's up-front pin): once there is an inferred output for
+   * the pin to contradict — or the builder is already pinned — this is typed as
+   * a non-callable diagnostic. In practice that means calling it directly after
+   * `match(…)`; the gate is about output rather than position, so an earlier arm
+   * whose handler returns `never` (it always throws) contributes nothing and
+   * does not close it — sound, since a `never` branch can contradict no declared
+   * type. A no-op at runtime.
+   *
+   * @typeParam R - the declared output type of every branch.
+   */
+  returnType: [O] extends [never]
+    ? [Declared] extends [Unset]
+      ? <R>() => Matcher<E, Remaining, never, R>
+      : PinTooLate
+    : PinTooLate;
 
   /**
    * Terminate the match. Typed callable only when every case is covered
@@ -124,14 +211,14 @@ export type Matcher<E, Remaining, O> = {
    * naming the remaining cases, and the builder fails the `ExhaustiveMatch`
    * constraint at the combinator call site.
    */
-  exhaustive: [Remaining] extends [never] ? () => O : NonExhaustive<Remaining>;
+  exhaustive: [Remaining] extends [never] ? () => PinnedOut<Declared, O> : NonExhaustive<Remaining>;
 
   /**
    * Execute the match (the combinators call this; it runs `.exhaustive()`).
    * A value with no matching arm throws {@link NonExhaustiveError} —
    * unreachable for well-typed callers.
    */
-  run(): O;
+  run(): PinnedOut<Declared, O>;
 };
 
 /**
@@ -230,6 +317,14 @@ class MatcherImpl {
         return this;
       }
     }
+    return this;
+  }
+
+  /**
+   * Type-level only — pinning the output type has no runtime meaning, so the
+   * builder is returned unchanged (as ts-pattern does).
+   */
+  returnType(): this {
     return this;
   }
 

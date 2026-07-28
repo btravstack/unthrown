@@ -2,7 +2,8 @@
 // at lint time. Five rules:
 //
 //   unthrown/no-ambiguous-error-type  — keep `E` a concrete domain error
-//                                        (no unknown/any/Error/{}), i.e. Thesis #1.
+//                                        (no unknown/any/Error/{}), i.e. Thesis #1;
+//                                        also covers mapErrCases' returnType<R>() pin.
 //   unthrown/prefer-async-result      — use AsyncResult<T,E> over Promise<Result<T,E>>.
 //   unthrown/no-unhandled-result      — don't drop a Result returned by a bare call.
 //   unthrown/no-throw                 — ban raw `throw` (opt-in; not in `recommended`) —

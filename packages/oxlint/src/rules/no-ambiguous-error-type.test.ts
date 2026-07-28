@@ -46,6 +46,75 @@ ruleTester.run("no-ambiguous-error-type", noAmbiguousErrorType, {
     {
       code: `import type { Result } from "unthrown";\ntype E = unknown;\ntype T = Result<number, E>;`,
     },
+
+    // --- matcher `.returnType<R>()` pins ------------------------------------
+    // A pin only declares `E` in `mapErrCases`. Everywhere else the builder's
+    // output is something other than the error channel, so an ambiguous pin is
+    // legitimate and must NOT be reported.
+    //
+    // `recoverErrCases` — the output is the new SUCCESS type.
+    { code: `const x = r.recoverErrCases((m) => m.returnType<unknown>().with(P._, (e) => e));` },
+    // `tapErrCases` — the branch results are discarded.
+    { code: `const x = r.tapErrCases((m) => m.returnType<void>().with(P._, () => undefined));` },
+    // `match`'s `errCases` — the output is a folded value.
+    {
+      code: `const x = r.match({ ok: (v) => v, defect: () => 0, errCases: (m) => m.returnType<unknown>().with(P._, (e) => e) });`,
+    },
+    // A standalone `match(value)` — likewise a folded value.
+    { code: `const x = match(v).returnType<unknown>().with(P._, (e) => e).exhaustive();` },
+    // `flatMapErrCases` / `flatTapErrCases` — the builder output must be a
+    // `Result`, so a *bare* ambiguous pin does not type-check in the first
+    // place; the rule leaves it to `tsc` rather than double-reporting. An
+    // ambiguous type NESTED in the pin is caught by the type-reference visitor
+    // (see the invalid cases below).
+    { code: `const x = r.flatMapErrCases((m) => m.returnType<unknown>().with(P._, (e) => e));` },
+    { code: `const x = r.flatTapErrCases((m) => m.returnType<unknown>().with(P._, (e) => e));` },
+    // A concrete pin is the whole point of `returnType`.
+    { code: `const x = r.mapErrCases((m) => m.returnType<MyError>().with(P._, (e) => e));` },
+    // `never` is an intentionally error-free output, as in the `E` position.
+    {
+      code: `const x = r.mapErrCases((m) => m.returnType<never>().with(P._, (e) => { throw e; }));`,
+    },
+    // A user's own `type Error` is not the ambiguous global, on the pin path
+    // too — resolve by scope, not by name. (Regression guard for the
+    // bare-`Error` false positive, mirroring the annotation-path guard above,
+    // but reached through the callback's function scope rather than module
+    // scope.)
+    {
+      code: `type Error = { code: number };\nconst x = r.mapErrCases((m) => m.returnType<Error>().with(P._, (e) => e));`,
+    },
+    // A generic parameter literally named `Error` is a concrete type variable,
+    // on the pin path too.
+    {
+      code: `function f<Error>() { return r.mapErrCases((m) => m.returnType<Error>().with(P._, (e) => e)); }`,
+    },
+    // A generic error parameter `E` is concrete on the pin path too — never
+    // treat it as ambiguous.
+    {
+      code: `function f<E>() { return r.mapErrCases((m) => m.returnType<E>().with(P._, (e) => e)); }`,
+    },
+    // The pin must be on the MATCHER — the callback's first parameter. The
+    // second is the injected `defect` helper.
+    { code: `const x = r.mapErrCases((m, defect) => defect.returnType<unknown>());` },
+    // An unrelated `returnType` call on something that is not a matcher
+    // parameter is none of the rule's business.
+    { code: `const x = builder.returnType<unknown>();` },
+    // …nor is a `returnType` call carrying no type argument at all.
+    { code: `const x = r.mapErrCases((m) => m.returnType().with(P._, (e) => e));` },
+    // A parameter of an ordinary function is not a matcher handed out by a
+    // combinator, whatever it is named.
+    { code: `function outer(m) { return m.returnType<unknown>(); }` },
+    // A callback passed to a plain (non-method) call is not a combinator's.
+    { code: `const x = wrap((m) => m.returnType<unknown>().with(P._, (e) => e));` },
+    // Documented syntactic limits — pinned valid on purpose (see the Linting
+    // guide): a matcher copied into another variable…
+    {
+      code: `const x = r.mapErrCases((m) => { const b = m; return b.returnType<unknown>().with(P._, (e) => e); });`,
+    },
+    // …and a callback declared elsewhere and passed by reference.
+    {
+      code: `const cb = (m) => m.returnType<unknown>().with(P._, (e) => e);\nconst x = r.mapErrCases(cb);`,
+    },
   ],
   invalid: [
     {
@@ -124,6 +193,68 @@ ruleTester.run("no-ambiguous-error-type", noAmbiguousErrorType, {
     // A namespace import's qualified name resolves too.
     {
       code: `import type * as U from "unthrown";\ntype T = U.Result<number, unknown>;`,
+      errors: [{ messageId: "noAmbiguousErrorType" }],
+    },
+
+    // --- matcher `.returnType<R>()` pins ------------------------------------
+    // In `mapErrCases` the builder's output IS the new error channel, so an
+    // ambiguous pin re-opens Thesis #1 through a type ARGUMENT — a position the
+    // annotation visitor above never sees.
+    {
+      code: `const x = r.mapErrCases((m) => m.returnType<unknown>().with(P._, (e) => e));`,
+      errors: [{ messageId: "noAmbiguousReturnTypePin" }],
+    },
+    {
+      code: `const x = r.mapErrCases((m) => m.returnType<any>().with(P._, (e) => e));`,
+      errors: [{ messageId: "noAmbiguousReturnTypePin" }],
+    },
+    {
+      code: `const x = r.mapErrCases((m) => m.returnType<Error>().with(P._, (e) => e));`,
+      errors: [{ messageId: "noAmbiguousReturnTypePin" }],
+    },
+    {
+      code: `const x = r.mapErrCases((m) => m.returnType<{}>().with(P._, (e) => e));`,
+      errors: [{ messageId: "noAmbiguousReturnTypePin" }],
+    },
+    {
+      code: `const x = r.mapErrCases((m) => m.returnType<string>().with(P._, (e) => e._tag));`,
+      errors: [{ messageId: "noAmbiguousReturnTypePin" }],
+    },
+    // An ambiguous member taints a union pin, as in the `E` position.
+    {
+      code: `const x = r.mapErrCases((m) => m.returnType<MyError | unknown>().with(P._, (e) => e));`,
+      errors: [{ messageId: "noAmbiguousReturnTypePin" }],
+    },
+    // The `defect` parameter's presence changes nothing.
+    {
+      code: `const x = r.mapErrCases((m, defect) => m.returnType<unknown>().with(P._, (e) => defect(e)));`,
+      errors: [{ messageId: "noAmbiguousReturnTypePin" }],
+    },
+    // A `function` expression callback, not just an arrow.
+    {
+      code: `const x = r.mapErrCases(function (m) { return m.returnType<unknown>().with(P._, (e) => e); });`,
+      errors: [{ messageId: "noAmbiguousReturnTypePin" }],
+    },
+    // The matcher referenced from a nested arrow inside the same callback still
+    // resolves to the `mapErrCases` parameter (scope analysis, not proximity).
+    {
+      code: `const x = r.mapErrCases((m) => wrap(() => m.returnType<unknown>().with(P._, (e) => e)));`,
+      errors: [{ messageId: "noAmbiguousReturnTypePin" }],
+    },
+    // The async surface shares the method name, so it is covered as-is.
+    {
+      code: `const x = ar.mapErrCases((m) => m.returnType<unknown>().with(P._, (e) => e));`,
+      errors: [{ messageId: "noAmbiguousReturnTypePin" }],
+    },
+    // A `Result<U, E2>` pin on the flat combinators carries `E` in its own
+    // second type argument — the type-reference visitor already sees it, in a
+    // type argument just as in an annotation. (Locks that coverage.)
+    {
+      code: `import type { Result } from "unthrown";\nconst x = r.flatMapErrCases((m) => m.returnType<Result<number, unknown>>().with(P._, (e) => e));`,
+      errors: [{ messageId: "noAmbiguousErrorType" }],
+    },
+    {
+      code: `import type { Result } from "unthrown";\nconst x = r.flatTapErrCases((m) => m.returnType<Result<never, Error>>().with(P._, (e) => e));`,
       errors: [{ messageId: "noAmbiguousErrorType" }],
     },
   ],

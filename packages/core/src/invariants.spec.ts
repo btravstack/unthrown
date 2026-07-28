@@ -119,6 +119,69 @@ describe("Invariant 1b: a Result-constrained callback returning a non-Result bec
   });
 });
 
+describe("Invariant 1c: a deliberate defect(…) in a failure observer preserves the original failure", () => {
+  // A branch may return the injected `defect(cause)` marker — freely in
+  // `tapErrCases`, and under a `returnType` pin in `flatTapErrCases` (whose
+  // `ExhaustiveMatch<Result<…>>` constraint otherwise rejects it). The marker is
+  // the lint-clean, expression-position form of a `throw` (Thesis #5), so in
+  // BOTH observers it takes the same route: the observed error survives in the
+  // AggregateError instead of being replaced by a bare Defect — and
+  // `tapErrCases` does not discard it, though it discards every other branch
+  // return. (A branch returning a Defect-state *Result* still short-circuits and
+  // replaces — an effect that blew up on its own.)
+  const original = new Error("original");
+  const cause = new Error("caller-cause");
+
+  const expectAggregated = (r: Result<unknown, unknown>) => {
+    expect(r.tag).toBe("Defect");
+    if (r.isDefect()) {
+      expect(r.cause).toBeInstanceOf(AggregateError);
+      expect((r.cause as AggregateError).errors).toEqual([cause, original]);
+    }
+  };
+
+  it("sync flatTapErrCases: the Defect aggregates [the caller's cause, the original error]", () => {
+    expectAggregated(
+      Err(original).flatTapErrCases((matcher, defect) =>
+        matcher.returnType<Result<never, never>>().with(P._, () => defect(cause)),
+      ),
+    );
+  });
+
+  it("async flatTapErrCases: the same, on the awaiting surface", async () => {
+    expectAggregated(
+      await Err(original)
+        .toAsync()
+        .flatTapErrCases((matcher, defect) =>
+          matcher.returnType<Result<never, never>>().with(P._, () => defect(cause)),
+        ),
+    );
+  });
+
+  it("sync tapErrCases: the marker is NOT discarded — it aggregates like a throw", () => {
+    expectAggregated(
+      Err(original).tapErrCases((matcher, defect) => matcher.with(P._, () => defect(cause))),
+    );
+  });
+
+  it("async tapErrCases: the same, on the async surface", async () => {
+    expectAggregated(
+      await Err(original)
+        .toAsync()
+        .tapErrCases((matcher, defect) => matcher.with(P._, () => defect(cause))),
+    );
+  });
+
+  it("tapErrCases still discards an ordinary branch value on both surfaces", async () => {
+    const sync = Err(original).tapErrCases((matcher) => matcher.with(P._, () => "ignored"));
+    expect(sync.tag).toBe("Err");
+    const async_ = await Err(original)
+      .toAsync()
+      .tapErrCases((matcher) => matcher.with(P._, () => "ignored"));
+    expect(async_.tag).toBe("Err");
+  });
+});
+
 describe("Invariant 2: a Defect flows through every method except match() and recoverDefect()", () => {
   it("success/error combinators pass a Defect through and never call their callback", () => {
     const f = vi.fn();

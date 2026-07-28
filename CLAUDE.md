@@ -86,8 +86,9 @@ was planned).
    (the error passes through unchanged); a branch that returns a raw
    `Promise`/`AsyncResult` is rejected where the combinator awaits it
    (`flatMapErrCases`/`flatTapErrCases`, via the builder-output constraint) **and** in
-   `tapErrCases` (its branch results are discarded, so a rejected `Promise` would
-   float unobserved — its builder output is `NotThenable`-constrained) — only
+   `tapErrCases` (its branch results are discarded — bar the `defect(…)` marker,
+   which is a control-flow signal, not a value — so a rejected `Promise` would
+   float unobserved; its builder output is `NotThenable`-constrained) — only
    the non-awaiting transformers `mapErrCases`/`recoverErrCases` run the branch
    synchronously with an async branch remaining a visible Promise-valued
    result, not a rejection bypass. `tapDefect` / `tapFailure` keep single callbacks — their payloads
@@ -111,7 +112,13 @@ was planned).
    peer, keeping its call-site shape): a purpose-built, shallow matcher whose
    exhaustiveness is plain `Exclude` over a tracked `Remaining` parameter, with
    `match`, `P` (`_`/`any`, `instanceOf`, `when`, `union`, `string`, `number`),
-   and `NonExhaustiveError` exported from core — first-class in one import,
+   `returnType<R>()` (declare the output type once — every branch is checked
+   against it, and the match evaluates to `R` instead of the union of the branch
+   returns; callable before any arm has produced an output and only once — in
+   practice directly after `match(…)`, though an arm returning `never` closes
+   nothing — a runtime no-op, and a `defect(…)` branch stays legal because the
+   defect channel is not part of the declared output), and `NonExhaustiveError`
+   exported from core — first-class in one import,
    dual-copy-safe (patterns carry a `Symbol.for` brand). Deliberately **not**
    supported: deep structural inversion, `P.select`, array patterns — the
    complexity (and cross-version instability) the replacement removed.
@@ -158,6 +165,33 @@ was planned).
   object can satisfy it and bypass exhaustiveness in typed code — accepted, as
   a deliberate act no worse than the sanctioned `P._` catch-all. This
   is a _type-level_ invariant, guarded in `types.test-d.ts`.
+- **A pinned match under-describes the defect channel — deliberately.** Under
+  `.returnType<R>()` a branch handler may return `R | Defect` (the injected
+  `defect` helper stays legal — Thesis #5) while `run()`/`exhaustive()` type as
+  `R`: the marker is subtracted up front instead of at the end. Unpinned, the
+  five error combinators do **not** treat the marker uniformly, so the pin
+  papers over a _typing_ asymmetry: `mapErrCases`/`recoverErrCases` subtract it
+  from the output (`MatchErrOut` = `Exclude<MatchOut, Defect>`),
+  `flatMapErrCases` tolerates it through an explicit `| Defect` in its
+  constraint, `tapErrCases` infers it as an ordinary (unthenable) branch return,
+  and `flatTapErrCases` unpinned **rejects** it (its
+  `ExhaustiveMatch<Result<…>>` constraint admits no marker) — a pin is the only
+  way to write a `defect(…)` branch there. The _runtime_ treatment, by contrast,
+  is uniform: **every** one of the five combinators checks `isDefectMarker` on
+  the branch output, so `defect(…)` is everywhere the expression-position form
+  of a `throw`, with no combinator silently discarding one. Soundness is per
+  call site, not in `runMatch` (which only builds the matcher, runs the callback
+  and `.run()`s the builder): the three transformers mint `defectRes(cause)`,
+  while the two observers (`tapErrCases`, `flatTapErrCases`) route it through
+  `observerThrowToDefect`, since a deliberate `defect(…)` in an observer is the
+  expression-position form of a `throw` and must not destroy the error being
+  observed — `tapErrCases` discards ordinary branch _values_, but the marker is
+  a control-flow signal, not a value. `match`'s `errCases`
+  handler accepts the same shape but is injected **no** `defect` helper and the
+  marker has no public constructor, so a `Defect` is not reachable there without
+  deliberately smuggling the injected helper out of another combinator's
+  callback. Type-level, guarded in `types.test-d.ts`; the observer's runtime
+  treatment is guarded in `invariants.spec.ts`.
 - **A `Defect` flows through every method untouched EXCEPT `match()`,
   `recoverDefect()`, and the observers `tapDefect()` / `tapFailure()` (which
   observe it without consuming it).** Therefore `getOr`, `getOrElse`,
@@ -168,7 +202,15 @@ was planned).
   `tapErrCases` / `tapDefect` / `tapFailure` / `flatTapErrCases` produces a `Defect` whose
   cause is an `AggregateError([thrown, original])` — observing a failure never
   destroys it. (A throw in the success-channel `tap`/`map` keeps the plain
-  thrown cause.)
+  thrown cause.) An **observer branch returning the injected `defect(cause)`
+  marker** — in `tapErrCases` (always writable) or in `flatTapErrCases` (only
+  under a `returnType` pin, which its constraint otherwise rejects) — takes the
+  **same** route: it is the lint-clean, expression-position form of a `throw`,
+  so it must not behave differently from one. In particular `tapErrCases` does
+  **not** discard it, even though it discards every other branch return — a
+  marker is a control-flow signal, not a value. (A branch returning a Defect-state
+  _`Result`_ is a different act — an effect that blew up on its own — and keeps
+  the documented short-circuit: it replaces the error, unaggregated.)
 - **Thenable callback returns are rejected at compile time — where a rejection
   could bypass qualification or vanish.** Every combinator callback not already
   constrained to return a `Result` (`map`, `tap`, `let`, `tapDefect`,
@@ -179,7 +221,8 @@ was planned).
   **awaiting** ones — `flatMapErrCases` / `flatTapErrCases` — reject an async branch via
   their builder-output constraint (an awaited rejection would bypass
   qualification), and so does the observer **`tapErrCases`** (its branch results are
-  **discarded**, so a rejected `Promise` would float unobserved; same
+  **discarded** — bar the `defect(…)` marker — so a rejected `Promise` would
+  float unobserved; same
   builder-output `NotThenable` constraint). The **non-awaiting** transformers
   `mapErrCases` / `recoverErrCases` run
   the matched branch **synchronously with no await**, so an async branch is
@@ -312,7 +355,9 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
   name — no deprecated surface survives into v5.
 - matcher exports: `match`, `P`, and `NonExhaustiveError` come from the
   built-in `matcher.ts` (plus the types `Matcher`/`PatternMatcher`/
-  `UniversalPattern`), and `tag(t)` (the `{ _tag: t }` pattern, narrowing to
+  `UniversalPattern`; the builder also carries `returnType<R>()`, which pins
+  the output type — see Thesis #5), and `tag(t)` (the `{ _tag: t }` pattern,
+  narrowing to
   the variant + payload) lives in `tagged.ts`. These make the error matcher,
   and matching a whole `Result` (`match(r).with({ tag: "Ok" }, …)`),
   first-class in one import — the former `@unthrown/pattern` package and the
@@ -570,7 +615,16 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
 - `packages/oxlint` → `@unthrown/oxlint` (an oxlint **JS plugin**, peerDep
   `oxlint`, dep `@oxlint/plugins`; ships **five rules**: `no-ambiguous-error-type`
   — enforces Thesis #1 against `unknown`/`any`/`Error`/`{}` **and the primitive
-  keywords** (`void` included) in `E`; `prefer-async-result` (reports
+  keywords** (`void` included) in `E`, both in a `Result`/`AsyncResult` type
+  **annotation** and in the matcher's `returnType<R>()` **pin** — the latter only
+  inside a `mapErrCases` callback, the one surface whose builder output _becomes_
+  `E`; `recoverErrCases` (success type), `tapErrCases` (discarded) and `match`
+  (folded value) are deliberately left alone, and the flat pair needs no case of
+  its own (a bare ambiguous pin does not type-check there, and a nested
+  `Result<U, E2>` pin is already read by the annotation check, which sees type
+  arguments wherever they occur). Recognised on the callback's own matcher
+  parameter via scope analysis — a matcher copied to another variable, or a
+  callback passed by reference, is a documented miss; `prefer-async-result` (reports
   `Promise<Result<T, E>>` in favour of `AsyncResult<T, E>`, but withholds the
   autofix on an `async` function's return annotation **and in function-type
   return positions** — either must stay a native `Promise` at the
@@ -649,8 +703,12 @@ code: "NOT_FOUND" }, …))`); non-inferable →
   actually happens). **Deliberately outside the fixed version group** — its
   majors track oRPC's cadence, not the family's. Documented in the oRPC guide
   page.)
-- `tools/tsconfig`, `tools/typedoc` → private shared config (`@unthrown/tsconfig`,
-  `@unthrown/typedoc`)
+- shared config is **external**, not a workspace package: the tsconfig and
+  typedoc bases come from the catalog dependencies `@btravstack/tsconfig` and
+  `@btravstack/typedoc` (alongside `@btravstack/oxlint`, `@btravstack/commitlint`,
+  `@btravstack/lefthook` and the docs' `@btravstack/theme`). There is no
+  `tools/` directory — `pnpm-workspace.yaml` declares only `packages/*` and
+  `docs`.
 - `docs` → `@unthrown/docs`, the VitePress site (guide + TypeDoc-generated API
   reference); deployed to GitHub Pages by `deploy-docs.yml` — **versioned**:
   while a prerelease is in progress (`.changeset/pre.json` on main) the site is

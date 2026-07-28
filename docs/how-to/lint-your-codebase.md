@@ -61,6 +61,34 @@ sees the type argument as written and does not chase aliases (an alias resolving
 `unknown` is not followed). Name your error types honestly and this limit never
 bites.
 
+The same table applies to the matcher's
+[`returnType<R>()`](../explanation/exhaustive-error-matching#declaring-the-output-returntype-r)
+pin — but **only where the pin declares the error channel**, which is inside a
+`mapErrCases` callback: there the builder's output _becomes_ the new `E`.
+
+```ts
+result.mapErrCases((m) => m.returnType<unknown>().with(P._, (e) => e)); // ✗ flagged — this is E
+result.mapErrCases((m) => m.returnType<ApiError>().with(P._, () => new ApiError())); // ✓
+
+result.recoverErrCases((m) => m.returnType<unknown>().with(P._, (e) => e)); // ✓ — that is the SUCCESS type
+result.tapErrCases((m) => m.returnType<void>().with(P._, log)); // ✓ — discarded
+result.match({ ok, defect, errCases: (m) => m.returnType<unknown>().with(P._, id) }); // ✓ — a folded value
+```
+
+`flatMapErrCases` / `flatTapErrCases` need no separate check: their builder output
+must be a `Result`, so a _bare_ ambiguous pin does not type-check at all, and an
+ambiguous `E2` **nested** in a `Result<U, E2>` pin is caught by the same rule (it
+reads type arguments wherever they occur, annotation or not).
+
+Two syntactic limits, deliberate — the pin is recognised on the callback's own
+matcher parameter, so a matcher first copied into another variable
+(`const b = m; b.returnType<unknown>()`), or a callback declared elsewhere and
+passed by reference (`result.mapErrCases(handler)`), is not seen. Writing the pin
+where the matcher is handed to you keeps the check honest. This is also the one
+check anchored on shape rather than on an import: a `returnType<R>()` call on the
+matcher parameter of a `mapErrCases` callback is unthrown's own vocabulary, so no
+`Result` binding needs resolving.
+
 ### `unthrown/prefer-async-result` {#prefer-async-result}
 
 Prefer `AsyncResult<T, E>` over `Promise<Result<T, E>>`. A raw `Promise<Result>`

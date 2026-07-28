@@ -198,4 +198,29 @@ describe("the built-in matcher engine", () => {
     expect(out).toBe("a");
     expect(sideEffect).toBe(0);
   });
+
+  it("returnType() pins the output type and is a runtime no-op", () => {
+    // The pin is type-level only: the builder is returned unchanged and the
+    // match evaluates exactly as it would unpinned.
+    expect(
+      match("a" as "a" | "b")
+        .returnType<number>()
+        .with("a", () => 1)
+        .with("b", () => 2)
+        .run(),
+    ).toBe(1);
+  });
+
+  it("still throws NonExhaustiveError under a pin when no arm matches", () => {
+    // A rogue value that slipped past the types: pinning must not swallow the
+    // non-exhaustive throw (the combinators' throw-to-defect net relies on it).
+    const rogue = "c" as unknown as "a" | "b";
+    expect(() =>
+      match(rogue)
+        .returnType<number>()
+        .with("a", () => 1)
+        .with("b", () => 2)
+        .run(),
+    ).toThrow(NonExhaustiveError);
+  });
 });

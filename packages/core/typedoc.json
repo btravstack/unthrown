@@ -26,6 +26,10 @@
     "ExhaustiveMatch",
     "MatchOut",
     "NonExhaustive",
-    "MatchedOf"
+    "MatchedOf",
+    "Unset",
+    "BranchReturn",
+    "PinnedOut",
+    "PinTooLate"
   ]
 }
