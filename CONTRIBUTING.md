@@ -48,9 +48,12 @@ before proposing a change. In particular:
 
 - **oxlint rules are binding:** no `interface` (use `type`), no `any` (use
   `unknown`). Genuine exceptions carry a targeted `oxlint-disable` with a reason.
-- **Core has exactly one runtime dependency, `ts-pattern`** (it powers the
-  exhaustive error matchers and is re-exported as `match`/`P`). Add no others —
-  never pull `vitest` or any interop peer into core.
+- **Core has zero runtime dependencies** — the exhaustive error matcher is
+  built in (`packages/core/src/matcher.ts`, exporting `match`/`P`/
+  `NonExhaustiveError` as core's own). It replaced a former `ts-pattern`
+  dependency deliberately: the exhaustiveness guarantee must not vary with a
+  consumer-resolved third-party version. Add no dependencies — never pull
+  `vitest` or any interop peer into core.
 - **One name per concept.** Resist convenience aliases.
 - Public API carries full **TSDoc**; `pnpm --filter <pkg> build:docs` must stay
   warning-free.
