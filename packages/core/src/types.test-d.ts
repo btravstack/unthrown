@@ -900,7 +900,10 @@ new WithMsg({ ticketId: "t1" });
 
   const unioned = match(e)
     .returnType<string>()
-    .with(P.union(tag("NotFound"), tag("Conflict")), (both) => both._tag)
+    .with(P.union(tag("NotFound"), tag("Conflict")), (both) => {
+      type _UnionNarrowed = Expect<Equal<typeof both, NotFound | Conflict>>;
+      return both._tag;
+    })
     .exhaustive();
   type _Unioned = Expect<Equal<typeof unioned, string>>;
 }
