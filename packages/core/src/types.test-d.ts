@@ -6,6 +6,11 @@
 // `Expect<Equal<A, B>>` is a hard error when `A` and `B` differ; `@ts-expect-error`
 // guards the cases that must NOT compile.
 
+// `defect` is deliberately NOT re-exported from index.ts (Thesis #5 — it is
+// injected at triage sites only). Imported directly from its internal module,
+// for the returnType()-under-a-pin assertion below only; the public surface
+// stays untouched.
+import { defect } from "./defect.js";
 import {
   all,
   allAsync,
@@ -860,10 +865,42 @@ new WithMsg({ ticketId: "t1" });
     // @ts-expect-error — not callable: the builder is already pinned
     .returnType<number>();
 
+  // re-pinning is rejected even with no arm in between
+  match(e)
+    .returnType<string>()
+    // @ts-expect-error — not callable: the builder is already pinned
+    .returnType<number>();
+
   // a missing case under a pin still makes `.exhaustive` uncallable
   const partial = match(e)
     .returnType<string>()
     .with(tag("NotFound"), (n) => n.id);
   // @ts-expect-error — Conflict is unhandled
   partial.exhaustive();
+
+  // a defect branch stays legal under a pin, and the marker does not reach the
+  // output type — the same subtraction the unpinned path does with Exclude
+  const defectFor = (cause: unknown) => defect(cause);
+  const pinnedDefect = match(e)
+    .returnType<string>()
+    .with(tag("NotFound"), (n) => n.id)
+    .with(tag("Conflict"), (c) => defectFor(c))
+    .exhaustive();
+  type _PinnedDefect = Expect<Equal<typeof pinnedDefect, string>>;
+
+  // grouped patterns under a pin: the variadic form and P.union
+  const grouped = match(e)
+    .returnType<string>()
+    .with(tag("NotFound"), tag("Conflict"), (both) => {
+      type _Both = Expect<Equal<typeof both, NotFound | Conflict>>;
+      return both._tag;
+    })
+    .exhaustive();
+  type _Grouped = Expect<Equal<typeof grouped, string>>;
+
+  const unioned = match(e)
+    .returnType<string>()
+    .with(P.union(tag("NotFound"), tag("Conflict")), (both) => both._tag)
+    .exhaustive();
+  type _Unioned = Expect<Equal<typeof unioned, string>>;
 }

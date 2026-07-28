@@ -194,7 +194,11 @@ export type Matcher<E, Remaining, O, Declared = Unset> = {
    *
    * @typeParam R - the declared output type of every branch.
    */
-  returnType: [O] extends [never] ? <R>() => Matcher<E, Remaining, never, R> : PinTooLate;
+  returnType: [O] extends [never]
+    ? [Declared] extends [Unset]
+      ? <R>() => Matcher<E, Remaining, never, R>
+      : PinTooLate
+    : PinTooLate;
 
   /**
    * Terminate the match. Typed callable only when every case is covered
