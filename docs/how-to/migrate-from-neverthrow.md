@@ -29,7 +29,7 @@ Most rows are a rename. `andThen` → `flatMap` is unthrown's
 rule. The one behavioral change to know up front: `mapErrCases` (and the other error
 combinators) take an **exhaustive matcher** rather than a plain callback. Port a
 `mapErr(f)` by **naming each case** the old callback silently absorbed —
-`.mapErrCases((matcher) => matcher.with(tag("NotFound"), f).with(tag("Conflict"), f))`
+`.mapErrCases((matcher) => matcher.with(P.tag("NotFound"), f).with(P.tag("Conflict"), f))`
 — and let the compiler tell you when you have missed one. That enumeration is
 the migration's actual payoff; the reasoning is in
 [Exhaustive error matching](../explanation/exhaustive-error-matching). The rest
@@ -63,7 +63,7 @@ app.get("/users/:id", async (req, res) => {
 
 ```ts
 // unthrown — the same bug becomes a Defect inside the pipeline; no try/catch
-import { tag } from "unthrown";
+import { P } from "unthrown";
 
 // getUser: (id: string) => AsyncResult<User, NotFound | Forbidden>
 app.get("/users/:id", async (req, res) => {
@@ -72,8 +72,8 @@ app.get("/users/:id", async (req, res) => {
     ok: (view) => res.status(200).json(view),
     errCases: (matcher) =>
       matcher
-        .with(tag("NotFound"), () => res.status(404).json({ error: "not found" }))
-        .with(tag("Forbidden"), () => res.status(403).json({ error: "forbidden" })),
+        .with(P.tag("NotFound"), () => res.status(404).json({ error: "not found" }))
+        .with(P.tag("Forbidden"), () => res.status(403).json({ error: "forbidden" })),
     defect: (cause) => {
       console.error(cause); // everything the pipeline caught lands here
       res.status(500).json({ error: "internal error" });

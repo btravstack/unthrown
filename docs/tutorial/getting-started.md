@@ -27,7 +27,7 @@ yarn add unthrown
 
 `unthrown` is ESM-first, ships dual CJS/ESM builds with full types, and has
 **zero runtime dependencies** — the exhaustive error matcher is built-in
-(exported as `match` / `P` / `tag`). Use it with TypeScript in `strict` mode.
+(exported as `match` / `P`). Use it with TypeScript in `strict` mode.
 
 ## Step 2 — Return a failure instead of throwing
 

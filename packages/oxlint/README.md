@@ -14,13 +14,13 @@ library's theses into automated checks.
 
 ## Rules
 
-| Rule                               | What it enforces                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `unthrown/no-ambiguous-error-type` | The `E` in `Result<T, E>` / `AsyncResult<T, E>` must name a concrete domain error — no `unknown`, `any`, `Error`, `object`, bare `{}`, `void`, or primitives. (`never` is allowed.) This is [Thesis #1](https://btravstack.github.io/unthrown/explanation/why-unthrown): `E` is only the _anticipated_ failures. Covers the matcher's `returnType<R>()` pin too, but only in `mapErrCases`, where the pin _is_ the new `E`.                 |
-| `unthrown/prefer-async-result`     | Prefer `AsyncResult<T, E>` over `Promise<Result<T, E>>` — a raw `Promise<Result>` can still reject. Autofixable — except on an `async` function's own return annotation and on a function _type_'s return position (the implementer may be `async`), where the rule reports without a fix since the rewrite would not compile.                                                                                                              |
-| `unthrown/no-unhandled-result`     | A `Result` / `AsyncResult` returned by a bare call (awaited or not) must not be dropped on the floor — it carries the error channel; dropping it silently discards failures. Bind it, return it, or eliminate it with `match` / a `get*` extractor.                                                                                                                                                                                         |
-| `unthrown/no-catch-all-pattern`    | No `P._` / `P.any` catch-all in a matcher — enumerate every error case by name (`.with(tag("A"), tag("B"), …, handler)`, grouping cases that share a handler), so a new error can't be silently absorbed. This is unthrown's default position; `P._` is an escape hatch — a helper generic in `E`, or an `E` that is a single type rather than a union — and carries a targeted `oxlint-disable`. See [below](#the-catch-all-escape-hatch). |
-| `unthrown/no-throw`                | **Opt-in** (not in `recommended`): no raw `throw` statements — errors are returned (`Err(...)`), only a true defect ever throws. `getOrThrow()` is the sanctioned extraction escape; a known-technical precondition throw lives in a plain helper wrapped once with `fromSafeThrowable`; a deliberate throw site carries a targeted `oxlint-disable`.                                                                                       |
+| Rule                               | What it enforces                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `unthrown/no-ambiguous-error-type` | The `E` in `Result<T, E>` / `AsyncResult<T, E>` must name a concrete domain error — no `unknown`, `any`, `Error`, `object`, bare `{}`, `void`, or primitives. (`never` is allowed.) This is [Thesis #1](https://btravstack.github.io/unthrown/explanation/why-unthrown): `E` is only the _anticipated_ failures. Covers the matcher's `returnType<R>()` pin too, but only in `mapErrCases`, where the pin _is_ the new `E`.                     |
+| `unthrown/prefer-async-result`     | Prefer `AsyncResult<T, E>` over `Promise<Result<T, E>>` — a raw `Promise<Result>` can still reject. Autofixable — except on an `async` function's own return annotation and on a function _type_'s return position (the implementer may be `async`), where the rule reports without a fix since the rewrite would not compile.                                                                                                                  |
+| `unthrown/no-unhandled-result`     | A `Result` / `AsyncResult` returned by a bare call (awaited or not) must not be dropped on the floor — it carries the error channel; dropping it silently discards failures. Bind it, return it, or eliminate it with `match` / a `get*` extractor.                                                                                                                                                                                             |
+| `unthrown/no-catch-all-pattern`    | No `P._` / `P.any` catch-all in a matcher — enumerate every error case by name (`.with(P.tag("A"), P.tag("B"), …, handler)`, grouping cases that share a handler), so a new error can't be silently absorbed. This is unthrown's default position; `P._` is an escape hatch — a helper generic in `E`, or an `E` that is a single type rather than a union — and carries a targeted `oxlint-disable`. See [below](#the-catch-all-escape-hatch). |
+| `unthrown/no-throw`                | **Opt-in** (not in `recommended`): no raw `throw` statements — errors are returned (`Err(...)`), only a true defect ever throws. `getOrThrow()` is the sanctioned extraction escape; a known-technical precondition throw lives in a plain helper wrapped once with `fromSafeThrowable`; a deliberate throw site carries a targeted `oxlint-disable`.                                                                                           |
 
 The rules resolve import bindings via scope analysis (through the _imported_
 name, so renamed imports resolve too), and only fire on unthrown's own
@@ -82,13 +82,13 @@ Everywhere the error union is concrete, name the cases instead — grouping the
 ones that share a handler:
 
 ```ts
-import { tag } from "unthrown";
+import { P } from "unthrown";
 
 // E is `NotFound | Conflict | DriverError` — every member gets an arm:
 result.mapErrCases((matcher) =>
   matcher
-    .with(tag("NotFound"), () => new ApiError({ status: 404 }))
-    .with(tag("Conflict"), tag("DriverError"), (e) => new ApiError({ status: 500, error: e })),
+    .with(P.tag("NotFound"), () => new ApiError({ status: 404 }))
+    .with(P.tag("Conflict"), P.tag("DriverError"), (e) => new ApiError({ status: 500, error: e })),
 );
 ```
 

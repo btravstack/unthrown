@@ -13,19 +13,20 @@
 | **Renamed export**     | `UnwrapError`                                                    | `GetError`                                                                                |
 | **Removed** (aliases)  | `unwrap` / `unwrapErr` / `unwrapOr` / `unwrapOrElse`             | `get` / `getErr` / `getOr` / `getOrElse`                                                  |
 | **Removed** (aliases)  | `orElse` / `recover`                                             | `flatMapErrCases` / `recoverErrCases`                                                     |
-| **Removed**            | `matchTags` / the `TagHandlers` type                             | `match({ …, errCases: (m) => m.with(tag("…"), …) })`                                      |
+| **Removed**            | `matchTags` / the `TagHandlers` type                             | `match({ …, errCases: (m) => m.with(P.tag("…"), …) })`                                    |
+| **Renamed** (loud)     | the standalone `tag("…")` export                                 | `P.tag("…")` — it lives in the pattern namespace with every other constructor             |
 | **Changed, same name** | `getOrThrow()` on any `Result`                                   | gated to a **non-empty** error channel (use `get()` otherwise)                            |
 | **Packaging**          | `ts-pattern` bundled as a dependency                             | the matcher is **built-in** — no dependency at all                                        |
 | **Packaging**          | `@unthrown/pattern` (`match` / `P` / `tag`)                      | absorbed into core — import them from `unthrown`                                          |
-| **New**                | —                                                                | `ensure`, `DoAsync`, and the built-in `match` / `P` / `tag` / `NonExhaustiveError`        |
+| **New**                | —                                                                | `ensure`, `DoAsync`, and the built-in `match` / `P` / `NonExhaustiveError`                |
 
 Everything except the two rows below is a compile error at the old call site, so
 `pnpm typecheck` is your migration to-do list.
 
 ## 1. Nothing to install — the matcher is built-in
 
-unthrown's exhaustive matcher is its own module (same `.with(…)` / `tag` / `P`
-call-site shape ts-pattern users know), exported as `match` / `P` / `tag` /
+unthrown's exhaustive matcher is its own module (same `.with(…)` / `P`
+call-site shape ts-pattern users know), exported as `match` / `P` /
 `NonExhaustiveError`. There is **no dependency to install** alongside
 `unthrown` — and no version of any third-party library can change what
 "exhaustive" means.
@@ -37,7 +38,7 @@ imports it directly for other matching.)
 
 One boundary to know: patterns built by the real `ts-pattern` library are
 **not** accepted by unthrown's matchers (and vice versa). Import `P` / `match`
-/ `tag` from `"unthrown"` at unthrown call sites; keep `ts-pattern` for your
+from `"unthrown"` at unthrown call sites; keep `ts-pattern` for your
 own unrelated matching if you use it.
 
 ## 2. Rename the error-channel combinators
@@ -48,8 +49,11 @@ The old names no longer exist, so the compiler flags each site:
 
 ```diff
 - result.mapErr((m) => m.with(tag("NotFound"), wrap))
-+ result.mapErrCases((m) => m.with(tag("NotFound"), wrap))
++ result.mapErrCases((m) => m.with(P.tag("NotFound"), wrap))
 ```
+
+The arm moved too — `tag(…)` is now `P.tag(…)`, a separate change covered in
+[§7](#_7-tag-moved-onto-p).
 
 Same for `flatMapErr` → `flatMapErrCases`, `recoverErr` → `recoverErrCases`,
 `tapErr` → `tapErrCases`, `flatTapErr` → `flatTapErrCases`. See
@@ -92,15 +96,15 @@ extractor — over re-throwing inside a match arm.
 
 The `@deprecated` aliases from the 4.x line are gone (one concept, one name):
 
-| Removed        | Use                                                  |
-| -------------- | ---------------------------------------------------- |
-| `unwrap`       | `get`                                                |
-| `unwrapErr`    | `getErr`                                             |
-| `unwrapOr`     | `getOr`                                              |
-| `unwrapOrElse` | `getOrElse`                                          |
-| `orElse`       | `flatMapErrCases`                                    |
-| `recover`      | `recoverErrCases`                                    |
-| `matchTags`    | `match({ …, errCases: (m) => m.with(tag("…"), …) })` |
+| Removed        | Use                                                    |
+| -------------- | ------------------------------------------------------ |
+| `unwrap`       | `get`                                                  |
+| `unwrapErr`    | `getErr`                                               |
+| `unwrapOr`     | `getOr`                                                |
+| `unwrapOrElse` | `getOrElse`                                            |
+| `orElse`       | `flatMapErrCases`                                      |
+| `recover`      | `recoverErrCases`                                      |
+| `matchTags`    | `match({ …, errCases: (m) => m.with(P.tag("…"), …) })` |
 
 `UnwrapError` (the throw type of `get`/`getErr`) is renamed **`GetError`**.
 
@@ -115,18 +119,42 @@ The `@deprecated` aliases from the 4.x line are gone (one concept, one name):
 
 ## 6. `@unthrown/pattern` is gone
 
-`match`, `P`, and `tag` are now exported by `unthrown` itself. Drop the
-`@unthrown/pattern` dependency and re-point the imports:
+`match` and `P` are now exported by `unthrown` itself, and the package's `tag`
+helper is now `P.tag` (see the next section). Drop the `@unthrown/pattern`
+dependency and re-point the imports:
 
 ```diff
 - import { match, P, tag } from "@unthrown/pattern";
-+ import { match, P, tag } from "unthrown";
++ import { match, P } from "unthrown";
 ```
+
+## 7. `tag` moved onto `P`
+
+`tag(t)` builds the `{ _tag: t }` pattern — it is a pattern constructor, so it
+now lives in the pattern namespace beside `P._`, `P.instanceOf`, `P.when` and
+the rest. The standalone export is **removed**, not deprecated: one concept,
+one spelling.
+
+```diff
+- import { tag } from "unthrown";
++ import { P } from "unthrown";
+
+  result.mapErrCases((matcher) =>
+    matcher
+-     .with(tag("NotFound"), () => 404)
+-     .with(tag("Conflict"), () => 409),
++     .with(P.tag("NotFound"), () => 404)
++     .with(P.tag("Conflict"), () => 409),
+  );
+```
+
+The missing `tag` export is a compile error at every import site, and each call
+site follows from it. Nothing about the pattern's behaviour changed.
 
 ## What you gained
 
 - **`ensure`** — validate or refine a success in place (`Result<T, E | E2>`, or a
   type-guard narrowing `T`).
 - **`DoAsync()`** — the pre-lifted async twin of `Do()`.
-- **`match` / `P` / `tag`** as first-class re-exports, so the error matcher is one
+- **`match` / `P`** as first-class re-exports, so the error matcher is one
   import.

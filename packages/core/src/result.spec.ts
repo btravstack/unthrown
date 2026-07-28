@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { Err, Ok, P, type Result, tag } from "./index.js";
+import { Err, Ok, P, type Result } from "./index.js";
 
 const boom = new Error("boom");
 const defectOf = (cause: unknown): Result<number, never> =>
@@ -254,7 +254,7 @@ const errB = (b: string): Result<never, TagA | TagB> => Err<TagA | TagB>({ _tag:
 describe("Result.mapErrCases (matcher)", () => {
   it("dispatches a tagged error to its matching branch", () => {
     const r = errA(7).mapErrCases((matcher) =>
-      matcher.with(tag("A"), (e) => `a:${e.a}`).with(tag("B"), (e) => `b:${e.b}`),
+      matcher.with(P.tag("A"), (e) => `a:${e.a}`).with(P.tag("B"), (e) => `b:${e.b}`),
     );
     expect(r.getErr()).toBe("a:7");
   });
@@ -269,7 +269,7 @@ describe("Result.mapErrCases (matcher)", () => {
 
   it("shares one strategy across grouped patterns", () => {
     const build = (r: Result<never, TagA | TagB>) =>
-      r.mapErrCases((matcher) => matcher.with(tag("A"), tag("B"), () => "grouped" as const));
+      r.mapErrCases((matcher) => matcher.with(P.tag("A"), P.tag("B"), () => "grouped" as const));
     expect(build(errA(7)).getErr()).toBe("grouped");
     expect(build(errB("x")).getErr()).toBe("grouped");
   });
@@ -281,12 +281,12 @@ describe("Result.mapErrCases (matcher)", () => {
 
   it("a branch returning the injected defect(cause) becomes a Defect carrying that cause", () => {
     const ok = errA(7).mapErrCases((matcher, defect) =>
-      matcher.with(tag("A"), (e) => e.a).with(tag("B"), (_e) => defect(boom)),
+      matcher.with(P.tag("A"), (e) => e.a).with(P.tag("B"), (_e) => defect(boom)),
     );
     expect(ok.isDefect()).toBe(false); // an A error takes the mapped branch
 
     const d = errB("x").mapErrCases((matcher, defect) =>
-      matcher.with(tag("A"), (e) => e.a).with(tag("B"), (_e) => defect(boom)),
+      matcher.with(P.tag("A"), (e) => e.a).with(P.tag("B"), (_e) => defect(boom)),
     );
     expect(d.isDefect()).toBe(true);
     if (d.isDefect()) expect(d.cause).toBe(boom);
@@ -294,7 +294,7 @@ describe("Result.mapErrCases (matcher)", () => {
 
   it("throws NonExhaustiveError → Defect when a value slips past the types", () => {
     const smuggled = Err({ _tag: "C" }) as unknown as Result<never, TagA>;
-    const r = smuggled.mapErrCases((matcher) => matcher.with(tag("A"), (e) => e.a));
+    const r = smuggled.mapErrCases((matcher) => matcher.with(P.tag("A"), (e) => e.a));
     expect(r.isDefect()).toBe(true);
   });
 
@@ -338,7 +338,7 @@ describe("Result.flatMapErrCases (matcher)", () => {
   it("dispatches per tag — one branch recovers, another re-emits", () => {
     const build = (r: Result<never, TagA | TagB>) =>
       r.flatMapErrCases((matcher) =>
-        matcher.with(tag("A"), (e) => Ok(e.a)).with(tag("B"), (e) => Err(e)),
+        matcher.with(P.tag("A"), (e) => Ok(e.a)).with(P.tag("B"), (e) => Err(e)),
       );
     expect(build(errA(7)).getOr(-1)).toBe(7);
     const reEmitted = build(errB("x"));
@@ -391,7 +391,9 @@ describe("Result.recoverErrCases (matcher)", () => {
   it("dispatches per tag and unions the recovered values", () => {
     expect(
       errA(7)
-        .recoverErrCases((matcher) => matcher.with(tag("A"), (e) => e.a).with(tag("B"), (e) => e.b))
+        .recoverErrCases((matcher) =>
+          matcher.with(P.tag("A"), (e) => e.a).with(P.tag("B"), (e) => e.b),
+        )
         .get(),
     ).toBe(7);
   });
@@ -443,7 +445,7 @@ describe("Result.tapErrCases (matcher, exhaustive)", () => {
   it("runs only the matching branch; the error still passes through unchanged", () => {
     const seenA: number[] = [];
     const observed = errA(7).tapErrCases((matcher) =>
-      matcher.with(tag("A"), (e) => seenA.push(e.a)).with(tag("B"), () => undefined),
+      matcher.with(P.tag("A"), (e) => seenA.push(e.a)).with(P.tag("B"), () => undefined),
     );
     expect(seenA).toEqual([7]);
     expect(observed.isErr() && observed.error).toEqual({ _tag: "A", a: 7 });
@@ -524,7 +526,7 @@ describe("a rogue value past the types: NonExhaustiveError → Defect in EVERY e
   it("flatMapErrCases routes the unmatched rogue value to a Defect", () => {
     expect(
       smuggled()
-        .flatMapErrCases((matcher) => matcher.with(tag("A"), (e) => Ok(e.a)))
+        .flatMapErrCases((matcher) => matcher.with(P.tag("A"), (e) => Ok(e.a)))
         .isDefect(),
     ).toBe(true);
   });
@@ -532,7 +534,7 @@ describe("a rogue value past the types: NonExhaustiveError → Defect in EVERY e
   it("recoverErrCases routes the unmatched rogue value to a Defect", () => {
     expect(
       smuggled()
-        .recoverErrCases((matcher) => matcher.with(tag("A"), (e) => e.a))
+        .recoverErrCases((matcher) => matcher.with(P.tag("A"), (e) => e.a))
         .isDefect(),
     ).toBe(true);
   });
@@ -540,7 +542,7 @@ describe("a rogue value past the types: NonExhaustiveError → Defect in EVERY e
   it("tapErrCases routes the unmatched rogue value to a Defect", () => {
     expect(
       smuggled()
-        .tapErrCases((matcher) => matcher.with(tag("A"), () => undefined))
+        .tapErrCases((matcher) => matcher.with(P.tag("A"), () => undefined))
         .isDefect(),
     ).toBe(true);
   });
@@ -548,7 +550,7 @@ describe("a rogue value past the types: NonExhaustiveError → Defect in EVERY e
   it("flatTapErrCases routes the unmatched rogue value to a Defect", () => {
     expect(
       smuggled()
-        .flatTapErrCases((matcher) => matcher.with(tag("A"), () => Ok(1)))
+        .flatTapErrCases((matcher) => matcher.with(P.tag("A"), () => Ok(1)))
         .isDefect(),
     ).toBe(true);
   });

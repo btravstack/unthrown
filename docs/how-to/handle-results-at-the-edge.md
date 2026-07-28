@@ -24,7 +24,7 @@ modeled statuses are mapped in a `flatMap` (a `throw` there, like an unexpected
 status or malformed JSON, becomes a `Defect`):
 
 ```ts
-import { fromPromise, Err, tag } from "unthrown";
+import { fromPromise, Err, P } from "unthrown";
 
 const loadProfile = (id: string) =>
   // A network error (a rejected fetch) is unexpected → defect.
@@ -41,8 +41,8 @@ async function handler(id: string): Promise<HttpResponse> {
     ok: (profile) => ({ status: 200, body: profile }),
     errCases: (matcher) =>
       matcher
-        .with(tag("NotFound"), (e) => ({ status: 404, body: e }))
-        .with(tag("Forbidden"), (e) => ({ status: 403, body: e })),
+        .with(P.tag("NotFound"), (e) => ({ status: 404, body: e }))
+        .with(P.tag("Forbidden"), (e) => ({ status: 403, body: e })),
     defect: (cause) => {
       logger.error(cause); // a real bug — log it, don't leak it
       return { status: 500, body: "Internal Error" };
@@ -71,7 +71,7 @@ own `AsyncResult`, and `match`'s matcher folds every tag to a status code:
 import { Hono } from "hono";
 import { z } from "zod";
 import { fromSchema } from "@unthrown/standard-schema";
-import { P, tag, TaggedError, type AsyncResult } from "unthrown";
+import { P, TaggedError, type AsyncResult } from "unthrown";
 
 class InvalidId extends TaggedError("InvalidId") {}
 
@@ -96,8 +96,8 @@ app.get("/users/:id", (c) => {
     ok: (u) => c.json(u, 200),
     errCases: (matcher) =>
       matcher
-        .with(tag("InvalidId"), () => c.json({ error: "invalid id" }, 400))
-        .with(tag("NotFound"), (e) => c.json({ error: `no user ${e.id}` }, 404)),
+        .with(P.tag("InvalidId"), () => c.json({ error: "invalid id" }, 400))
+        .with(P.tag("NotFound"), (e) => c.json({ error: `no user ${e.id}` }, 404)),
     defect: (cause) => {
       logger.error(cause);
       return c.json({ error: "Internal Error" }, 500);

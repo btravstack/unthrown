@@ -39,7 +39,7 @@ Effect is the exception: it _does_ have a defect channel (`Cause.die`), so
 `Result ↔ Exit` round-trips losslessly.
 
 ```ts
-import { Ok, Err, tag, TaggedError } from "unthrown";
+import { Ok, Err, P, TaggedError } from "unthrown";
 import { toExit, fromEffect } from "@unthrown/effect";
 import { Effect } from "effect";
 
@@ -58,7 +58,7 @@ declare const loadUser: Effect.Effect<User, NotFound | Timeout>;
 await fromEffect(loadUser).match({
   ok: (user) => user.name,
   errCases: (matcher) =>
-    matcher.with(tag("NotFound"), () => "missing").with(tag("Timeout"), () => "timed out"),
+    matcher.with(P.tag("NotFound"), () => "missing").with(P.tag("Timeout"), () => "timed out"),
   defect: String,
 });
 ```

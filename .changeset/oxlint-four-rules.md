@@ -2,7 +2,7 @@
 "@unthrown/oxlint": minor
 ---
 
-**Two new rules, and sharper resolution in the existing two.**
+**Two new rules, and sharper resolution in the two carried over from 4.x.**
 
 - New `no-unhandled-result` (in the recommended preset): flags a bare
   statement dropping a `Result` — a call to an unthrown-imported producer, a
@@ -13,7 +13,7 @@
 - New `no-throw` (opt-in, not in the preset): reports every `throw` statement,
   pointing at `Err(...)`, `getOrThrow()`, and `fromSafeThrowable` — the rule
   the `getOrThrow` design has always referenced.
-- Both existing rules now resolve bindings by the **imported** name:
+- Both 4.x rules now resolve bindings by the **imported** name:
   `import { Result as R }` is caught, `import { Ok as Result }` no longer
   false-positives, and namespace-qualified `U.Result<…>` is flagged.
 - `no-ambiguous-error-type` also flags `void` in `E`, and a false negative

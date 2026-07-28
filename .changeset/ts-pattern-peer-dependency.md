@@ -2,16 +2,20 @@
 "unthrown": major
 ---
 
-**`ts-pattern` is now a `peerDependency` (`^5`), not a plain dependency.** Core
-re-exports `match` / `P` / `tag` and its error matchers speak ts-pattern's
-builder type. When ts-pattern was a nested, exact-pinned dependency, a consumer
-who already used ts-pattern at another version ended up with two copies whose
-declarations don't unify — feeding a `P.union(...)` built by one copy into an
-unthrown matcher failed five layers deep in a conditional type.
+**Core takes no `ts-pattern` dependency — neither a plain one nor a peer.** An
+early v5 beta shipped it nested and exact-pinned, and that copy's declarations
+did not unify with a consumer's own: feeding a `P.union(...)` built by one copy
+into an unthrown matcher failed five layers deep in a conditional type. Making
+it a peer settled the duplication, but at the price of an install obligation on
+every consumer — and it left unthrown's central guarantee, exhaustiveness, at
+the mercy of whichever version the consumer resolved.
 
-Declaring it as a peer guarantees a single copy the consumer owns, so
-`import { P } from "ts-pattern"` composes with unthrown's matchers as expected.
+The matcher is built into core instead, so neither problem remains: `match` /
+`P` / `NonExhaustiveError` come from `"unthrown"` itself, there is only ever one
+copy of the builder type, and nothing has to be installed alongside the package
+(see the built-in matcher entry).
 
-**Action required:** add `ts-pattern` (`^5`) to your own dependencies if you
-don't already depend on it. Most package managers surface this as a missing-peer
-warning on install.
+**Action required:** none on a fresh v5 install. If you added `ts-pattern` only
+for unthrown's sake, drop it; keep it if your own code matches with it, and
+import `P` from `"unthrown"` at unthrown call sites — the two `P`s are not
+interchangeable.

@@ -55,9 +55,9 @@ handed to every error combinator's callback. You return it un-terminated; the
 combinator runs `.exhaustive()`, so a missing case does not compile. See
 [Exhaustive error matching](../explanation/exhaustive-error-matching).
 
-**`P` / `tag(t)`**
-: `P` is unthrown's pattern namespace (`P._`, `P.instanceOf`, `P.when`, `P.union`, `P.string`, `P.number`).
-`tag(t)` is sugar for the `{ _tag: t }` pattern, narrowing to a tagged variant
+**`P` / `P.tag(t)`**
+: `P` is unthrown's pattern namespace (`P._`, `P.tag`, `P.instanceOf`, `P.when`, `P.union`, `P.string`, `P.number`).
+`P.tag(t)` is sugar for the `{ _tag: t }` pattern, narrowing to a tagged variant
 and its payload — the everyday way to write an arm. `P._` is the universal
 catch-all; it makes any match exhaustive, so it is reserved for the two cases
 enumeration cannot express — a helper generic in `E`, or an `E` that is a single

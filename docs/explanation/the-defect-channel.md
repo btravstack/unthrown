@@ -67,7 +67,7 @@ throws `NonExhaustiveError` at runtime, which becomes a `Defect`. There is no
 "no-op" on the error channel — every branch of the union must be handled, which
 is the whole point (see [Exhaustive error matching](./exhaustive-error-matching)).
 To genuinely pass the error through unchanged, use an observer (`tapErrCases`) —
-or re-emit each case by name (`.with(tag("NotFound"), (e) => e)…`).
+or re-emit each case by name (`.with(P.tag("NotFound"), (e) => e)…`).
 :::
 
 ## `recoverErrCases` clears the error channel, not the runtime

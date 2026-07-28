@@ -68,7 +68,7 @@ with the matcher gives you an exhaustive fold — the compiler lists
 exactly the cases the operation can hit:
 
 ```ts
-import { tag } from "unthrown";
+import { P } from "unthrown";
 
 const created = await db.user.tryCreate({ data: { email, name } });
 
@@ -76,9 +76,11 @@ return created.match({
   ok: (user) => resp.created(user),
   errCases: (matcher) =>
     matcher
-      .with(tag("UniqueConstraintViolation"), (e) => resp.conflict(`taken: ${e.fields.join(", ")}`))
-      .with(tag("ForeignKeyViolation"), () => resp.badRequest("unknown reference"))
-      .with(tag("DriverError"), (e) => resp.serverError(e)),
+      .with(P.tag("UniqueConstraintViolation"), (e) =>
+        resp.conflict(`taken: ${e.fields.join(", ")}`),
+      )
+      .with(P.tag("ForeignKeyViolation"), () => resp.badRequest("unknown reference"))
+      .with(P.tag("DriverError"), (e) => resp.serverError(e)),
   defect: (cause) => resp.serverError(cause),
 });
 // No RecordNotFound arm — a create can't raise it, and the type knows.
@@ -90,10 +92,10 @@ lights the call site up:
 
 ```ts
 matcher
-  .with(tag("UniqueConstraintViolation"), tag("ForeignKeyViolation"), () =>
+  .with(P.tag("UniqueConstraintViolation"), P.tag("ForeignKeyViolation"), () =>
     resp.badRequest("bad write"),
   )
-  .with(tag("DriverError"), (e) => resp.serverError(e));
+  .with(P.tag("DriverError"), (e) => resp.serverError(e));
 ```
 
 ## Transactions
@@ -130,7 +132,7 @@ const moved = db.$tryTransaction((tx) =>
 cursor API — same option names, same `[results, meta]` shape:
 
 ```ts
-import { tag } from "unthrown";
+import { P } from "unthrown";
 
 const page = await db.user
   .tryPaginate({ where: { active: true }, orderBy: { id: "asc" } })
@@ -139,7 +141,7 @@ const page = await db.user
 
 page.match({
   ok: ([users, meta]) => json({ users, nextCursor: meta.endCursor, hasMore: meta.hasNextPage }),
-  errCases: (matcher) => matcher.with(tag("DriverError"), (e) => serverError(e)),
+  errCases: (matcher) => matcher.with(P.tag("DriverError"), (e) => serverError(e)),
   defect: serverError,
 });
 ```

@@ -5,7 +5,7 @@ ruleTester.run("no-catch-all-pattern", noCatchAllPattern, {
   valid: [
     // Explicit enumeration — every case named, no wildcard.
     {
-      code: `import { P, tag } from "unthrown";\nresult.mapErrCases((m) => m.with(tag("A"), tag("B"), (e) => e));`,
+      code: `import { P } from "unthrown";\nresult.mapErrCases((m) => m.with(P.tag("A"), P.tag("B"), (e) => e));`,
     },
     // Specific `P.*` matchers are fine — only the catch-alls are banned.
     {

@@ -17,13 +17,15 @@ The headline breaking surface, so you have it up front:
 - **Removed 4.x aliases:** `unwrap` / `unwrapErr` / `unwrapOr` / `unwrapOrElse`
   (use `get` / `getErr` / `getOr` / `getOrElse`), `orElse` / `recover` (use
   `flatMapErrCases` / `recoverErrCases`), and `matchTags` / the `TagHandlers` type
-  (use `match({ …, errCases: (m) => m.with(tag("…"), …) })`).
+  (use `match({ …, errCases: (m) => m.with(P.tag("…"), …) })`).
 - **Renamed export:** `UnwrapError` → `GetError`.
 - **`getOrThrow()`** is now gated to a non-empty error channel; on a
   `Result<T, never>` use `get()`.
 - **The matcher is built-in** — nothing to install alongside `unthrown`. (The
   early v5 betas took `ts-pattern` as a peer; the built-in matcher replaced it,
-  keeping the same `.with(…)` / `tag` / `P` call-site shape.)
-- **`@unthrown/pattern` was absorbed into core** — import `match` / `P` / `tag`
-  from `unthrown`.
-- **New:** `ensure`, `DoAsync`, and the `match` / `P` / `tag` re-exports.
+  keeping the same `.with(…)` / `P` call-site shape.)
+- **`@unthrown/pattern` was absorbed into core** — import `match` / `P` from
+  `unthrown`.
+- **Renamed:** the standalone `tag("…")` pattern helper is now **`P.tag("…")`**,
+  alongside every other pattern constructor. The old export is removed.
+- **New:** `ensure`, `DoAsync`, and the `match` / `P` re-exports.

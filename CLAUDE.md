@@ -75,7 +75,7 @@ was planned).
    values cannot be silently dropped. The matcher matches by structure, so this
    works on any discriminant (`_tag`, `code`, guards, grouped patterns), not
    only `TaggedError`. **Every case is named** — that is the default position,
-   and cases sharing a handler are grouped (`.with(tag("A"), tag("B"), h)`)
+   and cases sharing a handler are grouped (`.with(P.tag("A"), P.tag("B"), h)`)
    rather than collapsed into a wildcard. `P._` is an **escape hatch**, not the
    sanctioned way to handle the channel: it makes any match exhaustive, so it
    absorbs unnamed every case `E` grows later — precisely the blanket-handling
@@ -89,7 +89,7 @@ was planned).
    `oxlint-disable` with a reason. Each branch
    receives the narrowed variant and the **injected `defect` helper** — the
    same injection `qualify` gets (Thesis #3), the sanctioned deliberate
-   `Err`→`Defect` form (`.with(tag("DriverError"), (e) => defect(e.cause))`);
+   `Err`→`Defect` form (`.with(P.tag("DriverError"), (e) => defect(e.cause))`);
    the outgoing type is the builder's output **with the `Defect` arm
    subtracted** (`Exclude<O, Defect>`, exactly the boundary inference), so a
    defect branch — or a throwing one, the safety net — contributes nothing.
@@ -116,14 +116,14 @@ was planned).
    plain value, with no `Defect` output channel; the separate `defect` case
    handles a `Result` that already carries one. (This subsumes the former
    `matchTags` fold — per-tag folding at the edge is now `match` with the
-   matcher and `tag(t)`, and it works on any discriminant, not only `_tag`.) The
-   value-surrendering extractors (`getOr` / `getOrElse` / `getOrNull` /
+   matcher and `P.tag(t)`, and it works on any discriminant, not only `_tag`.)
+   The value-surrendering extractors (`getOr` / `getOrElse` / `getOrNull` /
    `getOrUndefined`) stay exempt — the value is being surrendered anyway. **The
    matcher is built-in** (`matcher.ts` — it replaced the former `ts-pattern`
    peer, keeping its call-site shape): a purpose-built, shallow matcher whose
    exhaustiveness is plain `Exclude` over a tracked `Remaining` parameter, with
-   `match`, `P` (`_`/`any`, `instanceOf`, `when`, `union`, `string`, `number`),
-   `returnType<R>()` (declare the output type once — every branch is checked
+   `match`, `P` (`_`/`any`, `tag`, `instanceOf`, `when`, `union`, `string`,
+   `number`), `returnType<R>()` (declare the output type once — every branch is checked
    against it, and the match evaluates to `R` instead of the union of the branch
    returns; callable before any arm has produced an output and only once — in
    practice directly after `match(…)`, though an arm returning `never` closes
@@ -377,10 +377,11 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
 - matcher exports: `match`, `P`, and `NonExhaustiveError` come from the
   built-in `matcher.ts` (plus the types `Matcher`/`PatternMatcher`/
   `UniversalPattern`; the builder also carries `returnType<R>()`, which pins
-  the output type — see Thesis #5), and `tag(t)` (the `{ _tag: t }` pattern,
-  narrowing to
-  the variant + payload) lives in `tagged.ts`. These make the error matcher,
-  and matching a whole `Result` (`match(r).with({ tag: "Ok" }, …)`),
+  the output type — see Thesis #5). Every pattern constructor lives on `P`,
+  `P.tag(t)` (the `{ _tag: t }` pattern, narrowing to the variant + payload)
+  included — it is a pattern like `P.instanceOf` or `P.when`, so it is spelled
+  like one; there is **no** standalone `tag` export. These make the error
+  matcher, and matching a whole `Result` (`match(r).with({ tag: "Ok" }, …)`),
   first-class in one import — the former `@unthrown/pattern` package and the
   former `ts-pattern` re-exports, now one owned module.
 - guards: methods `isOk`/`isErr`/`isDefect` **and** standalone
@@ -483,11 +484,13 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
   name; the payload reserves `name`, `message`, **and** `stack` via `?: never`
   (`cause` stays allowed — see Thesis #4), so the
   message is set per subclass with `override message = "…"`, never as a payload
-  field) and `tag(t)` (the `{ _tag: t }` matcher pattern, for use in the
-  error matchers, in `match`'s `errCases` handler, and in `match(result)`); see the
+  field). The matching half is `P.tag(t)` (the `{ _tag: t }` matcher pattern,
+  for use in the error matchers, in `match`'s `errCases` handler, and in
+  `match(result)`) — it sits with the other pattern constructors, not with
+  `TaggedError`; see the
   `TaggedError` convention in Thesis #4. **There is no `matchTags`** — a per-tag
   exhaustive fold over a tagged error union is `result.match({ ok, defect, errCases:
-(matcher) => matcher.with(tag("…"), …) })`, which generalises beyond `_tag` to
+(matcher) => matcher.with(P.tag("…"), …) })`, which generalises beyond `_tag` to
   any discriminant.
 
 Deliberately **excluded** for now: **generator** do-notation (`gen`/`yield*`
@@ -613,8 +616,9 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   `constructors.ts` (`Ok`/`Err` + guards), `do.ts` (the `Do()` do-notation entry
   — the `bind`/`let` steps themselves live on the method surface in `core.ts`),
   `interop.ts` (`from*`/`qualify`/`all`), `facade.ts` (the `Result` object),
-  `tagged.ts` (`TaggedError`/`tag`), `matcher.ts` (the built-in matcher —
-  `match`/`P`/`NonExhaustiveError` + the `Matcher` types), and `index.ts` (the
+  `tagged.ts` (`TaggedError`), `matcher.ts` (the built-in matcher —
+  `match`/`P` (`P.tag` included)/`NonExhaustiveError` + the `Matcher` types),
+  and `index.ts` (the
   curated public re-exports — the one place the API is decided).
 
 ## Monorepo layout
@@ -782,9 +786,10 @@ channel?**
    changesets `release.yml`.)
 2. ✅ **`packages/core/src/tagged.ts`** — Done. `TaggedError(tag)` factory
    (extends `Error`, `_tag`, no-arg constructor when payload is empty via the
-   `keyof A extends never ? void : A` trick) and `tag(t)` (the `{ _tag: t }`
-   matcher pattern). A per-tag exhaustive fold is `match`'s `errCases` handler
-   with the matcher (`matcher.with(tag("…"), …)`), not a dedicated
+   `keyof A extends never ? void : A` trick). Its matching half is the
+   `P.tag(t)` pattern (`{ _tag: t }`), which lives with the other pattern
+   constructors. A per-tag exhaustive fold is `match`'s `errCases` handler
+   with the matcher (`matcher.with(P.tag("…"), …)`), not a dedicated
    `matchTags` — that former helper was folded into `match` when the matcher
    became the error-channel convention.
 3. ✅ **`packages/vitest`** — Done. Custom matchers `toBeOk`, `toBeOkWith`,
@@ -801,8 +806,9 @@ channel?**
    matchers — the abandoned assertion is reported exactly once, correctly
    attributed, and can never late-fire as an unhandled rejection.
 4. ✅ **The built-in matcher** — Done. `matcher.ts` powers the exhaustive error
-   matchers (Thesis #5), exporting `match`/`P`/`NonExhaustiveError`, plus
-   `tag(t)` (the `{ _tag: t }` pattern). Because `Result` is a discriminated
+   matchers (Thesis #5), exporting `match`/`P`/`NonExhaustiveError` — `P`
+   carrying every pattern constructor, `P.tag(t)` (the `{ _tag: t }` pattern)
+   included. Because `Result` is a discriminated
    union (Thesis #1), `match(result).with({ tag: "Ok" }, …)` also matches a
    whole `Result` natively. (History: the standalone `@unthrown/pattern`
    package was folded into core when a `ts-pattern` dependency was taken in

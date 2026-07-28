@@ -19,7 +19,7 @@ type_. Qualification happens once, inside the extension: no raw Promise ever
 reaches your code.
 
 ```ts
-import { tag } from "unthrown";
+import { P } from "unthrown";
 import { unthrownPrisma } from "@unthrown/prisma";
 import { PrismaClient } from "./generated/prisma/client.ts";
 
@@ -35,8 +35,8 @@ await db.user.tryCreate({ data }).match({
   // are grouped, so nothing is absorbed unnamed:
   errCases: (matcher) =>
     matcher
-      .with(tag("UniqueConstraintViolation"), (e) => conflict(e.fields))
-      .with(tag("ForeignKeyViolation"), tag("DriverError"), (e) => serverError(e)),
+      .with(P.tag("UniqueConstraintViolation"), (e) => conflict(e.fields))
+      .with(P.tag("ForeignKeyViolation"), P.tag("DriverError"), (e) => serverError(e)),
   defect: serverError,
 });
 ```

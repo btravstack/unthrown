@@ -38,8 +38,8 @@ error, and you **return the un-terminated builder**. The combinator calls
 db.reading.tryFindUniqueOrThrow({ where: { id } }).mapErrCases(
   (matcher, defect) =>
     matcher
-      .with(tag("RecordNotFound"), () => new ReadingNotFoundException(id))
-      .with(tag("DriverError"), (e) => defect(e.cause)), // deliberate defect — the tag leaves E
+      .with(P.tag("RecordNotFound"), () => new ReadingNotFoundException(id))
+      .with(P.tag("DriverError"), (e) => defect(e.cause)), // deliberate defect — the tag leaves E
 );
 ```
 
@@ -77,7 +77,7 @@ through unchanged is a real decision with a real spelling:
 
 - to _observe_ and pass through, use `tapErrCases` (an observer);
 - to _re-emit_ cases unchanged, name them — grouped in one arm if they share the
-  treatment: `.with(tag("NotFound"), tag("Forbidden"), (e) => e)`.
+  treatment: `.with(P.tag("NotFound"), P.tag("Forbidden"), (e) => e)`.
 
 Grouped patterns are the honest form of "several cases, one strategy": the
 handler is written once, but every case is still spelled out, so enriching `E`
@@ -139,7 +139,8 @@ matcher exists to eliminate.
 ```ts
 result.match({
   ok: (v) => v,
-  errCases: (matcher) => matcher.with(tag("NotFound"), () => 404).with(tag("Forbidden"), () => 403),
+  errCases: (matcher) =>
+    matcher.with(P.tag("NotFound"), () => 404).with(P.tag("Forbidden"), () => 403),
   defect: (cause) => 500,
 });
 ```
@@ -190,7 +191,7 @@ input. There is no way to widen this hole from user code.
 // ❌ Still won't compile — and shouldn't: tag arms can never be shown to cover
 // an unresolved E. Only the catch-all (or a concrete union) can.
 function partial<T, E>(result: Result<T, E>) {
-  return result.mapErrCases((matcher) => matcher.with(tag("NotFound"), () => 404));
+  return result.mapErrCases((matcher) => matcher.with(P.tag("NotFound"), () => 404));
 }
 ```
 
@@ -258,8 +259,8 @@ result.mapErrCases(
   (matcher, defect) =>
     matcher
       .returnType<ApiError>()
-      .with(tag("RecordNotFound"), () => new ApiError({ status: 404 }))
-      .with(tag("DriverError"), (e) => defect(e.cause)), // still fine
+      .with(P.tag("RecordNotFound"), () => new ApiError({ status: 404 }))
+      .with(P.tag("DriverError"), (e) => defect(e.cause)), // still fine
 );
 ```
 

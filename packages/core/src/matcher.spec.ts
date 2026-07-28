@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import { match, NonExhaustiveError, P } from "./matcher.js";
-import { tag } from "./tagged.js";
 
 describe("the built-in matcher engine", () => {
   it("matches a primitive literal (Object.is semantics)", () => {
@@ -47,12 +46,12 @@ describe("the built-in matcher engine", () => {
     ).toBe("prim");
   });
 
-  it("matches tag() patterns and grouped patterns with one handler", () => {
+  it("matches P.tag() patterns and grouped patterns with one handler", () => {
     type E = { _tag: "A"; a: number } | { _tag: "B" } | { _tag: "C" };
     const run = (e: E) =>
       match(e)
-        .with(tag("A"), (a) => `a:${a.a}`)
-        .with(tag("B"), tag("C"), (bc) => `bc:${bc._tag}`)
+        .with(P.tag("A"), (a) => `a:${a.a}`)
+        .with(P.tag("B"), P.tag("C"), (bc) => `bc:${bc._tag}`)
         .run();
     expect(run({ _tag: "A", a: 1 })).toBe("a:1");
     expect(run({ _tag: "B" })).toBe("bc:B");
@@ -115,8 +114,8 @@ describe("the built-in matcher engine", () => {
     type E = { _tag: "A" } | { _tag: "B" } | { _tag: "C" };
     const run = (e: E) =>
       match(e)
-        .with(P.union(tag("A"), tag("B")), (ab) => `ab:${ab._tag}`)
-        .with(tag("C"), () => "c")
+        .with(P.union(P.tag("A"), P.tag("B")), (ab) => `ab:${ab._tag}`)
+        .with(P.tag("C"), () => "c")
         .run();
     expect(run({ _tag: "A" })).toBe("ab:A");
     expect(run({ _tag: "B" })).toBe("ab:B");
@@ -189,8 +188,8 @@ describe("the built-in matcher engine", () => {
   it("arms after a match are inert (builder short-circuits)", () => {
     let sideEffect = 0;
     const out = match({ _tag: "A" } as { _tag: "A" } | { _tag: "B" })
-      .with(tag("A"), () => "a")
-      .with(tag("B"), () => {
+      .with(P.tag("A"), () => "a")
+      .with(P.tag("B"), () => {
         sideEffect += 1;
         return "b";
       })
@@ -209,6 +208,19 @@ describe("the built-in matcher engine", () => {
         .with("b", () => 2)
         .run(),
     ).toBe(1);
+  });
+
+  it("freezes the P namespace — its members cannot be swapped out", () => {
+    // `P` is part of the exhaustiveness machinery (the catch-all's phantom
+    // universality above all), so a member swapped out from under every call
+    // site would silently change what "exhaustive" means at runtime.
+    expect(Object.isFrozen(P)).toBe(true);
+    expect(Object.isFrozen(P._)).toBe(true);
+    expect(Object.isFrozen(P.string)).toBe(true);
+    expect(() => {
+      (P as unknown as { string: unknown }).string = P.number;
+    }).toThrow(TypeError);
+    expect(P.string).not.toBe(P.number);
   });
 
   it("still throws NonExhaustiveError under a pin when no arm matches", () => {
