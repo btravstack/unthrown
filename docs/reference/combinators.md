@@ -168,6 +168,8 @@ The same shape works for every error combinator — transform, recover, or fold 
 the edge — and mixes freely with per-case arms:
 
 ```ts
+// result: Result<number, RateLimited | NotFound | Forbidden>
+
 // one case handled specially, the rest sharing a strategy
 result.tapErrCases((matcher) =>
   matcher
@@ -176,12 +178,17 @@ result.tapErrCases((matcher) =>
 );
 
 result.recoverErrCases((matcher) =>
-  matcher.with(tag("NotFound"), tag("Forbidden"), () => fallback),
+  matcher
+    .with(tag("RateLimited"), (e) => e.retryAfter)
+    .with(tag("NotFound"), tag("Forbidden"), () => fallback),
 );
 
 result.match({
   ok: (v) => v,
-  errCases: (matcher) => matcher.with(tag("NotFound"), tag("Forbidden"), (e) => `failed: ${e}`),
+  errCases: (matcher) =>
+    matcher
+      .with(tag("RateLimited"), (e) => `retry in ${e.retryAfter}`)
+      .with(tag("NotFound"), tag("Forbidden"), (e) => `failed: ${e}`),
   defect: (c) => `bug: ${c}`,
 });
 ```
