@@ -18,12 +18,24 @@ const CATCH_ALL_PROPS: ReadonlySet<string> = new Set(["_", "any"]);
  * *accounted for by name* — a catch-all re-opens the blanket-handling hole it
  * closes, silently absorbing any error the union grows later.
  *
- * This rule is **stricter than unthrown's own default**: the library documents
- * `P._` as the sanctioned "handle everything else" branch, so this is opt-in
- * (not in the `recommended` preset) — for teams that want *every* error
- * enumerated (`.with(tag("A"), tag("B"), …, handler)`, grouping cases that
- * share a handler) with no wildcard. A genuinely intended catch-all carries a
- * targeted `oxlint-disable` with a reason.
+ * This rule states unthrown's own default: every error case is enumerated by
+ * name (`.with(tag("A"), tag("B"), …, handler)`, grouping cases that share a
+ * handler), and `P._` is an **escape hatch**, not the sanctioned way to handle
+ * the error channel. Hence its place in the `recommended` preset.
+ *
+ * The one irreducible use of the catch-all is a helper **generic in `E`**: no
+ * list of arms can prove exhaustiveness against an unresolved type parameter,
+ * and only `P._`'s state transition can. Silence the rule there — and at any
+ * other deliberate wildcard — with a targeted disable and a reason:
+ *
+ * ```ts
+ * const toApiError = <T, E>(result: Result<T, E>): Result<T, ApiError> =>
+ *   result.mapErrCases((matcher) =>
+ *     // oxlint-disable-next-line unthrown/no-catch-all-pattern -- generic in `E`:
+ *     // no arm list can prove exhaustiveness here.
+ *     matcher.returnType<ApiError>().with(P._, (error) => new ApiError({ error })),
+ *   );
+ * ```
  *
  * Resolves `P` by its imported name via scope analysis, so a rename
  * (`import { P as Pattern }`) still fires and a decoy (`const P = …`) does not.
@@ -35,12 +47,12 @@ export const noCatchAllPattern = defineRule({
     type: "suggestion",
     docs: {
       description:
-        "Disallow the `P._` / `P.any` catch-all in an unthrown matcher — enumerate every error case instead",
-      recommended: false,
+        "Disallow the `P._` / `P.any` catch-all in an unthrown matcher — enumerate every error case by name; the catch-all is an escape hatch (a helper generic in `E`), carried by a targeted `oxlint-disable`",
+      recommended: true,
     },
     messages: {
       noCatchAll:
-        'Unexpected `P.{{prop}}` catch-all. Enumerate every error case by name — `.with(tag("A"), tag("B"), …, handler)`, grouping cases that share a handler — so a new error can\'t be silently absorbed. A deliberate catch-all carries a targeted `oxlint-disable` with a reason.',
+        'Unexpected `P.{{prop}}` catch-all. Enumerate every error case by name — `.with(tag("A"), tag("B"), …, handler)`, grouping cases that share a handler — so a new error can\'t be silently absorbed. The catch-all is an escape hatch: in a helper generic in `E` it is the only arm that can prove exhaustiveness, so keep it there behind a targeted `oxlint-disable` with a reason.',
     },
   },
   createOnce: (context) => {

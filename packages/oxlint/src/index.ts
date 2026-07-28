@@ -6,11 +6,10 @@
 //                                        also covers mapErrCases' returnType<R>() pin.
 //   unthrown/prefer-async-result      — use AsyncResult<T,E> over Promise<Result<T,E>>.
 //   unthrown/no-unhandled-result      — don't drop a Result returned by a bare call.
+//   unthrown/no-catch-all-pattern     — ban the `P._` / `P.any` matcher catch-all;
+//                                        enumerate every error case by name.
 //   unthrown/no-throw                 — ban raw `throw` (opt-in; not in `recommended`) —
 //                                        errors are returned, only a defect ever throws.
-//   unthrown/no-catch-all-pattern     — ban the `P._` / `P.any` matcher catch-all
-//                                        (opt-in; not in `recommended`) — enumerate
-//                                        every error case instead.
 //
 // Enable the bundled `recommended` preset, or wire the rules by hand. See the
 // package README.
@@ -39,15 +38,23 @@ const plugin = eslintCompatPlugin({
   },
 }) as UnthrownPlugin;
 
-// `no-throw` and `no-catch-all-pattern` are deliberately NOT in the preset:
-// `no-throw` bans a core language statement, and `no-catch-all-pattern` is
-// stricter than unthrown's own default (the library documents `P._` as the
-// sanctioned catch-all). Both stay explicit opt-ins for codebases committed to
-// the convention end-to-end.
+// `no-throw` is the ONE deliberate opt-out from the preset: it bans a core
+// language statement, which is a whole-codebase commitment rather than an
+// unthrown convention.
+//
+// `no-catch-all-pattern` IS in the preset. Enumerating every error case by name
+// is unthrown's default position — the exhaustive matcher exists so a failure
+// mode cannot be absorbed unnamed, and `P._` re-opens exactly the
+// blanket-handling hole it closes. `P._` remains an escape hatch, not the
+// sanctioned default: its one irreducible use is a helper generic in `E`, where
+// no list of arms can prove exhaustiveness and only the catch-all's state
+// transition can. That site silences the rule with a targeted
+// `oxlint-disable-next-line unthrown/no-catch-all-pattern` and a reason.
 plugin.recommended = defineConfig({
   jsPlugins: [{ name: "unthrown", specifier: "@unthrown/oxlint" }],
   rules: {
     "unthrown/no-ambiguous-error-type": "error",
+    "unthrown/no-catch-all-pattern": "error",
     "unthrown/no-unhandled-result": "error",
     "unthrown/prefer-async-result": "error",
   },
