@@ -173,9 +173,10 @@ compiler point at each unhandled case until every one is named — the rule and 
 type checker push the same way.
 
 `P._` remains a legitimate **escape hatch**, and the rule expects you to say so
-in place. The case it exists for is a helper still **generic in `E`**, where no
+in place. Two cases are legitimate: a helper still **generic in `E`**, where no
 list of tag arms can prove coverage and the catch-all is the only form that
-compiles:
+compiles; and an **`E` that is a single type** rather than a union, where one
+arm _is_ the enumeration. The first looks like this:
 
 ```ts
 function toPromise<T, E>(result: Result<T, E>): T {

@@ -48,12 +48,12 @@ export const noCatchAllPattern = defineRule({
     type: "suggestion",
     docs: {
       description:
-        "Disallow the `P._` / `P.any` catch-all in an unthrown matcher — enumerate every error case by name; the catch-all is an escape hatch (a helper generic in `E`), carried by a targeted `oxlint-disable`",
+        "Disallow the `P._` / `P.any` catch-all in an unthrown matcher — enumerate every error case by name; the catch-all is an escape hatch (a helper generic in `E`, or an `E` that is a single type rather than a union), carried by a targeted `oxlint-disable`",
       recommended: true,
     },
     messages: {
       noCatchAll:
-        'Unexpected `P.{{prop}}` catch-all. Enumerate every error case by name — `.with(tag("A"), tag("B"), …, handler)`, grouping cases that share a handler — so a new error can\'t be silently absorbed. The catch-all is an escape hatch: in a helper generic in `E` it is the only arm that can prove exhaustiveness, so keep it there behind a targeted `oxlint-disable` with a reason.',
+        'Unexpected `P.{{prop}}` catch-all. Enumerate every error case by name — `.with(tag("A"), tag("B"), …, handler)`, grouping cases that share a handler — so a new error can\'t be silently absorbed. The catch-all is an escape hatch for what enumeration can\'t express — a helper generic in `E`, or an `E` that is a single type rather than a union — so keep it there behind a targeted `oxlint-disable` with a reason.',
     },
   },
   createOnce: (context) => {

@@ -129,8 +129,8 @@ const status = authorize(id).match({
 
 Grouping is the answer when several errors deserve the same response: the union
 stays written out, so adding a fourth code still stops the build here. `P._`
-exists for the one shape enumeration cannot express — a helper generic in `E`
-— and is covered in
+exists for what enumeration cannot express — a helper generic in `E`, or an `E`
+that is a single type rather than a union — and is covered in
 [Exhaustive error matching](../explanation/exhaustive-error-matching#generic-boundary-helpers-the-catch-all-is-the-only-form-that-compiles).
 
 Unlike the error _combinators_ (`mapErrCases`, `flatMapErrCases`, …), `match`'s `err`
