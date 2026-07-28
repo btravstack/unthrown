@@ -916,6 +916,7 @@ new WithMsg({ ticketId: "t1" });
   class NotFound extends TaggedError("NotFound")<{ id: string }> {}
   class DriverError extends TaggedError("DriverError")<{ cause: unknown }> {}
   class ApiError extends TaggedError("ApiError")<{ status: number }> {}
+  class AuditFailed extends TaggedError("AuditFailed") {}
   const r = Ok(1) as Result<number, NotFound | DriverError>;
 
   // mapErrCases: the outgoing E is the DECLARED type
@@ -994,6 +995,16 @@ new WithMsg({ ticketId: "t1" });
   );
   type _Observed = Expect<Equal<typeof observed, Result<number, NotFound | DriverError>>>;
 
+  // flatTapErrCases: the observer's own failure channel is the declared type,
+  // unioned with the untouched incoming E (this combinator infers a plain E2 —
+  // see CLAUDE.md on why it does not derive the channel through MatchOut)
+  const flatObserved = r.flatTapErrCases((matcher) =>
+    matcher.returnType<Result<never, AuditFailed>>().with(P._, () => Err(new AuditFailed())),
+  );
+  type _FlatObserved = Expect<
+    Equal<typeof flatObserved, Result<number, NotFound | DriverError | AuditFailed>>
+  >;
+
   // the async surface mirrors it
   const apinned = r.toAsync().mapErrCases((matcher) =>
     matcher
@@ -1002,6 +1013,37 @@ new WithMsg({ ticketId: "t1" });
       .with(tag("DriverError"), () => new ApiError({ status: 500 })),
   );
   type _APinned = Expect<Equal<typeof apinned, AsyncResult<number, ApiError>>>;
+
+  // async flatMapErrCases: mirrors the sync channel derivation
+  const aflat = r.toAsync().flatMapErrCases((matcher) =>
+    matcher
+      .returnType<Result<string, ApiError>>()
+      .with(tag("NotFound"), (n) => Ok(n.id))
+      .with(tag("DriverError"), () => Err(new ApiError({ status: 500 }))),
+  );
+  type _AFlat = Expect<Equal<typeof aflat, AsyncResult<number | string, ApiError>>>;
+
+  // async recoverErrCases: mirrors the sync recovered-success-type derivation
+  const arec = r
+    .toAsync()
+    .recoverErrCases((matcher) => matcher.returnType<number>().with(P._, () => 0));
+  type _ARec = Expect<Equal<typeof arec, AsyncResult<number, never>>>;
+
+  // async tapErrCases: the error still passes through unchanged under a pin
+  const aobserved = r
+    .toAsync()
+    .tapErrCases((matcher) => matcher.returnType<void>().with(P._, () => undefined));
+  type _AObserved = Expect<Equal<typeof aobserved, AsyncResult<number, NotFound | DriverError>>>;
+
+  // async flatTapErrCases: mirrors the sync plain-E2 channel derivation
+  const aflatObserved = r
+    .toAsync()
+    .flatTapErrCases((matcher) =>
+      matcher.returnType<Result<never, AuditFailed>>().with(P._, () => Err(new AuditFailed())),
+    );
+  type _AFlatObserved = Expect<
+    Equal<typeof aflatObserved, AsyncResult<number, NotFound | DriverError | AuditFailed>>
+  >;
 
   // match's errCases handler: the fold type is the declared one
   const folded = r.match({
