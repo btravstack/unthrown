@@ -175,6 +175,54 @@ function toPromise<T, E>(result: Result<T, E>): T {
 }
 ```
 
+## Declaring the output: `returnType<R>()`
+
+By default a match's output type is **inferred** — the union of whatever the
+branches return. That is the right default when the branches are the source of
+truth. It is the wrong one when a **signature** is: a boundary helper, a bridge,
+an adapter whose return type is already decided. There, inference works
+backwards, and a branch that drifts off-spec silently widens the result instead
+of failing.
+
+`.returnType<R>()`, called directly after `match(…)`, declares the output once:
+
+```ts
+const toApiError = <T, E>(result: Result<T, E>): Result<T, ApiError> =>
+  result.mapErrCases((matcher) =>
+    matcher.returnType<ApiError>().with(P._, (error) => new ApiError({ status: 500, error })),
+  );
+```
+
+Three things change:
+
+- **The match evaluates to `R`**, not to the union of the branch returns — so
+  the helper's declared return type is what actually flows out.
+- **Every branch is checked against `R`**, and a mismatch is reported **on the
+  offending branch** rather than downstream at the call site.
+- **Branch returns get a contextual type**, so object literals infer against `R`
+  with no per-branch annotation.
+
+The injected `defect` helper stays legal under a pin — the defect channel is not
+part of the declared output:
+
+```ts
+result.mapErrCases(
+  (matcher, defect) =>
+    matcher
+      .returnType<ApiError>()
+      .with(tag("RecordNotFound"), () => new ApiError({ status: 404 }))
+      .with(tag("DriverError"), (e) => defect(e.cause)), // still fine
+);
+```
+
+Exhaustiveness is unaffected: a missing case is still a compile error, and
+`P._` is still the deliberate catch-all. Pinning declares _what comes out_, not
+_what is covered_.
+
+`.returnType<R>()` is allowed **only directly after `match(…)`** — once an arm
+has run there is already an inferred output to contradict, so pinning late (or
+twice) does not compile.
+
 ## Where to go next
 
 - The mechanics and every rule: [Combinator reference](../reference/combinators#the-error-channel).

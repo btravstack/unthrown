@@ -110,6 +110,13 @@ forget, and no `.otherwise()` to slip in a fallback. The rationale is in
   so defecting a case removes it from the modeled channel. A branch that `throw`s
   also becomes a defect, but `defect(...)` is the lint-clean, expression-position
   form.
+- **…unless you declare it.** `matcher.returnType<R>()`, called directly after
+  the matcher is handed to you, pins the output to `R`: every branch is checked
+  against it (a mismatch is reported on that branch) and the outgoing channel is
+  `R` rather than the union of the branch returns. Reach for it when a signature
+  decides the type — most sharply in code generic in `E`. A `defect(…)` branch
+  stays legal under a pin. See
+  [Exhaustive error matching](../explanation/exhaustive-error-matching#declaring-the-output-returntype-r).
 - **`P._` is the deliberate catch-all.** Uniform handling — the equivalent of the
   old single callback — is one wildcard branch: `matcher.with(P._, (e) => wrap(e))`.
   It makes the match exhaustive and reads as an explicit "everything else" at the

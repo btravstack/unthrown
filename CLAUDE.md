@@ -111,7 +111,12 @@ was planned).
    peer, keeping its call-site shape): a purpose-built, shallow matcher whose
    exhaustiveness is plain `Exclude` over a tracked `Remaining` parameter, with
    `match`, `P` (`_`/`any`, `instanceOf`, `when`, `union`, `string`, `number`),
-   and `NonExhaustiveError` exported from core — first-class in one import,
+   `returnType<R>()` (declare the output type once — every branch is checked
+   against it, and the match evaluates to `R` instead of the union of the branch
+   returns; callable only directly after `match(…)`, a runtime no-op, and a
+   `defect(…)` branch stays legal because the defect channel is not part of the
+   declared output), and `NonExhaustiveError` exported from core — first-class in
+   one import,
    dual-copy-safe (patterns carry a `Symbol.for` brand). Deliberately **not**
    supported: deep structural inversion, `P.select`, array patterns — the
    complexity (and cross-version instability) the replacement removed.
@@ -158,6 +163,17 @@ was planned).
   object can satisfy it and bypass exhaustiveness in typed code — accepted, as
   a deliberate act no worse than the sanctioned `P._` catch-all. This
   is a _type-level_ invariant, guarded in `types.test-d.ts`.
+- **A pinned match under-describes the defect channel — deliberately, and by
+  exactly the amount `recoverErrCases` already does.** Under
+  `.returnType<R>()` a branch handler may return `R | Defect` (the injected
+  `defect` helper stays legal — Thesis #5) while `run()`/`exhaustive()` type as
+  `R`. This is the same subtraction the unpinned path performs with
+  `Exclude<O, Defect>`, decided up front instead of at the end. It is sound at
+  runtime because the combinators' `runMatch` checks `isDefectMarker` before
+  using the value, so a defect never escapes typed as `R`. `match`'s `errCases`
+  handler accepts the same shape but is injected **no** `defect` helper, and
+  there is no public constructor — so a `Defect` is unreachable there. This is a
+  _type-level_ invariant, guarded in `types.test-d.ts`.
 - **A `Defect` flows through every method untouched EXCEPT `match()`,
   `recoverDefect()`, and the observers `tapDefect()` / `tapFailure()` (which
   observe it without consuming it).** Therefore `getOr`, `getOrElse`,
@@ -312,7 +328,9 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
   name — no deprecated surface survives into v5.
 - matcher exports: `match`, `P`, and `NonExhaustiveError` come from the
   built-in `matcher.ts` (plus the types `Matcher`/`PatternMatcher`/
-  `UniversalPattern`), and `tag(t)` (the `{ _tag: t }` pattern, narrowing to
+  `UniversalPattern`; the builder also carries `returnType<R>()`, which pins
+  the output type — see Thesis #5), and `tag(t)` (the `{ _tag: t }` pattern,
+  narrowing to
   the variant + payload) lives in `tagged.ts`. These make the error matcher,
   and matching a whole `Result` (`match(r).with({ tag: "Ok" }, …)`),
   first-class in one import — the former `@unthrown/pattern` package and the
