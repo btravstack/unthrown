@@ -2,13 +2,14 @@
 "unthrown": major
 ---
 
-**The exhaustive matcher is now built-in — the `ts-pattern` peer dependency is
-removed.** `match`, `P`, and the new `NonExhaustiveError` are unthrown's own
-(`Matcher` / `PatternMatcher` / `UniversalPattern` types included), keeping the
-exact call-site shape: `.with(pattern, …patterns, handler)`, `P.tag(t)`, grouped
-patterns, and `P._` / `P.any` / `P.instanceOf` / `P.when` / `P.union` /
-`P.string` / `P.number`. Most code needs **no changes** beyond deleting
-`ts-pattern` from your dependencies (if you only added it for unthrown).
+**The exhaustive matcher is now built-in — core carries no `ts-pattern`
+dependency, plain or peer.** `match`, `P`, and the new `NonExhaustiveError` are
+unthrown's own (`Matcher` / `PatternMatcher` / `UniversalPattern` types
+included), keeping the exact call-site shape:
+`.with(pattern, …patterns, handler)`, `P.tag(t)`, grouped patterns, and `P._` /
+`P.any` / `P.instanceOf` / `P.when` / `P.union` / `P.string` / `P.number`. Most
+code needs **no changes** beyond deleting `ts-pattern` from your dependencies
+(if you only added it for unthrown).
 
 Why: exhaustiveness is unthrown's central promise, and delegating it to a peer
 meant the guarantee could vary with whichever ts-pattern version a consumer

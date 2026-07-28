@@ -6,13 +6,16 @@
 `flatMapErr`, `recoverErr`, `tapErr`, and `flatTapErr` become `mapErrCases`,
 `flatMapErrCases`, `recoverErrCases`, `tapErrCases`, and `flatTapErrCases`.
 
-Each takes a ts-pattern matcher over the error's _cases_, not the error value —
+Each takes an exhaustive matcher over the error's _cases_, not the error value —
 so the suffix names that protocol and keeps it distinct from the value-taking
 success surface (`map` / `tap`). A bare `mapErr((e) => …)` would promise a
 functor-style callback the combinators never accept; there is deliberately no
 such variant.
 
-Migration is a rename at every call site:
+Migration is a rename at every call site. (The `-` lines here and below are the
+pre-rename v5-beta spelling, matcher callback included; coming from 4.x, `mapErr`
+and `match`'s `err` took a plain `(error) => …` callback — see the
+exhaustive-matcher entry for that step.)
 
 ```diff
 - result.mapErr((m) => m.with(tag("NotFound"), wrap))
@@ -20,7 +23,7 @@ Migration is a rename at every call site:
 ```
 
 **`match`'s error handler is renamed the same way — `err` → `errCases`** — for
-the same reason: it takes the exhaustive ts-pattern matcher, not a plain
+the same reason: it takes the same exhaustive matcher, not a plain
 `(error) => …` callback. This also makes the change **loud** where it would
 otherwise be silent: a leftover 4.x `err: (error) => …` handler still compiled
 under the matcher constraint (a throwing handler returns `never`, which

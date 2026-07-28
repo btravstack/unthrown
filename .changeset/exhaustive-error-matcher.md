@@ -2,10 +2,10 @@
 "unthrown": major
 ---
 
-**The error channel is now matched exhaustively with ts-pattern** (Thesis #5).
+**The error channel is now matched exhaustively** (Thesis #5).
 The error combinators — `mapErrCases`, `flatMapErrCases`, `recoverErrCases`, `tapErrCases`,
 `flatTapErrCases` — no longer take a plain callback. Their callback receives a
-ts-pattern match builder over the error (`match(error)`) plus the injected
+match builder over the error (`match(error)`) plus the injected
 `defect` helper, and **returns the un-terminated builder** — the combinator
 calls `.exhaustive()` for you:
 
@@ -33,7 +33,7 @@ compile error at every consuming site** until each new case is handled. Because
 the combinator runs `.exhaustive()`, a missing case does not compile — there is
 no `.exhaustive()` to forget and no `.otherwise()` to smuggle in a fallback.
 
-- **Match on anything ts-pattern supports** — `_tag`, a `code`-discriminated
+- **Match on any discriminant** — `_tag`, a `code`-discriminated
   union (the oRPC shape), structural shapes, guards, and grouped patterns
   (`.with(a, b, handler)` — one strategy for several cases). `P.tag("X")` is sugar
   for the `{ _tag: "X" }` pattern.
@@ -49,16 +49,17 @@ no `.exhaustive()` to forget and no `.otherwise()` to smuggle in a fallback.
 - **Observers match exhaustively too** (`tapErrCases`/`flatTapErrCases`, with the
   same named arms); the error is observed and flows through unchanged.
 
-**Core now depends on `ts-pattern`** (a small, types-heavy, dual-copy-safe
-library), and re-exports `match` and `P` — so the matcher, and matching a whole
-`Result` (`match(r).with(P.Ok(), …)`), are first-class in one import. **The
-`@unthrown/pattern` package is removed** — its `tag` helper is now core's
-`P.tag(t)` pattern constructor; the `P.Ok`/`P.Err`/`P.Defect` sugar is dropped
-(match the union structurally instead).
+**The matcher is built into core**, which keeps **zero runtime dependencies**:
+`match`, `P`, and `NonExhaustiveError` are unthrown's own exports — so the
+matcher, and matching a whole `Result` (`match(r).with({ tag: "Ok" }, …)`), are
+first-class in one import. **The `@unthrown/pattern` package is removed** — its
+`match` / `P` are core's now, and its `tag` helper is the `P.tag(t)` pattern
+constructor; the `P.Ok`/`P.Err`/`P.Defect` sugar is dropped (match the union
+structurally instead).
 
 **`match` now matches the error channel exhaustively too, and `matchTags` is
 removed.** `match`'s error handler no longer takes a blanket `(error) => R`
-callback — it receives the same ts-pattern matcher and returns the un-terminated
+callback — it receives the same exhaustive matcher and returns the un-terminated
 builder (no `defect` helper: `match` folds to a value, with no `Defect` output
 channel). It is also **renamed `err` → `errCases`** to match the combinators and
 to make the change loud (a leftover 4.x `err:` handler is now an
@@ -91,11 +92,13 @@ result.match({
 Name every case here too, grouping the ones that share a handler; `.with(P._, …)`
 stays an escape hatch, not the shape to reach for first. `matchTags` and its
 `TagHandlers` type are gone; `TaggedError` is unchanged. **Library code generic
-in the error type `E`** (which ts-pattern can't prove exhaustive over an
-unresolved type parameter) should fold with the `isOk` / `isErr` / `isDefect`
-guards instead of `match`.
+in the error type `E`** can still fold with the `isOk` / `isErr` / `isDefect`
+guards — the simplest shape when no per-case branching is needed — but `match`
+works there too, terminated by the `.with(P._, …)` catch-all: it is the one arm
+provable against an unresolved type parameter.
 
 **Also breaking:** the deprecated error-channel aliases `orElse` and `recover`
-are removed; the extractor aliases (`unwrap`, `unwrapErr`, `unwrapOr`,
-`unwrapOrElse`) remain. `AsyncOkOf` / `AsyncErrOf` now infer through the
-awaitable channel only (same results for ordinary `AsyncResult` types).
+are removed, as are the extractor aliases `unwrap` / `unwrapErr` / `unwrapOr` /
+`unwrapOrElse` (see the extractor entry). `AsyncOkOf` / `AsyncErrOf` now infer
+through the awaitable channel only (same results for ordinary `AsyncResult`
+types).
