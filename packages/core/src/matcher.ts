@@ -19,9 +19,9 @@
 // primitive literals, shallow(-ly nested) object literals (`{ _tag: "X" }`,
 // `{ code: "X" }` — `P.tag(t)` produces the former), and the `P.*` matchers
 // (`_`/`any`, `tag`, `instanceOf`, `when`, `union`, `string`, `number`).
-// Deliberately
-// NOT supported: deep structural inversion, selections, array/variadic
-// patterns — that is the complexity (and instability) being left behind.
+// Deliberately NOT supported: deep structural inversion, selections,
+// array/variadic patterns — that is the complexity (and instability) being
+// left behind.
 
 import type { Defect } from "./defect.js";
 
@@ -390,10 +390,13 @@ const universal = pattern<unknown>(() => true) as UniversalPattern;
  *   `no-catch-all-pattern` (in its `recommended` preset) flags every other use;
  *   keep the deliberate ones behind a targeted `oxlint-disable` saying which of
  *   the two it is.
- * - `P.tag(t)` — the `{ _tag: t }` object pattern, matching any value whose
- *   `_tag` equals `t` (a `TaggedError`, or any `_tag`-discriminated member) and
- *   narrowing to that variant, payload included. The workhorse of the error
- *   channel: `matcher.with(P.tag("NotFound"), () => …)`.
+ * - `P.tag<const Tag extends string>(value: Tag): { _tag: Tag }` — the
+ *   `{ _tag: t }` object pattern, matching any value whose `_tag` equals `t` (a
+ *   `TaggedError`, or any `_tag`-discriminated member) and narrowing the
+ *   branch's parameter to that variant, payload included. The workhorse of the
+ *   error channel: `matcher.with(P.tag("NotFound"), (e) => …)`. It composes like
+ *   any other pattern — in a grouped arm
+ *   (`.with(P.tag("A"), P.tag("B"), handler)`) and inside `P.union`.
  * - `P.instanceOf(Cls)` — an `instanceof` check, narrowing to the class
  *   instance type (for union members that are not tagged, e.g. a third-party
  *   error class).
@@ -406,24 +409,6 @@ const universal = pattern<unknown>(() => true) as UniversalPattern;
 export const P = Object.freeze({
   _: universal,
   any: universal,
-  /**
-   * A matcher pattern matching any value whose `_tag` equals `value` — a
-   * `TaggedError`, or any `_tag`-discriminated member. Equivalent to the object
-   * pattern `{ _tag: value }`, but reads better inside an error-matching
-   * combinator and narrows to the matching variant, payload included.
-   *
-   * @typeParam Tag - the string literal tag to match.
-   * @param value - the `_tag` to match.
-   *
-   * @example
-   * ```ts
-   * result.mapErrCases((matcher) =>
-   *   matcher
-   *     .with(P.tag("NotFound"), () => new NotFoundException())
-   *     .with(P.tag("Conflict"), (e) => new ConflictException(e.key)),
-   * );
-   * ```
-   */
   tag: <const Tag extends string>(value: Tag): { _tag: Tag } => ({ _tag: value }),
   instanceOf: <C extends abstract new (...args: never[]) => unknown>(
     cls: C,

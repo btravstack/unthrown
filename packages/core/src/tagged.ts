@@ -66,10 +66,14 @@ export type TaggedErrorConstructor<Tag extends string> = {
  * so a payload `cause` (e.g. a wrapped driver error) is a legitimate,
  * *narrowing* structured field.
  *
+ * The matching half of the convention is `P.tag(t)` — the pattern constructor on
+ * the `P` namespace, which builds the `{ _tag: t }` pattern this factory's `_tag`
+ * is selected by (there is no standalone `tag` export).
+ *
  * `_tag` is the discriminant matched by `P.tag` in the error combinators
  * (`result.mapErrCases((matcher) => matcher.with(P.tag("NotFound"), …))`) and in
- * `match`; `Error.name` is the human-facing label in stack traces and logs. By
- * default they coincide, but
+ * `match`'s `errCases` handler; `Error.name` is the human-facing label in stack
+ * traces and logs. By default they coincide, but
  * they can be **decoupled** with `options.name` — so a tag can be namespaced for
  * collision-safety (`"@my-lib/RetryableError"`) without that slash-prefixed
  * string leaking into `Error.name`:
