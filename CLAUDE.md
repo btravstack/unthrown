@@ -86,8 +86,9 @@ was planned).
    (the error passes through unchanged); a branch that returns a raw
    `Promise`/`AsyncResult` is rejected where the combinator awaits it
    (`flatMapErrCases`/`flatTapErrCases`, via the builder-output constraint) **and** in
-   `tapErrCases` (its branch results are discarded, so a rejected `Promise` would
-   float unobserved — its builder output is `NotThenable`-constrained) — only
+   `tapErrCases` (its branch results are discarded — bar the `defect(…)` marker,
+   which is a control-flow signal, not a value — so a rejected `Promise` would
+   float unobserved; its builder output is `NotThenable`-constrained) — only
    the non-awaiting transformers `mapErrCases`/`recoverErrCases` run the branch
    synchronously with an async branch remaining a visible Promise-valued
    result, not a rejection bypass. `tapDefect` / `tapFailure` keep single callbacks — their payloads
@@ -169,20 +170,23 @@ was planned).
   `defect` helper stays legal — Thesis #5) while `run()`/`exhaustive()` type as
   `R`: the marker is subtracted up front instead of at the end. Unpinned, the
   five error combinators do **not** treat the marker uniformly, so the pin
-  papers over an asymmetry: `mapErrCases`/`recoverErrCases` subtract it from the
-  output (`MatchErrOut` = `Exclude<MatchOut, Defect>`), `flatMapErrCases`
-  tolerates it through an explicit `| Defect` in its constraint, `tapErrCases`
-  discards every branch return, and `flatTapErrCases` unpinned **rejects** it
-  (its `ExhaustiveMatch<Result<…>>` constraint admits no marker) — a pin is the
-  only way to write a `defect(…)` branch there. Soundness is per call site, not
-  in `runMatch` (which only builds the matcher, runs the callback and `.run()`s
-  the builder): each of the four combinators that consumes a branch return
-  checks `isDefectMarker` on it — the three transformers mint
-  `defectRes(cause)`, while the observer `flatTapErrCases` routes it through
+  papers over a _typing_ asymmetry: `mapErrCases`/`recoverErrCases` subtract it
+  from the output (`MatchErrOut` = `Exclude<MatchOut, Defect>`),
+  `flatMapErrCases` tolerates it through an explicit `| Defect` in its
+  constraint, `tapErrCases` infers it as an ordinary (unthenable) branch return,
+  and `flatTapErrCases` unpinned **rejects** it (its
+  `ExhaustiveMatch<Result<…>>` constraint admits no marker) — a pin is the only
+  way to write a `defect(…)` branch there. The _runtime_ treatment, by contrast,
+  is uniform: **every** one of the five combinators checks `isDefectMarker` on
+  the branch output, so `defect(…)` is everywhere the expression-position form
+  of a `throw`, with no combinator silently discarding one. Soundness is per
+  call site, not in `runMatch` (which only builds the matcher, runs the callback
+  and `.run()`s the builder): the three transformers mint `defectRes(cause)`,
+  while the two observers (`tapErrCases`, `flatTapErrCases`) route it through
   `observerThrowToDefect`, since a deliberate `defect(…)` in an observer is the
   expression-position form of a `throw` and must not destroy the error being
-  observed. `tapErrCases` needs no check: it discards branch returns, so a
-  marker there is a no-op (as it already was unpinned). `match`'s `errCases`
+  observed — `tapErrCases` discards ordinary branch _values_, but the marker is
+  a control-flow signal, not a value. `match`'s `errCases`
   handler accepts the same shape but is injected **no** `defect` helper and the
   marker has no public constructor, so a `Defect` is not reachable there without
   deliberately smuggling the injected helper out of another combinator's
@@ -198,10 +202,13 @@ was planned).
   `tapErrCases` / `tapDefect` / `tapFailure` / `flatTapErrCases` produces a `Defect` whose
   cause is an `AggregateError([thrown, original])` — observing a failure never
   destroys it. (A throw in the success-channel `tap`/`map` keeps the plain
-  thrown cause.) A `flatTapErrCases` branch returning the injected
-  `defect(cause)` marker — reachable only under a `returnType` pin — takes the
+  thrown cause.) An **observer branch returning the injected `defect(cause)`
+  marker** — in `tapErrCases` (always writable) or in `flatTapErrCases` (only
+  under a `returnType` pin, which its constraint otherwise rejects) — takes the
   **same** route: it is the lint-clean, expression-position form of a `throw`,
-  so it must not behave differently from one. (A branch returning a Defect-state
+  so it must not behave differently from one. In particular `tapErrCases` does
+  **not** discard it, even though it discards every other branch return — a
+  marker is a control-flow signal, not a value. (A branch returning a Defect-state
   _`Result`_ is a different act — an effect that blew up on its own — and keeps
   the documented short-circuit: it replaces the error, unaggregated.)
 - **Thenable callback returns are rejected at compile time — where a rejection
@@ -214,7 +221,8 @@ was planned).
   **awaiting** ones — `flatMapErrCases` / `flatTapErrCases` — reject an async branch via
   their builder-output constraint (an awaited rejection would bypass
   qualification), and so does the observer **`tapErrCases`** (its branch results are
-  **discarded**, so a rejected `Promise` would float unobserved; same
+  **discarded** — bar the `defect(…)` marker — so a rejected `Promise` would
+  float unobserved; same
   builder-output `NotThenable` constraint). The **non-awaiting** transformers
   `mapErrCases` / `recoverErrCases` run
   the matched branch **synchronously with no await**, so an async branch is

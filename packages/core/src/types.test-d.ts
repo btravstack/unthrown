@@ -1012,6 +1012,25 @@ new WithMsg({ ticketId: "t1" });
   );
   type _Observed = Expect<Equal<typeof observed, Result<number, NotFound | DriverError>>>;
 
+  // a `defect(…)` branch is legal in tapErrCases pinned OR unpinned (the marker
+  // is unthenable, so it satisfies the `NotThenable` builder-output constraint)
+  // and, this being an OBSERVER, changes nothing in the type. At runtime it is
+  // NOT discarded like an ordinary branch value: it takes the observer route,
+  // aggregating with the observed error (invariants.spec.ts).
+  const observedDefect = r.tapErrCases((matcher, defect) =>
+    matcher.returnType<void>().with(P._, (e) => defect(e)),
+  );
+  type _ObservedDefect = Expect<
+    Equal<typeof observedDefect, Result<number, NotFound | DriverError>>
+  >;
+
+  const observedDefectUnpinned = r.tapErrCases((matcher, defect) =>
+    matcher.with(P._, (e) => defect(e)),
+  );
+  type _ObservedDefectUnpinned = Expect<
+    Equal<typeof observedDefectUnpinned, Result<number, NotFound | DriverError>>
+  >;
+
   // flatTapErrCases: the observer's own failure channel is the declared type,
   // unioned with the untouched incoming E (this combinator infers a plain E2 —
   // see CLAUDE.md on why it does not derive the channel through MatchOut)
@@ -1072,6 +1091,14 @@ new WithMsg({ ticketId: "t1" });
     );
   type _AFlatObserved = Expect<
     Equal<typeof aflatObserved, AsyncResult<number, NotFound | DriverError | AuditFailed>>
+  >;
+
+  // async tapErrCases: the defect branch mirrors the sync surface
+  const aobservedDefect = r
+    .toAsync()
+    .tapErrCases((matcher, defect) => matcher.with(P._, (e) => defect(e)));
+  type _AObservedDefect = Expect<
+    Equal<typeof aobservedDefect, AsyncResult<number, NotFound | DriverError>>
   >;
 
   // async flatTapErrCases: the defect branch mirrors the sync surface

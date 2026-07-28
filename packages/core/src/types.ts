@@ -338,11 +338,15 @@ export type ResultMethods<out T, out E> = {
    * failure]` — observing a failure never destroys it. An **async branch is
    * rejected at compile time** ({@link NotThenable} on the builder output):
    * because the branch results are discarded, a returned `Promise` would float
-   * unobserved and its rejection would vanish. A failable
+   * unobserved and its rejection would vanish. The one branch return that is
+   * **not** discarded is the injected `defect(cause)` marker: it is the
+   * lint-clean, expression-position form of a `throw`, so it follows the throw
+   * rule above (an `AggregateError` of `[the branch's cause, original
+   * failure]`), never a silent no-op. A failable
    * `Result`-returning effect belongs in
    * {@link ResultMethods.flatTapErrCases | flatTapErrCases}.
    *
-   * @param f - builds the match; branch returns are ignored.
+   * @param f - builds the match; branch returns are ignored, bar `defect(cause)`.
    */
   tapErrCases<R>(
     f: (
@@ -846,11 +850,13 @@ export type AsyncResultMethods<out T, out E> = {
 
   /**
    * Asynchronous {@link ResultMethods.tapErrCases | tapErrCases}. `f` is synchronous; if it
-   * throws, the result is a `Defect` whose cause is an `AggregateError` of
-   * `[thrown, original failure]` — observing a failure never destroys it. An
+   * throws — or a branch returns the injected `defect(cause)` marker, the
+   * expression-position form of a throw — the result is a `Defect` whose cause
+   * is an `AggregateError` of `[thrown, original failure]` — observing a failure
+   * never destroys it. An
    * async branch is rejected at compile time ({@link NotThenable} on the
-   * builder output) — branch results are discarded, so a rejected `Promise`
-   * would float unobserved. The
+   * builder output) — other branch results are discarded, so a rejected
+   * `Promise` would float unobserved. The
    * {@link AsyncResultMethods.tap | tap} fire-and-forget caveat applies here
    * too — a failable effect belongs in
    * {@link AsyncResultMethods.flatTapErrCases | flatTapErrCases}.

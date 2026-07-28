@@ -33,4 +33,13 @@ behaves like the `throw` it is the expression-position form of: the resulting
 `Defect` carries an `AggregateError` of `[the branch's cause, the observed
 error]`, so observing a failure still never destroys it.
 
+`tapErrCases` is fixed to match, and that one is a behaviour change **outside**
+any pin: a `defect(…)` branch there always compiled and was then silently
+thrown away, so the pipeline carried on with the original `Err` while a `throw`
+in the very same branch produced a `Defect`. It now takes the throw route too —
+the same `AggregateError` of `[the branch's cause, the observed error]`.
+Ordinary branch values are still discarded; the marker never was one. Across
+all five `*ErrCases` combinators, `defect(…)` is now uniformly the
+expression-position form of a `throw`.
+
 Closes #152.

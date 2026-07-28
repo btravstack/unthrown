@@ -233,7 +233,12 @@ class Res<T, E> {
   ): Result<T, E> {
     if (this.tag !== "Err") return this;
     try {
-      runMatch(f, this.error);
+      const out = runMatch(f, this.error);
+      // Branch *values* are discarded here — but the injected `defect(cause)`
+      // marker is not a value, it is the lint-clean, expression-position form of
+      // a `throw` (Thesis #5). So it takes the same route a `throw` in this
+      // branch would: the observed error survives alongside the caller's cause.
+      if (isDefectMarker(out)) return observerThrowToDefect(out.cause, this.error);
       return this;
     } catch (cause) {
       return observerThrowToDefect(cause, this.error);
@@ -552,9 +557,10 @@ function runMatch<E>(
  * underlying failure hurts most. The resulting Defect aggregates both:
  * `errors[0]` is the observer's own failure, `errors[1]` the original failure.
  *
- * A `flatTapErrCases` branch returning the injected `defect(cause)` marker takes
- * the same route: it is the lint-clean, expression-position form of a `throw`
- * (Thesis #5), so it must not behave differently from one.
+ * An observer branch returning the injected `defect(cause)` marker
+ * (`tapErrCases` / `flatTapErrCases`) takes the same route: it is the
+ * lint-clean, expression-position form of a `throw` (Thesis #5), so it must not
+ * behave differently from one.
  *
  * @internal
  */
@@ -819,7 +825,11 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
       this.#promise.then((r) => {
         if (r.tag !== "Err") return r;
         try {
-          runMatch(f, r.error);
+          const out = runMatch(f, r.error);
+          // Same observer treatment as the sync surface — a deliberate
+          // `defect(…)` is the expression-position form of a `throw`, not a
+          // discarded branch value.
+          if (isDefectMarker(out)) return observerThrowToDefect<T, E>(out.cause, r.error);
           return r;
         } catch (cause) {
           return observerThrowToDefect<T, E>(cause, r.error);

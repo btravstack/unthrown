@@ -131,7 +131,9 @@ forget, and no `.otherwise()` to slip in a fallback. The rationale is in
 - **Observers match exhaustively too.** `tapErrCases` and `flatTapErrCases` take the same
   builder (use `P._` for a catch-all); the error is observed and then flows
   through unchanged. Their branch returns are ignored (`tapErrCases`) or thread only a
-  _new_ effect failure (`flatTapErrCases`). `tapDefect` / `tapFailure` keep single
+  _new_ effect failure (`flatTapErrCases`) — the one exception being a branch that
+  returns the injected `defect(cause)`, which in either observer behaves like the
+  `throw` it stands for. `tapDefect` / `tapFailure` keep single
   callbacks — their payloads carry no discriminant to match.
 - **A non-exhaustive match is a `Defect` if it ever slips past the types.** Only
   reachable outside the typed contract (a widened cast, a JS caller): the matcher
