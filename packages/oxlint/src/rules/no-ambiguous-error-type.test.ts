@@ -75,6 +75,24 @@ ruleTester.run("no-ambiguous-error-type", noAmbiguousErrorType, {
     {
       code: `const x = r.mapErrCases((m) => m.returnType<never>().with(P._, (e) => { throw e; }));`,
     },
+    // A user's own `type Error` is not the ambiguous global, on the pin path
+    // too — resolve by scope, not by name. (Regression guard for the
+    // bare-`Error` false positive, mirroring the annotation-path guard above,
+    // but reached through the callback's function scope rather than module
+    // scope.)
+    {
+      code: `type Error = { code: number };\nconst x = r.mapErrCases((m) => m.returnType<Error>().with(P._, (e) => e));`,
+    },
+    // A generic parameter literally named `Error` is a concrete type variable,
+    // on the pin path too.
+    {
+      code: `function f<Error>() { return r.mapErrCases((m) => m.returnType<Error>().with(P._, (e) => e)); }`,
+    },
+    // A generic error parameter `E` is concrete on the pin path too — never
+    // treat it as ambiguous.
+    {
+      code: `function f<E>() { return r.mapErrCases((m) => m.returnType<E>().with(P._, (e) => e)); }`,
+    },
     // The pin must be on the MATCHER — the callback's first parameter. The
     // second is the injected `defect` helper.
     { code: `const x = r.mapErrCases((m, defect) => defect.returnType<unknown>());` },

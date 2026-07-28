@@ -57,14 +57,14 @@ export const noAmbiguousErrorType = defineRule({
     type: "problem",
     docs: {
       description:
-        "Disallow non-specific error types (`unknown`, `any`, `Error`, `object`, `{}`, primitives) in the error position of `Result` / `AsyncResult`",
+        "Disallow non-specific error types (`unknown`, `any`, `Error`, `object`, `{}`, primitives) in the error position of `Result` / `AsyncResult`, and in the matcher's `returnType<R>()` pin where it declares the error channel (a `mapErrCases` callback)",
       recommended: true,
     },
     messages: {
       noAmbiguousErrorType:
         "Specify a concrete domain error instead of `{{ type }}` in `{{ result }}`.",
       noAmbiguousReturnTypePin:
-        "This `returnType<{{ type }}>()` pin becomes the error channel of `{{ method }}` — declare a concrete domain error instead.",
+        "This `returnType<{{ type }}>()` pin declares the error channel of `{{ method }}` — specify a concrete domain error instead.",
     },
   },
   createOnce: (context) => {
