@@ -1,5 +1,15 @@
 # @unthrown/oxlint
 
+## 5.0.0-beta.9
+
+### Patch Changes
+
+- e43d44e: Update `no-catch-all-pattern`'s diagnostic and documentation to spell the
+  recommended form as `.with(P.tag("A"), P.tag("B"), …, handler)`, following
+  core's move of the `tag` pattern constructor onto the `P` namespace. No rule
+  behaviour, name, or option changed — only the guidance text a developer reads
+  when the rule fires.
+
 ## 5.0.0-beta.8
 
 ### Minor Changes
