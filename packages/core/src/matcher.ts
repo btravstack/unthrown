@@ -124,14 +124,14 @@ type BranchReturn<Declared, O2> = [Declared] extends [Unset] ? O2 : Declared | D
 type PinnedOut<Declared, O> = [Declared] extends [Unset] ? O : Declared;
 
 /**
- * The diagnostic type of `.returnType` on a builder that has already run a
- * `.with(…)` arm (or is already pinned): not callable, so the mistake is
- * caught where it is written.
+ * The diagnostic type of `.returnType` on a builder that already has an output
+ * to contradict — an arm has contributed a return type, or it is already
+ * pinned: not callable, so the mistake is caught where it is written.
  *
  * @internal
  */
 type PinTooLate = {
-  readonly "unthrown: `.returnType<R>()` is only allowed directly after `match(…)`": true;
+  readonly "unthrown: `.returnType<R>()` must come before any arm produces an output, and only once": true;
 };
 
 /**
@@ -188,9 +188,14 @@ export type Matcher<E, Remaining, O, Declared = Unset> = {
    * A branch may still return the injected `defect` helper's marker; the defect
    * channel is not part of the declared output.
    *
-   * Callable **only directly after `match(…)`** (mirroring ts-pattern): once an
-   * arm has run — or the builder is already pinned — this is typed as a
-   * non-callable diagnostic. A no-op at runtime.
+   * Callable **before any arm has produced an output**, and only once
+   * (mirroring ts-pattern's up-front pin): once there is an inferred output for
+   * the pin to contradict — or the builder is already pinned — this is typed as
+   * a non-callable diagnostic. In practice that means calling it directly after
+   * `match(…)`; the gate is about output rather than position, so an earlier arm
+   * whose handler returns `never` (it always throws) contributes nothing and
+   * does not close it — sound, since a `never` branch can contradict no declared
+   * type. A no-op at runtime.
    *
    * @typeParam R - the declared output type of every branch.
    */

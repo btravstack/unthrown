@@ -198,7 +198,12 @@ Three things change:
 - **The match evaluates to `R`**, not to the union of the branch returns — so
   the helper's declared return type is what actually flows out.
 - **Every branch is checked against `R`**, and a mismatch is reported **on the
-  offending branch** rather than downstream at the call site.
+  offending branch** rather than downstream at the call site. Assignability is
+  checked in full; one honest caveat — excess-property checking does _not_ fire
+  through the pin, so a branch returning an object literal with an **extra**
+  property still compiles where an explicit `(): R =>` annotation would reject
+  it. A misspelled optional property can therefore slip through; a wrong or
+  missing one cannot.
 - **Branch returns get a contextual type**, so object literals infer against `R`
   with no per-branch annotation.
 
@@ -219,9 +224,13 @@ Exhaustiveness is unaffected: a missing case is still a compile error, and
 `P._` is still the deliberate catch-all. Pinning declares _what comes out_, not
 _what is covered_.
 
-`.returnType<R>()` is allowed **only directly after `match(…)`** — once an arm
-has run there is already an inferred output to contradict, so pinning late (or
-twice) does not compile.
+`.returnType<R>()` is allowed **before any arm has produced an output**, and
+only once — once there is an inferred output for the pin to contradict, pinning
+(or re-pinning) does not compile. In practice that means calling it directly
+after `match(…)`. The gate is about output, not position: an earlier arm whose
+handler returns `never` — one that always throws — contributes nothing, so it
+does not close the gate. That is sound; a `never` branch can contradict no
+declared type.
 
 ## Where to go next
 

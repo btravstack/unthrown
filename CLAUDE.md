@@ -113,10 +113,11 @@ was planned).
    `match`, `P` (`_`/`any`, `instanceOf`, `when`, `union`, `string`, `number`),
    `returnType<R>()` (declare the output type once — every branch is checked
    against it, and the match evaluates to `R` instead of the union of the branch
-   returns; callable only directly after `match(…)`, a runtime no-op, and a
-   `defect(…)` branch stays legal because the defect channel is not part of the
-   declared output), and `NonExhaustiveError` exported from core — first-class in
-   one import,
+   returns; callable before any arm has produced an output and only once — in
+   practice directly after `match(…)`, though an arm returning `never` closes
+   nothing — a runtime no-op, and a `defect(…)` branch stays legal because the
+   defect channel is not part of the declared output), and `NonExhaustiveError`
+   exported from core — first-class in one import,
    dual-copy-safe (patterns carry a `Symbol.for` brand). Deliberately **not**
    supported: deep structural inversion, `P.select`, array patterns — the
    complexity (and cross-version instability) the replacement removed.
@@ -163,17 +164,30 @@ was planned).
   object can satisfy it and bypass exhaustiveness in typed code — accepted, as
   a deliberate act no worse than the sanctioned `P._` catch-all. This
   is a _type-level_ invariant, guarded in `types.test-d.ts`.
-- **A pinned match under-describes the defect channel — deliberately, and by
-  exactly the amount `recoverErrCases` already does.** Under
+- **A pinned match under-describes the defect channel — deliberately.** Under
   `.returnType<R>()` a branch handler may return `R | Defect` (the injected
   `defect` helper stays legal — Thesis #5) while `run()`/`exhaustive()` type as
-  `R`. This is the same subtraction the unpinned path performs with
-  `Exclude<O, Defect>`, decided up front instead of at the end. It is sound at
-  runtime because the combinators' `runMatch` checks `isDefectMarker` before
-  using the value, so a defect never escapes typed as `R`. `match`'s `errCases`
-  handler accepts the same shape but is injected **no** `defect` helper, and
-  there is no public constructor — so a `Defect` is unreachable there. This is a
-  _type-level_ invariant, guarded in `types.test-d.ts`.
+  `R`: the marker is subtracted up front instead of at the end. Unpinned, the
+  five error combinators do **not** treat the marker uniformly, so the pin
+  papers over an asymmetry: `mapErrCases`/`recoverErrCases` subtract it from the
+  output (`MatchErrOut` = `Exclude<MatchOut, Defect>`), `flatMapErrCases`
+  tolerates it through an explicit `| Defect` in its constraint, `tapErrCases`
+  discards every branch return, and `flatTapErrCases` unpinned **rejects** it
+  (its `ExhaustiveMatch<Result<…>>` constraint admits no marker) — a pin is the
+  only way to write a `defect(…)` branch there. Soundness is per call site, not
+  in `runMatch` (which only builds the matcher, runs the callback and `.run()`s
+  the builder): each of the four combinators that consumes a branch return
+  checks `isDefectMarker` on it — the three transformers mint
+  `defectRes(cause)`, while the observer `flatTapErrCases` routes it through
+  `observerThrowToDefect`, since a deliberate `defect(…)` in an observer is the
+  expression-position form of a `throw` and must not destroy the error being
+  observed. `tapErrCases` needs no check: it discards branch returns, so a
+  marker there is a no-op (as it already was unpinned). `match`'s `errCases`
+  handler accepts the same shape but is injected **no** `defect` helper and the
+  marker has no public constructor, so a `Defect` is not reachable there without
+  deliberately smuggling the injected helper out of another combinator's
+  callback. Type-level, guarded in `types.test-d.ts`; the observer's runtime
+  treatment is guarded in `invariants.spec.ts`.
 - **A `Defect` flows through every method untouched EXCEPT `match()`,
   `recoverDefect()`, and the observers `tapDefect()` / `tapFailure()` (which
   observe it without consuming it).** Therefore `getOr`, `getOrElse`,
@@ -184,7 +198,12 @@ was planned).
   `tapErrCases` / `tapDefect` / `tapFailure` / `flatTapErrCases` produces a `Defect` whose
   cause is an `AggregateError([thrown, original])` — observing a failure never
   destroys it. (A throw in the success-channel `tap`/`map` keeps the plain
-  thrown cause.)
+  thrown cause.) A `flatTapErrCases` branch returning the injected
+  `defect(cause)` marker — reachable only under a `returnType` pin — takes the
+  **same** route: it is the lint-clean, expression-position form of a `throw`,
+  so it must not behave differently from one. (A branch returning a Defect-state
+  _`Result`_ is a different act — an effect that blew up on its own — and keeps
+  the documented short-circuit: it replaces the error, unaggregated.)
 - **Thenable callback returns are rejected at compile time — where a rejection
   could bypass qualification or vanish.** Every combinator callback not already
   constrained to return a `Result` (`map`, `tap`, `let`, `tapDefect`,
