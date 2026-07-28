@@ -694,8 +694,12 @@ code: "NOT_FOUND" }, …))`); non-inferable →
   actually happens). **Deliberately outside the fixed version group** — its
   majors track oRPC's cadence, not the family's. Documented in the oRPC guide
   page.)
-- `tools/tsconfig`, `tools/typedoc` → private shared config (`@unthrown/tsconfig`,
-  `@unthrown/typedoc`)
+- shared config is **external**, not a workspace package: the tsconfig and
+  typedoc bases come from the catalog dependencies `@btravstack/tsconfig` and
+  `@btravstack/typedoc` (alongside `@btravstack/oxlint`, `@btravstack/commitlint`,
+  `@btravstack/lefthook` and the docs' `@btravstack/theme`). There is no
+  `tools/` directory — `pnpm-workspace.yaml` declares only `packages/*` and
+  `docs`.
 - `docs` → `@unthrown/docs`, the VitePress site (guide + TypeDoc-generated API
   reference); deployed to GitHub Pages by `deploy-docs.yml` — **versioned**:
   while a prerelease is in progress (`.changeset/pre.json` on main) the site is
