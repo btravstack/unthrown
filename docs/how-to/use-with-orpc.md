@@ -152,7 +152,7 @@ The error channel is the raw inferable `ORPCError` union, discriminated by `code
 already ships a discriminated error type, and one concept should have one name.
 Branch on `code` — in `match`'s `errCases` matcher (as above), a `switch`, or a
 standalone `match`. Because these are plain `ORPCError`s rather than
-`TaggedError`s, `tag(...)` doesn't apply — match on the `code` field instead.
+`TaggedError`s, `P.tag(...)` doesn't apply — match on the `code` field instead.
 
 Anything non-inferable — a network failure, an undeclared throw collapsed to
 `INTERNAL_SERVER_ERROR`, a malformed response — is a `Defect`: it flows past your

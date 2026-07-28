@@ -48,9 +48,12 @@ matcher over the error's _cases_, not a plain `(error) => …` callback.
 The old names no longer exist, so the compiler flags each site:
 
 ```diff
-- result.mapErr((m) => m.with(P.tag("NotFound"), wrap))
+- result.mapErr((m) => m.with(tag("NotFound"), wrap))
 + result.mapErrCases((m) => m.with(P.tag("NotFound"), wrap))
 ```
+
+The arm moved too — `tag(…)` is now `P.tag(…)`, a separate change covered in
+[§7](#_7-tag-moved-onto-p).
 
 Same for `flatMapErr` → `flatMapErrCases`, `recoverErr` → `recoverErrCases`,
 `tapErr` → `tapErrCases`, `flatTapErr` → `flatTapErrCases`. See
