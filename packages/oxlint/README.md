@@ -71,8 +71,7 @@ import { P, type Result } from "unthrown";
 
 const toApiError = <T, E>(result: Result<T, E>): Result<T, ApiError> =>
   result.mapErrCases((matcher) =>
-    // oxlint-disable-next-line unthrown/no-catch-all-pattern -- generic in `E`:
-    // no arm list can prove exhaustiveness against an unresolved type parameter.
+    // oxlint-disable-next-line unthrown/no-catch-all-pattern -- generic in `E`: no arm list can prove exhaustiveness
     matcher.returnType<ApiError>().with(P._, (error) => new ApiError({ status: 500, error })),
   );
 ```

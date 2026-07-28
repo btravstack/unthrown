@@ -181,8 +181,8 @@ compiles:
 function toPromise<T, E>(result: Result<T, E>): T {
   return result.match({
     ok: (value) => value,
-    // oxlint-disable-next-line unthrown/no-catch-all-pattern -- generic in E: no tag arm can prove coverage
     errCases: (matcher) =>
+      // oxlint-disable-next-line unthrown/no-catch-all-pattern -- generic in E: no tag arm can prove coverage
       matcher.with(P._, (error) => {
         throw error;
       }),

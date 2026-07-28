@@ -66,8 +66,8 @@ type ValidationResult =
 function validateSignup(input: unknown): ValidationResult {
   return parseSignup(input).match({
     ok: (data) => ({ ok: true, data }),
-    // oxlint-disable-next-line unthrown/no-catch-all-pattern -- E is a single issues array, not a union
     errCases: (matcher) =>
+      // oxlint-disable-next-line unthrown/no-catch-all-pattern -- E is a single issues array, not a union
       matcher.with(P._, (issues) => ({
         ok: false as const,
         fieldErrors: issues.reduce<Record<string, string[]>>((byField, issue) => {

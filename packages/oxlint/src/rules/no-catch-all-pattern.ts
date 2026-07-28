@@ -31,8 +31,7 @@ const CATCH_ALL_PROPS: ReadonlySet<string> = new Set(["_", "any"]);
  * ```ts
  * const toApiError = <T, E>(result: Result<T, E>): Result<T, ApiError> =>
  *   result.mapErrCases((matcher) =>
- *     // oxlint-disable-next-line unthrown/no-catch-all-pattern -- generic in `E`:
- *     // no arm list can prove exhaustiveness here.
+ *     // oxlint-disable-next-line unthrown/no-catch-all-pattern -- generic in `E`: no arm list can prove exhaustiveness
  *     matcher.returnType<ApiError>().with(P._, (error) => new ApiError({ error })),
  *   );
  * ```
