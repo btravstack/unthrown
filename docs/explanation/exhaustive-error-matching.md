@@ -224,6 +224,16 @@ Exhaustiveness is unaffected: a missing case is still a compile error, and
 `P._` is still the deliberate catch-all. Pinning declares _what comes out_, not
 _what is covered_.
 
+One thing a pin must not do is _widen_ the error channel. In `mapErrCases` the
+declared output **is** the new `E`, so `returnType<unknown>()` there re-opens
+[Thesis #1](./why-unthrown) — through a type argument, where a `Result<T, unknown>`
+annotation would have been rejected. `@unthrown/oxlint`'s
+[`no-ambiguous-error-type`](../how-to/lint-your-codebase#no-ambiguous-error-type)
+(in its recommended preset) flags exactly that pin, and deliberately leaves the
+others alone: `recoverErrCases` pins the _success_ type, `tapErrCases`'s branch
+results are discarded, and `match` folds to a plain value — an ambiguous pin is
+legitimate in all three.
+
 `.returnType<R>()` is allowed **before any arm has produced an output**, and
 only once — once there is an inferred output for the pin to contradict, pinning
 (or re-pinning) does not compile. In practice that means calling it directly

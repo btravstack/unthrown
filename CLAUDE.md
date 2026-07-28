@@ -615,7 +615,16 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
 - `packages/oxlint` → `@unthrown/oxlint` (an oxlint **JS plugin**, peerDep
   `oxlint`, dep `@oxlint/plugins`; ships **five rules**: `no-ambiguous-error-type`
   — enforces Thesis #1 against `unknown`/`any`/`Error`/`{}` **and the primitive
-  keywords** (`void` included) in `E`; `prefer-async-result` (reports
+  keywords** (`void` included) in `E`, both in a `Result`/`AsyncResult` type
+  **annotation** and in the matcher's `returnType<R>()` **pin** — the latter only
+  inside a `mapErrCases` callback, the one surface whose builder output _becomes_
+  `E`; `recoverErrCases` (success type), `tapErrCases` (discarded) and `match`
+  (folded value) are deliberately left alone, and the flat pair needs no case of
+  its own (a bare ambiguous pin does not type-check there, and a nested
+  `Result<U, E2>` pin is already read by the annotation check, which sees type
+  arguments wherever they occur). Recognised on the callback's own matcher
+  parameter via scope analysis — a matcher copied to another variable, or a
+  callback passed by reference, is a documented miss; `prefer-async-result` (reports
   `Promise<Result<T, E>>` in favour of `AsyncResult<T, E>`, but withholds the
   autofix on an `async` function's return annotation **and in function-type
   return positions** — either must stay a native `Promise` at the
