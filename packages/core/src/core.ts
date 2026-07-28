@@ -247,6 +247,12 @@ class Res<T, E> {
     if (this.tag !== "Err") return this;
     try {
       const r = runMatch(f, this.error);
+      // A deliberate `defect(cause)` branch is the expression-position form of a
+      // `throw` (Thesis #5), so it is treated like one: this is a failure
+      // *observer*, and the observed error survives alongside the caller's cause.
+      // (Contrast a branch returning a Defect-state `Result` below — an effect
+      // that blew up on its own, which short-circuits and replaces the error.)
+      if (isDefectMarker(r)) return observerThrowToDefect(r.cause, this.error);
       if (!isResult(r)) return nonResultCallbackDefect();
       // Keep the original error on the effect's success; an Err/Defect threads through.
       return r.tag === "Ok" ? this : passThrough(r);
@@ -540,11 +546,15 @@ function runMatch<E>(
 }
 
 /**
- * A throw inside a *failure observer* (`tapErrCases` / `tapDefect` / `flatTapErrCases`)
- * must not destroy the failure being observed — that is the exact place (e.g. a
- * failing error-logger) where losing the underlying failure hurts most. The
- * resulting Defect aggregates both: `errors[0]` is the observer's throw,
- * `errors[1]` the original failure.
+ * A throw inside a *failure observer* (`tapErrCases` / `tapDefect` /
+ * `tapFailure` / `flatTapErrCases`) must not destroy the failure being observed
+ * — that is the exact place (e.g. a failing error-logger) where losing the
+ * underlying failure hurts most. The resulting Defect aggregates both:
+ * `errors[0]` is the observer's own failure, `errors[1]` the original failure.
+ *
+ * A `flatTapErrCases` branch returning the injected `defect(cause)` marker takes
+ * the same route: it is the lint-clean, expression-position form of a `throw`
+ * (Thesis #5), so it must not behave differently from one.
  *
  * @internal
  */
@@ -552,7 +562,7 @@ function observerThrowToDefect<T, E>(thrown: unknown, original: unknown): Result
   return defectRes(
     new AggregateError(
       [thrown, original],
-      "unthrown: a failure-observer callback threw; errors[0] is the callback's throw, errors[1] the original failure",
+      "unthrown: a failure-observer callback failed; errors[0] is the callback's failure (a throw, or a deliberate defect), errors[1] the original failure",
     ),
   );
 }
@@ -828,9 +838,13 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
       this.#promise.then(async (r) => {
         if (r.tag !== "Err") return passThrough(r);
         try {
-          const inner = await (runMatch(f, r.error) as
-            | Result<unknown, unknown>
-            | AsyncResult<unknown, unknown>);
+          const out = runMatch(f, r.error);
+          // Checked BEFORE the await, mirroring the async `flatMapErrCases`: the
+          // marker is never thenable, so awaiting it would be a no-op microtask.
+          // Same observer treatment as the sync surface — the observed error
+          // survives alongside the caller's cause.
+          if (isDefectMarker(out)) return observerThrowToDefect(out.cause, r.error);
+          const inner = await (out as Result<unknown, unknown> | AsyncResult<unknown, unknown>);
           if (!isResult(inner)) return nonResultCallbackDefect();
           // Keep the original error on success; an Err/Defect from the effect wins.
           return inner.tag === "Ok" ? passThrough(r) : passThrough(inner);

@@ -119,6 +119,44 @@ describe("Invariant 1b: a Result-constrained callback returning a non-Result bec
   });
 });
 
+describe("Invariant 1c: a deliberate defect(…) in a failure observer preserves the original failure", () => {
+  // Under a `returnType` pin a branch may return the injected `defect(cause)`
+  // marker; `flatTapErrCases` is the one observer that consumes its branch
+  // returns, so it is the one that can see it. The marker is the lint-clean,
+  // expression-position form of a `throw` (Thesis #5), so it takes the same
+  // route: the observed error survives in the AggregateError instead of being
+  // replaced by a bare Defect. (A branch returning a Defect-state *Result* still
+  // short-circuits and replaces — an effect that blew up on its own.)
+  const original = new Error("original");
+  const cause = new Error("caller-cause");
+
+  const expectAggregated = (r: Result<unknown, unknown>) => {
+    expect(r.tag).toBe("Defect");
+    if (r.isDefect()) {
+      expect(r.cause).toBeInstanceOf(AggregateError);
+      expect((r.cause as AggregateError).errors).toEqual([cause, original]);
+    }
+  };
+
+  it("sync flatTapErrCases: the Defect aggregates [the caller's cause, the original error]", () => {
+    expectAggregated(
+      Err(original).flatTapErrCases((matcher, defect) =>
+        matcher.returnType<Result<never, never>>().with(P._, () => defect(cause)),
+      ),
+    );
+  });
+
+  it("async flatTapErrCases: the same, on the awaiting surface", async () => {
+    expectAggregated(
+      await Err(original)
+        .toAsync()
+        .flatTapErrCases((matcher, defect) =>
+          matcher.returnType<Result<never, never>>().with(P._, () => defect(cause)),
+        ),
+    );
+  });
+});
+
 describe("Invariant 2: a Defect flows through every method except match() and recoverDefect()", () => {
   it("success/error combinators pass a Defect through and never call their callback", () => {
     const f = vi.fn();

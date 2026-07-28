@@ -361,10 +361,13 @@ export type ResultMethods<out T, out E> = {
    * branch returns a `Result` whose **success value is discarded** — on the
    * effect's `Ok` the original `Err` flows through, while an `Err`/`Defect` from a
    * branch short-circuits and threads its error. Note the asymmetry with a
-   * *throw*: a branch that **returns** a `Defect` **replaces** the original `Err`
-   * (Defect-dominance, the short-circuit rule — it is not aggregated), whereas a
-   * branch that **throws** produces a `Defect` aggregating `[thrown, original
-   * failure]` (observing a failure by throwing never destroys it).
+   * *throw*: a branch that **returns** a Defect-state `Result` **replaces** the
+   * original `Err` (Defect-dominance, the short-circuit rule — it is not
+   * aggregated), whereas a branch that **throws** produces a `Defect`
+   * aggregating `[thrown, original failure]` (observing a failure by throwing
+   * never destroys it). A branch returning the injected `defect(cause)` marker —
+   * reachable under a `returnType` pin — follows the *throw* rule, since it is
+   * the lint-clean, expression-position form of one.
    *
    * @typeParam M - the exhaustive builder the callback returns.
    * @param f - builds the match; each branch is a failable effect (its `Ok` is ignored).
@@ -863,9 +866,10 @@ export type AsyncResultMethods<out T, out E> = {
    * Asynchronous {@link ResultMethods.flatTapErrCases | flatTapErrCases} — the
    * error-channel mirror of `flatTap`. `f` may return a `Result` **or** an
    * `AsyncResult`; its `Ok` value is discarded, an `Err`/`Defect` from `f`
-   * threads through, and if `f` throws, the result is a `Defect` whose cause is
-   * an `AggregateError` of `[thrown, original failure]` — observing a failure
-   * never destroys it.
+   * threads through, and if `f` throws — or a branch returns the injected
+   * `defect(cause)` marker, the expression-position form of a throw — the result
+   * is a `Defect` whose cause is an `AggregateError` of `[thrown, original
+   * failure]` — observing a failure never destroys it.
    */
   flatTapErrCases<E2>(
     f: (
