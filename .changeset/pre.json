@@ -26,6 +26,8 @@
     "oxlint-catch-all-recommended",
     "oxlint-four-rules",
     "oxlint-no-catch-all-pattern",
+    "oxlint-p-tag-message",
+    "p-tag-pattern",
     "prisma-transaction-defect",
     "remove-tools-packages",
     "rename-err-combinators-cases",
