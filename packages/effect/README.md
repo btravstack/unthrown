@@ -16,17 +16,23 @@ failure (`Cause.fail` ↔ `Err`) from an unexpected one (`Cause.die` ↔ `Defect
 So `Result ↔ Exit` is a genuine **bijection**.
 
 ```ts
-import { Ok, Err, P } from "unthrown";
+import { Ok, Err, tag, TaggedError } from "unthrown";
 import { toExit, fromEffect, toEither } from "@unthrown/effect";
 import { Effect } from "effect";
+
+class NotFound extends TaggedError("NotFound") {}
 
 toExit(Ok(1)); // Exit.succeed(1)
 toExit(Err("e")); // Exit.fail("e")        — a modeled Cause.fail
 
+const load = (id: string): Effect.Effect<string, NotFound> =>
+  id === "1" ? Effect.succeed("value") : Effect.fail(new NotFound());
+
 // Run an Effect and collect its outcome (die/interrupt become a Defect):
-await fromEffect(Effect.succeed(1)).match({
-  ok: (n) => n,
-  errCases: (matcher) => matcher.with(P._, (e) => e), // the error channel, matched exhaustively
+await fromEffect(load("1")).match({
+  ok: (value) => value,
+  // the error channel, matched exhaustively — every case named
+  errCases: (matcher) => matcher.with(tag("NotFound"), () => "missing"),
   defect: String,
 });
 ```

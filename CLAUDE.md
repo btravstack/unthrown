@@ -74,8 +74,19 @@ was planned).
    site until each is handled. This is the payoff of errors-as-values: the
    values cannot be silently dropped. The matcher matches by structure, so this
    works on any discriminant (`_tag`, `code`, guards, grouped patterns), not
-   only `TaggedError`. `P._` is the deliberate catch-all (the uniform "handle
-   everything else" branch, replacing the old single callback). Each branch
+   only `TaggedError`. **Every case is named** — that is the default position,
+   and cases sharing a handler are grouped (`.with(tag("A"), tag("B"), h)`)
+   rather than collapsed into a wildcard. `P._` is an **escape hatch**, not the
+   sanctioned way to handle the channel: it makes any match exhaustive, so it
+   absorbs unnamed every case `E` grows later — precisely the blanket-handling
+   hole the matcher closes. Its **principal remaining purpose is the generic-`E`
+   case**: inside a helper generic in `E`, no arm list can prove exhaustiveness
+   against an unresolved type parameter and only the catch-all's state
+   transition can (see the catch-all invariant below), so `P._` stays exported
+   and functional; the untyped boundary (`isResult`, where `E` is `unknown`) is
+   the same shape. `@unthrown/oxlint`'s `no-catch-all-pattern` — **in the
+   `recommended` preset** — enforces this, and those sites carry a targeted
+   `oxlint-disable` with a reason. Each branch
    receives the narrowed variant and the **injected `defect` helper** — the
    same injection `qualify` gets (Thesis #3), the sanctioned deliberate
    `Err`→`Defect` form (`.with(tag("DriverError"), (e) => defect(e.cause))`);
@@ -163,7 +174,7 @@ was planned).
   for a caller to reach (the combinator owns termination). One honest caveat:
   `ExhaustiveMatch` is **structural**, so a hand-rolled `{ exhaustive, run }`
   object can satisfy it and bypass exhaustiveness in typed code — accepted, as
-  a deliberate act no worse than the sanctioned `P._` catch-all. This
+  a deliberate act no worse than the `P._` escape hatch. This
   is a _type-level_ invariant, guarded in `types.test-d.ts`.
 - **A pinned match under-describes the defect channel — deliberately.** Under
   `.returnType<R>()` a branch handler may return `R | Defect` (the injected
@@ -246,7 +257,13 @@ was planned).
   `UniversalPattern` type returning `Matcher<E, never, …>` — literal `never`,
   no deferred `Exclude`), so a catch-all-terminated builder compiles inside
   code **generic in `E`** — the fix for #145; tag/pattern arms alone remain
-  correctly unprovable over an unresolved type parameter. Library code that
+  correctly unprovable over an unresolved type parameter. This is why `P._`
+  survives the de-promotion in Thesis #5: it is the **only** arm that can
+  terminate a match over an unresolved `E` (even a universal `P.when` guard is
+  excluded from the overload by the `UniversalPattern` marker), so the
+  generic-`E` helper keeps it behind a targeted
+  `oxlint-disable … unthrown/no-catch-all-pattern` naming that reason.
+  Library code that
   folds a generic `Result<T, E>` per-channel (the interop `to*` bridges,
   `@unthrown/orpc`'s `handlerResult`) still uses the `isOk` / `isErr` /
   `isDefect` guards — the simplest shape when no per-case branching is needed.
@@ -634,14 +651,15 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   locally-declared function whose return annotation is unthrown's
   `Result`/`AsyncResult`, awaited or not; deliberately syntactic — a dropped
   method _chain_ like `r.map(f);` is type-dependent and out of scope); and
-  `no-throw` (**opt-in**, not in the preset — reports every `throw` statement,
-  pointing at `Err`/`getOrThrow`/`fromSafeThrowable`; this is the `no-throw`
-  rule the `getOrThrow` rationale references); and `no-catch-all-pattern`
-  (**opt-in**, not in the preset — reports the ts-pattern catch-all `P._` / its
-  alias `P.any` where `P` is imported from `unthrown` or `ts-pattern`, so every
-  error case must be enumerated by name; **stricter than the library's own
-  default**, which documents `P._` as the sanctioned catch-all — hence opt-in,
-  like `no-throw`; a deliberate wildcard carries a targeted `oxlint-disable`).
+  `no-catch-all-pattern` (**in the recommended preset** — reports the catch-all
+  `P._` / its alias `P.any` where `P` is imported from `unthrown` or
+  `ts-pattern`, so every error case must be enumerated by name; this **states
+  the library's own default** (Thesis #5: `P._` is an escape hatch, not the
+  sanctioned catch-all), and the sites that must keep the wildcard — chiefly a
+  helper generic in `E` — carry a targeted `oxlint-disable` with a reason); and
+  `no-throw` (**the one opt-in**, not in the preset — reports every `throw`
+  statement, pointing at `Err`/`getOrThrow`/`fromSafeThrowable`; this is the
+  `no-throw` rule the `getOrThrow` rationale references).
   Purely syntactic AST rules that
   resolve bindings via scope analysis keyed by the **imported** name (renamed
   and namespace imports resolve; alias indirection like `type E = unknown` is a
@@ -815,7 +833,8 @@ configured outside the repo).
   exhaustiveness (a missing tag does not compile; the folded type unions the
   branch returns), and the
   error-matcher semantics — narrowing, defect/throw-branch subtraction,
-  `P._` catch-all, grouped patterns, `code`-discriminated and untagged unions,
+  the `P._` escape hatch (including over a generic `E`), grouped patterns,
+  `code`-discriminated and untagged unions,
   forced exhaustiveness (a missing case does not compile), the `E`-inference
   regression guard (`combine` still infers), and the `flatMapErrCases`/`flatTapErrCases`
   async-branch rejection) with a

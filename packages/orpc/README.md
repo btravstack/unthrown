@@ -29,7 +29,7 @@ second error concept in between.
 ## Server — `handlerResult` / `.result()`
 
 ```ts
-import { P } from "unthrown";
+import { tag } from "unthrown";
 import { handlerResult } from "@unthrown/orpc/server";
 
 const find = os
@@ -39,7 +39,7 @@ const find = os
     handlerResult(({ input, errors }) =>
       repo
         .findPlanet(input.id)
-        .mapErrCases((matcher) => matcher.with(P._, () => errors.NOT_FOUND())),
+        .mapErrCases((matcher) => matcher.with(tag("NotFound"), () => errors.NOT_FOUND())),
     ),
   );
 ```
@@ -50,14 +50,16 @@ inferable; a `Defect` rethrows its cause and stays a defect. A handler may also
 be written as `.result(...)` directly, by opting into the builder extension:
 
 ```ts
-import { P } from "unthrown";
+import { tag } from "unthrown";
 import "@unthrown/orpc/extensions/result";
 
 const find = os
   .input(z.object({ id: z.string() }))
   .errors({ NOT_FOUND: {} })
   .result(({ input, errors }) =>
-    repo.findPlanet(input.id).mapErrCases((matcher) => matcher.with(P._, () => errors.NOT_FOUND())),
+    repo
+      .findPlanet(input.id)
+      .mapErrCases((matcher) => matcher.with(tag("NotFound"), () => errors.NOT_FOUND())),
   );
 ```
 
@@ -68,7 +70,6 @@ and on contract-first `implement(...)` implementers.)
 ## Client — `createResultClient` / `fromCall`
 
 ```ts
-import { P } from "unthrown";
 import { createResultClient } from "@unthrown/orpc/client";
 
 const rc = createResultClient(client);
@@ -78,9 +79,12 @@ const greeting = await rc.planet
   .map((planet) => `Hello, ${planet.name}!`)
   .match({
     ok: (msg) => msg,
-    // `errCases` takes the exhaustive matcher — branch on the ORPCError `code`
+    // `errCases` takes the exhaustive matcher — one arm per `code` the
+    // procedure declares (here `.errors({ NOT_FOUND: {}, CONFLICT: {} })`):
     errCases: (matcher) =>
-      matcher.with({ code: "NOT_FOUND" }, () => "Hello, void!").with(P._, () => "Hello, trouble!"),
+      matcher
+        .with({ code: "NOT_FOUND" }, () => "Hello, void!")
+        .with({ code: "CONFLICT" }, () => "Hello, again!"),
     defect: () => "Hello, bug tracker!",
   });
 ```

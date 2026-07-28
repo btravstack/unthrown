@@ -147,12 +147,17 @@ type PinTooLate = {
  */
 export type Matcher<E, Remaining, O, Declared = Unset> = {
   /**
-   * The catch-all arm: `.with(P._, handler)` / `.with(P.any, handler)`. A
-   * **state transition**, not a computation — it returns `Matcher<E, never, …>`
-   * with the remaining cases literally `never`, so the builder is provably
-   * exhaustive even when `E` is an unresolved type parameter (a lazily-deferred
-   * `Exclude<E, unknown>` would not resolve there). This is what lets a
-   * boundary helper generic in `E` terminate with the catch-all (issue #145).
+   * The catch-all arm: `.with(P._, handler)` / `.with(P.any, handler)` — the
+   * wildcard **escape hatch**, not the way to handle a concrete error union
+   * (name those cases; `@unthrown/oxlint`'s `no-catch-all-pattern`, in its
+   * `recommended` preset, flags the wildcard).
+   *
+   * It is a **state transition**, not a computation — it returns
+   * `Matcher<E, never, …>` with the remaining cases literally `never`, so the
+   * builder is provably exhaustive even when `E` is an unresolved type
+   * parameter (a lazily-deferred `Exclude<E, unknown>` would not resolve
+   * there). That is the escape hatch's irreducible use: a helper generic in
+   * `E` can terminate a match no arm list could (issue #145).
    */
   with<O2>(
     pattern: UniversalPattern,
@@ -347,8 +352,9 @@ Object.freeze(MatcherImpl.prototype);
  * @remarks
  * This is unthrown's own matcher (the former ts-pattern re-export): the same
  * call-site shape, with exhaustiveness computed by plain `Exclude` over the
- * builder's `Remaining` parameter. A `P._` catch-all is provably exhaustive
- * even over an unresolved generic input.
+ * builder's `Remaining` parameter. Name every case of the input union; the
+ * `P._` catch-all is the escape hatch, and is provably exhaustive even over an
+ * unresolved generic input — which is the one place it is irreplaceable.
  *
  * @category Constructors
  */
@@ -369,9 +375,14 @@ const universal = pattern<unknown>(() => true) as UniversalPattern;
 /**
  * The pattern namespace (unthrown's own; the former ts-pattern `P`):
  *
- * - `P._` / `P.any` — the universal catch-all. Matches anything, and (because
- *   its phantom type is `unknown`) makes the builder provably exhaustive even
- *   when the matched input is an unresolved type parameter.
+ * - `P._` / `P.any` — the universal catch-all, and an **escape hatch** rather
+ *   than the default: matching the error channel means naming its cases, so
+ *   reach for this only where they cannot be named. Matches anything, and
+ *   (because its phantom type is `unknown`) makes the builder provably
+ *   exhaustive even when the matched input is an unresolved type parameter —
+ *   the generic-`E` helper, the one case with no alternative. `@unthrown/oxlint`'s
+ *   `no-catch-all-pattern` (in its `recommended` preset) flags every other use;
+ *   keep the deliberate ones behind a targeted `oxlint-disable`.
  * - `P.instanceOf(Cls)` — an `instanceof` check, narrowing to the class
  *   instance type (for union members that are not tagged, e.g. a third-party
  *   error class).

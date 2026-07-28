@@ -13,7 +13,7 @@ const SOURCES: ReadonlySet<string> = new Set(["unthrown", "ts-pattern"]);
 const CATCH_ALL_PROPS: ReadonlySet<string> = new Set(["_", "any"]);
 
 /**
- * Disallow the ts-pattern catch-all `P._` (and its alias `P.any`) in an
+ * Disallow the matcher catch-all `P._` (and its alias `P.any`) in an
  * unthrown matcher. The exhaustive error matcher exists so every failure is
  * *accounted for by name* — a catch-all re-opens the blanket-handling hole it
  * closes, silently absorbing any error the union grows later.
