@@ -274,7 +274,7 @@ describe("Result.mapErrCases (matcher)", () => {
     expect(build(errB("x")).getErr()).toBe("grouped");
   });
 
-  it("P._ is the deliberate catch-all", () => {
+  it("P._ is the escape hatch that terminates a match without naming the cases", () => {
     const r = errA(7).mapErrCases((matcher) => matcher.with(P._, (e) => `all:${e._tag}`));
     expect(r.getErr()).toBe("all:A");
   });

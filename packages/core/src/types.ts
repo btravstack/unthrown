@@ -281,9 +281,15 @@ export type ResultMethods<out T, out E> = {
    * to a `Defect` and drops it from `E`. Runs only on `Err`; `Ok` and `Defect`
    * pass through. A branch that throws also becomes a `Defect`.
    *
-   * `.with(P._, …)` is the deliberate uniform/catch-all (it makes the match
-   * exhaustive). Match on anything the matcher supports — `_tag`, `code`,
-   * structural shape, guards, or grouped patterns `.with(a, b, handler)`.
+   * **Name every case.** Match on anything the matcher supports — `_tag`,
+   * `code`, structural shape, guards — and group the cases that share a handler
+   * with `.with(a, b, handler)`. `.with(P._, …)` is the wildcard **escape
+   * hatch**, not the default: it makes any match exhaustive, so it also absorbs
+   * every case `E` grows later. Two uses are sanctioned — a helper generic in
+   * `E`, where no arm list can prove exhaustiveness against an unresolved type
+   * parameter, and an `E` that is a single type rather than a union of cases
+   * (see {@link P} for both). `@unthrown/oxlint`'s `no-catch-all-pattern` (in
+   * its `recommended` preset) flags the rest.
    *
    * @typeParam M - the exhaustive builder the callback returns.
    * @param f - builds the match over the error (returns the un-terminated builder).
@@ -333,7 +339,8 @@ export type ResultMethods<out T, out E> = {
    * @remarks
    * The callback builds a match whose branches run side effects; their return
    * values are ignored and the original `Err` flows through. Exhaustive like the
-   * transformers (use `.with(P._, …)` for a catch-all). If a branch throws, the
+   * transformers, and like them it wants every case named — `.with(P._, …)`
+   * remains the wildcard escape hatch. If a branch throws, the
    * result is a `Defect` whose cause is an `AggregateError` of `[thrown, original
    * failure]` — observing a failure never destroys it. An **async branch is
    * rejected at compile time** ({@link NotThenable} on the builder output):
@@ -447,8 +454,9 @@ export type ResultMethods<out T, out E> = {
    * exactly like the error combinators — which is why the key carries the same
    * `…Cases` suffix. Chain `.with(pattern, handler)` and **return the
    * un-terminated builder** — `match` calls `.exhaustive()` itself, so a missing
-   * case is a compile error at the call site (no `.exhaustive()` to forget). Use
-   * `.with(P._, …)` for a uniform catch-all. Unlike the combinators the branches
+   * case is a compile error at the call site (no `.exhaustive()` to forget).
+   * Folding at the edge names every case too — `.with(P._, …)` is the wildcard
+   * escape hatch, not the default. Unlike the combinators the branches
    * receive **no `defect` helper** — `match` is total elimination to a value,
    * with no `Defect` output channel; the `defect` case handles a `Result` that
    * already carries one. (A `Result` is also a discriminated union — for richer
@@ -673,7 +681,7 @@ export type FailureView<E, T = never> = ErrView<E, T> | DefectView<T, E>;
  *
  * @example
  * ```ts
- * import { Ok, Err, P, type Result } from "unthrown";
+ * import { Ok, Err, type Result } from "unthrown";
  *
  * function half(n: number): Result<number, "odd"> {
  *   return n % 2 === 0 ? Ok(n / 2) : Err("odd");
@@ -681,7 +689,8 @@ export type FailureView<E, T = never> = ErrView<E, T> | DefectView<T, E>;
  *
  * const message = half(10).match({
  *   ok: (n) => `got ${n}`,
- *   errCases: (matcher) => matcher.with(P._, (e) => `failed: ${e}`),
+ *   // every case of `E` named — here the one literal it holds
+ *   errCases: (matcher) => matcher.with("odd", () => "failed: odd"),
  *   defect: (cause) => `bug: ${String(cause)}`,
  * });
  * ```

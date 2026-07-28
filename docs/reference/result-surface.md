@@ -48,11 +48,13 @@ A combinator only runs its callback on its own channel — the other states flow
 through untouched:
 
 ```ts
-import { P } from "unthrown";
+import { Ok, Err, type Result } from "unthrown";
 
-Ok(2).map((n) => n + 1); // => Ok(3)
+const two: Result<number, "boom"> = Ok(2);
+
+two.map((n) => n + 1); // => Ok(3)
 Err("boom").map((n) => n + 1); // => Err("boom") — the success callback is skipped
-Ok(2 as number).mapErrCases((m) => m.with(P._, (e) => `wrapped: ${e}`)); // => Ok(2) — the error branch is skipped
+two.mapErrCases((m) => m.with("boom", (e) => `wrapped: ${e}`)); // => Ok(2) — the error branch is skipped
 ```
 
 The `mapErrCases` above carries a real, exhaustive matcher; on an `Ok` it simply never

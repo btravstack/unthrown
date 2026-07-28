@@ -3,7 +3,7 @@
 > **How-to.** [`@unthrown/oxlint`](https://github.com/btravstack/unthrown/tree/main/packages/oxlint)
 > is an [oxlint](https://oxc.rs/docs/guide/usage/linter) plugin that turns
 > unthrown's theses into automated checks the type system can't enforce on its
-> own — a lazy `E`, a dropped `Result`, a raw `throw`.
+> own — a lazy `E`, a dropped `Result`, a blanket `P._`, a raw `throw`.
 
 ```sh
 pnpm add -D @unthrown/oxlint oxlint
@@ -28,8 +28,8 @@ Register the plugin and turn its rules on in your `.oxlintrc.json`:
 
 The default export also exposes a `recommended` preset — an oxlint config that
 registers the plugin and enables `no-ambiguous-error-type`, `no-unhandled-result`,
-and `prefer-async-result` (`no-throw` and `no-catch-all-pattern` stay explicit
-opt-ins) — for setups that
+`prefer-async-result`, and `no-catch-all-pattern` (`no-throw` is the one explicit
+opt-in) — for setups that
 build their config programmatically (`import unthrown from "@unthrown/oxlint"` →
 `unthrown.recommended`).
 
@@ -67,12 +67,13 @@ pin — but **only where the pin declares the error channel**, which is inside a
 `mapErrCases` callback: there the builder's output _becomes_ the new `E`.
 
 ```ts
-result.mapErrCases((m) => m.returnType<unknown>().with(P._, (e) => e)); // ✗ flagged — this is E
-result.mapErrCases((m) => m.returnType<ApiError>().with(P._, () => new ApiError())); // ✓
+// result: Result<User, NotFound>
+result.mapErrCases((m) => m.returnType<unknown>().with(tag("NotFound"), (e) => e)); // ✗ flagged — this is E
+result.mapErrCases((m) => m.returnType<ApiError>().with(tag("NotFound"), () => new ApiError())); // ✓
 
-result.recoverErrCases((m) => m.returnType<unknown>().with(P._, (e) => e)); // ✓ — that is the SUCCESS type
-result.tapErrCases((m) => m.returnType<void>().with(P._, log)); // ✓ — discarded
-result.match({ ok, defect, errCases: (m) => m.returnType<unknown>().with(P._, id) }); // ✓ — a folded value
+result.recoverErrCases((m) => m.returnType<unknown>().with(tag("NotFound"), (e) => e)); // ✓ — the SUCCESS type
+result.tapErrCases((m) => m.returnType<void>().with(tag("NotFound"), log)); // ✓ — discarded
+result.match({ ok, defect, errCases: (m) => m.returnType<unknown>().with(tag("NotFound"), id) }); // ✓ — a folded value
 ```
 
 `flatMapErrCases` / `flatTapErrCases` need no separate check: their builder output
@@ -132,8 +133,8 @@ out of scope — no false positives is the design priority.
 
 ### `unthrown/no-throw` {#no-throw}
 
-**Opt-in** — not part of the `recommended` preset, because it bans a core language
-statement. For codebases committed to errors-as-values end-to-end, it closes the
+**The one opt-in rule** — not part of the `recommended` preset, because it bans a
+core language statement. For codebases committed to errors-as-values end-to-end, it closes the
 loop: ordinary errors are _returned_, so a raw `throw` is either a modeled failure
 in disguise or an unmodeled one that belongs to the defect channel's machinery.
 
@@ -154,12 +155,12 @@ hatch.
 
 ### `unthrown/no-catch-all-pattern` {#no-catch-all-pattern}
 
-**Opt-in** — not part of the `recommended` preset. It is **stricter than
-unthrown's own default**: the library documents `P._` as the sanctioned
-"handle everything else" branch, but some teams want _every_ error enumerated by
-name, with no wildcard that could silently absorb a case the union grows later.
-This rule enforces that stricter stance by banning the ts-pattern catch-all `P._`
-(and its alias `P.any`) wherever `P` is imported from `unthrown` or `ts-pattern`.
+Enumerating every error case is the library's
+[default position](../explanation/exhaustive-error-matching#enumerate-the-cases-the-wildcard-is-the-exception),
+so this rule is part of the `recommended` preset. It bans the universal
+catch-all `P._` (and its alias `P.any`) wherever `P` is imported from `unthrown`
+or `ts-pattern` — a wildcard makes _any_ match exhaustive, which means it keeps
+compiling as `E` grows and silently absorbs each new case.
 
 ```ts
 result.mapErrCases((m) => m.with(P._, (e) => e)); // ✗ — the catch-all
@@ -169,8 +170,35 @@ result.mapErrCases((m) => m.with(tag("NotFound"), tag("Forbidden"), (e) => e));
 
 Because a matched builder must still be exhaustive, removing `P._` makes the
 compiler point at each unhandled case until every one is named — the rule and the
-type checker push the same way. A deliberate wildcard carries a targeted
-`// oxlint-disable-next-line unthrown/no-catch-all-pattern -- <reason>`.
+type checker push the same way.
+
+`P._` remains a legitimate **escape hatch**, and the rule expects you to say so
+in place. Two cases are legitimate: a helper still **generic in `E`**, where no
+list of tag arms can prove coverage and the catch-all is the only form that
+compiles; and an **`E` that is a single type** rather than a union, where one
+arm _is_ the enumeration. The first looks like this:
+
+```ts
+function toPromise<T, E>(result: Result<T, E>): T {
+  return result.match({
+    ok: (value) => value,
+    errCases: (matcher) =>
+      // oxlint-disable-next-line unthrown/no-catch-all-pattern -- generic in E: no tag arm can prove coverage
+      matcher.with(P._, (error) => {
+        throw error;
+      }),
+    defect: (cause) => {
+      throw cause;
+    },
+  });
+}
+```
+
+The same targeted disable comment covers the other honest case: an `E` that is a
+single type rather than a union, where one arm _is_ the enumeration. The rule has no options and no
+autofix — the disable comment is the escape hatch. (Where the helper needs no
+matcher at all, the `isOk` / `isErr` / `isDefect` guards carry no exhaustiveness
+obligation and need no disable comment.)
 
 ## Import resolution
 

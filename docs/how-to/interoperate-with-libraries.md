@@ -39,18 +39,26 @@ Effect is the exception: it _does_ have a defect channel (`Cause.die`), so
 `Result ↔ Exit` round-trips losslessly.
 
 ```ts
-import { Ok, Err, P } from "unthrown";
+import { Ok, Err, tag, TaggedError } from "unthrown";
 import { toExit, fromEffect } from "@unthrown/effect";
 import { Effect } from "effect";
+
+class NotFound extends TaggedError("NotFound") {}
+class Timeout extends TaggedError("Timeout") {}
+type User = { name: string };
 
 toExit(Ok(1)); // Exit.succeed(1)
 toExit(Err("e")); // Exit.fail("e")  — a modeled Cause.fail
 // a Defect would become Exit.die(cause)
 
-// Run an Effect and collect its outcome; a die/interrupt becomes a Defect:
-await fromEffect(Effect.succeed(1)).match({
-  ok: (value) => value,
-  errCases: (matcher) => matcher.with(P._, (error) => error),
+// Run an Effect and collect its outcome; a die/interrupt becomes a Defect.
+// Effect's error channel arrives as E, so name each of its cases:
+declare const loadUser: Effect.Effect<User, NotFound | Timeout>;
+
+await fromEffect(loadUser).match({
+  ok: (user) => user.name,
+  errCases: (matcher) =>
+    matcher.with(tag("NotFound"), () => "missing").with(tag("Timeout"), () => "timed out"),
   defect: String,
 });
 ```

@@ -12,7 +12,7 @@
 | `ok(v)` / `err(e)`                   | `Ok(v)` / `Err(e)`                                | constructors are capitalized                                                           |
 | `result.andThen(f)`                  | `result.flatMap(f)`                               | one name per concept                                                                   |
 | `result.map(f)`                      | same                                              | callbacks must be synchronous                                                          |
-| `result.mapErr(f)`                   | `result.mapErrCases((matcher) => …)`              | an exhaustive match over the error's cases; `.with(P._, f)` is the uniform form        |
+| `result.mapErr(f)`                   | `result.mapErrCases((matcher) => …)`              | an exhaustive match — one `.with(…)` arm per case in `E`, not a single callback        |
 | `result.orElse(f)`                   | `result.flatMapErrCases((matcher) => …)`          | `flatMap` on the error channel; same exhaustive matcher                                |
 | `result.match(okFn, errFn)`          | `match({ ok, errCases: (matcher) => …, defect })` | the third channel is new, and `errCases` takes the same exhaustive matcher — see below |
 | `result.unwrapOr(v)`                 | `result.getOr(v)`                                 | still throws on a Defect (a bug is not an absent value)                                |
@@ -27,9 +27,12 @@
 Most rows are a rename. `andThen` → `flatMap` is unthrown's
 [one-name-per-concept](../explanation/design-decisions#one-name-per-concept-no-aliases)
 rule. The one behavioral change to know up front: `mapErrCases` (and the other error
-combinators) take an **exhaustive matcher** rather than a plain callback — the
-uniform port is `.mapErrCases((matcher) => matcher.with(P._, f))`, and the reasoning is
-in [Exhaustive error matching](../explanation/exhaustive-error-matching). The rest
+combinators) take an **exhaustive matcher** rather than a plain callback. Port a
+`mapErr(f)` by **naming each case** the old callback silently absorbed —
+`.mapErrCases((matcher) => matcher.with(tag("NotFound"), f).with(tag("Conflict"), f))`
+— and let the compiler tell you when you have missed one. That enumeration is
+the migration's actual payoff; the reasoning is in
+[Exhaustive error matching](../explanation/exhaustive-error-matching). The rest
 of the table is where the libraries genuinely differ.
 
 ## Delta 1 — the defect channel
@@ -60,13 +63,17 @@ app.get("/users/:id", async (req, res) => {
 
 ```ts
 // unthrown — the same bug becomes a Defect inside the pipeline; no try/catch
-import { fromPromise, P } from "unthrown";
+import { tag } from "unthrown";
 
+// getUser: (id: string) => AsyncResult<User, NotFound | Forbidden>
 app.get("/users/:id", async (req, res) => {
   const result = await getUser(req.params.id).map((user) => formatUser(user)); // a bug in formatUser → Defect
   result.match({
     ok: (view) => res.status(200).json(view),
-    errCases: (matcher) => matcher.with(P._, () => res.status(404).json({ error: "not found" })),
+    errCases: (matcher) =>
+      matcher
+        .with(tag("NotFound"), () => res.status(404).json({ error: "not found" }))
+        .with(tag("Forbidden"), () => res.status(403).json({ error: "forbidden" })),
     defect: (cause) => {
       console.error(cause); // everything the pipeline caught lands here
       res.status(500).json({ error: "internal error" });

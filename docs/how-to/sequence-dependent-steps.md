@@ -37,14 +37,17 @@ normal surface, so you can mix in `map`, `flatMap`, `match`, and the rest freely
 and a thrown callback still becomes a `Defect`:
 
 ```ts
-import { Do, Ok, P } from "unthrown";
+import { Do, Ok, Err, tag, TaggedError } from "unthrown";
+
+class TooSmall extends TaggedError("TooSmall") {}
+declare const input: number;
 
 Do()
-  .bind("n", () => Ok(2))
+  .bind("n", () => (input >= 2 ? Ok(input) : Err(new TooSmall())))
   .let("doubled", ({ n }) => n * 2)
   .match({
     ok: ({ n, doubled }) => `${n} → ${doubled}`,
-    errCases: (matcher) => matcher.with(P._, (e) => `failed: ${e}`),
+    errCases: (matcher) => matcher.with(tag("TooSmall"), () => "too small"),
     defect: (cause) => `bug: ${String(cause)}`,
   });
 ```
@@ -56,19 +59,30 @@ To sequence asynchronous steps, lift the chain with `toAsync()` (or start from
 (never a raw `Promise` — see [Qualify a boundary](./qualify-a-boundary)):
 
 ```ts
-import { Do, fromPromise, P } from "unthrown";
+import { Do, fromPromise, tag, TaggedError } from "unthrown";
+
+class UserNotFound extends TaggedError("UserNotFound") {}
+declare class MissingRowError extends Error {}
 
 const profile = await Do()
   .toAsync()
-  .bind("user", () => fromPromise(fetchUser(id), (c, defect) => defect(c)))
+  .bind("user", () =>
+    fromPromise(fetchUser(id), (c, defect) =>
+      c instanceof MissingRowError ? new UserNotFound() : defect(c),
+    ),
+  )
   .bind("posts", ({ user }) => fromPromise(fetchPosts(user.id), (c, defect) => defect(c)))
   .let("count", ({ posts }) => posts.length)
   .match({
     ok: (s) => s,
-    errCases: (matcher) => matcher.with(P._, () => null),
+    errCases: (matcher) => matcher.with(tag("UserNotFound"), () => null),
     defect: () => null,
   });
 ```
+
+Because binds **union** their error types, adding a failable step also adds a
+case to `E` — and the `errCases` matcher at the end stops compiling until that
+new case is named. Enumerating the arms is what makes the chain self-auditing.
 
 ## When to reach for named functions instead
 

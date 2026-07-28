@@ -35,9 +35,11 @@ if (bad.isErr()) bad.error; // readonly StandardSchemaV1.Issue[]
 
 ## Reduce issues to per-field messages
 
-The error channel is the issues array — map it in the `errCases` arm. Here a `P._`
-catch-all hands the whole array to one branch that reduces it to per-field
-messages:
+The error channel is the issues array — map it in the `errCases` arm. `E` here is
+a **single** type (`SchemaIssues`), not a union of tags, so there are no cases to
+enumerate: `P._` _is_ the enumeration, and one branch takes the whole array and
+reduces it to per-field messages. (Everywhere `E` is a real union, name the cases
+instead — see [Exhaustive error matching](../explanation/exhaustive-error-matching).)
 
 ```ts
 import { P } from "unthrown";
@@ -65,6 +67,7 @@ function validateSignup(input: unknown): ValidationResult {
   return parseSignup(input).match({
     ok: (data) => ({ ok: true, data }),
     errCases: (matcher) =>
+      // oxlint-disable-next-line unthrown/no-catch-all-pattern -- E is a single issues array, not a union
       matcher.with(P._, (issues) => ({
         ok: false as const,
         fieldErrors: issues.reduce<Record<string, string[]>>((byField, issue) => {

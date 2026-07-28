@@ -110,7 +110,6 @@ export type ResultClient<T extends AnyNestedClient> =
  *
  * @example
  * ```ts
- * import { P } from "unthrown";
  * import { createResultClient } from "@unthrown/orpc/client";
  *
  * const rc = createResultClient(client);
@@ -120,11 +119,12 @@ export type ResultClient<T extends AnyNestedClient> =
  *   .map((planet) => `Hello, ${planet.name}!`)
  *   .match({
  *     ok: (msg) => msg,
- *     // the `errCases` handler matches the error exhaustively (here on `code`)
+ *     // the `errCases` handler matches the error exhaustively: one arm per
+ *     // `code` the procedure declares — no catch-all to absorb a new one
  *     errCases: (matcher) =>
  *       matcher
  *         .with({ code: "NOT_FOUND" }, () => "Hello, void!")
- *         .with(P._, () => "Hello, trouble!"),
+ *         .with({ code: "CONFLICT" }, () => "Hello, again!"),
  *     defect: () => "Hello, bug tracker!",
  *   });
  * ```

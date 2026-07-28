@@ -84,8 +84,17 @@ return created.match({
 // No RecordNotFound arm — a create can't raise it, and the type knows.
 ```
 
-When you don't need per-tag branches, collapse the `errCases` matcher to a single
-`.with(P._, …)` catch-all.
+When several tags deserve the same response, **group** them in one arm rather
+than reaching for a wildcard — the list stays explicit, so a new P-code still
+lights the call site up:
+
+```ts
+matcher
+  .with(tag("UniqueConstraintViolation"), tag("ForeignKeyViolation"), () =>
+    resp.badRequest("bad write"),
+  )
+  .with(tag("DriverError"), (e) => resp.serverError(e));
+```
 
 ## Transactions
 
@@ -121,7 +130,7 @@ const moved = db.$tryTransaction((tx) =>
 cursor API — same option names, same `[results, meta]` shape:
 
 ```ts
-import { P } from "unthrown";
+import { tag } from "unthrown";
 
 const page = await db.user
   .tryPaginate({ where: { active: true }, orderBy: { id: "asc" } })
@@ -130,7 +139,7 @@ const page = await db.user
 
 page.match({
   ok: ([users, meta]) => json({ users, nextCursor: meta.endCursor, hasMore: meta.hasNextPage }),
-  errCases: (matcher) => matcher.with(P._, (e) => serverError(e)),
+  errCases: (matcher) => matcher.with(tag("DriverError"), (e) => serverError(e)),
   defect: serverError,
 });
 ```

@@ -39,22 +39,32 @@ your service layer keeps speaking `Result`, and the endpoint stops needing to
 unwrap it into throws:
 
 ```ts
-import { P } from "unthrown";
+import { tag } from "unthrown";
 import { handlerResult } from "@unthrown/orpc/server";
 import { os } from "@orpc/server";
 import * as z from "zod";
 
+// repo.findPlanet: (id: string) => AsyncResult<Planet, NotFound | Conflict | DriverError>
+
 const find = os
   .input(z.object({ id: z.string() }))
-  .errors({ NOT_FOUND: {} })
+  .errors({ NOT_FOUND: {}, CONFLICT: {} })
   .handler(
     handlerResult(({ input, errors }) =>
-      repo
-        .findPlanet(input.id)
-        .mapErrCases((matcher) => matcher.with(P._, () => errors.NOT_FOUND())),
+      repo.findPlanet(input.id).mapErrCases(
+        (matcher, defect) =>
+          matcher
+            .with(tag("NotFound"), () => errors.NOT_FOUND()) // modeled → typed for the client
+            .with(tag("Conflict"), () => errors.CONFLICT())
+            .with(tag("DriverError"), (e) => defect(e.cause)), // infrastructure → defect
+      ),
     ),
   );
 ```
+
+Naming every case is the point: the matcher makes the transport boundary state,
+per case, which failures the client is invited to handle and which are bugs. Add
+a case to the repository and this endpoint stops compiling until it decides.
 
 - `Ok` becomes the procedure's output.
 - `Err` is **returned as a value**; oRPC marks it inferable, so the client sees it
@@ -88,14 +98,19 @@ If you prefer a builder method over wrapping, opt into the extension — one
 side-effectful import:
 
 ```ts
-import { P } from "unthrown";
+import { tag } from "unthrown";
 import "@unthrown/orpc/extensions/result";
 
 const find = os
   .input(z.object({ id: z.string() }))
-  .errors({ NOT_FOUND: {} })
+  .errors({ NOT_FOUND: {}, CONFLICT: {} })
   .result(({ input, errors }) =>
-    repo.findPlanet(input.id).mapErrCases((matcher) => matcher.with(P._, () => errors.NOT_FOUND())),
+    repo.findPlanet(input.id).mapErrCases((matcher, defect) =>
+      matcher
+        .with(tag("NotFound"), () => errors.NOT_FOUND())
+        .with(tag("Conflict"), () => errors.CONFLICT())
+        .with(tag("DriverError"), (e) => defect(e.cause)),
+    ),
   );
 ```
 
@@ -110,7 +125,6 @@ patching a third-party prototype is unwelcome.
 `AsyncResult` — the mirror of oRPC's own `createSafeClient`:
 
 ```ts
-import { P } from "unthrown";
 import { createResultClient } from "@unthrown/orpc/client";
 
 const rc = createResultClient(client);
@@ -122,10 +136,16 @@ const greeting = await rc.planet
     ok: (msg) => msg,
     // the matcher branches on the ORPCError `code`, not a `_tag`
     errCases: (matcher) =>
-      matcher.with({ code: "NOT_FOUND" }, () => "Hello, void!").with(P._, () => "Hello, trouble!"),
+      matcher
+        .with({ code: "NOT_FOUND" }, () => "Hello, void!")
+        .with({ code: "CONFLICT" }, () => "Hello, again!"),
     defect: () => "Hello, bug tracker!",
   });
 ```
+
+`E` is exactly the set of codes the procedure declares or returns — so listing
+them is finite and mechanical, and adding a code server-side lights up every
+client call site.
 
 The error channel is the raw inferable `ORPCError` union, discriminated by `code`
 — deliberately **not** re-wrapped into [tagged errors](./model-errors): oRPC

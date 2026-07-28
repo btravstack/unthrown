@@ -97,26 +97,36 @@ throwing until it earns the conversion.
 
 ## `try`/`catch` idioms → combinators
 
-| `try`/`catch` idiom       | unthrown combinator                             | Example                                                                                    |
-| ------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| catch-and-default         | `getOr(fallback)`                               | `parseConfig(text).getOr(DEFAULT_CONFIG)`                                                  |
-| catch-and-rethrow-wrapped | `mapErrCases((matcher) => …)`                   | `parseConfig(text).mapErrCases((matcher) => matcher.with(P._, (e) => new ConfigError(e)))` |
-| catch-log-rethrow         | `tapErrCases((matcher) => …)`                   | `parseConfig(text).tapErrCases((matcher) => matcher.with(P._, (e) => logger.warn(e)))`     |
-| `finally` cleanup         | run before eliminating, or in every `match` arm | see below                                                                                  |
+A `catch` block sees one opaque value; a matcher sees the **cases**. Each row
+below names them — `parseConfig`'s channel is the single `"invalid_json"` case,
+so that is what the arms spell out:
+
+| `try`/`catch` idiom       | unthrown combinator                             | Example                                                                                   |
+| ------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| catch-and-default         | `getOr(fallback)`                               | `parseConfig(text).getOr(DEFAULT_CONFIG)`                                                 |
+| catch-and-rethrow-wrapped | `mapErrCases((matcher) => …)`                   | `parseConfig(text).mapErrCases((m) => m.with("invalid_json", (e) => new ConfigError(e)))` |
+| catch-log-rethrow         | `tapErrCases((matcher) => …)`                   | `parseConfig(text).tapErrCases((m) => m.with("invalid_json", (e) => logger.warn(e)))`     |
+| `finally` cleanup         | run before eliminating, or in every `match` arm | see below                                                                                 |
 
 `catch-and-rethrow-wrapped` — turn a caught error into a modeled `Err`:
 
 ```ts
 // before: throw new ConfigError(cause)
 // after:  ConfigError becomes a modeled Err, not a throw
-parseConfig(text).mapErrCases((matcher) => matcher.with(P._, (e) => new ConfigError(e)));
+parseConfig(text).mapErrCases((matcher) => matcher.with("invalid_json", (e) => new ConfigError(e)));
 ```
 
 `catch-log-rethrow` — log, keep the original error, still propagate as an `Err`:
 
 ```ts
-parseConfig(text).tapErrCases((matcher) => matcher.with(P._, (e) => logger.warn("bad config", e)));
+parseConfig(text).tapErrCases((matcher) =>
+  matcher.with("invalid_json", (e) => logger.warn("bad config", e)),
+);
 ```
+
+Add a second case to `qualify` later — say a `"missing_field"` — and every one of
+these arms stops compiling until you say what it does. That is the trade a
+`catch (cause)` block can never make.
 
 `finally` has no combinator counterpart — a `Result` pipeline has no single point
 that always runs on the way out, since `Ok`, `Err`, and `Defect` can each take a
@@ -131,7 +141,7 @@ result.match({
     return v;
   },
   errCases: (matcher) =>
-    matcher.with(P._, (e) => {
+    matcher.with("invalid_json", (e) => {
       connection.close();
       return handleErr(e);
     }),

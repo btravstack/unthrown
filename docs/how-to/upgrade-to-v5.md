@@ -47,8 +47,8 @@ matcher over the error's _cases_, not a plain `(error) => …` callback.
 The old names no longer exist, so the compiler flags each site:
 
 ```diff
-- result.mapErr((m) => m.with(P._, wrap))
-+ result.mapErrCases((m) => m.with(P._, wrap))
+- result.mapErr((m) => m.with(tag("NotFound"), wrap))
++ result.mapErrCases((m) => m.with(tag("NotFound"), wrap))
 ```
 
 Same for `flatMapErr` → `flatMapErrCases`, `recoverErr` → `recoverErrCases`,
@@ -75,6 +75,14 @@ excess-property compile error instead.
     defect: (cause) => report(cause),
   })
 ```
+
+The `P._` arm above is the **mechanical** port — a 4.x `err` callback was a
+blanket handler, and one wildcard reproduces it exactly. Treat it as a way
+station, not a destination: replace it with one arm per case in `E` (grouping
+those that share a handler) so the site starts failing the build when the union
+grows. That is the whole reason the handler changed shape. `@unthrown/oxlint`'s
+[`no-catch-all-pattern`](./lint-your-codebase#no-catch-all-pattern), now in the
+recommended preset, will point at every arm still waiting to be converted.
 
 If your old `err` handler was `(error) => { throw error }`, prefer
 [`getOrThrow()`](../reference/combinators) — the sanctioned single-throw

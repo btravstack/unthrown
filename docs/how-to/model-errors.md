@@ -111,18 +111,27 @@ no `.exhaustive()` to forget. For an `AsyncResult`, `match` resolves to a
 ## Match on more than `_tag`
 
 Because the matcher matches by structure, you can also branch on a `code`, on a
-guard, or on grouped patterns, and `.with(P._, …)` is the deliberate catch-all
-when every error is handled the same way:
+`P.*` matcher, or on **grouped patterns** — several cases sharing one strategy,
+each still named:
 
 ```ts
-import { P } from "unthrown";
-
+// E = { code: "EXPIRED" } | { code: "REVOKED" } | { code: "THROTTLED"; retryAfter: number }
 const status = authorize(id).match({
   ok: () => 200,
   defect: () => 500,
-  errCases: (matcher) => matcher.with(P._, () => 403), // every error → 403
+  errCases: (matcher) =>
+    matcher
+      // grouped: one handler, two named cases — not a wildcard
+      .with({ code: "EXPIRED" }, { code: "REVOKED" }, () => 401)
+      .with({ code: "THROTTLED" }, () => 429),
 });
 ```
+
+Grouping is the answer when several errors deserve the same response: the union
+stays written out, so adding a fourth code still stops the build here. `P._`
+exists for what enumeration cannot express — a helper generic in `E`, or an `E`
+that is a single type rather than a union — and is covered in
+[Exhaustive error matching](../explanation/exhaustive-error-matching#generic-boundary-helpers-the-catch-all-is-the-only-form-that-compiles).
 
 Unlike the error _combinators_ (`mapErrCases`, `flatMapErrCases`, …), `match`'s `err`
 handler receives **no `defect` helper** — `match` is total elimination to a value,

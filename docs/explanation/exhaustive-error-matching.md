@@ -3,7 +3,7 @@
 > **Explanation.** This page explains _why_ the error combinators take a
 > matcher instead of a plain callback, and why they carry a `*Cases`
 > suffix (`mapErrCases`, `tapErrCases`, …) rather than a bare `map`/`tap`-style
-> name. For the mechanics — the rules, the `P._` catch-all, the per-method
+> name. For the mechanics — the rules, grouped patterns, the per-method
 > signatures — see the [combinator reference](../reference/combinators#the-error-channel).
 
 Errors-as-values only pays off if the values **can't be silently dropped**. On
@@ -76,11 +76,35 @@ There is deliberately **no** identity on the error channel. Passing the error
 through unchanged is a real decision with a real spelling:
 
 - to _observe_ and pass through, use `tapErrCases` (an observer);
-- to _re-emit_ every case unchanged, write the catch-all: `.with(P._, (e) => e)`.
+- to _re-emit_ cases unchanged, name them — grouped in one arm if they share the
+  treatment: `.with(tag("NotFound"), tag("Forbidden"), (e) => e)`.
 
-`P._` is the sanctioned "handle everything else" branch — the explicit,
-greppable replacement for the old blanket callback. It makes the match
-exhaustive and it reads, at the call site, as an on-purpose "everything else".
+Grouped patterns are the honest form of "several cases, one strategy": the
+handler is written once, but every case is still spelled out, so enriching `E`
+still breaks the build. That is the property the whole design is buying.
+
+## Enumerate the cases; the wildcard is the exception
+
+`P._` matches anything, so a single `.with(P._, …)` arm makes _any_ match
+exhaustive — including matches over unions it has never seen. That is precisely
+what makes it the wrong default. A wildcard turns the compile error you wanted
+into silence: the day a `PaymentDeclined` joins `E`, every wildcard-terminated
+site keeps building and quietly routes the new case down whatever path was
+already there.
+
+So the library's position is: **name the cases**. Group them when several share a
+handler. Reach for `P._` in exactly two situations, and say why in a comment when
+you do:
+
+1. **A helper generic in `E`** — enumeration is impossible in principle, not just
+   inconvenient (the next section).
+2. **An `E` that is a single type**, not a union of cases — a validator's issues
+   array, say. There is nothing to enumerate; one arm _is_ the enumeration.
+
+`@unthrown/oxlint`'s
+[`no-catch-all-pattern`](../how-to/lint-your-codebase#no-catch-all-pattern) —
+part of its recommended preset — encodes this: `P._` is reported, and the two
+sanctioned uses carry a targeted `oxlint-disable` comment saying which one it is.
 
 ## Why the `*Cases` suffix?
 
@@ -126,14 +150,18 @@ left to silently drop a case. Its `errCases` handler receives the matcher but **
 channel, and a `Result` that already carries a defect is handled by the separate
 `defect:` case.
 
-## Generic boundary helpers: the catch-all works, tags don't
+## Generic boundary helpers: the catch-all is the only form that compiles
 
-Exhaustiveness is proven _at the call site_, from the error union. Inside a
-**generic** helper — one whose error type is still a type parameter `E` — no
-list of tag arms can prove coverage, because the compiler cannot know what `E`
-will contain. But the **catch-all can**: `.with(P._, …)` is a state transition
-to "nothing remains" that does not depend on `E` at all, so a
-catch-all-terminated builder compiles even in fully generic code:
+This is `P._`'s remaining purpose — not a convenience, a necessity.
+
+Exhaustiveness is proven _at the call site_, from the concrete error union.
+Inside a **generic** helper — one whose error type is still a type parameter `E`
+— no list of tag arms can prove coverage, because the compiler cannot know what
+`E` will contain. Enumeration is not merely tedious here; it is impossible.
+
+The **catch-all can** prove it: `.with(P._, …)` is a state transition to
+"nothing remains" that does not depend on `E` at all, so a catch-all-terminated
+builder compiles even in fully generic code:
 
 ```ts
 // ✅ Compiles for any E: the catch-all is provably exhaustive by construction.
@@ -141,6 +169,7 @@ function toPromise<T, E>(result: Result<T, E>): T {
   return result.match({
     ok: (value) => value,
     errCases: (matcher) =>
+      // oxlint-disable-next-line unthrown/no-catch-all-pattern -- generic in E: no tag arm can prove coverage
       matcher.with(P._, (error) => {
         throw error;
       }),
@@ -150,6 +179,12 @@ function toPromise<T, E>(result: Result<T, E>): T {
   });
 }
 ```
+
+The exemption is narrow by construction: the `UniversalPattern` type that
+unlocks the catch-all overload is carried by `P._` / `P.any` alone. Even a
+`P.when` guard that happens to accept everything is _not_ assignable to it — the
+overload fires only for a pattern the type system **knows** covers the whole
+input. There is no way to widen this hole from user code.
 
 ```ts
 // ❌ Still won't compile — and shouldn't: tag arms can never be shown to cover
@@ -162,18 +197,24 @@ function partial<T, E>(result: Result<T, E>) {
 (Earlier v5 betas, which delegated matching to ts-pattern, rejected even the
 catch-all form here — the original issue #145. The built-in matcher fixed it.)
 
-The narrowing guards remain a fine alternative when a boundary just splits by
-channel with no per-case branching — it is what unthrown's own interop bridges
-use, simply because nothing there needs a matcher:
+Often the better answer at a boundary is not to match at all. The narrowing
+guards split by _channel_ with no per-case branching and carry no exhaustiveness
+obligation — which is what unthrown's own interop bridges use, simply because
+nothing there needs a matcher:
 
 ```ts
-// ✅ Also fine: guards carry no exhaustiveness obligation.
+// ✅ Also fine — and usually preferable: guards make no exhaustiveness claim,
+// so there is no wildcard to justify.
 function toPromise<T, E>(result: Result<T, E>): T {
   if (result.isErr()) throw result.error;
   if (result.isDefect()) throw result.cause;
   return result.value;
 }
 ```
+
+Reach for the generic catch-all only when the helper genuinely needs the
+matcher's shape — a `.returnType<R>()` pin, say (next section). Otherwise the
+guards say the same thing with less machinery.
 
 ## Declaring the output: `returnType<R>()`
 
@@ -187,8 +228,10 @@ of failing.
 `.returnType<R>()`, called directly after `match(…)`, declares the output once:
 
 ```ts
+// Generic in E again — so the catch-all is the only arm that can compile here.
 const toApiError = <T, E>(result: Result<T, E>): Result<T, ApiError> =>
   result.mapErrCases((matcher) =>
+    // oxlint-disable-next-line unthrown/no-catch-all-pattern -- generic in E
     matcher.returnType<ApiError>().with(P._, (error) => new ApiError({ status: 500, error })),
   );
 ```
@@ -220,9 +263,9 @@ result.mapErrCases(
 );
 ```
 
-Exhaustiveness is unaffected: a missing case is still a compile error, and
-`P._` is still the deliberate catch-all. Pinning declares _what comes out_, not
-_what is covered_.
+Exhaustiveness is unaffected: a missing case is still a compile error. Pinning
+declares _what comes out_, not _what is covered_ — so a pinned match over a
+concrete union still names every case.
 
 One thing a pin must not do is _widen_ the error channel. In `mapErrCases` the
 declared output **is** the new `E`, so `returnType<unknown>()` there re-opens

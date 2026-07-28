@@ -15,8 +15,8 @@ such variant.
 Migration is a rename at every call site:
 
 ```diff
-- result.mapErr((m) => m.with(P._, wrap))
-+ result.mapErrCases((m) => m.with(P._, wrap))
+- result.mapErr((m) => m.with(tag("NotFound"), wrap))
++ result.mapErrCases((m) => m.with(tag("NotFound"), wrap))
 ```
 
 **`match`'s error handler is renamed the same way — `err` → `errCases`** — for
@@ -30,8 +30,8 @@ the key turns that into an excess-property compile error.
 ```diff
   result.match({
     ok: (value) => value,
--   err: (matcher) => matcher.with(P._, wrap),
-+   errCases: (matcher) => matcher.with(P._, wrap),
+-   err: (matcher) => matcher.with(tag("NotFound"), wrap),
++   errCases: (matcher) => matcher.with(tag("NotFound"), wrap),
     defect: (cause) => report(cause),
   })
 ```

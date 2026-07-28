@@ -55,7 +55,7 @@ No peer dependencies — the exhaustive error matcher is built-in and exported a
 ## Quick Example
 
 ```ts
-import { fromPromise, P, TaggedError } from "unthrown";
+import { fromPromise, tag, TaggedError } from "unthrown";
 
 // Our modeled domain failure:
 class NotFound extends TaggedError("NotFound") {}
@@ -71,8 +71,9 @@ const user = fromPromise(fetchUser(id), (cause, defect) =>
 // Handle every channel once, at the edge — no surrounding try/catch.
 const status = await user.match({
   ok: () => 200,
-  // `errCases` receives the exhaustive matcher; `.with(P._, …)` handles every error:
-  errCases: (matcher) => matcher.with(P._, () => 404), // your modeled NotFound
+  // `errCases` receives the exhaustive matcher — name every case of E; adding
+  // one to E is a compile error here until you handle it:
+  errCases: (matcher) => matcher.with(tag("NotFound"), () => 404),
   defect: (cause) => {
     logger.error(cause); // everything unexpected
     return 500;
