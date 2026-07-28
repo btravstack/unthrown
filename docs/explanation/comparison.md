@@ -64,7 +64,7 @@ won't _also_ throw — `JSON.parse`, a surprise `null`, a throwing getter.
 - In **unthrown**, a throw inside any combinator is **caught and converted to a
   `Defect`** — nothing escapes a pipeline as a raw throw, and an `AsyncResult`'s
   internal promise **never rejects**. That is the runtime guarantee that lets an
-  HTTP adapter do a single `match({ ok, err, defect })` with no surrounding
+  HTTP adapter do a single `match({ ok, errCases, defect })` with no surrounding
   `try/catch`. See [The async model](./async-model).
 
 A single-axis Result can only stay sound if every combinator callback is

@@ -41,7 +41,7 @@ the signatures below abbreviate its callback as `(matcher) => …`.
 | recover from a defect (rare)                   | `recoverDefect`   | `(cause) => Result<U, E2>` → `Result<T \| U, E \| E2>`       | Defect       |
 | observe a defect, e.g. log it                  | `tapDefect`       | `(cause) => void` → `Result<T, E>`                           | Defect       |
 | observe **any** failure (error _or_ defect)    | `tapFailure`      | `(f: FailureView<E>) => void` → `Result<T, E>`               | Err + Defect |
-| handle all three channels at the edge          | `match`           | `{ ok, err, defect }` → `R`                                  | all          |
+| handle all three channels at the edge          | `match`           | `{ ok, errCases, defect }` → `R`                             | all          |
 | combine an array of `Result`s                  | `all`             | `Result<T, E>[]` → `Result<T[], E>`                          | —            |
 | combine a record of `Result`s                  | `allFromDict`     | `{ [k]: Result<T, E> }` → `Result<{ [k]: T }, E>`            | —            |
 

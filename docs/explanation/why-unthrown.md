@@ -70,7 +70,7 @@ Two more deliberate choices follow from it:
   in `E`. See [Qualification](./qualification).
 - **Throws are caught and become defects.** A `throw` inside any combinator
   (`.map`, `.flatMap`, …) is captured as a defect rather than escaping — which is
-  what lets an HTTP handler do a single `match({ ok, err, defect })` with no
+  what lets an HTTP handler do a single `match({ ok, errCases, defect })` with no
   surrounding `try`/`catch`.
 
 ## Why this matters more with AI in the loop
