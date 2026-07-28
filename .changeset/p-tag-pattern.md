@@ -13,7 +13,9 @@ The type and the runtime behaviour are unchanged — it still produces the
 payload, and still works in grouped patterns and inside `P.union`.
 
 Migration is mechanical: drop `tag` from the import (keeping or adding `P`) and
-prefix the call sites.
+prefix the call sites. (The `- import { tag } from "unthrown"` line below is the
+v5-beta spelling; coming from 4.x the import was `@unthrown/pattern`, which is
+gone — see the v5 upgrade guide.)
 
 ```diff
 - import { tag } from "unthrown";

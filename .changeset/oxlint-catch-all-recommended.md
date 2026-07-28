@@ -23,8 +23,8 @@ exhaustive by construction, so the compiler tells you when the list is complete:
 ```ts
 result.mapErrCases((matcher) =>
   matcher
-    .with(tag("NotFound"), () => new ApiError({ status: 404 }))
-    .with(tag("Conflict"), tag("DriverError"), (e) => new ApiError({ status: 500, error: e })),
+    .with(P.tag("NotFound"), () => new ApiError({ status: 404 }))
+    .with(P.tag("Conflict"), P.tag("DriverError"), (e) => new ApiError({ status: 500, error: e })),
 );
 ```
 

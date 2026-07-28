@@ -10,7 +10,7 @@ ts-pattern match builder over the error (`match(error)`) plus the injected
 calls `.exhaustive()` for you:
 
 ```ts
-import { P, tag } from "unthrown";
+import { P } from "unthrown";
 
 // before
 result.mapErr((error) => {
@@ -21,8 +21,8 @@ result.mapErr((error) => {
 // after — exhaustive; the type checker forces every case to be handled
 result.mapErrCases((matcher, defect) =>
   matcher
-    .with(tag("RecordNotFound"), () => new NotFoundException(id))
-    .with(tag("DriverError"), (e) => defect(e.cause)),
+    .with(P.tag("RecordNotFound"), () => new NotFoundException(id))
+    .with(P.tag("DriverError"), (e) => defect(e.cause)),
 );
 ```
 
@@ -35,7 +35,7 @@ no `.exhaustive()` to forget and no `.otherwise()` to smuggle in a fallback.
 
 - **Match on anything ts-pattern supports** — `_tag`, a `code`-discriminated
   union (the oRPC shape), structural shapes, guards, and grouped patterns
-  (`.with(a, b, handler)` — one strategy for several cases). `tag("X")` is sugar
+  (`.with(a, b, handler)` — one strategy for several cases). `P.tag("X")` is sugar
   for the `{ _tag: "X" }` pattern.
 - **Name the cases; group the ones that share a handler** — `.with(a, b, handler)`
   writes the handler once and still spells every case out, which is what keeps a
@@ -43,18 +43,18 @@ no `.exhaustive()` to forget and no `.otherwise()` to smuggle in a fallback.
   (principally a helper generic in `E`, where no arm list can prove coverage),
   not as a drop-in for the old single callback.
 - Each branch receives the narrowed variant **and the injected `defect` helper**
-  (`.with(tag("X"), (e) => defect(e.cause))`); its `Defect` arm is subtracted
+  (`.with(P.tag("X"), (e) => defect(e.cause))`); its `Defect` arm is subtracted
   from the outgoing `E` (`Exclude<O, Defect>`, the boundary inference). A
   throwing branch also becomes a `Defect` (the safety net).
 - **Observers match exhaustively too** (`tapErrCases`/`flatTapErrCases`, with the
   same named arms); the error is observed and flows through unchanged.
 
 **Core now depends on `ts-pattern`** (a small, types-heavy, dual-copy-safe
-library), and re-exports `match` and `P`, plus `tag` — so the matcher, and
-matching a whole `Result` (`match(r).with(P.Ok(), …)`), are first-class in one
-import. **The `@unthrown/pattern` package is removed** — its `tag` helper moved
-into core; the `P.Ok`/`P.Err`/`P.Defect` sugar is dropped (match the union
-structurally instead).
+library), and re-exports `match` and `P` — so the matcher, and matching a whole
+`Result` (`match(r).with(P.Ok(), …)`), are first-class in one import. **The
+`@unthrown/pattern` package is removed** — its `tag` helper is now core's
+`P.tag(t)` pattern constructor; the `P.Ok`/`P.Err`/`P.Defect` sugar is dropped
+(match the union structurally instead).
 
 **`match` now matches the error channel exhaustively too, and `matchTags` is
 removed.** `match`'s error handler no longer takes a blanket `(error) => R`
@@ -63,11 +63,11 @@ builder (no `defect` helper: `match` folds to a value, with no `Defect` output
 channel). It is also **renamed `err` → `errCases`** to match the combinators and
 to make the change loud (a leftover 4.x `err:` handler is now an
 excess-property compile error). This subsumes the old `matchTags` fold — a per-tag fold over a tagged
-union is now `match` with the matcher and `tag(t)`, and it generalises to any
+union is now `match` with the matcher and `P.tag(t)`, and it generalises to any
 discriminant, not only `_tag`:
 
 ```ts
-import { P, tag } from "unthrown";
+import { P } from "unthrown";
 
 // before
 matchTags(result, {
@@ -82,16 +82,18 @@ result.match({
   ok: (n) => `got ${n}`,
   defect: (cause) => `bug: ${String(cause)}`,
   errCases: (matcher) =>
-    matcher.with(tag("NotFound"), () => "404").with(tag("Forbidden"), (e) => `403 for ${e.user}`),
+    matcher
+      .with(P.tag("NotFound"), () => "404")
+      .with(P.tag("Forbidden"), (e) => `403 for ${e.user}`),
 });
 ```
 
 Name every case here too, grouping the ones that share a handler; `.with(P._, …)`
 stays an escape hatch, not the shape to reach for first. `matchTags` and its
-`TagHandlers` type are gone; `TaggedError` and `tag` are unchanged. **Library
-code generic in the error type `E`** (which ts-pattern can't prove exhaustive
-over an unresolved type parameter) should fold with the `isOk` / `isErr` /
-`isDefect` guards instead of `match`.
+`TagHandlers` type are gone; `TaggedError` is unchanged. **Library code generic
+in the error type `E`** (which ts-pattern can't prove exhaustive over an
+unresolved type parameter) should fold with the `isOk` / `isErr` / `isDefect`
+guards instead of `match`.
 
 **Also breaking:** the deprecated error-channel aliases `orElse` and `recover`
 are removed; the extractor aliases (`unwrap`, `unwrapErr`, `unwrapOr`,

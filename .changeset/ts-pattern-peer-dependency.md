@@ -3,8 +3,8 @@
 ---
 
 **`ts-pattern` is now a `peerDependency` (`^5`), not a plain dependency.** Core
-re-exports `match` / `P` / `tag` and its error matchers speak ts-pattern's
-builder type. When ts-pattern was a nested, exact-pinned dependency, a consumer
+re-exports `match` / `P` and its error matchers speak ts-pattern's builder type.
+When ts-pattern was a nested, exact-pinned dependency, a consumer
 who already used ts-pattern at another version ended up with two copies whose
 declarations don't unify — feeding a `P.union(...)` built by one copy into an
 unthrown matcher failed five layers deep in a conditional type.
