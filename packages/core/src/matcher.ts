@@ -17,8 +17,9 @@
 //
 // Supported patterns (the vocabulary the error channel actually uses):
 // primitive literals, shallow(-ly nested) object literals (`{ _tag: "X" }`,
-// `{ code: "X" }` — `tag(t)` produces the former), and the `P.*` matchers
-// (`_`/`any`, `instanceOf`, `when`, `union`, `string`, `number`). Deliberately
+// `{ code: "X" }` — `P.tag(t)` produces the former), and the `P.*` matchers
+// (`_`/`any`, `tag`, `instanceOf`, `when`, `union`, `string`, `number`).
+// Deliberately
 // NOT supported: deep structural inversion, selections, array/variadic
 // patterns — that is the complexity (and instability) being left behind.
 
@@ -166,7 +167,7 @@ export type Matcher<E, Remaining, O, Declared = Unset> = {
   ): Matcher<E, never, O | O2, Declared>;
   /**
    * Add an arm: one or more patterns sharing a single handler (grouped
-   * patterns — `matcher.with(tag("A"), tag("B"), handler)`). The handler
+   * patterns — `matcher.with(P.tag("A"), P.tag("B"), handler)`). The handler
    * receives the input narrowed to what the patterns match (computed against
    * `Remaining`, so cases already handled by earlier arms are excluded); the
    * matched cases are subtracted from `Remaining`.
@@ -268,7 +269,7 @@ function isPlainObject(x: object): x is Record<string, unknown> {
 /**
  * Runtime test: does `pattern` match `value`? A branded `P.*` pattern applies
  * its predicate; a **plain-object** pattern (an object literal, e.g. the
- * `{ _tag }` produced by `tag()`) matches when every key matches recursively
+ * `{ _tag }` produced by `P.tag()`) matches when every key matches recursively
  * (extra keys on the value are ignored — matching is structural); anything
  * else — primitives, but also class instances, arrays, and foreign pattern
  * objects (e.g. a real ts-pattern matcher, whose keys are symbols) — is
@@ -389,6 +390,10 @@ const universal = pattern<unknown>(() => true) as UniversalPattern;
  *   `no-catch-all-pattern` (in its `recommended` preset) flags every other use;
  *   keep the deliberate ones behind a targeted `oxlint-disable` saying which of
  *   the two it is.
+ * - `P.tag(t)` — the `{ _tag: t }` object pattern, matching any value whose
+ *   `_tag` equals `t` (a `TaggedError`, or any `_tag`-discriminated member) and
+ *   narrowing to that variant, payload included. The workhorse of the error
+ *   channel: `matcher.with(P.tag("NotFound"), () => …)`.
  * - `P.instanceOf(Cls)` — an `instanceof` check, narrowing to the class
  *   instance type (for union members that are not tagged, e.g. a third-party
  *   error class).
@@ -401,6 +406,25 @@ const universal = pattern<unknown>(() => true) as UniversalPattern;
 export const P = Object.freeze({
   _: universal,
   any: universal,
+  /**
+   * A matcher pattern matching any value whose `_tag` equals `value` — a
+   * `TaggedError`, or any `_tag`-discriminated member. Equivalent to the object
+   * pattern `{ _tag: value }`, but reads better inside an error-matching
+   * combinator and narrows to the matching variant, payload included.
+   *
+   * @typeParam Tag - the string literal tag to match.
+   * @param value - the `_tag` to match.
+   *
+   * @example
+   * ```ts
+   * result.mapErrCases((matcher) =>
+   *   matcher
+   *     .with(P.tag("NotFound"), () => new NotFoundException())
+   *     .with(P.tag("Conflict"), (e) => new ConflictException(e.key)),
+   * );
+   * ```
+   */
+  tag: <const Tag extends string>(value: Tag): { _tag: Tag } => ({ _tag: value }),
   instanceOf: <C extends abstract new (...args: never[]) => unknown>(
     cls: C,
   ): PatternMatcher<InstanceType<C>> => pattern((value) => value instanceof cls),

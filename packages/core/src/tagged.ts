@@ -1,5 +1,6 @@
-// The TaggedError convention (à la Effect's `Data.TaggedError`) and the
-// `tag(t)` matcher pattern for matching a tagged error union.
+// The TaggedError convention (à la Effect's `Data.TaggedError`). The matcher
+// pattern that matches a tagged error union lives with the other pattern
+// constructors, as `P.tag(t)` in `matcher.ts`.
 
 type Props = Record<string, unknown>;
 
@@ -65,8 +66,8 @@ export type TaggedErrorConstructor<Tag extends string> = {
  * so a payload `cause` (e.g. a wrapped driver error) is a legitimate,
  * *narrowing* structured field.
  *
- * `_tag` is the discriminant matched by {@link tag} in the error combinators
- * (`result.mapErrCases((matcher) => matcher.with(tag("NotFound"), …))`) and in
+ * `_tag` is the discriminant matched by `P.tag` in the error combinators
+ * (`result.mapErrCases((matcher) => matcher.with(P.tag("NotFound"), …))`) and in
  * `match`; `Error.name` is the human-facing label in stack traces and logs. By
  * default they coincide, but
  * they can be **decoupled** with `options.name` — so a tag can be namespaced for
@@ -145,28 +146,4 @@ export function TaggedError<Tag extends string>(
   }
 
   return TaggedErrorBase as unknown as TaggedErrorConstructor<Tag>;
-}
-
-/**
- * A matcher pattern matching any value whose `_tag` equals `value` — a
- * {@link TaggedError}, or any discriminated member. Equivalent to the object
- * pattern `{ _tag: value }`, but reads better inside an error-matching
- * combinator and narrows to the matching variant, payload included.
- *
- * @typeParam Tag - the string literal tag to match.
- * @param value - the `_tag` to match.
- *
- * @category Tagged errors
- *
- * @example
- * ```ts
- * result.mapErrCases((matcher) =>
- *   matcher
- *     .with(tag("NotFound"), () => new NotFoundException())
- *     .with(tag("Conflict"), (e) => new ConflictException(e.key)),
- * );
- * ```
- */
-export function tag<const Tag extends string>(value: Tag): { _tag: Tag } {
-  return { _tag: value };
 }

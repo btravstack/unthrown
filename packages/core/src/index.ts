@@ -1,10 +1,10 @@
 // The built-in matcher powers the error-matching combinators
 // (`mapErrCases`/`flatMapErrCases`/…): `match` starts a match (over an error or
 // any discriminated value, a `Result` included), `P` carries the pattern
-// helpers (`P.instanceOf`, `P.when`, `P.union`, `P.string`, `P.number`, plus
-// the wildcard escape hatch `P._` — name your cases instead wherever `E` is
-// concrete), and `NonExhaustiveError` is what a rogue unmatched value throws at
-// the `match` edge.
+// helpers (`P.tag`, `P.instanceOf`, `P.when`, `P.union`, `P.string`,
+// `P.number`, plus the wildcard escape hatch `P._` — name your cases instead
+// wherever `E` is concrete), and `NonExhaustiveError` is what a rogue unmatched
+// value throws at the `match` edge.
 export { match, NonExhaustiveError, P } from "./matcher.js";
 export type { Matcher, PatternMatcher, UniversalPattern } from "./matcher.js";
 
@@ -23,7 +23,7 @@ export {
   fromSafeThrowable,
   fromThrowable,
 } from "./interop.js";
-export { tag, TaggedError } from "./tagged.js";
+export { TaggedError } from "./tagged.js";
 
 export type { TaggedErrorConstructor, TaggedErrorInstance } from "./tagged.js";
 export type {

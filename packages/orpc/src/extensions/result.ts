@@ -13,7 +13,7 @@
 //     .result(({ input, errors }) =>
 //       repo
 //         .findPlanet(input.id)
-//         .mapErrCases((m) => m.with(tag("NotFound"), () => errors.NOT_FOUND())),
+//         .mapErrCases((m) => m.with(P.tag("NotFound"), () => errors.NOT_FOUND())),
 //     );
 //
 // This registration is a genuine import-time side effect — the one entry

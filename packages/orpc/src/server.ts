@@ -10,7 +10,7 @@
 //   Defect     → rethrow the cause     (oRPC collapses it to INTERNAL_SERVER_ERROR)
 //
 // The handler's `Err` channel is constrained to `ORPCError`: mapping a domain
-// error into one — `mapErrCases((m) => m.with(tag("NotFound"), () => errors.NOT_FOUND({...})))`,
+// error into one — `mapErrCases((m) => m.with(P.tag("NotFound"), () => errors.NOT_FOUND({...})))`,
 // one arm per case of `E` — is the explicit triage point at the transport
 // boundary (Thesis #3).
 
@@ -66,7 +66,7 @@ export type ResultHandler<
  *
  * @example
  * ```ts
- * import { tag } from "unthrown";
+ * import { P } from "unthrown";
  * import { handlerResult } from "@unthrown/orpc/server";
  *
  * const find = os
@@ -76,7 +76,7 @@ export type ResultHandler<
  *     handlerResult(({ input, errors }) =>
  *       repo
  *         .findPlanet(input.id)
- *         .mapErrCases((matcher) => matcher.with(tag("NotFound"), () => errors.NOT_FOUND())),
+ *         .mapErrCases((matcher) => matcher.with(P.tag("NotFound"), () => errors.NOT_FOUND())),
  *     ),
  *   );
  * ```

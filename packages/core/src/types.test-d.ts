@@ -33,7 +33,6 @@ import {
   isOk,
   isResult,
   match,
-  tag,
   P,
   Ok,
   OkAsync,
@@ -370,14 +369,14 @@ declare const tagged: Result<number, TagA | TagB>;
 tagged.match({
   ok: () => 1,
   defect: () => 2,
-  errCases: (matcher) => matcher.with(tag("TagA"), () => 3).with(tag("TagB"), () => 4),
+  errCases: (matcher) => matcher.with(P.tag("TagA"), () => 3).with(P.tag("TagB"), () => 4),
 });
 
 tagged.match({
   ok: () => 1,
   defect: () => 2,
   // @ts-expect-error - the TagB branch is missing, so the builder is not exhaustive
-  errCases: (matcher) => matcher.with(tag("TagA"), () => 3),
+  errCases: (matcher) => matcher.with(P.tag("TagA"), () => 3),
 });
 
 // The 4.x call shape — an `err` key taking the error value — no longer compiles:
@@ -402,7 +401,7 @@ const folded = tagged.match({
   ok: () => "ok" as const,
   defect: () => "defect" as const,
   errCases: (matcher) =>
-    matcher.with(tag("TagA"), () => "a" as const).with(tag("TagB"), () => "b" as const),
+    matcher.with(P.tag("TagA"), () => "a" as const).with(P.tag("TagB"), () => "b" as const),
 });
 type _folded = Expect<Equal<typeof folded, "ok" | "defect" | "a" | "b">>;
 
@@ -460,7 +459,7 @@ function _genericMatchTags<T, E>(result: Result<T, E>): void {
   result.match({
     ok: () => undefined,
     // @ts-expect-error - tag arms are not provably exhaustive over an unresolved E
-    errCases: (matcher) => matcher.with(tag("X"), () => undefined),
+    errCases: (matcher) => matcher.with(P.tag("X"), () => undefined),
     defect: () => undefined,
   });
 }
@@ -674,26 +673,26 @@ new WithMsg({ ticketId: "t1" });
   // exhaustive per-tag; the outgoing E is the union of the branch returns
   const triaged = r.mapErrCases((matcher) =>
     matcher
-      .with(tag("NotFound"), (e) => `nf:${e.id}` as const)
-      .with(tag("Conflict"), () => new Mapped()),
+      .with(P.tag("NotFound"), (e) => `nf:${e.id}` as const)
+      .with(P.tag("Conflict"), () => new Mapped()),
   );
   type _Triaged = Expect<Equal<ErrOf<typeof triaged>, `nf:${string}` | Mapped>>;
 
   // each branch receives the narrowed variant
   r.mapErrCases((matcher) =>
     matcher
-      .with(tag("NotFound"), (e) => {
+      .with(P.tag("NotFound"), (e) => {
         type _Narrowed = Expect<Equal<typeof e, NotFound>>;
         return e;
       })
-      .with(tag("Conflict"), (e) => e),
+      .with(P.tag("Conflict"), (e) => e),
   );
 
   // a throwing branch types as `never` and drops out of the outgoing union
   const thrown = r.mapErrCases((matcher) =>
     matcher
-      .with(tag("NotFound"), () => new Mapped())
-      .with(tag("Conflict"), (e) => {
+      .with(P.tag("NotFound"), () => new Mapped())
+      .with(P.tag("Conflict"), (e) => {
         throw e.key;
       }),
   );
@@ -703,7 +702,9 @@ new WithMsg({ ticketId: "t1" });
   // Defect arm is subtracted from the outgoing union (Exclude<O, Defect>, the
   // same inference as a qualify boundary)
   const defected = r.mapErrCases((matcher, defect) =>
-    matcher.with(tag("NotFound"), () => new Mapped()).with(tag("Conflict"), (e) => defect(e.key)),
+    matcher
+      .with(P.tag("NotFound"), () => new Mapped())
+      .with(P.tag("Conflict"), (e) => defect(e.key)),
   );
   type _DefectDrops = Expect<Equal<ErrOf<typeof defected>, Mapped>>;
 
@@ -723,29 +724,31 @@ new WithMsg({ ticketId: "t1" });
   // NOT exhaustive: a missing case makes `.exhaustive()` uncallable, so the
   // builder is not an ExhaustiveMatch and the call fails at the call site
   // @ts-expect-error — Conflict is unhandled
-  r.mapErrCases((matcher) => matcher.with(tag("NotFound"), (e) => e));
+  r.mapErrCases((matcher) => matcher.with(P.tag("NotFound"), (e) => e));
 
   // flatMapErrCases: channels are the unions of the branch-returned Results' channels
   const flat = r.flatMapErrCases((matcher) =>
-    matcher.with(tag("NotFound"), (e) => Ok(e.id)).with(tag("Conflict"), () => Err(new Mapped())),
+    matcher
+      .with(P.tag("NotFound"), (e) => Ok(e.id))
+      .with(P.tag("Conflict"), () => Err(new Mapped())),
   );
   type _FlatT = Expect<Equal<typeof flat, Result<number | string, Mapped>>>;
 
   // flatMapErrCases: a defect branch contributes to neither channel
   const flatDefected = r.flatMapErrCases((matcher, defect) =>
-    matcher.with(tag("NotFound"), (e) => Ok(e.id)).with(tag("Conflict"), (e) => defect(e.key)),
+    matcher.with(P.tag("NotFound"), (e) => Ok(e.id)).with(P.tag("Conflict"), (e) => defect(e.key)),
   );
   type _FlatDefected = Expect<Equal<typeof flatDefected, Result<number | string, never>>>;
 
   // recoverErrCases: recovers per tag, unioning the recovered values; E empties
   const rec = r.recoverErrCases((matcher) =>
-    matcher.with(tag("NotFound"), (e) => e.id).with(tag("Conflict"), () => 0 as const),
+    matcher.with(P.tag("NotFound"), (e) => e.id).with(P.tag("Conflict"), () => 0 as const),
   );
   type _Rec = Expect<Equal<typeof rec, Result<number | string | 0, never>>>;
 
   // recoverErrCases: a defect branch does not widen the recovered success type
   const recDefected = r.recoverErrCases((matcher, defect) =>
-    matcher.with(tag("NotFound"), (e) => e.id).with(tag("Conflict"), (e) => defect(e.key)),
+    matcher.with(P.tag("NotFound"), (e) => e.id).with(P.tag("Conflict"), (e) => defect(e.key)),
   );
   type _RecDefected = Expect<Equal<typeof recDefected, Result<number | string, never>>>;
 
@@ -764,8 +767,8 @@ new WithMsg({ ticketId: "t1" });
   const ar2 = r.toAsync();
   const aflat = ar2.flatMapErrCases((matcher) =>
     matcher
-      .with(tag("NotFound"), (e) => OkAsync(e.id))
-      .with(tag("Conflict"), () => Err(new Mapped())),
+      .with(P.tag("NotFound"), (e) => OkAsync(e.id))
+      .with(P.tag("Conflict"), () => Err(new Mapped())),
   );
   type _AFlat = Expect<Equal<typeof aflat, AsyncResult<number | string, Mapped>>>;
 }
@@ -819,8 +822,8 @@ new WithMsg({ ticketId: "t1" });
   // pinned: the fold type is the DECLARED one, not the union of branch returns
   const pinned = match(e)
     .returnType<string>()
-    .with(tag("NotFound"), (n) => n.id)
-    .with(tag("Conflict"), () => "conflict")
+    .with(P.tag("NotFound"), (n) => n.id)
+    .with(P.tag("Conflict"), () => "conflict")
     .exhaustive();
   type _Pinned = Expect<Equal<typeof pinned, string>>;
 
@@ -828,42 +831,42 @@ new WithMsg({ ticketId: "t1" });
   // (the `BranchReturn` conditional must not defer inference and collapse O2 —
   // the `fromPromise`-qualify hazard, see CLAUDE.md's internal design)
   const inferred = match(e)
-    .with(tag("NotFound"), () => 1 as const)
-    .with(tag("Conflict"), () => "x" as const)
+    .with(P.tag("NotFound"), () => 1 as const)
+    .with(P.tag("Conflict"), () => "x" as const)
     .exhaustive();
   type _Inferred = Expect<Equal<typeof inferred, 1 | "x">>;
 
   // narrowing is preserved under a pin
   match(e)
     .returnType<string>()
-    .with(tag("NotFound"), (n) => {
+    .with(P.tag("NotFound"), (n) => {
       type _Narrowed = Expect<Equal<typeof n, NotFound>>;
       return n.id;
     })
-    .with(tag("Conflict"), () => "c")
+    .with(P.tag("Conflict"), () => "c")
     .exhaustive();
 
   // a branch that violates the pin fails ON THE BRANCH, not downstream
   match(e)
     .returnType<string>()
     // @ts-expect-error — 42 is not assignable to the declared `string`
-    .with(tag("NotFound"), () => 42)
-    .with(tag("Conflict"), () => "c")
+    .with(P.tag("NotFound"), () => 42)
+    .with(P.tag("Conflict"), () => "c")
     .exhaustive();
 
   // `.returnType` is callable only before any arm has produced an output, and
   // only once — not tied to position (see `afterNever` below); here an arm has
   // already produced an output, so pinning after it is rejected
   match(e)
-    .with(tag("NotFound"), () => "a")
-    .with(tag("Conflict"), () => "c")
+    .with(P.tag("NotFound"), () => "a")
+    .with(P.tag("Conflict"), () => "c")
     // @ts-expect-error — not callable: an arm has already run
     .returnType<string>();
 
   // re-pinning is rejected by the same gate
   match(e)
     .returnType<string>()
-    .with(tag("NotFound"), () => "a")
+    .with(P.tag("NotFound"), () => "a")
     // @ts-expect-error — not callable: the builder is already pinned
     .returnType<number>();
 
@@ -878,18 +881,18 @@ new WithMsg({ ticketId: "t1" });
   // contributes nothing, so a pin after it still compiles. Sound, since a
   // `never` branch can contradict no declared type.
   const afterNever = match(e)
-    .with(tag("NotFound"), (): never => {
+    .with(P.tag("NotFound"), (): never => {
       throw new Error("always throws");
     })
     .returnType<string>()
-    .with(tag("Conflict"), () => "c")
+    .with(P.tag("Conflict"), () => "c")
     .exhaustive();
   type _AfterNever = Expect<Equal<typeof afterNever, string>>;
 
   // a missing case under a pin still makes `.exhaustive` uncallable
   const partial = match(e)
     .returnType<string>()
-    .with(tag("NotFound"), (n) => n.id);
+    .with(P.tag("NotFound"), (n) => n.id);
   // @ts-expect-error — Conflict is unhandled
   partial.exhaustive();
 
@@ -897,15 +900,15 @@ new WithMsg({ ticketId: "t1" });
   // output type — the same subtraction the unpinned path does with Exclude
   const pinnedDefect = match(e)
     .returnType<string>()
-    .with(tag("NotFound"), (n) => n.id)
-    .with(tag("Conflict"), (c) => defect(c))
+    .with(P.tag("NotFound"), (n) => n.id)
+    .with(P.tag("Conflict"), (c) => defect(c))
     .exhaustive();
   type _PinnedDefect = Expect<Equal<typeof pinnedDefect, string>>;
 
   // grouped patterns under a pin: the variadic form and P.union
   const grouped = match(e)
     .returnType<string>()
-    .with(tag("NotFound"), tag("Conflict"), (both) => {
+    .with(P.tag("NotFound"), P.tag("Conflict"), (both) => {
       type _Both = Expect<Equal<typeof both, NotFound | Conflict>>;
       return both._tag;
     })
@@ -914,7 +917,7 @@ new WithMsg({ ticketId: "t1" });
 
   const unioned = match(e)
     .returnType<string>()
-    .with(P.union(tag("NotFound"), tag("Conflict")), (both) => {
+    .with(P.union(P.tag("NotFound"), P.tag("Conflict")), (both) => {
       type _UnionNarrowed = Expect<Equal<typeof both, NotFound | Conflict>>;
       return both._tag;
     })
@@ -940,8 +943,8 @@ new WithMsg({ ticketId: "t1" });
   const pinned = r.mapErrCases((matcher) =>
     matcher
       .returnType<ApiError>()
-      .with(tag("NotFound"), () => new ApiError({ status: 404 }))
-      .with(tag("DriverError"), () => new ApiError({ status: 500 })),
+      .with(P.tag("NotFound"), () => new ApiError({ status: 404 }))
+      .with(P.tag("DriverError"), () => new ApiError({ status: 500 })),
   );
   type _Pinned = Expect<Equal<typeof pinned, Result<number, ApiError>>>;
 
@@ -950,8 +953,8 @@ new WithMsg({ ticketId: "t1" });
   const withDefect = r.mapErrCases((matcher, defect) =>
     matcher
       .returnType<ApiError>()
-      .with(tag("NotFound"), () => new ApiError({ status: 404 }))
-      .with(tag("DriverError"), (d) => defect(d.cause)),
+      .with(P.tag("NotFound"), () => new ApiError({ status: 404 }))
+      .with(P.tag("DriverError"), (d) => defect(d.cause)),
   );
   type _WithDefect = Expect<Equal<typeof withDefect, Result<number, ApiError>>>;
 
@@ -959,8 +962,8 @@ new WithMsg({ ticketId: "t1" });
   const flat = r.flatMapErrCases((matcher) =>
     matcher
       .returnType<Result<string, ApiError>>()
-      .with(tag("NotFound"), (n) => Ok(n.id))
-      .with(tag("DriverError"), () => Err(new ApiError({ status: 500 }))),
+      .with(P.tag("NotFound"), (n) => Ok(n.id))
+      .with(P.tag("DriverError"), () => Err(new ApiError({ status: 500 }))),
   );
   type _Flat = Expect<Equal<typeof flat, Result<number | string, ApiError>>>;
 
@@ -980,11 +983,11 @@ new WithMsg({ ticketId: "t1" });
   const responded = r.recoverErrCases((matcher) =>
     matcher
       .returnType<Response>()
-      .with(tag("NotFound"), () => ({
+      .with(P.tag("NotFound"), () => ({
         status: 404 as const,
         body: { code: "NOT_FOUND" as const },
       }))
-      .with(tag("DriverError"), () => ({
+      .with(P.tag("DriverError"), () => ({
         status: 409 as const,
         body: { code: "CONFLICT" as const },
       })),
@@ -996,11 +999,11 @@ new WithMsg({ ticketId: "t1" });
     matcher
       .returnType<Response>()
       // @ts-expect-error — "GONE" is not a declared body code
-      .with(tag("NotFound"), () => ({
+      .with(P.tag("NotFound"), () => ({
         status: 404 as const,
         body: { code: "GONE" as const },
       }))
-      .with(tag("DriverError"), () => ({
+      .with(P.tag("DriverError"), () => ({
         status: 409 as const,
         body: { code: "CONFLICT" as const },
       })),
@@ -1057,8 +1060,8 @@ new WithMsg({ ticketId: "t1" });
   const apinned = r.toAsync().mapErrCases((matcher) =>
     matcher
       .returnType<ApiError>()
-      .with(tag("NotFound"), () => new ApiError({ status: 404 }))
-      .with(tag("DriverError"), () => new ApiError({ status: 500 })),
+      .with(P.tag("NotFound"), () => new ApiError({ status: 404 }))
+      .with(P.tag("DriverError"), () => new ApiError({ status: 500 })),
   );
   type _APinned = Expect<Equal<typeof apinned, AsyncResult<number, ApiError>>>;
 
@@ -1066,8 +1069,8 @@ new WithMsg({ ticketId: "t1" });
   const aflat = r.toAsync().flatMapErrCases((matcher) =>
     matcher
       .returnType<Result<string, ApiError>>()
-      .with(tag("NotFound"), (n) => Ok(n.id))
-      .with(tag("DriverError"), () => Err(new ApiError({ status: 500 }))),
+      .with(P.tag("NotFound"), (n) => Ok(n.id))
+      .with(P.tag("DriverError"), () => Err(new ApiError({ status: 500 }))),
   );
   type _AFlat = Expect<Equal<typeof aflat, AsyncResult<number | string, ApiError>>>;
 
