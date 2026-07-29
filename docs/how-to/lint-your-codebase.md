@@ -20,6 +20,7 @@ Register the plugin and turn its rules on in your `.oxlintrc.json`:
     "unthrown/no-ambiguous-error-type": "error",
     "unthrown/no-unhandled-result": "error",
     "unthrown/prefer-async-result": "error",
+    "unthrown/prefer-ensure": "error",
     "unthrown/no-throw": "error",
     "unthrown/no-catch-all-pattern": "error"
   }
@@ -28,8 +29,8 @@ Register the plugin and turn its rules on in your `.oxlintrc.json`:
 
 The default export also exposes a `recommended` preset — an oxlint config that
 registers the plugin and enables `no-ambiguous-error-type`, `no-unhandled-result`,
-`prefer-async-result`, and `no-catch-all-pattern` (`no-throw` is the one explicit
-opt-in) — for setups that
+`prefer-async-result`, and `no-catch-all-pattern` (`prefer-ensure` and `no-throw`
+are the two explicit opt-ins) — for setups that
 build their config programmatically (`import unthrown from "@unthrown/oxlint"` →
 `unthrown.recommended`).
 
@@ -130,6 +131,78 @@ imports included); the facade companions (`Result.Ok(...)`); and a
 `AsyncResult`. A dropped method _chain_ (`r.map(f);`) or a function whose
 `Result`-ness lives behind an imported declaration needs the type checker and is
 out of scope — no false positives is the design priority.
+
+### `unthrown/prefer-ensure` {#prefer-ensure}
+
+**An opt-in rule** — not part of the `recommended` preset. Every preset rule flags
+a spelling unthrown considers _wrong_; this one flags correct code with a better
+name available.
+
+A `flatMap` whose success branch returns **its own parameter, untouched** is not a
+bind — it is a predicate wearing a bind costume:
+
+```ts
+// ✗ flagged
+.flatMap((user) => (user.active ? Ok(user) : Err(new Inactive({ id: user.id }))))
+
+// ✓ the same gate, named
+.ensure(
+  (user) => user.active,
+  (user) => new Inactive({ id: user.id }),
+)
+```
+
+Beyond reading as the validation it is, [`ensure`](../reference/combinators#by-intent)
+passes the **same** `Ok` through when the predicate holds, where the `flatMap` form
+allocates a fresh one on every success. A body with several guards is several
+`ensure`s, chained — the rule says so in its message.
+
+The rule is anchored on the **constructors**, not on the method name: the
+`Ok(...)` / `Err(...)` calls must resolve to `unthrown` imports (`OkAsync` /
+`ErrAsync` and the facade members `Result.Ok(...)` / `AsyncResult.Err(...)`
+included). It reads the callback's **return positions** — its expression body, or
+every `return` in its block — and _every_ one of them must be a constructor call,
+so a body doing anything else besides gating is left alone:
+
+```ts
+// ✓ not flagged — the branches are wrapped; the rewrite would drop `wrap`
+.flatMap((x) => wrap(x.ok ? Ok(x) : Err("bad")));
+
+// ✓ not flagged — the fall-through is work `ensure` can't express
+.flatMap((x) => {
+  if (!x.ok) return Err("bad");
+  if (x.cached) return Ok(x);
+  return refresh(x);
+});
+```
+
+It stays quiet on everything else a gate is not, too — a success branch that
+builds a new value (`Ok(user.profile)`), a destructured parameter, a body with no
+failure branch, a constructor inside a nested callback, and — the one real false
+positive the shape admits — a **reassigned** parameter:
+
+```ts
+// ✓ not flagged: the value reaching `Ok` is not the one `ensure` would pass through
+.flatMap((x) => {
+  x = normalize(x);
+  return x.ok ? Ok(x) : Err("bad");
+});
+```
+
+No autofix, deliberately: the rewrite is not mechanical. A reversed ternary
+(`c ? Err(e) : Ok(x)`) needs its condition negated, and `ensure`'s boolean form
+requires a `boolean` predicate — a truthiness guard like `x.name && x.count` is a
+perfectly good `flatMap` condition and a type error as a predicate.
+
+An **absence guard followed by a projection** is deliberately out of scope:
+
+```ts
+// ✓ not flagged — a bind that opens with a null check, not a gate
+.flatMap((doc) => (doc === null ? Err(new NotFound({ id })) : Ok(project(doc))));
+```
+
+[`fromNullable`](./qualify-a-boundary) answers that shape as idiomatically as a
+type-guard `ensure` does, so the rule declines to pick a winner.
 
 ### `unthrown/no-throw` {#no-throw}
 

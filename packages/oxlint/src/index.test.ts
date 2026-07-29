@@ -9,7 +9,7 @@ const manifest: { peerDependencies: Record<string, string> } = JSON.parse(
 );
 
 describe("@unthrown/oxlint plugin", () => {
-  it("exposes all five rules under the `unthrown` plugin name", () => {
+  it("exposes all six rules under the `unthrown` plugin name", () => {
     expect(plugin.meta?.name).toBe("unthrown");
     expect(Object.keys(plugin.rules).sort()).toEqual([
       "no-ambiguous-error-type",
@@ -17,6 +17,7 @@ describe("@unthrown/oxlint plugin", () => {
       "no-throw",
       "no-unhandled-result",
       "prefer-async-result",
+      "prefer-ensure",
     ]);
   });
 
@@ -40,9 +41,17 @@ describe("@unthrown/oxlint plugin", () => {
     expect(plugin.rules["no-catch-all-pattern"]?.meta?.docs?.recommended).toBe(true);
   });
 
-  it("keeps `no-throw` out of the `recommended` preset — the one explicit opt-in", () => {
+  it("keeps `no-throw` out of the `recommended` preset — it bans a language statement", () => {
     expect(plugin.recommended.rules).not.toHaveProperty("unthrown/no-throw");
     expect(plugin.rules["no-throw"]?.meta?.docs?.recommended).toBe(false);
+  });
+
+  // Every preset rule flags a spelling unthrown considers *wrong*. A `flatMap`
+  // gating its own parameter violates no thesis — it is correct code with a
+  // better name available — so the rule stays opt-in.
+  it("keeps `prefer-ensure` out of the `recommended` preset — it is a refactor suggestion", () => {
+    expect(plugin.recommended.rules).not.toHaveProperty("unthrown/prefer-ensure");
+    expect(plugin.rules["prefer-ensure"]?.meta?.docs?.recommended).toBe(false);
   });
 
   it("keeps every preset rule pointing at a rule the plugin actually defines", () => {
