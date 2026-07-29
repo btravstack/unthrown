@@ -32,6 +32,7 @@
     "oxlint-peer-floor",
     "p-tag-pattern",
     "prisma-transaction-defect",
+    "relax-oxlint-peer-floor",
     "remove-tools-packages",
     "rename-err-combinators-cases",
     "runtime-hardening",
