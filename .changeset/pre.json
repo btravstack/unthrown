@@ -30,6 +30,7 @@
     "oxlint-no-catch-all-pattern",
     "oxlint-p-tag-message",
     "oxlint-peer-floor",
+    "oxlint-prefer-ensure",
     "p-tag-pattern",
     "prisma-transaction-defect",
     "relax-oxlint-peer-floor",
