@@ -1,5 +1,7 @@
 # @unthrown/vitest
 
+## 5.0.0-beta.11
+
 ## 5.0.0-beta.10
 
 ### Patch Changes
