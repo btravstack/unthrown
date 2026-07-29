@@ -1,5 +1,42 @@
 # @unthrown/standard-schema
 
+## 5.0.0
+
+### Patch Changes
+
+- 92c848b: Stop shipping sourcemaps and declaration maps: `files: ["dist"]` excludes
+  `src/`, so the published maps were dead-ends (silently broken go-to-definition
+  and stack mapping). Each package now sets `declarationMap: false`; consumers
+  land on the fully TSDoc'd `.d.ts` instead, and tarballs shrink.
+- 92c848b: Update stale v4 `match({ ok, err, defect })` doc examples to the v5
+  `{ ok, errCases, defect }` shape (including `fromSchemaAsync`'s `@example`,
+  which renders into the API reference).
+- 39db0d9: `fromSchema`: when a sync-declared schema returns a thenable (the documented
+  deliberate `TypeError`), the in-flight validation promise is now adopted before
+  throwing, so its later rejection can no longer surface as an unhandled
+  rejection.
+- 92c848b: Publish the `@standard-schema/spec` dependency as `^1.1.0` instead of an exact
+  pin, so it can dedupe with a consumer's own copy of the (types-only) spec
+  package.
+- Updated dependencies [3b06099]
+- Updated dependencies [a899858]
+- Updated dependencies [92c848b]
+- Updated dependencies [2297633]
+- Updated dependencies [284b7be]
+- Updated dependencies [f027af4]
+- Updated dependencies [a52eabe]
+- Updated dependencies [5364caa]
+- Updated dependencies [e5e5a14]
+- Updated dependencies [e43d44e]
+- Updated dependencies [4096713]
+- Updated dependencies [fe3840a]
+- Updated dependencies [2297633]
+- Updated dependencies [2297633]
+- Updated dependencies [e5e5a14]
+- Updated dependencies [5364caa]
+- Updated dependencies [a1f68d5]
+  - unthrown@5.0.0
+
 ## 5.0.0-beta.12
 
 ### Patch Changes

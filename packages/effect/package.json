@@ -1,6 +1,6 @@
 {
   "name": "@unthrown/effect",
-  "version": "5.0.0-beta.12",
+  "version": "5.0.0",
   "description": "Effect interop for unthrown",
   "keywords": [
     "effect",
