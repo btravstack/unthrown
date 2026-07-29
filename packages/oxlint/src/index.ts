@@ -1,5 +1,5 @@
 // @unthrown/oxlint — an oxlint (JS) plugin that enforces unthrown's conventions
-// at lint time. Five rules:
+// at lint time. Six rules:
 //
 //   unthrown/no-ambiguous-error-type  — keep `E` a concrete domain error
 //                                        (no unknown/any/Error/{}), i.e. Thesis #1;
@@ -8,6 +8,8 @@
 //   unthrown/no-unhandled-result      — don't drop a Result returned by a bare call.
 //   unthrown/no-catch-all-pattern     — ban the `P._` / `P.any` matcher catch-all;
 //                                        enumerate every error case by name.
+//   unthrown/prefer-ensure            — use `ensure` for a flatMap that only gates its
+//                                        own parameter (opt-in; not in `recommended`).
 //   unthrown/no-throw                 — ban raw `throw` (opt-in; not in `recommended`) —
 //                                        errors are returned, only a defect ever throws.
 //
@@ -24,6 +26,7 @@ import { noCatchAllPattern } from "./rules/no-catch-all-pattern.js";
 import { noThrow } from "./rules/no-throw.js";
 import { noUnhandledResult } from "./rules/no-unhandled-result.js";
 import { preferAsyncResult } from "./rules/prefer-async-result.js";
+import { preferEnsure } from "./rules/prefer-ensure.js";
 
 type UnthrownPlugin = Plugin & { recommended: OxlintConfig };
 
@@ -35,12 +38,20 @@ const plugin = eslintCompatPlugin({
     "no-throw": noThrow,
     "no-unhandled-result": noUnhandledResult,
     "prefer-async-result": preferAsyncResult,
+    "prefer-ensure": preferEnsure,
   },
 }) as UnthrownPlugin;
 
-// `no-throw` is the ONE deliberate opt-out from the preset: it bans a core
-// language statement, which is a whole-codebase commitment rather than an
-// unthrown convention.
+// Two deliberate opt-outs from the preset.
+//
+// `no-throw` bans a core language statement, which is a whole-codebase
+// commitment rather than an unthrown convention.
+//
+// `prefer-ensure` flags a shape that violates no thesis: a `flatMap` gating its
+// own parameter is correct code with a better name available. Every preset rule
+// below flags a spelling unthrown considers *wrong* — an ambiguous `E`, a
+// dropped `Result`, a catch-all that absorbs unnamed cases, a `Promise<Result>`
+// that loses the surface — and a refactor suggestion is not that.
 //
 // `no-catch-all-pattern` IS in the preset. Enumerating every error case by name
 // is unthrown's default position — the exhaustive matcher exists so a failure
