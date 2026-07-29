@@ -70,37 +70,87 @@ const classifyProducer = (scope: Scope, call: ESTree.CallExpression): Producer |
   return undefined;
 };
 
-type Producers = {
-  /** The `Ok(...)` calls in the callback's own body. */
-  ok: ESTree.CallExpression[];
-  /** How many `Err(...)` calls the body makes — one gate each. */
-  errors: number;
-  /** Whether any constructor call sits inside a *nested* function. */
-  nested: boolean;
+/** Strip the wrappers that don't change what a return position evaluates to. */
+const unwrap = (expression: ESTree.Expression): ESTree.Expression => {
+  let current = expression;
+  while (
+    current.type === "ParenthesizedExpression" ||
+    current.type === "TSAsExpression" ||
+    current.type === "TSSatisfiesExpression" ||
+    current.type === "TSTypeAssertion" ||
+    current.type === "TSNonNullExpression" ||
+    current.type === "TSInstantiationExpression"
+  )
+    current = current.expression;
+  return current;
 };
 
 /**
- * Collect the constructor calls under `node`, separating the callback's own
- * body from anything inside a nested function — a nested `Ok`/`Err` belongs to
- * another callback's control flow, and any such call makes the body too complex
- * to call a gate.
+ * The expressions a callback body *returns* — its expression body, or every
+ * `return` argument in its block, skipping nested functions (whose returns
+ * belong to another control flow).
  */
-const collectProducers = (
-  node: ESTree.Node,
-  nested: boolean,
-  found: Producers,
+const returnedExpressions = (
+  body: ESTree.FunctionBody | ESTree.Expression,
+): (ESTree.Expression | null)[] => {
+  if (body.type !== "BlockStatement") return [body];
+
+  const returned: (ESTree.Expression | null)[] = [];
+  const visit = (node: ESTree.Node): void => {
+    if (isFunction(node)) return;
+    if (node.type === "ReturnStatement") {
+      returned.push(node.argument);
+      return;
+    }
+    for (const child of childNodes(node)) visit(child);
+  };
+  visit(body);
+  return returned;
+};
+
+type Gate = {
+  /** The `Ok(...)` calls the body returns. */
+  ok: ESTree.CallExpression[];
+  /** How many `Err(...)` the body returns — one guard each. */
+  errors: number;
+  /** Whether any return position is something other than a constructor call. */
+  impure: boolean;
+};
+
+/**
+ * Classify one return position, following the branches of a conditional down to
+ * the expressions actually returned. Anything that is not an unthrown
+ * constructor makes the body more than a gate — a returned `wrap(Ok(x))` or a
+ * fall-through `return refresh(x)` is work `ensure` cannot express — so it is
+ * recorded as `impure` rather than ignored.
+ */
+const classifyReturn = (
+  expression: ESTree.Expression | null,
+  gate: Gate,
   classify: (call: ESTree.CallExpression) => Producer | undefined,
 ): void => {
-  if (node.type === "CallExpression") {
-    const kind = classify(node);
-    if (kind !== undefined) {
-      if (nested) found.nested = true;
-      else if (kind === "ok") found.ok.push(node);
-      else found.errors++;
-    }
+  if (expression === null) {
+    gate.impure = true;
+    return;
   }
-  const inNested = nested || isFunction(node);
-  for (const child of childNodes(node)) collectProducers(child, inNested, found, classify);
+
+  const returned = unwrap(expression);
+
+  if (returned.type === "ConditionalExpression") {
+    classifyReturn(returned.consequent, gate, classify);
+    classifyReturn(returned.alternate, gate, classify);
+    return;
+  }
+
+  if (returned.type !== "CallExpression") {
+    gate.impure = true;
+    return;
+  }
+
+  const kind = classify(returned);
+  if (kind === "ok") gate.ok.push(returned);
+  else if (kind === "err") gate.errors++;
+  else gate.impure = true;
 };
 
 /**
@@ -152,6 +202,15 @@ const isUntouchedParameter = (
  * `AsyncResult.Err(...)` included). The receiver of the `flatMap` is not
  * checked — that would need type information — so the constructors carry the
  * whole of the evidence.
+ *
+ * Read from the callback's **return positions** — its expression body, or every
+ * `return` in its block (following a conditional's branches, skipping nested
+ * functions) — and *every* one of them must be a constructor call. A body that
+ * also returns something else is doing work `ensure` cannot express, whether
+ * that is a wrapped branch (`return wrap(c ? Ok(x) : Err(e))`) or a
+ * fall-through (`if (!x.ok) return Err(e); return refresh(x)`), so it is left
+ * alone. A constructor that is merely *mentioned* — an argument, a nested
+ * callback's return — is not a return position and does not count.
  *
  * Conservative by construction, and **not** autofixable. The rewrite is not
  * mechanical: `c ? Err(e) : Ok(x)` needs the condition negated, and `ensure`'s
@@ -216,15 +275,18 @@ export const preferEnsure = defineRule({
         const body = callback.body;
         if (body === null) return;
 
-        const found: Producers = { ok: [], errors: 0, nested: false };
-        collectProducers(body, false, found, (call) => classifyProducer(getScope(call), call));
+        const gate: Gate = { ok: [], errors: 0, impure: false };
+        for (const returned of returnedExpressions(body))
+          classifyReturn(returned, gate, (call) => classifyProducer(getScope(call), call));
 
         // A gate returns the value on success and fails otherwise — both
-        // channels must be present, and neither may hide in a nested callback.
-        if (found.nested || found.ok.length === 0 || found.errors === 0) return;
+        // channels must be present, and EVERY return position must be one of
+        // them: a body that also returns something else is doing work `ensure`
+        // cannot express.
+        if (gate.impure || gate.ok.length === 0 || gate.errors === 0) return;
 
         // Every success must be the parameter itself, handed back untouched.
-        const gates = found.ok.every((call) => {
+        const gated = gate.ok.every((call) => {
           const [argument] = call.arguments;
           return (
             call.arguments.length === 1 &&
@@ -232,12 +294,12 @@ export const preferEnsure = defineRule({
             isUntouchedParameter(getScope(argument), argument, parameter)
           );
         });
-        if (!gates) return;
+        if (!gated) return;
 
         context.report({
           node: callee.property,
-          messageId: found.errors === 1 ? "preferEnsure" : "preferEnsureChained",
-          data: { parameter: parameter.name, count: String(found.errors) },
+          messageId: gate.errors === 1 ? "preferEnsure" : "preferEnsureChained",
+          data: { parameter: parameter.name, count: String(gate.errors) },
         });
       },
     };

@@ -160,7 +160,23 @@ allocates a fresh one on every success. A body with several guards is several
 The rule is anchored on the **constructors**, not on the method name: the
 `Ok(...)` / `Err(...)` calls must resolve to `unthrown` imports (`OkAsync` /
 `ErrAsync` and the facade members `Result.Ok(...)` / `AsyncResult.Err(...)`
-included). It stays quiet on everything a gate is not — a success branch that
+included). It reads the callback's **return positions** — its expression body, or
+every `return` in its block — and _every_ one of them must be a constructor call,
+so a body doing anything else besides gating is left alone:
+
+```ts
+// ✓ not flagged — the branches are wrapped; the rewrite would drop `wrap`
+.flatMap((x) => wrap(x.ok ? Ok(x) : Err("bad")));
+
+// ✓ not flagged — the fall-through is work `ensure` can't express
+.flatMap((x) => {
+  if (!x.ok) return Err("bad");
+  if (x.cached) return Ok(x);
+  return refresh(x);
+});
+```
+
+It stays quiet on everything else a gate is not, too — a success branch that
 builds a new value (`Ok(user.profile)`), a destructured parameter, a body with no
 failure branch, a constructor inside a nested callback, and — the one real false
 positive the shape admits — a **reassigned** parameter:

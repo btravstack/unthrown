@@ -44,13 +44,27 @@ ruleTester.run("prefer-ensure", preferEnsure, {
     {
       code: `import { Err, Ok } from "unthrown";\nr.flatMap((x) => load(x).flatMap((y) => (y.ok ? Ok(x) : Err("bad"))));`,
     },
+    // The branches are WRAPPED, so the callback does not return them — the
+    // rewrite would drop the wrapper.
+    {
+      code: `import { Err, Ok } from "unthrown";\nr.flatMap((x) => wrap(x.ok ? Ok(x) : Err("bad")));`,
+    },
+    // A constructor passed as an argument is a mention, not a return position.
+    {
+      code: `import { Err, Ok } from "unthrown";\nr.flatMap((x) => (x.ok ? recover(Ok(x)) : Err("bad")));`,
+    },
+    // A gate PLUS a fall-through: the last return is work `ensure` can't express.
+    {
+      code: `import { Err, Ok } from "unthrown";\nr.flatMap((x) => {\n  if (!x.ok) return Err("bad");\n  if (x.cached) return Ok(x);\n  return refresh(x);\n});`,
+    },
     // Other combinators are left alone — only `flatMap` can hide a gate.
     {
       code: `import { Err, Ok } from "unthrown";\nr.map((x) => (x.ok ? Ok(x) : Err("bad")));`,
     },
-    // The gate already written as a gate.
+    // The gate already written as a gate. (`onFail` returns the error VALUE —
+    // `ensure` puts it in the channel itself.)
     {
-      code: `import { Err } from "unthrown";\nr.ensure((x) => x.ok, () => Err("bad"));`,
+      code: `import { Inactive } from "./errors";\nr.ensure((x) => x.ok, (x) => new Inactive({ id: x.id }));`,
     },
     // A computed member access can't be resolved statically.
     {
@@ -95,6 +109,16 @@ ruleTester.run("prefer-ensure", preferEnsure, {
     },
     {
       code: `import { AsyncResult } from "unthrown";\nr.flatMap((x) => (x.ok ? AsyncResult.Ok(x) : AsyncResult.Err("bad")));`,
+      errors: [{ messageId: "preferEnsure" }],
+    },
+    // A nested conditional is still a chain of return positions.
+    {
+      code: `import { Err, Ok } from "unthrown";\nr.flatMap((x) => (x.ok ? Ok(x) : x.missing ? Err("gone") : Err("bad")));`,
+      errors: [{ messageId: "preferEnsureChained" }],
+    },
+    // A transparent wrapper (`as`) does not hide the return position.
+    {
+      code: `import { Err, Ok, type Result } from "unthrown";\nr.flatMap((x) => (x.ok ? Ok(x) : Err("bad")) as Result<Thing, string>);`,
       errors: [{ messageId: "preferEnsure" }],
     },
     // Several guards in one body: several `ensure`s, chained.
