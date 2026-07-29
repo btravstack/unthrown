@@ -689,7 +689,15 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   and namespace imports resolve; alias indirection like `type E = unknown` is a
   documented limit) so they only fire on unthrown's `Result`. No TypeDoc API
   page; documented in the Linting guide.
-  Tested with oxlint's `RuleTester` from `oxlint/plugins-dev`.)
+  Tested with oxlint's `RuleTester` from `oxlint/plugins-dev`.
+  The **`oxlint` peer floor (`^1.69.0`) is deliberately decoupled from the
+  `@oxlint/plugins` dependency** — it names the oldest _host_ the rules were
+  verified to run on, not the plugin-utils version the package happens to build
+  against. Slaving the two ratchets the floor on every bot bump and drags
+  consumers through an oxlint + `oxlint-tsgolint` engine upgrade for a
+  packaging-only release (#163). Raise it only when a rule starts using a host
+  API that needs it, and name that API in the changeset; the decoupling is
+  guarded by a test in `index.test.ts`.)
 - `packages/prisma` → `@unthrown/prisma` (peerDep `@prisma/client` ^7; a Prisma
   Client **extension** — `$extends(unthrownPrisma)` adds `try*` variants of
   **all seventeen** model delegate operations alongside the raw promise ones,

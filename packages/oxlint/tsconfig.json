@@ -5,7 +5,10 @@
     "rootDir": "./src",
     // `files: ["dist"]` excludes `src/`, so published declaration maps would be
     // dead-ends (broken go-to-definition); consumers get the TSDoc'd d.ts.
-    "declarationMap": false
+    "declarationMap": false,
+    // `node:fs` + `import.meta.url` in `index.test.ts`, which reads the manifest
+    // to guard the `oxlint` peer floor. Same setting as core's tsconfig.
+    "types": ["node"]
   },
   "include": ["src/**/*"]
 }

@@ -1,6 +1,12 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import plugin from "./index.js";
+
+const manifest: { peerDependencies: Record<string, string> } = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+);
 
 describe("@unthrown/oxlint plugin", () => {
   it("exposes all five rules under the `unthrown` plugin name", () => {
@@ -42,5 +48,16 @@ describe("@unthrown/oxlint plugin", () => {
   it("keeps every preset rule pointing at a rule the plugin actually defines", () => {
     for (const name of Object.keys(plugin.recommended.rules ?? {}))
       expect(plugin.rules).toHaveProperty(name.replace(/^unthrown\//, ""));
+  });
+
+  // Regression guard for #163. The `oxlint` peer floor is the oldest *host* the
+  // rules were verified to run on — it is NOT the `@oxlint/plugins` version this
+  // package happens to build against. Slaving the two (as beta.10 did) ratchets
+  // the floor every time a bot bumps the dependency, forcing consumers through a
+  // lint + type-check engine upgrade for a packaging-only release. Raise this
+  // deliberately, only when a rule starts using a host API that needs it, and say
+  // which API in the changeset.
+  it("keeps the `oxlint` peer floor decoupled from the `@oxlint/plugins` dependency", () => {
+    expect(manifest.peerDependencies["oxlint"]).toBe("^1.69.0");
   });
 });
