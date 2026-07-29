@@ -653,7 +653,7 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   `Result` via `fromSchema` / `fromSchemaAsync`, with the validation issues as
   the modeled `E`)
 - `packages/oxlint` → `@unthrown/oxlint` (an oxlint **JS plugin**, peerDep
-  `oxlint`, dep `@oxlint/plugins`; ships **five rules**: `no-ambiguous-error-type`
+  `oxlint`, dep `@oxlint/plugins`; ships **six rules**: `no-ambiguous-error-type`
   — enforces Thesis #1 against `unknown`/`any`/`Error`/`{}` **and the primitive
   keywords** (`void` included) in `E`, both in a `Result`/`AsyncResult` type
   **annotation** and in the matcher's `returnType<R>()` **pin** — the latter only
@@ -681,9 +681,22 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   sanctioned catch-all), and the sites that must keep the wildcard — a helper
   generic in `E`, or an `E` that is a single type rather than a union of
   cases — carry a targeted `oxlint-disable` with a reason); and
-  `no-throw` (**the one opt-in**, not in the preset — reports every `throw`
+  `no-throw` (**opt-in**, not in the preset — reports every `throw`
   statement, pointing at `Err`/`getOrThrow`/`fromSafeThrowable`; this is the
-  `no-throw` rule the `getOrThrow` rationale references).
+  `no-throw` rule the `getOrThrow` rationale references); and `prefer-ensure`
+  (**the other opt-in**, report-only with **no autofix** — flags a `flatMap`
+  whose success branch returns its own parameter untouched
+  (`flatMap((x) => c ? Ok(x) : Err(e))`), a predicate wearing a bind costume:
+  `ensure` names that intent and passes the _same_ `Ok` through where the
+  `flatMap` form allocates a fresh one. Anchored on the constructors rather
+  than the method name — the `Ok(...)` / `Err(...)` calls must resolve to
+  `unthrown` imports (`OkAsync` / `ErrAsync` and the facade members included) —
+  and it requires **every** return position of the callback to be a constructor
+  call, so a wrapped branch or a fall-through is left alone; a **reassigned**
+  parameter is the one false positive the shape admits. No autofix because a
+  reversed ternary needs its condition negated and `ensure`'s boolean form
+  requires a `boolean` predicate. Unlike every preset rule, the shape it flags
+  violates no thesis — it is correct code with a better name available).
   Purely syntactic AST rules that
   resolve bindings via scope analysis keyed by the **imported** name (renamed
   and namespace imports resolve; alias indirection like `type E = unknown` is a
