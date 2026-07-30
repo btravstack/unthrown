@@ -40,6 +40,11 @@ ruleTester.run("no-unused-matcher", noUnusedMatcher, {
     {
       code: `const match = (x) => x;\nresult.tapErrCases((m) => {\n  match(value);\n  return m.with("a", () => {});\n});`,
     },
+    // A defaulted parameter that IS read is a use — the default never applies
+    // (the combinator always passes the matcher), but the binding is traced.
+    {
+      code: `result.mapErrCases((m = prebuilt) => m.with("a", () => 0));`,
+    },
   ],
   invalid: [
     // The issue's repro: the callback never declares the matcher and returns a
@@ -68,6 +73,12 @@ ruleTester.run("no-unused-matcher", noUnusedMatcher, {
     // Declared but never referenced is the same ignore.
     {
       code: `result.mapErrCases((matcher) => prebuilt);`,
+      errors: [{ messageId: "unusedMatcher" }],
+    },
+    // A defaulted parameter still receives the injected matcher (the default
+    // never applies) — never reading it is the same ignore.
+    {
+      code: `result.mapErrCases((m = prebuilt) => prebuilt);`,
       errors: [{ messageId: "unusedMatcher" }],
     },
     // A write-only parameter is not a use — nothing reads the injected matcher.

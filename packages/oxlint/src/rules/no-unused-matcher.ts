@@ -100,12 +100,16 @@ export const noUnusedMatcher = defineRule({
     const usesMatcher = (callback: Callback): boolean => {
       const [parameter] = callback.params;
       if (parameter === undefined) return false;
-      // Only a plain identifier can be traced through scope analysis; a
-      // destructured or defaulted parameter is left alone (conservative).
-      if (parameter.type !== "Identifier") return true;
+      // A defaulted parameter (`(m = prebuilt) => …`) still receives the
+      // injected matcher — the combinator always passes one, so the default
+      // never applies — and is traced through its underlying identifier. Only
+      // a plain identifier can be traced through scope analysis; a
+      // destructured parameter is left alone (conservative).
+      const bound = parameter.type === "AssignmentPattern" ? parameter.left : parameter;
+      if (bound.type !== "Identifier") return true;
       const variable = context.sourceCode
         .getDeclaredVariables(callback)
-        .find((v) => v.defs.some((def) => def.name === parameter));
+        .find((v) => v.defs.some((def) => def.name === bound));
       return variable === undefined || variable.references.some((ref) => ref.isRead());
     };
 
