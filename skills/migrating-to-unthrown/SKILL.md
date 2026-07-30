@@ -51,13 +51,15 @@ after every file:
 1. Add the bridge package once: `@unthrown/neverthrow` or `@unthrown/boxed`.
 2. Migrate a module fully (see the mapping reference for the source library).
 3. **Untouched callers keep compiling through a seam**: a small compat file
-   that re-exports the migrated functions under their _legacy_ type
-   (`toNeverthrowAsync(result, onDefect)` / `toBoxedFuture(result, onDefect)`).
-   `onDefect` is mandatory — fold the defect into the legacy blanket `Error`
-   to reproduce pre-migration behavior exactly, and mark the seam file as the
-   quarantined un-triage point. Incoming still-legacy dependencies lift with
-   `fromNeverthrow(Async)` / `fromBoxed` / `fromBoxedFuture` (never a Defect —
-   two-channel sources).
+   that re-exports the migrated functions under their _legacy_ type — sync:
+   `toNeverthrow(result, onDefect)` / `toBoxed(result, onDefect)`; async:
+   `toNeverthrowAsync(asyncResult, onDefect)` /
+   `toBoxedFuture(asyncResult, onDefect)` (the async pair takes the
+   `AsyncResult`). `onDefect` is mandatory — fold the defect into the legacy
+   blanket `Error` to reproduce pre-migration behavior exactly, and mark the
+   seam file as the quarantined un-triage point. Incoming still-legacy
+   dependencies lift with `fromNeverthrow` / `fromNeverthrowAsync` /
+   `fromBoxed` / `fromBoxedFuture` (never a Defect — two-channel sources).
 4. Ratchet with lint: enable `@unthrown/oxlint`'s `recommended` preset on
    migrated paths — it catches the migration's characteristic leftovers
    (`E = Error`/`unknown`, dropped results, `P._` blanket arms).
