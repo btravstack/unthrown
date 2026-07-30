@@ -3,7 +3,8 @@
 > **How-to.** [`@unthrown/oxlint`](https://github.com/btravstack/unthrown/tree/main/packages/oxlint)
 > is an [oxlint](https://oxc.rs/docs/guide/usage/linter) plugin that turns
 > unthrown's theses into automated checks the type system can't enforce on its
-> own — a lazy `E`, a dropped `Result`, a blanket `P._`, a raw `throw`.
+> own — a lazy `E`, a dropped `Result`, a blanket `P._`, an ignored matcher, a
+> raw `throw`.
 
 ```sh
 pnpm add -D @unthrown/oxlint oxlint
@@ -19,6 +20,7 @@ Register the plugin and turn its rules on in your `.oxlintrc.json`:
   "rules": {
     "unthrown/no-ambiguous-error-type": "error",
     "unthrown/no-unhandled-result": "error",
+    "unthrown/no-unused-matcher": "error",
     "unthrown/prefer-async-result": "error",
     "unthrown/prefer-ensure": "error",
     "unthrown/no-throw": "error",
@@ -29,8 +31,8 @@ Register the plugin and turn its rules on in your `.oxlintrc.json`:
 
 The default export also exposes a `recommended` preset — an oxlint config that
 registers the plugin and enables `no-ambiguous-error-type`, `no-unhandled-result`,
-`prefer-async-result`, and `no-catch-all-pattern` (`prefer-ensure` and `no-throw`
-are the two explicit opt-ins) — for setups that
+`no-unused-matcher`, `prefer-async-result`, and `no-catch-all-pattern`
+(`prefer-ensure` and `no-throw` are the two explicit opt-ins) — for setups that
 build their config programmatically (`import unthrown from "@unthrown/oxlint"` →
 `unthrown.recommended`).
 
@@ -206,7 +208,7 @@ type-guard `ensure` does, so the rule declines to pick a winner.
 
 ### `unthrown/no-throw` {#no-throw}
 
-**The one opt-in rule** — not part of the `recommended` preset, because it bans a
+**An opt-in rule** — not part of the `recommended` preset, because it bans a
 core language statement. For codebases committed to errors-as-values end-to-end, it closes the
 loop: ordinary errors are _returned_, so a raw `throw` is either a modeled failure
 in disguise or an unmodeled one that belongs to the defect channel's machinery.
@@ -272,6 +274,46 @@ single type rather than a union, where one arm _is_ the enumeration. The rule ha
 autofix — the disable comment is the escape hatch. (Where the helper needs no
 matcher at all, the `isOk` / `isErr` / `isDefect` guards carry no exhaustiveness
 obligation and need no disable comment.)
+
+### `unthrown/no-unused-matcher` {#no-unused-matcher}
+
+`no-catch-all-pattern` guards the exhaustiveness contract against the wildcard;
+this rule — also in the `recommended` preset — guards it from the other side. A
+`…Cases` callback (the five error combinators, and `match`'s `errCases`
+handler) that never uses the matcher it was handed sources its exhaustiveness
+from a builder bound to some **other** value, and neither the type checker nor
+the runtime can tell: the constraint on the callback's return is structural
+(`ExhaustiveMatch`), so any exhaustive builder satisfies it, and
+`noUnusedParameters` never fires because the parameter is not unused — it is
+simply never declared.
+
+```ts
+// ✗ flagged — compiles clean, but the branch is chosen by `decoy`, not the error
+const recovered = await source.recoverErrCases(() =>
+  match(decoy)
+    .with(P.tag("A"), () => "recovered as A")
+    .with(P.tag("B"), () => "recovered as B"),
+);
+
+// ✓ the injected matcher is the only builder bound to the actual error
+const recovered = await source.recoverErrCases((matcher) =>
+  matcher.with(P.tag("A"), P.tag("B"), () => "recovered"),
+);
+```
+
+The borrowed builder fails in one of two ways, neither diagnosable at the call
+site: a branch matches the foreign value and a **plausible wrong value** comes
+back (with the Err channel typing as fully handled), or nothing matches,
+`.run()` throws `NonExhaustiveError`, and the modeled error becomes a
+**Defect** — a deliberately non-retryable failure turned retryable.
+
+The rule reports a callback whose matcher parameter is absent or never read,
+and — separately, to catch a trivial reference like `void matcher` fronting for
+a foreign builder — any second `match(...)` (unthrown's or ts-pattern's) built
+in the callback's **own** body. Branch handlers are nested functions and stay
+free to match their payload (`.with(P.tag("A"), (e) => match(e.code)…)` is that
+inner value's ordinary match). There is no escape hatch and no autofix: a
+`…Cases` callback that does not use its matcher is never what you meant.
 
 ## Import resolution
 

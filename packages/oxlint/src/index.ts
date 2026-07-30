@@ -1,5 +1,5 @@
 // @unthrown/oxlint — an oxlint (JS) plugin that enforces unthrown's conventions
-// at lint time. Six rules:
+// at lint time. Seven rules:
 //
 //   unthrown/no-ambiguous-error-type  — keep `E` a concrete domain error
 //                                        (no unknown/any/Error/{}), i.e. Thesis #1;
@@ -8,6 +8,9 @@
 //   unthrown/no-unhandled-result      — don't drop a Result returned by a bare call.
 //   unthrown/no-catch-all-pattern     — ban the `P._` / `P.any` matcher catch-all;
 //                                        enumerate every error case by name.
+//   unthrown/no-unused-matcher        — a `…Cases` callback must use the matcher it
+//                                        was handed; a foreign builder matches the
+//                                        wrong value.
 //   unthrown/prefer-ensure            — use `ensure` for a flatMap that only gates its
 //                                        own parameter (opt-in; not in `recommended`).
 //   unthrown/no-throw                 — ban raw `throw` (opt-in; not in `recommended`) —
@@ -25,6 +28,7 @@ import { noAmbiguousErrorType } from "./rules/no-ambiguous-error-type.js";
 import { noCatchAllPattern } from "./rules/no-catch-all-pattern.js";
 import { noThrow } from "./rules/no-throw.js";
 import { noUnhandledResult } from "./rules/no-unhandled-result.js";
+import { noUnusedMatcher } from "./rules/no-unused-matcher.js";
 import { preferAsyncResult } from "./rules/prefer-async-result.js";
 import { preferEnsure } from "./rules/prefer-ensure.js";
 
@@ -37,6 +41,7 @@ const plugin = eslintCompatPlugin({
     "no-catch-all-pattern": noCatchAllPattern,
     "no-throw": noThrow,
     "no-unhandled-result": noUnhandledResult,
+    "no-unused-matcher": noUnusedMatcher,
     "prefer-async-result": preferAsyncResult,
     "prefer-ensure": preferEnsure,
   },
@@ -63,12 +68,20 @@ const plugin = eslintCompatPlugin({
 // cases, where one arm IS the enumeration. Such a site silences the rule with a
 // targeted `oxlint-disable-next-line unthrown/no-catch-all-pattern` and a
 // reason.
+//
+// `no-unused-matcher` IS in the preset. A `…Cases` callback that ignores the
+// injected matcher sources its exhaustiveness from a builder bound to some
+// other value — the other way through the door `no-catch-all-pattern` closes,
+// and invisible to both the type checker (the `ExhaustiveMatch` constraint is
+// structural) and the runtime (the wrong branch is chosen silently). Unlike the
+// catch-all it has no irreducible use, so no escape hatch is documented.
 plugin.recommended = defineConfig({
   jsPlugins: [{ name: "unthrown", specifier: "@unthrown/oxlint" }],
   rules: {
     "unthrown/no-ambiguous-error-type": "error",
     "unthrown/no-catch-all-pattern": "error",
     "unthrown/no-unhandled-result": "error",
+    "unthrown/no-unused-matcher": "error",
     "unthrown/prefer-async-result": "error",
   },
 });
