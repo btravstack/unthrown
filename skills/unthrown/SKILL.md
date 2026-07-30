@@ -7,8 +7,9 @@ description: Write and review TypeScript that uses the unthrown library — erro
 
 Errors as values for TypeScript, with a separate **defect channel** for the
 unexpected. Ordinary errors are _unthrown_ — returned as values; only a true
-defect ever throws (at extraction). Zero runtime dependencies; the exhaustive
-matcher (`match` / `P`) is built in.
+defect ever throws (at extraction — `getOrThrow` being the one deliberate
+escape hatch that throws a modeled error). Zero runtime dependencies; the
+exhaustive matcher (`match` / `P`) is built in.
 
 Full docs: https://btravstack.github.io/unthrown/
 

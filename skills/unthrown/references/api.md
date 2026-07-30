@@ -33,6 +33,11 @@ matcher callback as `(matcher) => …`.
 | observe **any** failure (error or defect)      | `tapFailure`      | `(f: FailureView<E>) => void` → `Result<T, E>`               | Err + Defect |
 | handle all three channels at the edge          | `match`           | `{ ok, errCases, defect }` → `R`                             | all          |
 
+Signatures are abbreviated to intent: a `=> void` return means the callback's
+return value is ignored, and every callback not constrained to return a
+`Result` is actually typed `(…) => R & NotThenable<R>` — a thenable/async
+callback is a compile error (see [Utility types](#utility-types)).
+
 `ensure` with a type-guard predicate narrows `T` to `U`. A `flatMap` whose
 callback is just a predicate wearing a bind costume
 (`flatMap((x) => c ? Ok(x) : Err(e))`) should be `ensure(c, () => e)` — it
@@ -171,16 +176,16 @@ same names as types.
 
 ## Utility types
 
-| type                                             | purpose                                                       |
-| ------------------------------------------------ | ------------------------------------------------------------- |
-| `Result<T, E>` / `AsyncResult<T, E>`             | the public types                                              |
-| `OkView<T, E>` / `ErrView<E, T>` / `DefectView`  | the narrowed variants                                         |
-| `FailureView<E, T>`                              | `ErrView \| DefectView` — what `tapFailure` receives          |
-| `OkOf<R>` / `ErrOf<R>`                           | extract a `Result`'s channels from a function return type     |
-| `AsyncOkOf<R>` / `AsyncErrOf<R>`                 | same for `AsyncResult`                                        |
-| `NotThenable<R>`                                 | compile-time ban on thenable callback returns                 |
-| `ErrMatcher<E>`                                  | the matcher-callback parameter type (parameter position only) |
-| `TaggedErrorConstructor` / `TaggedErrorInstance` | type an `extends TaggedError(…)` site externally              |
+| type                                             | purpose                                                                                                             |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `Result<T, E>` / `AsyncResult<T, E>`             | the public types                                                                                                    |
+| `OkView<T, E>` / `ErrView<E, T>` / `DefectView`  | the narrowed variants                                                                                               |
+| `FailureView<E, T = never>`                      | `ErrView \| DefectView` — what `tapFailure` receives (`T` is phantom; `FailureView<MyError>` is the usual spelling) |
+| `OkOf<R>` / `ErrOf<R>`                           | extract a `Result`'s channels from a function return type                                                           |
+| `AsyncOkOf<R>` / `AsyncErrOf<R>`                 | same for `AsyncResult`                                                                                              |
+| `NotThenable<R>`                                 | compile-time ban on thenable callback returns                                                                       |
+| `ErrMatcher<E>`                                  | the matcher-callback parameter type (parameter position only)                                                       |
+| `TaggedErrorConstructor` / `TaggedErrorInstance` | type an `extends TaggedError(…)` site externally                                                                    |
 
 `GetError` (exported) is the defensive wrong-variant error `get`/`getErr`
 throw — reachable only via casts or raw JS.
