@@ -9,13 +9,14 @@ const manifest: { peerDependencies: Record<string, string> } = JSON.parse(
 );
 
 describe("@unthrown/oxlint plugin", () => {
-  it("exposes all six rules under the `unthrown` plugin name", () => {
+  it("exposes all seven rules under the `unthrown` plugin name", () => {
     expect(plugin.meta?.name).toBe("unthrown");
     expect(Object.keys(plugin.rules).sort()).toEqual([
       "no-ambiguous-error-type",
       "no-catch-all-pattern",
       "no-throw",
       "no-unhandled-result",
+      "no-unused-matcher",
       "prefer-async-result",
       "prefer-ensure",
     ]);
@@ -28,6 +29,7 @@ describe("@unthrown/oxlint plugin", () => {
       "unthrown/no-ambiguous-error-type": "error",
       "unthrown/no-catch-all-pattern": "error",
       "unthrown/no-unhandled-result": "error",
+      "unthrown/no-unused-matcher": "error",
       "unthrown/prefer-async-result": "error",
     });
     expect(plugin.recommended.jsPlugins).toEqual([
@@ -39,6 +41,11 @@ describe("@unthrown/oxlint plugin", () => {
     expect(plugin.recommended.rules).toHaveProperty("unthrown/no-catch-all-pattern", "error");
     // …and the rule's own metadata agrees with the preset.
     expect(plugin.rules["no-catch-all-pattern"]?.meta?.docs?.recommended).toBe(true);
+  });
+
+  it("enables `no-unused-matcher` in `recommended` — an ignored matcher is always a fault", () => {
+    expect(plugin.recommended.rules).toHaveProperty("unthrown/no-unused-matcher", "error");
+    expect(plugin.rules["no-unused-matcher"]?.meta?.docs?.recommended).toBe(true);
   });
 
   it("keeps `no-throw` out of the `recommended` preset — it bans a language statement", () => {

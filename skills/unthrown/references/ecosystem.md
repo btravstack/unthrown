@@ -34,7 +34,7 @@ wiring exports: the six raw matcher functions, `failOnForgottenAwait`, and the
 
 ## Linting: @unthrown/oxlint
 
-An oxlint JS plugin (peer `oxlint`). Six rules; scope-analysis keyed to
+An oxlint JS plugin (peer `oxlint`). Seven rules; scope-analysis keyed to
 unthrown imports, so they only fire on unthrown's `Result`.
 
 **Recommended preset:**
@@ -49,6 +49,10 @@ unthrown imports, so they only fire on unthrown's `Result`.
 - `no-catch-all-pattern` — reports `P._` / `P.any`; keep-the-wildcard sites
   (generic-`E` helpers, single-type `E`) carry a targeted `oxlint-disable`
   with a reason.
+- `no-unused-matcher` — reports a `…Cases` callback (or `match`'s `errCases`
+  handler) whose matcher parameter is absent or never read, and a second
+  `match(...)` built in the callback's own body — a borrowed builder matches
+  whatever value it closed over, not the error. No escape hatch.
 
 **Opt-in (not in the preset):**
 

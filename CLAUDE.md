@@ -653,7 +653,7 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   `Result` via `fromSchema` / `fromSchemaAsync`, with the validation issues as
   the modeled `E`)
 - `packages/oxlint` → `@unthrown/oxlint` (an oxlint **JS plugin**, peerDep
-  `oxlint`, dep `@oxlint/plugins`; ships **six rules**: `no-ambiguous-error-type`
+  `oxlint`, dep `@oxlint/plugins`; ships **seven rules**: `no-ambiguous-error-type`
   — enforces Thesis #1 against `unknown`/`any`/`Error`/`{}` **and the primitive
   keywords** (`void` included) in `E`, both in a `Result`/`AsyncResult` type
   **annotation** and in the matcher's `returnType<R>()` **pin** — the latter only
@@ -680,7 +680,24 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   the library's own default** (Thesis #5: `P._` is an escape hatch, not the
   sanctioned catch-all), and the sites that must keep the wildcard — a helper
   generic in `E`, or an `E` that is a single type rather than a union of
-  cases — carry a targeted `oxlint-disable` with a reason); and
+  cases — carry a targeted `oxlint-disable` with a reason);
+  `no-unused-matcher` (**in the recommended preset** — the other way through
+  the door `no-catch-all-pattern` guards (#171): a `…Cases` callback — the five
+  error combinators, plus `match`'s `errCases` handler — whose matcher
+  parameter is absent or never read sources its exhaustiveness from a builder
+  bound to some **other** value, which the structural `ExhaustiveMatch`
+  constraint accepts and the runtime runs against whatever that builder closed
+  over — the wrong branch chosen silently, or a `NonExhaustiveError` turning
+  the modeled error into a Defect; the rule also reports a second unthrown /
+  ts-pattern `match(...)` call in the callback's **own** body (catching a
+  trivial `void matcher` reference fronting for a foreign builder — reported
+  only when the parameter is otherwise used, so one fault yields one report),
+  while **nested functions are skipped** — a branch handler matching a payload
+  field (`.with(P.tag("A"), (e) => match(e.code)…)`) is legitimate; keyed on
+  the `…Cases` method names alone (unthrown's own coinage — no receiver
+  typing), a callback passed by reference is a documented miss, and there is
+  deliberately **no escape hatch**: a `…Cases` callback that does not use its
+  matcher is never what you meant); and
   `no-throw` (**opt-in**, not in the preset — reports every `throw`
   statement, pointing at `Err`/`getOrThrow`/`fromSafeThrowable`; this is the
   `no-throw` rule the `getOrThrow` rationale references); and `prefer-ensure`
