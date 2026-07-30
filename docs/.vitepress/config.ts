@@ -49,6 +49,7 @@ const GUIDE_SIDEBAR = [
       { text: "Upgrade from 4.x to 5.0", link: "/how-to/upgrade-to-v5" },
       { text: "Migrate from try/catch", link: "/how-to/migrate-from-try-catch" },
       { text: "Migrate from neverthrow", link: "/how-to/migrate-from-neverthrow" },
+      { text: "Migrate from Boxed", link: "/how-to/migrate-from-boxed" },
       { text: "Qualify a boundary", link: "/how-to/qualify-a-boundary" },
       { text: "Model errors", link: "/how-to/model-errors" },
       { text: "Sequence dependent steps", link: "/how-to/sequence-dependent-steps" },
