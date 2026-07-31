@@ -36,21 +36,37 @@ await db.user.tryCreate({ data }).match({
   errCases: (matcher) =>
     matcher
       .with(P.tag("UniqueConstraintViolation"), (e) => conflict(e.fields))
+      .with(P.tag("RecordNotFound"), () => badRequest("unknown reference"))
       .with(P.tag("ForeignKeyViolation"), P.tag("DriverError"), (e) => serverError(e)),
   defect: serverError,
 });
 ```
 
-- **Per-operation errors** — reads (`tryFindMany` / `tryFindUnique` /
-  `tryFindFirst` / `tryCount` / `tryAggregate` / `tryGroupBy`) fail only with
-  `DriverError`; writes (`tryCreate` / `tryCreateMany` / `tryCreateManyAndReturn`
-  / `tryUpsert` / `tryUpdateMany` / `tryUpdateManyAndReturn`) add
-  `UniqueConstraintViolation` (P2002) and `ForeignKeyViolation` (P2003);
-  `tryFindUniqueOrThrow` / `tryFindFirstOrThrow` / `tryUpdate` / `tryDelete` add
-  `RecordNotFound` (P2025) — the batch mutations and `tryUpsert` never carry it
-  (zero matches is `Ok({ count: 0 })`; an upsert miss creates). `tryDeleteMany`
-  models only `ForeignKeyViolation`. Everything else folds into `DriverError`
-  with the cause preserved.
+- **Per-operation errors** — every operation carries `DriverError`; on top of
+  that:
+
+  | Operation                                                                                     | Adds                                                                 |
+  | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+  | `tryFindMany` / `tryFindUnique` / `tryFindFirst` / `tryCount` / `tryAggregate` / `tryGroupBy` | — (reads fail only in the driver)                                    |
+  | `tryFindUniqueOrThrow` / `tryFindFirstOrThrow`                                                | `RecordNotFound`                                                     |
+  | `tryCreate` / `tryUpsert`                                                                     | `UniqueConstraintViolation`, `ForeignKeyViolation`, `RecordNotFound` |
+  | `tryUpdate`                                                                                   | `UniqueConstraintViolation`, `ForeignKeyViolation`, `RecordNotFound` |
+  | `tryDelete`                                                                                   | `ForeignKeyViolation`, `RecordNotFound`                              |
+  | `tryCreateMany` / `tryCreateManyAndReturn` / `tryUpdateMany` / `tryUpdateManyAndReturn`       | `UniqueConstraintViolation`, `ForeignKeyViolation`                   |
+  | `tryDeleteMany`                                                                               | `ForeignKeyViolation`                                                |
+
+  `UniqueConstraintViolation` is P2002 (and carries the offending `fields`),
+  `ForeignKeyViolation` is P2003, `RecordNotFound` is P2025/P2018. Only the
+  **batch** mutations are free of `RecordNotFound`: they take no nested writes,
+  and zero matches is `Ok({ count: 0 })`. `tryCreate` and `tryUpsert` carry it
+  because a nested `connect` can point at a row that does not exist.
+
+- **Bugs stay bugs** — a malformed query, a client that cannot start and an
+  engine panic (`PrismaClientValidationError` /
+  `PrismaClientInitializationError` / `PrismaClientRustPanicError`) go to the
+  **defect** channel, not into `E`. `DriverError` means the database refused
+  the query — connection drops, timeouts, unmapped P-codes — which is an
+  anticipated outcome worth handling.
 - **`$tryTransaction`** — an interactive transaction whose callback speaks
   `AsyncResult`: an `Err` triggers a ROLLBACK and comes out as the same typed
   `Err`; a defect also rolls back and stays a defect. The `try*` methods are
@@ -79,7 +95,10 @@ const page = await db.user
   .tryPaginate({ where: { active: true }, orderBy: { id: "asc" } })
   .withCursor({ limit: 20, after: req.query.cursor });
 // Ok([users, { hasPreviousPage, hasNextPage, startCursor, endCursor }])
-// | Err(DriverError) — a malformed cursor included.
+// | Err(DriverError) — a malformed cursor included: it comes from a client, so
+//   it stays a value you can turn into a 400, never a defect.
+// `after` and `before` are mutually exclusive, and `before` + `limit: null` is
+// a compile error.
 
 // Custom serialization (composite keys, non-id cursors):
 const liked = await db.like.tryPaginate({ orderBy: { postId: "asc" } }).withCursor({

@@ -8,7 +8,7 @@
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import "@unthrown/vitest";
-import { Err, fromSafePromise, TaggedError } from "unthrown";
+import { Err, fromSafePromise, P, TaggedError } from "unthrown";
 import { describe, expect, test } from "vitest";
 
 import { PrismaClient } from "./generated/prisma/client.ts";
@@ -98,6 +98,52 @@ describe("try* model methods", () => {
       "RecordNotFound",
     );
     await expect(db.user.tryDelete({ where: { id: 999 } })).toBeErrTagged("RecordNotFound");
+  });
+
+  // `create` and `upsert` have no row of their own to miss, but a nested
+  // `connect` pointing at a record that does not exist raises P2025 all the
+  // same — so RecordNotFound belongs in their unions.
+  it("models a nested connect to a missing record as RecordNotFound (create and upsert)", async ({
+    db,
+  }) => {
+    await expect(
+      db.post.tryCreate({ data: { title: "orphan", author: { connect: { id: 999 } } } }),
+    ).toBeErrTagged("RecordNotFound");
+    await expect(
+      db.post.tryUpsert({
+        where: { id: 999 },
+        create: { title: "orphan", author: { connect: { id: 999 } } },
+        update: {},
+      }),
+    ).toBeErrTagged("RecordNotFound");
+  });
+
+  // The regression this guards: while CreateError omitted RecordNotFound, the
+  // match below was exhaustive *by type* yet had no arm for the value that
+  // actually arrived — the matcher threw NonExhaustiveError and the
+  // throw-to-defect net turned a modeled database failure into a Defect.
+  it("keeps that nested-connect failure a VALUE under an exhaustive match (never a Defect)", async ({
+    db,
+  }) => {
+    await expect(
+      db.post
+        .tryCreate({ data: { title: "orphan", author: { connect: { id: 999 } } } })
+        .mapErrCases((matcher) =>
+          matcher
+            .with(P.tag("UniqueConstraintViolation"), () => "conflict" as const)
+            .with(P.tag("ForeignKeyViolation"), () => "bad-reference" as const)
+            .with(P.tag("RecordNotFound"), () => "missing" as const)
+            .with(P.tag("DriverError"), () => "unavailable" as const),
+        ),
+    ).toBeErrWith("missing");
+  });
+
+  // A malformed query is a BUG, not an anticipated outcome — `Prisma.Exact`
+  // rejects it in typed code, so reaching it means the types were cast away.
+  it("routes a malformed query (a Prisma validation error) to the DEFECT channel", async ({
+    db,
+  }) => {
+    await expect(db.user.tryFindMany({ where: { bogus: true } } as never)).toBeDefect();
   });
 
   it("updates, deletes, and counts through the bridge", async ({ db }) => {
@@ -356,7 +402,7 @@ describe("tryPaginate / withCursor", () => {
     ]);
   });
 
-  // The fix carried over from deptyped/prisma-extension-pagination#36 (#35):
+  // The fix carried over from deptyped/prisma-extension-pagination#35:
   // when the AFTER cursor row was mutated and no longer matches the filter, the
   // first element of the page must NOT be skipped.
   it("does not skip the first element when the after cursor no longer matches the filter", async ({
@@ -427,7 +473,12 @@ describe("tryPaginate / withCursor", () => {
     ).toBeErrTagged("DriverError");
   });
 
-  it("surfaces a malformed cursor as DriverError", async ({ seededDb: db }) => {
+  // The pagination carve-out. Prisma rejects this with a
+  // PrismaClientValidationError, which the `try*` surface routes to the DEFECT
+  // channel — but here the cursor is an OPAQUE STRING from the outside world, so
+  // a client sending garbage is anticipated input, not a bug. It must stay a
+  // modeled Err the caller can turn into a 400.
+  it("surfaces a malformed cursor as DriverError, not a defect", async ({ seededDb: db }) => {
     // Default parseCursor keeps a non-numeric cursor as a string — invalid for
     // this model's Int id, so Prisma rejects it.
     await expect(
@@ -576,9 +627,19 @@ describe("qualifyPrismaError", () => {
       ...(meta ? { meta } : {}),
     });
 
+  // Stands in for the `defect` helper a boundary injects: a distinguishable
+  // marker, so a test can tell "routed to the defect channel" from "mapped".
+  const DEFECTED = Symbol("defected");
+  const defect = (cause: unknown) => ({ [DEFECTED]: cause }) as const;
+  const qualify = (cause: unknown) => qualifyPrismaError(cause, defect);
+
+  // A Prisma error class the extension recognizes by `name` alone (the runtime
+  // module path moves between Prisma majors, so `instanceof` is not an option).
+  const named = (name: string) => Object.assign(new Error("boom"), { name });
+
   it("maps P2002 to UniqueConstraintViolation with the offending fields", () => {
     const cause = known("P2002", { target: ["email"] });
-    expect(qualifyPrismaError(cause)).toEqual(
+    expect(qualify(cause)).toEqual(
       expect.objectContaining({ _tag: "UniqueConstraintViolation", fields: ["email"], cause }),
     );
   });
@@ -587,13 +648,13 @@ describe("qualifyPrismaError", () => {
     const cause = known("P2002", {
       driverAdapterError: { cause: { constraint: { fields: ["email"] } } },
     });
-    expect(qualifyPrismaError(cause)).toEqual(
+    expect(qualify(cause)).toEqual(
       expect.objectContaining({ _tag: "UniqueConstraintViolation", fields: ["email"], cause }),
     );
   });
 
   it("maps P2002 without a target to an empty field list", () => {
-    expect(qualifyPrismaError(known("P2002"))).toEqual(
+    expect(qualify(known("P2002"))).toEqual(
       expect.objectContaining({ _tag: "UniqueConstraintViolation", fields: [] }),
     );
   });
@@ -604,36 +665,48 @@ describe("qualifyPrismaError", () => {
     { driverAdapterError: { cause: { constraint: "junk" } } },
     { driverAdapterError: { cause: { constraint: { fields: "email" } } } },
   ])("maps P2002 with a malformed meta (%j) to an empty field list", (meta) => {
-    expect(qualifyPrismaError(known("P2002", meta))).toEqual(
+    expect(qualify(known("P2002", meta))).toEqual(
       expect.objectContaining({ _tag: "UniqueConstraintViolation", fields: [] }),
     );
   });
 
   it("maps P2003 to ForeignKeyViolation", () => {
     const cause = known("P2003");
-    expect(qualifyPrismaError(cause)).toEqual(
-      expect.objectContaining({ _tag: "ForeignKeyViolation", cause }),
-    );
+    expect(qualify(cause)).toEqual(expect.objectContaining({ _tag: "ForeignKeyViolation", cause }));
   });
 
-  it("maps P2025 to RecordNotFound", () => {
-    const cause = known("P2025");
-    expect(qualifyPrismaError(cause)).toEqual(
-      expect.objectContaining({ _tag: "RecordNotFound", cause }),
-    );
-  });
+  it.each(["P2025", "P2018"])(
+    "maps %s to RecordNotFound (the to-one and to-many sides of the same failure)",
+    (code) => {
+      const cause = known(code);
+      expect(qualify(cause)).toEqual(expect.objectContaining({ _tag: "RecordNotFound", cause }));
+    },
+  );
 
   it("maps an unhandled P-code to DriverError", () => {
     const cause = known("P2024");
-    expect(qualifyPrismaError(cause)).toEqual(
-      expect.objectContaining({ _tag: "DriverError", cause }),
-    );
+    expect(qualify(cause)).toEqual(expect.objectContaining({ _tag: "DriverError", cause }));
   });
 
   it("maps a non-Prisma rejection to DriverError, preserving the cause", () => {
     const cause = new Error("socket hang up");
-    expect(qualifyPrismaError(cause)).toEqual(
-      expect.objectContaining({ _tag: "DriverError", cause }),
-    );
+    expect(qualify(cause)).toEqual(expect.objectContaining({ _tag: "DriverError", cause }));
+  });
+
+  it("keeps PrismaClientUnknownRequestError in the error channel (the query DID fail)", () => {
+    const cause = named("PrismaClientUnknownRequestError");
+    expect(qualify(cause)).toEqual(expect.objectContaining({ _tag: "DriverError", cause }));
+  });
+
+  // Thesis #1: `E` lists only anticipated failures. A malformed query, a client
+  // that cannot start and an engine panic are bugs / environment faults, so they
+  // must take the defect channel rather than masquerading as a DriverError.
+  it.each([
+    "PrismaClientValidationError",
+    "PrismaClientInitializationError",
+    "PrismaClientRustPanicError",
+  ])("routes %s to the DEFECT channel, not to E", (name) => {
+    const cause = named(name);
+    expect(qualify(cause)).toEqual(defect(cause));
   });
 });

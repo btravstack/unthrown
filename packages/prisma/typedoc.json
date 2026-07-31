@@ -4,6 +4,7 @@
   "out": "docs",
   "intentionallyNotExported": [
     "CreateError",
+    "CreateManyError",
     "UpdateError",
     "DeleteError",
     "UpsertError",

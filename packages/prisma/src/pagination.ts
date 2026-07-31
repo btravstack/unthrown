@@ -26,6 +26,9 @@ export type CursorPaginationMeta = {
  * Options of `withCursor`, in the style of `prisma-extension-pagination`.
  *
  * @remarks
+ * `after` and `before` are mutually exclusive — a page runs in one direction,
+ * and passing both used to silently drop `after`. Pick a direction.
+ *
  * `limit: null` returns everything (from the `after` cursor when given).
  * Combining `limit: null` with `before` is a compile error — "everything
  * before the cursor, backwards, unbounded" is not something Prisma's negative
@@ -42,8 +45,6 @@ export type CursorPaginationMeta = {
  * @typeParam Cursor - the model's `cursor` input (its unique-where shape).
  */
 export type CursorPaginationOptions<Row, Cursor> = {
-  /** An opaque cursor: results strictly AFTER this record. */
-  after?: string;
   /** Serialize a row into an opaque cursor. Defaults to `String(row.id)`. */
   getCursor?: (row: Row) => string;
   /** Parse an opaque cursor back into the model's `cursor` input. */
@@ -52,12 +53,24 @@ export type CursorPaginationOptions<Row, Cursor> = {
   | {
       /** Page size. */
       limit: number;
+      /** An opaque cursor: results strictly AFTER this record. */
+      after?: string;
+      /** Cannot be combined with `after` — a page runs in one direction. */
+      before?: never;
+    }
+  | {
+      /** Page size. */
+      limit: number;
       /** An opaque cursor: results strictly BEFORE this record. */
       before?: string;
+      /** Cannot be combined with `before` — a page runs in one direction. */
+      after?: never;
     }
   | {
       /** `null` returns all results. Cannot be combined with `before`. */
       limit: null;
+      /** An opaque cursor: results strictly AFTER this record. */
+      after?: string;
       before?: never;
     }
 );

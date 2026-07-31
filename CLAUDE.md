@@ -733,16 +733,37 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   **all seventeen** model delegate operations alongside the raw promise ones,
   each an `AsyncResult` whose error channel is exactly the P-codes that
   operation can raise: `UniqueConstraintViolation` P2002, `ForeignKeyViolation`
-  P2003, `RecordNotFound` P2025, everything else `DriverError` with the cause
-  preserved — `upsert` and the `*Many` batch mutations never carry P2025 (an
-  upsert miss creates; zero batch matches is `Ok({ count: 0 })`). Also
+  P2003, `RecordNotFound` P2025 **and P2018** (the to-one and to-many sides of
+  "a record this write depended on was not found" — the same failure, so one
+  tag), other query failures `DriverError` with the cause preserved. Only the
+  **batch** mutations (`createMany`/`updateMany` + their `*AndReturn` twins) are
+  free of `RecordNotFound`: they accept no nested writes and zero matches is
+  `Ok({ count: 0 })`. `create` and `upsert` **do** carry it — neither misses a
+  row of its own, but a nested `connect` to a non-existent record raises P2025
+  (an unsound omission until 2026-08: the runtime produced a `RecordNotFound`
+  the type excluded, so a type-exhaustive `mapErrCases` threw
+  `NonExhaustiveError` and the modeled error silently became a `Defect`).
+  Prisma's **non-query** error classes —
+  `PrismaClientValidationError` (a malformed query, unreachable without casting
+  the `Prisma.Exact` args away), `PrismaClientInitializationError`,
+  `PrismaClientRustPanicError` — are routed to the **defect** channel rather
+  than into `E` (Thesis #1: `DriverError` means the database refused the query,
+  not "everything else"); `PrismaClientUnknownRequestError` deliberately stays a
+  `DriverError` (the query did fail, just without a P-code). Also
   `$tryTransaction` (an interactive transaction whose callback
   speaks `AsyncResult` — an `Err` rolls back and re-surfaces typed; a defect
   rolls back and stays a defect, a throwing callback included) and
   `tryPaginate(...).withCursor(...)` (the
   `prisma-extension-pagination` cursor API with its unmerged #35 fix folded
-  in). Qualification happens once inside the extension via the exported
-  `qualifyPrismaError`; the raw methods stay as the escape hatch for batch
+  in; `after`/`before` are mutually exclusive in the type — passing both used to
+  drop `after` silently — and pagination carries the **one carve-out** to the
+  defect routing above: a validation error there stays a modeled `DriverError`,
+  because the cursor is an opaque string from a client, not code the developer
+  wrote). Qualification happens once inside the extension via the exported
+  `qualifyPrismaError`, which **is** a `qualify` — `(cause, defect)`, generic in
+  the marker type so core's non-exported `Defect` need not be named — and so
+  drops straight into a `fromPromise` at a boundary of your own; the raw methods
+  stay as the escape hatch for batch
   `$transaction([...])` and raw SQL. Tested against a
   real in-memory SQLite client (`@prisma/adapter-better-sqlite3`) with a
   generated, gitignored test client; **deliberately outside the fixed version

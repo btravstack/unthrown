@@ -38,27 +38,60 @@ write a handler for a case that can't happen.
 | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | `tryFindMany` / `tryFindUnique` / `tryFindFirst` / `tryCount` / `tryAggregate` / `tryGroupBy` | `DriverError`                                                                       |
 | `tryFindUniqueOrThrow` / `tryFindFirstOrThrow`                                                | `RecordNotFound \| DriverError`                                                     |
-| `tryCreate` / `tryCreateMany` / `tryCreateManyAndReturn`                                      | `UniqueConstraintViolation \| ForeignKeyViolation \| DriverError`                   |
-| `tryUpsert`                                                                                   | `UniqueConstraintViolation \| ForeignKeyViolation \| DriverError`                   |
+| `tryCreate` / `tryUpsert`                                                                     | `UniqueConstraintViolation \| ForeignKeyViolation \| RecordNotFound \| DriverError` |
 | `tryUpdate`                                                                                   | `RecordNotFound \| UniqueConstraintViolation \| ForeignKeyViolation \| DriverError` |
-| `tryUpdateMany` / `tryUpdateManyAndReturn`                                                    | `UniqueConstraintViolation \| ForeignKeyViolation \| DriverError`                   |
 | `tryDelete`                                                                                   | `RecordNotFound \| ForeignKeyViolation \| DriverError`                              |
+| `tryCreateMany` / `tryCreateManyAndReturn`                                                    | `UniqueConstraintViolation \| ForeignKeyViolation \| DriverError`                   |
+| `tryUpdateMany` / `tryUpdateManyAndReturn`                                                    | `UniqueConstraintViolation \| ForeignKeyViolation \| DriverError`                   |
 | `tryDeleteMany`                                                                               | `ForeignKeyViolation \| DriverError`                                                |
 | `tryPaginate(...).withCursor(...)`                                                            | `DriverError`                                                                       |
 
-Note where `RecordNotFound` does **not** appear: `tryUpsert` (a miss _creates_) and
-the batch mutations (`*Many` — zero matches is `Ok({ count: 0 })`, not an error).
+Note where `RecordNotFound` does **not** appear: the **batch** mutations (`*Many`
+and their `*AndReturn` twins). Those are the only operations genuinely free of it —
+they accept no nested writes, and zero matches is `Ok({ count: 0 })`, not an error.
+
+`tryCreate` and `tryUpsert` _do_ carry it, which is worth a second look: neither
+has a row of its own to miss, but a **nested `connect`** does.
+
+```ts
+db.post.tryCreate({ data: { title, author: { connect: { id: authorId } } } });
+// Err(RecordNotFound) when that author does not exist — P2025.
+```
 
 The tagged errors map to Prisma's P-codes: `UniqueConstraintViolation` is `P2002`
 (and carries the offending `fields`), `ForeignKeyViolation` is `P2003`, and
-`RecordNotFound` is `P2025`. Everything else — connection drops, timeouts, unmapped
-codes, non-Prisma causes — folds into `DriverError` with the original `cause`
-preserved.
+`RecordNotFound` is `P2025` — plus `P2018`, which says the same thing from the
+to-many side of a nested write. Other query failures — connection drops, timeouts,
+unmapped codes, non-Prisma causes — fold into `DriverError` with the original
+`cause` preserved.
 
 ::: tip Absence is not an error
 `tryFindUnique` returns `Ok(null)` for a miss — a missing row is an anticipated
 value, not a failure. Reach for `tryFindUniqueOrThrow` when the absence _is_ the
 error you want to model (`RecordNotFound`).
+:::
+
+## What does _not_ reach your error channel
+
+`DriverError` is the "the database refused the query" bucket, not an
+everything-else bucket. Three of Prisma's error classes are bugs or environment
+faults rather than outcomes, so they go to the
+[defect channel](../explanation/the-defect-channel) instead:
+
+| Prisma error                      | Why it is a defect                                                                                           |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `PrismaClientValidationError`     | The query is malformed. `try*` args are `Prisma.Exact`-typed — reaching this means the types were cast away. |
+| `PrismaClientInitializationError` | The client could not start: bad datasource URL, engine/version mismatch.                                     |
+| `PrismaClientRustPanicError`      | The query engine panicked.                                                                                   |
+
+`PrismaClientUnknownRequestError` is deliberately _not_ in that list: the query
+really did fail in the database, just without a P-code to name it — a `DriverError`.
+
+::: tip The one carve-out: pagination cursors
+A cursor is an **opaque string from the outside world**, turned into a query by
+your `parseCursor`. So a validation error out of `withCursor` stays a modeled
+`DriverError` — a client sending garbage is anticipated input you turn into a 400,
+not a bug. See [Cursor pagination](#cursor-pagination) below.
 :::
 
 ## Handle the errors
@@ -79,11 +112,15 @@ return created.match({
       .with(P.tag("UniqueConstraintViolation"), (e) =>
         resp.conflict(`taken: ${e.fields.join(", ")}`),
       )
-      .with(P.tag("ForeignKeyViolation"), () => resp.badRequest("unknown reference"))
+      .with(P.tag("ForeignKeyViolation"), P.tag("RecordNotFound"), () =>
+        resp.badRequest("unknown reference"),
+      )
       .with(P.tag("DriverError"), (e) => resp.serverError(e)),
   defect: (cause) => resp.serverError(cause),
 });
-// No RecordNotFound arm — a create can't raise it, and the type knows.
+// Exactly the four cases a create can raise — no more, no fewer. Add a P-code
+// to the union and every call site like this one stops compiling until it is
+// handled.
 ```
 
 When several tags deserve the same response, **group** them in one arm rather
@@ -92,8 +129,11 @@ lights the call site up:
 
 ```ts
 matcher
-  .with(P.tag("UniqueConstraintViolation"), P.tag("ForeignKeyViolation"), () =>
-    resp.badRequest("bad write"),
+  .with(
+    P.tag("UniqueConstraintViolation"),
+    P.tag("ForeignKeyViolation"),
+    P.tag("RecordNotFound"),
+    () => resp.badRequest("bad write"),
   )
   .with(P.tag("DriverError"), (e) => resp.serverError(e));
 ```
@@ -146,12 +186,17 @@ page.match({
 });
 ```
 
-Three deliberate differences from upstream: a cursor pointing at a now-filtered-out
+Four deliberate differences from upstream: a cursor pointing at a now-filtered-out
 row doesn't skip the first element (folds in the fix for
 [deptyped/prisma-extension-pagination#35](https://github.com/deptyped/prisma-extension-pagination/issues/35));
-`before` + `limit: null` is a compile error; and the default cursor preserves the
-id's type (all-digit → number/`bigint`, otherwise string). Provide `getCursor` /
-`parseCursor` for composite keys.
+`after` and `before` are mutually exclusive (a page runs in one direction, and
+passing both used to silently drop `after`); `before` + `limit: null` is a compile
+error; and the default cursor preserves the id's type (all-digit → number/`bigint`,
+otherwise string). Provide `getCursor` / `parseCursor` for composite keys.
+
+A malformed cursor stays a modeled `DriverError` rather than becoming a defect —
+the one place a Prisma validation error is treated as anticipated input, because
+the cursor comes from the client rather than from your code.
 
 ## Raw methods and raw SQL
 
@@ -167,6 +212,11 @@ import { qualifyPrismaError } from "@unthrown/prisma";
 const rows = fromPromise(db.$queryRaw`SELECT 1`, qualifyPrismaError);
 //    ^? AsyncResult<unknown, UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound | DriverError>
 ```
+
+`qualifyPrismaError` **is** a `qualify` — the boundary injects the `defect`
+helper as its second argument, so the same triage you get inside the extension
+(including routing the three bug-shaped Prisma errors to the defect channel)
+applies to your own boundaries for free.
 
 See the [API reference](/api/prisma/) for every method's exact signature.
 

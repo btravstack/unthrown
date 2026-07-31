@@ -11,7 +11,8 @@
 //   const db = new PrismaClient({ adapter }).$extends(unthrownPrisma);
 //
 //   await db.user.tryCreate({ data }).match({ ok, errCases, defect });
-//   // errCases matches UniqueConstraintViolation | ForeignKeyViolation | DriverError
+//   // errCases matches UniqueConstraintViolation | ForeignKeyViolation
+//   //                | RecordNotFound | DriverError
 //
 // The raw promise methods stay available on purpose: they are the escape hatch
 // for batch `$transaction([...])`, which needs unexecuted `PrismaPromise`s.
@@ -44,19 +45,29 @@ export class UniqueConstraintViolation extends TaggedError("UniqueConstraintViol
 export class ForeignKeyViolation extends TaggedError("ForeignKeyViolation")<{ cause: unknown }> {}
 
 /**
- * A record required by the operation does not exist (Prisma error `P2025`) —
- * the missing row of a `findUniqueOrThrow`, `update`, or `delete`.
+ * A record required by the operation does not exist (Prisma errors `P2025` and
+ * `P2018`) — the missing row of a `findUniqueOrThrow`, `update`, or `delete`,
+ * **or** the missing target of a nested `connect`.
+ *
+ * @remarks
+ * The nested-`connect` case is why `tryCreate` and `tryUpsert` carry this error
+ * despite never "missing" a row of their own: `create({ data: { author: {
+ * connect: { id } } } })` raises `P2025` when that author does not exist (and
+ * `P2018` for the to-many side of the same mistake). Both codes say the same
+ * thing — a record the write depended on was not found — so both map here.
  */
 export class RecordNotFound extends TaggedError("RecordNotFound")<{ cause: unknown }> {}
 
 /**
- * Any other query failure: connection drops, timeouts, unmapped P-codes,
+ * A genuine query failure: connection drops, timeouts, unmapped P-codes,
  * driver-level errors.
  *
  * @remarks
- * Prisma validation errors land here too. Arguably a malformed query is a
- * programmer bug rather than an anticipated outcome; triage it further at the
- * call site if the distinction matters to you.
+ * This is the "the database refused the query" bucket — an anticipated outcome
+ * of talking to a database over a network. It is deliberately NOT the
+ * everything-else bucket: a malformed query, a client that cannot start, and an
+ * engine panic are bugs rather than outcomes, so they take the **defect**
+ * channel instead (see {@link qualifyPrismaError}).
  */
 export class DriverError extends TaggedError("DriverError")<{ cause: unknown }> {}
 
@@ -89,6 +100,28 @@ const isKnownRequestError = (cause: unknown): cause is KnownRequestError =>
   cause.name === "PrismaClientKnownRequestError" &&
   typeof (cause as { code?: unknown }).code === "string";
 
+// Prisma's non-query error classes — recognized by `name` for the same reason
+// as above. None of these is an anticipated outcome of running a query:
+//
+//   PrismaClientValidationError    — the query itself is malformed (a bug: the
+//                                    `try*` surface types its args with
+//                                    `Prisma.Exact`, so reaching this means the
+//                                    types were cast away)
+//   PrismaClientInitializationError — the client could not start (bad datasource
+//                                    URL, engine/version mismatch)
+//   PrismaClientRustPanicError     — the query engine panicked
+//
+// `PrismaClientUnknownRequestError` is deliberately absent: the query really did
+// fail in the database, just without a P-code to name it. That is a DriverError.
+const DEFECT_ERROR_NAMES: ReadonlySet<string> = new Set([
+  "PrismaClientValidationError",
+  "PrismaClientInitializationError",
+  "PrismaClientRustPanicError",
+]);
+
+const isValidationError = (cause: unknown): boolean =>
+  cause instanceof Error && cause.name === "PrismaClientValidationError";
+
 // The offending column set of a P2002, wherever this Prisma version put it:
 // `meta.target` (the classic engine shape) or
 // `meta.driverAdapterError.cause.constraint.fields` (the driver-adapter shape).
@@ -107,24 +140,47 @@ const constraintFields = (meta: unknown): readonly string[] => {
 };
 
 /**
- * Qualify a Prisma rejection into a tagged error — the runtime half of the
- * bridge.
+ * Qualify a Prisma rejection — the runtime half of the bridge, and a ready-made
+ * `qualify` for any boundary you build yourself (raw SQL, a batch
+ * `$transaction([...])`).
  *
  * @remarks
  * Recognized P-codes map to their dedicated errors (`P2002` →
  * {@link UniqueConstraintViolation}, `P2003` → {@link ForeignKeyViolation},
- * `P2025` → {@link RecordNotFound}); everything else — including non-Prisma
- * causes — folds into {@link DriverError} with the cause preserved.
+ * `P2025` / `P2018` → {@link RecordNotFound}); other query failures fold into
+ * {@link DriverError} with the cause preserved.
+ *
+ * Prisma's **non-query** errors — a malformed query
+ * (`PrismaClientValidationError`), a client that could not start
+ * (`PrismaClientInitializationError`), an engine panic
+ * (`PrismaClientRustPanicError`) — are routed to the **defect** channel instead
+ * of `E`: they are bugs and environment faults, not anticipated outcomes of a
+ * query, and unthrown's first rule is that `E` lists only modeled failures.
  *
  * @param cause - the rejected value from a Prisma query.
+ * @param defect - the defect helper the boundary injects (never import it).
+ *
+ * @example
+ * ```ts
+ * // Pass it straight to a boundary — `defect` is injected for you.
+ * const rows = fromPromise(db.$queryRaw`SELECT 1`, qualifyPrismaError);
+ * ```
  */
-export const qualifyPrismaError = (cause: unknown): PrismaQueryError => {
+export const qualifyPrismaError = <D>(
+  cause: unknown,
+  defect: (cause: unknown) => D,
+): PrismaQueryError | D => {
+  if (cause instanceof Error && DEFECT_ERROR_NAMES.has(cause.name)) return defect(cause);
   if (isKnownRequestError(cause)) {
     switch (cause.code) {
       case "P2002":
         return new UniqueConstraintViolation({ fields: constraintFields(cause.meta), cause });
       case "P2003":
         return new ForeignKeyViolation({ cause });
+      // P2025 ("depends on records that were required but not found") and P2018
+      // ("the required connected records were not found") are the same failure
+      // reported from the to-one and to-many sides of a nested write.
+      case "P2018":
       case "P2025":
         return new RecordNotFound({ cause });
       default:
@@ -136,14 +192,19 @@ export const qualifyPrismaError = (cause: unknown): PrismaQueryError => {
 
 // Per-operation error unions — the static half. Reads can only fail in the
 // driver; writes add the constraint violations their SQL can raise; `*OrThrow`
-// and mutations of a specific record add P2025. The batch mutations (`*Many`)
-// and `upsert` never raise P2025: zero matches is `Ok({ count: 0 })`, and an
-// upsert miss creates.
+// and mutations of a specific record add RecordNotFound for their missing row.
+//
+// RecordNotFound also reaches `create` and `upsert`, which have no row of their
+// own to miss: a nested `connect` to a record that does not exist raises P2025
+// (to-one) or P2018 (to-many). The BATCH mutations are the ones genuinely free
+// of it — `createMany` / `updateMany` and their `*AndReturn` twins accept no
+// nested writes, and zero matches is `Ok({ count: 0 })`, never an error.
 type ReadError = DriverError;
-type CreateError = UniqueConstraintViolation | ForeignKeyViolation | DriverError;
+type CreateError = UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound | DriverError;
+type CreateManyError = UniqueConstraintViolation | ForeignKeyViolation | DriverError;
 type UpdateError = RecordNotFound | UniqueConstraintViolation | ForeignKeyViolation | DriverError;
 type DeleteError = RecordNotFound | ForeignKeyViolation | DriverError;
-type UpsertError = UniqueConstraintViolation | ForeignKeyViolation | DriverError;
+type UpsertError = UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound | DriverError;
 type UpdateManyError = UniqueConstraintViolation | ForeignKeyViolation | DriverError;
 type DeleteManyError = ForeignKeyViolation | DriverError;
 
@@ -162,6 +223,18 @@ const query = (self: unknown, op: string, args?: unknown): AsyncResult<unknown, 
     () => (Prisma.getExtensionContext(self) as unknown as UntypedDelegate)[op]!(args),
     qualifyPrismaError,
   );
+
+// Pagination's own triage. A cursor is an OPAQUE STRING from the outside world
+// (a query parameter), turned into a `where` input by caller-supplied
+// `parseCursor` — so a query Prisma refuses to validate is an anticipated
+// bad-input outcome here, not the programmer bug it is on the `Prisma.Exact`-typed
+// `try*` surface. It stays a modeled DriverError; every other cause is triaged
+// exactly as elsewhere.
+const qualifyPaginationError = <D>(
+  cause: unknown,
+  defect: (cause: unknown) => D,
+): PrismaQueryError | D =>
+  isValidationError(cause) ? new DriverError({ cause }) : qualifyPrismaError(cause, defect);
 
 // The rollback sentinel: an `Err` (or defect) inside `$tryTransaction`'s
 // callback is thrown so Prisma aborts the transaction, then unwrapped back out
@@ -338,7 +411,9 @@ export const unthrownPrisma = Prisma.defineExtension({
 
       /**
        * `create`, qualified: constraint violations are modeled —
-       * {@link UniqueConstraintViolation} and {@link ForeignKeyViolation}.
+       * {@link UniqueConstraintViolation} and {@link ForeignKeyViolation} — and
+       * so is a nested `connect` to a row that does not exist
+       * ({@link RecordNotFound}).
        */
       tryCreate<T, A>(
         this: T,
@@ -351,16 +426,17 @@ export const unthrownPrisma = Prisma.defineExtension({
       },
 
       /**
-       * `createMany`, qualified: the batch count, or the same modeled
-       * constraint violations as `tryCreate`.
+       * `createMany`, qualified: the batch count, or the constraint violations
+       * the batch can raise. No {@link RecordNotFound} — `createMany` accepts
+       * no nested writes, so there is no `connect` to miss.
        */
       tryCreateMany<T, A>(
         this: T,
         args: Prisma.Exact<A, Prisma.Args<T, "createMany">>,
-      ): AsyncResult<Prisma.Result<T, A, "createMany">, CreateError> {
+      ): AsyncResult<Prisma.Result<T, A, "createMany">, CreateManyError> {
         return query(this, "createMany", args) as AsyncResult<
           Prisma.Result<T, A, "createMany">,
-          CreateError
+          CreateManyError
         >;
       },
 
@@ -368,10 +444,10 @@ export const unthrownPrisma = Prisma.defineExtension({
       tryCreateManyAndReturn<T, A>(
         this: T,
         args: Prisma.Exact<A, Prisma.Args<T, "createManyAndReturn">>,
-      ): AsyncResult<Prisma.Result<T, A, "createManyAndReturn">, CreateError> {
+      ): AsyncResult<Prisma.Result<T, A, "createManyAndReturn">, CreateManyError> {
         return query(this, "createManyAndReturn", args) as AsyncResult<
           Prisma.Result<T, A, "createManyAndReturn">,
-          CreateError
+          CreateManyError
         >;
       },
 
@@ -390,9 +466,10 @@ export const unthrownPrisma = Prisma.defineExtension({
       },
 
       /**
-       * `upsert`, qualified: no {@link RecordNotFound} in the union — a miss
-       * *creates* — but the write can still hit the modeled constraint
-       * violations.
+       * `upsert`, qualified: a missing *target* is never an error — a miss
+       * **creates** — but the write can still hit the modeled constraint
+       * violations, and a nested `connect` in either branch can still raise
+       * {@link RecordNotFound}.
        */
       tryUpsert<T, A>(
         this: T,
@@ -487,12 +564,19 @@ export const unthrownPrisma = Prisma.defineExtension({
         Prisma.Result<T, A, "findMany">,
         NonNullable<Prisma.Args<T, "findMany">["cursor"]>
       > {
-        const delegate = Prisma.getExtensionContext(this) as unknown as PaginationDelegate;
         return {
+          // Everything runs inside the THUNK, `getExtensionContext` included —
+          // the same discipline as `query` above, so no synchronous throw can
+          // escape the boundary as a raw throw.
           withCursor: (options: Parameters<typeof paginateWithCursor>[2]) =>
             fromPromise(
-              paginateWithCursor(delegate, args as object | undefined, options),
-              qualifyPrismaError,
+              () =>
+                paginateWithCursor(
+                  Prisma.getExtensionContext(this) as unknown as PaginationDelegate,
+                  args as object | undefined,
+                  options,
+                ),
+              qualifyPaginationError,
             ),
         } as unknown as CursorPaginator<
           Prisma.Result<T, A, "findMany">,
@@ -582,7 +666,7 @@ export const unthrownPrisma = Prisma.defineExtension({
             ? cause.wasDefect
               ? defect(cause.carried)
               : (cause.carried as PrismaQueryError)
-            : qualifyPrismaError(cause),
+            : qualifyPrismaError(cause, defect),
       );
       // A non-defect `Rollback` carries the callback's own `Err` value, so the
       // channel is really `E | PrismaQueryError` — re-attached here.
