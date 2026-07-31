@@ -236,3 +236,87 @@ describe("qualify must be synchronous (runtime belt-and-braces)", () => {
     }
   });
 });
+
+describe("the SYNC boundaries reject an async fn", () => {
+  // A synchronous boundary only ever sees a synchronous `throw`, so an async
+  // `fn` rejects long after it has returned: the rejection can never reach
+  // `qualify`. Left alone it sat inside `Ok(<Promise>)` — un-triaged — and then
+  // floated as an unhandled rejection, which terminates the process on Node by
+  // default. This cannot be banned at compile time without breaking generic
+  // functions (`fromSafeThrowable(structuredClone)`), so it is caught here.
+  const withRejectionProbe = async (body: () => void): Promise<unknown[]> => {
+    const floated: unknown[] = [];
+    const probe = (reason: unknown): void => {
+      floated.push(reason);
+    };
+    process.on("unhandledRejection", probe);
+    try {
+      body();
+      // Two macrotasks: let the orphan settle, then let Node's
+      // unhandled-rejection detection run.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return floated;
+    } finally {
+      process.off("unhandledRejection", probe);
+    }
+  };
+
+  it("fromThrowable: an async fn is a Defect, never Ok(Promise)", async () => {
+    const floated = await withRejectionProbe(() => {
+      const fn = fromThrowable(
+        async (): Promise<number> => {
+          throw boom;
+        },
+        (cause, defect) => defect(cause),
+      );
+      const r = fn();
+      expect(r.isOk()).toBe(false);
+      expect(r.isDefect()).toBe(true);
+      if (r.isDefect()) {
+        expect(r.cause).toBeInstanceOf(TypeError);
+        expect(String((r.cause as TypeError).message)).toContain("returned a thenable");
+      }
+    });
+    // The orphaned rejection was adopted and silenced, not left to float.
+    expect(floated).toEqual([]);
+  });
+
+  it("fromSafeThrowable: an async fn is a Defect, never Ok(Promise)", async () => {
+    const floated = await withRejectionProbe(() => {
+      const fn = fromSafeThrowable(async (): Promise<number> => {
+        throw boom;
+      });
+      const r = fn();
+      expect(r.isOk()).toBe(false);
+      expect(r.isDefect()).toBe(true);
+    });
+    expect(floated).toEqual([]);
+  });
+
+  it("a RESOLVING async fn is a Defect too — the hazard is the shape, not the outcome", async () => {
+    const fn = fromSafeThrowable(async () => 1);
+    expect(fn().isDefect()).toBe(true);
+  });
+
+  it("a plain (non-promise) thenable is caught the same way", () => {
+    // oxlint-disable-next-line no-thenable -- the point of the test: a hand-rolled thenable must be caught like a Promise
+    const fn = fromSafeThrowable(() => ({ then: () => undefined }));
+    expect(fn().isDefect()).toBe(true);
+  });
+
+  it("a synchronous fn returning an ordinary object is untouched", () => {
+    // `then` is only a thenable marker when it is CALLABLE — a data property
+    // named `then` must still flow through as an ordinary success value.
+    // oxlint-disable-next-line no-thenable -- deliberately NOT a thenable: `then` is a number, which must not trip the guard
+    const fn = fromSafeThrowable(() => ({ then: 1, ok: true }));
+    const r = fn();
+    expect(r.isOk()).toBe(true);
+    // Asserted field-by-field rather than with a `{ then: … }` literal, which
+    // would trip the same `no-thenable` lint the code under test is about.
+    if (r.isOk()) {
+      expect(r.value.then).toBe(1);
+      expect(r.value.ok).toBe(true);
+    }
+  });
+});

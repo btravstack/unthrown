@@ -48,6 +48,40 @@ describe("toBeErr / toBeErrTagged", () => {
     expect(r).not.toBeErrTagged("MyError", { code: 42, extra: true });
   });
 
+  // The regression: `override message = "…"` is the documented way to set a
+  // TaggedError's message, and it lands as an OWN ENUMERABLE property — so it
+  // used to leak into the payload and break the exact-match form on the very
+  // pattern the library prescribes. `_tag` / `name` / `message` / `stack` are all
+  // reserved by TaggedError, so none of them is payload.
+  it("toBeErrTagged ignores the reserved keys — an `override message` is not payload", () => {
+    class HttpError extends TaggedError("HttpError")<{ status: number }> {
+      override message = `http ${this.status}`;
+    }
+    const error = new HttpError({ status: 500 });
+    const r: Result<number, HttpError> = Err(error);
+    // the message is really set (we are not just deleting it), and it really is
+    // an own enumerable property — which is why it used to leak into the payload
+    expect(error.message).toBe("http 500");
+    expect(Object.keys(error)).toContain("message");
+    expect(r).toBeErrTagged("HttpError", { status: 500 });
+    expect(r).not.toBeErrTagged("HttpError", { status: 404 });
+    // still exact: an extra field fails, and the reserved keys cannot be asserted
+    expect(r).not.toBeErrTagged("HttpError", { status: 500, extra: true });
+    expect(r).not.toBeErrTagged("HttpError", { status: 500, message: "http 500" });
+  });
+
+  it("toBeErrTagged ignores a namespaced tag's decoupled `name` too", () => {
+    class Retryable extends TaggedError("@lib/Retryable", { name: "Retryable" })<{
+      tries: number;
+    }> {
+      override message = "safe to retry";
+    }
+    const error = new Retryable({ tries: 3 });
+    const r: Result<number, Retryable> = Err(error);
+    expect(error.name).toBe("Retryable");
+    expect(r).toBeErrTagged("@lib/Retryable", { tries: 3 });
+  });
+
   it("toBeErrTagged matches the payload partially with an asymmetric matcher", () => {
     class Multi extends TaggedError("Multi")<{ id: number; msg: string }> {}
     const r: Result<number, Multi> = Err(new Multi({ id: 1, msg: "boom" }));

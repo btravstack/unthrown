@@ -152,6 +152,27 @@ describe("the built-in matcher engine", () => {
     }
   });
 
+  // `JSON.stringify` RETURNS undefined for these (it does not throw), so the
+  // `catch` never fires — without the `?? String(input)` fallback the message
+  // read "the value undefined" for exactly the rogue inputs this error describes.
+  it.each([
+    ["a function", function rogueFn() {}, "rogueFn"],
+    ["a symbol", Symbol("rogueSym"), "Symbol(rogueSym)"],
+  ])("NonExhaustiveError names %s instead of printing `undefined`", (_label, input, expected) => {
+    const builder = match(input as unknown as "a").with("a", () => 1);
+    try {
+      builder.run();
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(NonExhaustiveError);
+      expect((error as NonExhaustiveError).message).toContain(expected);
+      // The regression: `JSON.stringify` returns undefined for these, so without
+      // the `?? String(input)` fallback every one of them printed as `undefined`.
+      expect((error as NonExhaustiveError).message).not.toContain("the value undefined");
+      expect((error as NonExhaustiveError).input).toBe(input);
+    }
+  });
+
   it("a non-plain object pattern never matches structurally — identity only", () => {
     // A keyless class instance (Date, Error) or a foreign symbol-keyed pattern
     // object (e.g. a real ts-pattern matcher) must NOT vacuously match every

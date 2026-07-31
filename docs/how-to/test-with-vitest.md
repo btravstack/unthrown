@@ -51,8 +51,9 @@ test("matchers", () => {
 ## Assert on a tagged error's payload
 
 `toBeErrTagged` takes an optional second argument to also assert the tagged error's
-payload — its own fields, minus the `_tag` and `name` that `TaggedError` sets. A
-plain object matches it **exactly**; an asymmetric matcher matches it **partially**:
+payload — its own fields, minus the keys `TaggedError` reserves (`_tag`, `name`,
+`message`, `stack`). A plain object matches it **exactly**; an asymmetric matcher
+matches it **partially**:
 
 ```ts
 import { Err, TaggedError } from "unthrown";
@@ -68,6 +69,19 @@ expect(Err(new NotFound({ id: 1, msg: "nope" }))).toBeErrTagged(
   "NotFound",
   expect.objectContaining({ id: 1 }),
 );
+```
+
+The reserved keys are skipped so the exact form keeps working with the standard way
+of setting a message — `override message = "…"` lands as an own property on the
+instance, but it is `Error`'s human string, not payload:
+
+```ts
+class HttpError extends TaggedError("HttpError")<{ status: number }> {
+  override message = `http ${this.status}`;
+}
+
+// the payload is `{ status }` — the message is not part of it
+expect(Err(new HttpError({ status: 500 }))).toBeErrTagged("HttpError", { status: 500 });
 ```
 
 ## Async results — `await` is required
