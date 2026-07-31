@@ -8,11 +8,27 @@
 // type. Qualification happens once, inside the extension (Thesis #3): no raw
 // Promise ever crosses into a combinator.
 //
+// `E` carries ONLY domain outcomes — things a caller did, or a legitimate state
+// conflict, that your code branches on:
+//
+//   UniqueConstraintViolation  P2002  → 409
+//   ForeignKeyViolation        P2003  → 400
+//   RecordNotFound             P2025/P2018 → 404
+//
+// Everything infrastructural — a dropped connection, a pool timeout, a deadlock,
+// an unmapped P-code, a malformed query, an engine panic — is a DEFECT. Nobody
+// branches on those in domain code; they are logged and turned into a 500 by the
+// one `defect` arm you already write at the edge. Modelling them would have every
+// call site carry an arm that does exactly what the `defect` arm beside it does.
+//
 //   const db = new PrismaClient({ adapter }).$extends(unthrownPrisma);
 //
 //   await db.user.tryCreate({ data }).match({ ok, errCases, defect });
 //   // errCases matches UniqueConstraintViolation | ForeignKeyViolation
-//   //                | RecordNotFound | DriverError
+//   //                | RecordNotFound  — and nothing else
+//
+// So a read has NO modeled failure: `tryFindMany` is `AsyncResult<User[], never>`
+// (absence is `null`, not an error).
 //
 // The raw promise methods stay available on purpose: they are the escape hatch
 // for batch `$transaction([...])`, which needs unexecuted `PrismaPromise`s.
@@ -23,6 +39,7 @@ import { type AsyncResult, fromPromise, isResult, type Result, TaggedError } fro
 import {
   type CursorPaginationMeta,
   type CursorPaginationOptions,
+  CursorParseFailure,
   type PaginationDelegate,
   paginateWithCursor,
 } from "./pagination.js";
@@ -59,31 +76,31 @@ export class ForeignKeyViolation extends TaggedError("ForeignKeyViolation")<{ ca
 export class RecordNotFound extends TaggedError("RecordNotFound")<{ cause: unknown }> {}
 
 /**
- * A genuine query failure: connection drops, timeouts, unmapped P-codes,
- * driver-level errors.
+ * The cursor handed to `withCursor` could not be used — the caller's
+ * `parseCursor` rejected it, or the query it produced was one Prisma refuses.
  *
  * @remarks
- * This is the "the database refused the query" bucket — an anticipated outcome
- * of talking to a database over a network. It is deliberately NOT the
- * everything-else bucket: a malformed query, a client that cannot start, and an
- * engine panic are bugs rather than outcomes, so they take the **defect**
- * channel instead (see {@link qualifyPrismaError}).
+ * The one anticipated failure of pagination, and the reason it is modeled at
+ * all: a cursor is an **opaque string from the outside world** (a query
+ * parameter), so a client sending garbage is input you answer with a 400 — not
+ * a bug in your code. Every other pagination failure is a defect, like any other
+ * query.
  */
-export class DriverError extends TaggedError("DriverError")<{ cause: unknown }> {}
+export class InvalidCursor extends TaggedError("InvalidCursor")<{ cause: unknown }> {}
 
 /**
- * The full union of tagged errors a Prisma query can surface.
+ * The full union of domain errors a Prisma **query** can surface.
  *
  * @remarks
  * This is the RUNTIME-side union: {@link qualifyPrismaError} maps into it. Each
- * `try*` method narrows the static type to the codes its operation can
- * actually hit (a read is typed `DriverError` only).
+ * `try*` method narrows the static type to the codes its operation can actually
+ * hit — a read hits none of them, so it is typed `never`.
+ *
+ * Infrastructure failures are deliberately absent: they are defects, not values
+ * (see {@link qualifyPrismaError}). {@link InvalidCursor} is absent too — it
+ * belongs to pagination, not to a query.
  */
-export type PrismaQueryError =
-  | UniqueConstraintViolation
-  | ForeignKeyViolation
-  | RecordNotFound
-  | DriverError;
+export type PrismaQueryError = UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
@@ -100,25 +117,7 @@ const isKnownRequestError = (cause: unknown): cause is KnownRequestError =>
   cause.name === "PrismaClientKnownRequestError" &&
   typeof (cause as { code?: unknown }).code === "string";
 
-// Prisma's non-query error classes — recognized by `name` for the same reason
-// as above. None of these is an anticipated outcome of running a query:
-//
-//   PrismaClientValidationError    — the query itself is malformed (a bug: the
-//                                    `try*` surface types its args with
-//                                    `Prisma.Exact`, so reaching this means the
-//                                    types were cast away)
-//   PrismaClientInitializationError — the client could not start (bad datasource
-//                                    URL, engine/version mismatch)
-//   PrismaClientRustPanicError     — the query engine panicked
-//
-// `PrismaClientUnknownRequestError` is deliberately absent: the query really did
-// fail in the database, just without a P-code to name it. That is a DriverError.
-const DEFECT_ERROR_NAMES: ReadonlySet<string> = new Set([
-  "PrismaClientValidationError",
-  "PrismaClientInitializationError",
-  "PrismaClientRustPanicError",
-]);
-
+// Recognized by `name` for the same reason as above.
 const isValidationError = (cause: unknown): boolean =>
   cause instanceof Error && cause.name === "PrismaClientValidationError";
 
@@ -145,17 +144,19 @@ const constraintFields = (meta: unknown): readonly string[] => {
  * `$transaction([...])`).
  *
  * @remarks
- * Recognized P-codes map to their dedicated errors (`P2002` →
- * {@link UniqueConstraintViolation}, `P2003` → {@link ForeignKeyViolation},
- * `P2025` / `P2018` → {@link RecordNotFound}); other query failures fold into
- * {@link DriverError} with the cause preserved.
+ * The three P-codes that describe a **domain** outcome map to their tagged
+ * errors — `P2002` → {@link UniqueConstraintViolation}, `P2003` →
+ * {@link ForeignKeyViolation}, `P2025` / `P2018` → {@link RecordNotFound}.
  *
- * Prisma's **non-query** errors — a malformed query
- * (`PrismaClientValidationError`), a client that could not start
- * (`PrismaClientInitializationError`), an engine panic
- * (`PrismaClientRustPanicError`) — are routed to the **defect** channel instead
- * of `E`: they are bugs and environment faults, not anticipated outcomes of a
- * query, and unthrown's first rule is that `E` lists only modeled failures.
+ * **Everything else is a defect**, with the original cause preserved: a dropped
+ * connection, a pool timeout, a deadlock, an unmapped P-code, a malformed query,
+ * a client that could not start, an engine panic. None of those is something
+ * domain code branches on — they are logged and turned into a 500 at the edge,
+ * which is precisely what the defect channel is for. Modelling them would force
+ * every call site to carry an arm that duplicates its own `defect` arm.
+ *
+ * A defect is not a crash: it flows through the pipeline untouched and is folded
+ * by `match`'s `defect` handler like any other unmodeled failure.
  *
  * @param cause - the rejected value from a Prisma query.
  * @param defect - the defect helper the boundary injects (never import it).
@@ -170,7 +171,6 @@ export const qualifyPrismaError = <D>(
   cause: unknown,
   defect: (cause: unknown) => D,
 ): PrismaQueryError | D => {
-  if (cause instanceof Error && DEFECT_ERROR_NAMES.has(cause.name)) return defect(cause);
   if (isKnownRequestError(cause)) {
     switch (cause.code) {
       case "P2002":
@@ -187,26 +187,29 @@ export const qualifyPrismaError = <D>(
         break;
     }
   }
-  return new DriverError({ cause });
+  return defect(cause);
 };
 
-// Per-operation error unions — the static half. Reads can only fail in the
-// driver; writes add the constraint violations their SQL can raise; `*OrThrow`
-// and mutations of a specific record add RecordNotFound for their missing row.
+// Per-operation error unions — the static half, and only DOMAIN outcomes (every
+// infrastructure failure is a defect, so it appears in none of these).
+//
+// A read therefore has NO modeled failure at all: absence is `null`, and a
+// database that will not answer is a defect. Writes carry the constraint
+// violations their SQL can raise; `*OrThrow` and mutations of a specific record
+// add RecordNotFound for their missing row.
 //
 // RecordNotFound also reaches `create` and `upsert`, which have no row of their
 // own to miss: a nested `connect` to a record that does not exist raises P2025
 // (to-one) or P2018 (to-many). The BATCH mutations are the ones genuinely free
 // of it — `createMany` / `updateMany` and their `*AndReturn` twins accept no
 // nested writes, and zero matches is `Ok({ count: 0 })`, never an error.
-type ReadError = DriverError;
-type CreateError = UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound | DriverError;
-type CreateManyError = UniqueConstraintViolation | ForeignKeyViolation | DriverError;
-type UpdateError = RecordNotFound | UniqueConstraintViolation | ForeignKeyViolation | DriverError;
-type DeleteError = RecordNotFound | ForeignKeyViolation | DriverError;
-type UpsertError = UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound | DriverError;
-type UpdateManyError = UniqueConstraintViolation | ForeignKeyViolation | DriverError;
-type DeleteManyError = ForeignKeyViolation | DriverError;
+type CreateError = UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound;
+type CreateManyError = UniqueConstraintViolation | ForeignKeyViolation;
+type UpdateError = RecordNotFound | UniqueConstraintViolation | ForeignKeyViolation;
+type DeleteError = RecordNotFound | ForeignKeyViolation;
+type UpsertError = UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound;
+type UpdateManyError = UniqueConstraintViolation | ForeignKeyViolation;
+type DeleteManyError = ForeignKeyViolation;
 
 // The untyped runtime call under the typed surface: `getExtensionContext`
 // resolves the concrete delegate and the promise is qualified at the boundary,
@@ -224,17 +227,28 @@ const query = (self: unknown, op: string, args?: unknown): AsyncResult<unknown, 
     qualifyPrismaError,
   );
 
-// Pagination's own triage. A cursor is an OPAQUE STRING from the outside world
-// (a query parameter), turned into a `where` input by caller-supplied
-// `parseCursor` — so a query Prisma refuses to validate is an anticipated
-// bad-input outcome here, not the programmer bug it is on the `Prisma.Exact`-typed
-// `try*` surface. It stays a modeled DriverError; every other cause is triaged
-// exactly as elsewhere.
+// Pagination's own triage — the one place a Prisma VALIDATION error is a value
+// rather than a defect. A cursor is an OPAQUE STRING from the outside world (a
+// query parameter), turned into a `where` input by caller-supplied
+// `parseCursor`, so:
+//
+//   - `parseCursor` itself rejecting the string (flagged by the CursorParseFailure
+//     sentinel — a throw out of `getCursor`, which reads rows WE fetched, is a bug
+//     and is deliberately not flagged), and
+//   - a query Prisma refuses to validate, which for a cursor-driven `findMany` is
+//     overwhelmingly the cursor rather than the `Prisma.Exact`-typed query args
+//
+// are both anticipated bad input: an InvalidCursor you answer with a 400. Every
+// other cause is triaged exactly as it is everywhere else — a defect.
 const qualifyPaginationError = <D>(
   cause: unknown,
   defect: (cause: unknown) => D,
-): PrismaQueryError | D =>
-  isValidationError(cause) ? new DriverError({ cause }) : qualifyPrismaError(cause, defect);
+): InvalidCursor | D =>
+  cause instanceof CursorParseFailure
+    ? new InvalidCursor({ cause: cause.cause })
+    : isValidationError(cause)
+      ? new InvalidCursor({ cause })
+      : defect(cause);
 
 // The rollback sentinel: an `Err` (or defect) inside `$tryTransaction`'s
 // callback is thrown so Prisma aborts the transaction, then unwrapped back out
@@ -256,7 +270,7 @@ class Rollback extends Error {
  * is narrower (it lists only what YOUR database supports), but a shareable
  * extension cannot name a generated type — this union at least rejects typos
  * at compile time; a level your database does not support still fails at
- * runtime as a {@link DriverError}.
+ * runtime as a defect (an unsupported level is a bug, not an outcome).
  */
 export type TransactionIsolationLevel =
   | "ReadUncommitted"
@@ -274,12 +288,13 @@ export type TransactionIsolationLevel =
  */
 export type CursorPaginator<Results extends readonly unknown[], Cursor> = {
   /**
-   * Run the paginated query: the page and its metadata, or a
-   * {@link DriverError}.
+   * Run the paginated query: the page and its metadata, or an
+   * {@link InvalidCursor} — the only modeled failure, since the cursor is the
+   * only part of the query that came from outside.
    */
   readonly withCursor: (
     options: CursorPaginationOptions<Results[number], Cursor>,
-  ) => AsyncResult<[Results, CursorPaginationMeta], DriverError>;
+  ) => AsyncResult<[Results, CursorPaginationMeta], InvalidCursor>;
 };
 
 // Mirrors Prisma's `ITXClientDenyList` — what an interactive-transaction client
@@ -311,32 +326,29 @@ type TxDenyList =
  * const db = new PrismaClient({ adapter }).$extends(unthrownPrisma);
  *
  * const users = db.user.tryFindMany({ select: { id: true } });
- * //    ^? AsyncResult<{ id: number }[], DriverError>
+ * //    ^? AsyncResult<{ id: number }[], never>  — a read has no modeled failure
  * ```
  */
 export const unthrownPrisma = Prisma.defineExtension({
   name: "@unthrown/prisma",
   model: {
     $allModels: {
-      /** `findMany`, qualified: the list, or a {@link DriverError}. */
+      /** `findMany`, qualified: the list. A read has no modeled failure. */
       tryFindMany<T, A = Record<string, never>>(
         this: T,
         args?: Prisma.Exact<A, Prisma.Args<T, "findMany">>,
-      ): AsyncResult<Prisma.Result<T, A, "findMany">, ReadError> {
-        return query(this, "findMany", args) as AsyncResult<
-          Prisma.Result<T, A, "findMany">,
-          ReadError
-        >;
+      ): AsyncResult<Prisma.Result<T, A, "findMany">, never> {
+        return query(this, "findMany", args) as AsyncResult<Prisma.Result<T, A, "findMany">, never>;
       },
 
-      /** `findUnique`, qualified: the row or `null`, or a {@link DriverError}. */
+      /** `findUnique`, qualified: the row or `null` — absence is not an error. */
       tryFindUnique<T, A>(
         this: T,
         args: Prisma.Exact<A, Prisma.Args<T, "findUnique">>,
-      ): AsyncResult<Prisma.Result<T, A, "findUnique">, ReadError> {
+      ): AsyncResult<Prisma.Result<T, A, "findUnique">, never> {
         return query(this, "findUnique", args) as AsyncResult<
           Prisma.Result<T, A, "findUnique">,
-          ReadError
+          never
         >;
       },
 
@@ -347,21 +359,21 @@ export const unthrownPrisma = Prisma.defineExtension({
       tryFindUniqueOrThrow<T, A>(
         this: T,
         args: Prisma.Exact<A, Prisma.Args<T, "findUniqueOrThrow">>,
-      ): AsyncResult<Prisma.Result<T, A, "findUniqueOrThrow">, RecordNotFound | DriverError> {
+      ): AsyncResult<Prisma.Result<T, A, "findUniqueOrThrow">, RecordNotFound> {
         return query(this, "findUniqueOrThrow", args) as AsyncResult<
           Prisma.Result<T, A, "findUniqueOrThrow">,
-          RecordNotFound | DriverError
+          RecordNotFound
         >;
       },
 
-      /** `findFirst`, qualified: the first match or `null`, or a {@link DriverError}. */
+      /** `findFirst`, qualified: the first match or `null`. */
       tryFindFirst<T, A = Record<string, never>>(
         this: T,
         args?: Prisma.Exact<A, Prisma.Args<T, "findFirst">>,
-      ): AsyncResult<Prisma.Result<T, A, "findFirst">, ReadError> {
+      ): AsyncResult<Prisma.Result<T, A, "findFirst">, never> {
         return query(this, "findFirst", args) as AsyncResult<
           Prisma.Result<T, A, "findFirst">,
-          ReadError
+          never
         >;
       },
 
@@ -372,10 +384,10 @@ export const unthrownPrisma = Prisma.defineExtension({
       tryFindFirstOrThrow<T, A = Record<string, never>>(
         this: T,
         args?: Prisma.Exact<A, Prisma.Args<T, "findFirstOrThrow">>,
-      ): AsyncResult<Prisma.Result<T, A, "findFirstOrThrow">, RecordNotFound | DriverError> {
+      ): AsyncResult<Prisma.Result<T, A, "findFirstOrThrow">, RecordNotFound> {
         return query(this, "findFirstOrThrow", args) as AsyncResult<
           Prisma.Result<T, A, "findFirstOrThrow">,
-          RecordNotFound | DriverError
+          RecordNotFound
         >;
       },
 
@@ -383,18 +395,18 @@ export const unthrownPrisma = Prisma.defineExtension({
       tryCount<T, A = Record<string, never>>(
         this: T,
         args?: Prisma.Exact<A, Prisma.Args<T, "count">>,
-      ): AsyncResult<Prisma.Result<T, A, "count">, ReadError> {
-        return query(this, "count", args) as AsyncResult<Prisma.Result<T, A, "count">, ReadError>;
+      ): AsyncResult<Prisma.Result<T, A, "count">, never> {
+        return query(this, "count", args) as AsyncResult<Prisma.Result<T, A, "count">, never>;
       },
 
       /** `aggregate`, qualified. */
       tryAggregate<T, A>(
         this: T,
         args: Prisma.Exact<A, Prisma.Args<T, "aggregate">>,
-      ): AsyncResult<Prisma.Result<T, A, "aggregate">, ReadError> {
+      ): AsyncResult<Prisma.Result<T, A, "aggregate">, never> {
         return query(this, "aggregate", args) as AsyncResult<
           Prisma.Result<T, A, "aggregate">,
-          ReadError
+          never
         >;
       },
 
@@ -402,11 +414,8 @@ export const unthrownPrisma = Prisma.defineExtension({
       tryGroupBy<T, A>(
         this: T,
         args: Prisma.Exact<A, Prisma.Args<T, "groupBy">>,
-      ): AsyncResult<Prisma.Result<T, A, "groupBy">, ReadError> {
-        return query(this, "groupBy", args) as AsyncResult<
-          Prisma.Result<T, A, "groupBy">,
-          ReadError
-        >;
+      ): AsyncResult<Prisma.Result<T, A, "groupBy">, never> {
+        return query(this, "groupBy", args) as AsyncResult<Prisma.Result<T, A, "groupBy">, never>;
       },
 
       /**
@@ -547,14 +556,14 @@ export const unthrownPrisma = Prisma.defineExtension({
        * pagination owns those. A cursor pointing at a record that no longer
        * matches the query filter is handled correctly (the first element of
        * the page is not skipped). A throwing `parseCursor` — e.g. a malformed
-       * cursor from an API client — surfaces as a {@link DriverError}.
+       * cursor from an API client — surfaces as an {@link InvalidCursor}.
        *
        * @example
        * ```ts
        * const page = await db.user
        *   .tryPaginate({ where: { active: true }, orderBy: { id: "asc" } })
        *   .withCursor({ limit: 20, after: req.query.cursor });
-       * // Ok([users, { hasNextPage, endCursor, ... }]) | Err(DriverError)
+       * // Ok([users, { hasNextPage, endCursor, ... }]) | Err(InvalidCursor)
        * ```
        */
       tryPaginate<T, A>(
@@ -596,9 +605,15 @@ export const unthrownPrisma = Prisma.defineExtension({
      * `AsyncResult<T, E | PrismaQueryError>`. A defect inside the callback also
      * rolls back and stays a defect — including a callback that *throws*
      * instead of returning an `AsyncResult` (a bug, never downgraded to a
-     * modeled `DriverError`). The `try*` methods are available on `tx`
+     * modeled error). The `try*` methods are available on `tx`
      * (extensions propagate into the interactive transaction); the deny list
      * additionally removes `$tryTransaction` itself — no nesting.
+     *
+     * The `| PrismaQueryError` is not merely defensive: a deferred constraint
+     * surfaces its violation at COMMIT rather than at the statement, so the
+     * transaction boundary itself can produce one. Prisma's own machinery
+     * failing any other way (a `maxWait` / `timeout` expiry, a lost connection)
+     * is infrastructure, and so a defect like everywhere else.
      *
      * @example
      * ```ts
@@ -640,7 +655,7 @@ export const unthrownPrisma = Prisma.defineExtension({
               // A callback that resolves to a NON-Result (out of contract —
               // e.g. a raw value from untyped code) is a bug, exactly like a
               // throwing callback: the TypeError is caught below, so it rolls
-              // back as a DEFECT — never downgraded to a modeled DriverError
+              // back as a DEFECT — never downgraded to a modeled error
               // (which is what dispatching `returned.isOk()` outside this
               // try/catch used to do).
               if (!isResult(returned)) {

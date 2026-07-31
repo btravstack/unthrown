@@ -9,7 +9,6 @@
     "DeleteError",
     "UpsertError",
     "UpdateManyError",
-    "DeleteManyError",
     "TxDenyList"
   ]
 }

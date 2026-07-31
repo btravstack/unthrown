@@ -132,8 +132,7 @@ describe("try* model methods", () => {
           matcher
             .with(P.tag("UniqueConstraintViolation"), () => "conflict" as const)
             .with(P.tag("ForeignKeyViolation"), () => "bad-reference" as const)
-            .with(P.tag("RecordNotFound"), () => "missing" as const)
-            .with(P.tag("DriverError"), () => "unavailable" as const),
+            .with(P.tag("RecordNotFound"), () => "missing" as const),
         ),
     ).toBeErrWith("missing");
   });
@@ -278,12 +277,10 @@ describe("$tryTransaction", () => {
     await expect(db.user.tryCount()).toBeOkWith(0);
   });
 
-  it("a callback that THROWS (instead of returning an AsyncResult) is a defect, not a DriverError", async ({
-    db,
-  }) => {
+  it("a callback that THROWS (instead of returning an AsyncResult) is a defect", async ({ db }) => {
     // The throw bypasses every combinator (no AsyncResult exists yet), so it
     // reaches the transaction boundary raw. A bug must stay a defect — never
-    // be downgraded to a modeled DriverError.
+    // be downgraded into the modeled error channel.
     await expect(
       db.$tryTransaction(() => {
         throw new Error("sync callback bug");
@@ -298,7 +295,7 @@ describe("$tryTransaction", () => {
     // Out of contract: the callback resolves to `42` instead of a Result.
     // Dispatching on `result.isOk` would then throw a TypeError OUTSIDE the
     // sentinel try/catch, reject the transaction with a non-Rollback cause,
-    // and be downgraded into a modeled DriverError. A bug must stay a defect
+    // and be downgraded into the modeled error channel. A bug must stay a defect
     // — and the write made before the rogue return must be rolled back.
     const rogue = (async (tx: { user: { tryCreate: (args: unknown) => PromiseLike<unknown> } }) => {
       await tx.user.tryCreate({ data: { email: "rogue@example.com" } });
@@ -320,7 +317,7 @@ describe("$tryTransaction", () => {
     ).toBeErrTagged("UniqueConstraintViolation");
   });
 
-  it("qualifies a transaction-level failure (commit after timeout) as DriverError", async ({
+  it("routes a transaction-level failure (commit after timeout) to the defect channel", async ({
     db,
   }) => {
     // The callback outlives the transaction timeout WITHOUT touching `tx`, so the
@@ -330,7 +327,7 @@ describe("$tryTransaction", () => {
         () => fromSafePromise(new Promise((resolve) => setTimeout(resolve, 100))).map(() => "ok"),
         { timeout: 10 },
       ),
-    ).toBeErrTagged("DriverError");
+    ).toBeDefect();
   });
 });
 
@@ -465,12 +462,14 @@ describe("tryPaginate / withCursor", () => {
     ]);
   });
 
-  it("surfaces a default cursor over a selection without id as DriverError", async ({
+  // `getCursor` reads rows WE fetched, so a throw there is a bug in the caller's
+  // selection, not bad input from a client — the defect channel, not InvalidCursor.
+  it("routes a default cursor over a selection without id to the DEFECT channel", async ({
     seededDb: db,
   }) => {
     await expect(
       db.user.tryPaginate({ select: { email: true } }).withCursor({ limit: 2 }),
-    ).toBeErrTagged("DriverError");
+    ).toBeDefect();
   });
 
   // The pagination carve-out. Prisma rejects this with a
@@ -478,12 +477,41 @@ describe("tryPaginate / withCursor", () => {
   // channel — but here the cursor is an OPAQUE STRING from the outside world, so
   // a client sending garbage is anticipated input, not a bug. It must stay a
   // modeled Err the caller can turn into a 400.
-  it("surfaces a malformed cursor as DriverError, not a defect", async ({ seededDb: db }) => {
+  it("models a malformed cursor as InvalidCursor, not a defect", async ({ seededDb: db }) => {
     // Default parseCursor keeps a non-numeric cursor as a string — invalid for
     // this model's Int id, so Prisma rejects it.
     await expect(
       db.user.tryPaginate({ orderBy: { id: "asc" } }).withCursor({ limit: 2, after: "not-an-id" }),
-    ).toBeErrTagged("DriverError");
+    ).toBeErrTagged("InvalidCursor");
+  });
+
+  // The other half of the carve-out: the caller's own `parseCursor` rejecting a
+  // client-supplied string is the same anticipated bad input.
+  it("models a throwing parseCursor on a request cursor as InvalidCursor", async ({
+    seededDb: db,
+  }) => {
+    await expect(
+      db.user.tryPaginate({ orderBy: { id: "asc" } }).withCursor({
+        limit: 2,
+        after: "garbage",
+        parseCursor: (cursor) => {
+          throw new Error(`unparseable: ${cursor}`);
+        },
+      }),
+    ).toBeErrTagged("InvalidCursor");
+  });
+
+  // ...but the SAME throw while re-parsing a cursor we generated ourselves is a
+  // bug in the caller's cursor functions, and stays a defect.
+  it("routes a throwing getCursor to the DEFECT channel", async ({ seededDb: db }) => {
+    await expect(
+      db.user.tryPaginate({ orderBy: { id: "asc" } }).withCursor({
+        limit: 2,
+        getCursor: () => {
+          throw new Error("no cursor for this row");
+        },
+      }),
+    ).toBeDefect();
   });
 
   // The `before` + `limit: null` combination is typed away at the public
@@ -683,30 +711,22 @@ describe("qualifyPrismaError", () => {
     },
   );
 
-  it("maps an unhandled P-code to DriverError", () => {
-    const cause = known("P2024");
-    expect(qualify(cause)).toEqual(expect.objectContaining({ _tag: "DriverError", cause }));
-  });
-
-  it("maps a non-Prisma rejection to DriverError, preserving the cause", () => {
-    const cause = new Error("socket hang up");
-    expect(qualify(cause)).toEqual(expect.objectContaining({ _tag: "DriverError", cause }));
-  });
-
-  it("keeps PrismaClientUnknownRequestError in the error channel (the query DID fail)", () => {
-    const cause = named("PrismaClientUnknownRequestError");
-    expect(qualify(cause)).toEqual(expect.objectContaining({ _tag: "DriverError", cause }));
-  });
-
-  // Thesis #1: `E` lists only anticipated failures. A malformed query, a client
-  // that cannot start and an engine panic are bugs / environment faults, so they
-  // must take the defect channel rather than masquerading as a DriverError.
+  // Thesis #1: `E` lists only the failures a caller branches on. Everything
+  // infrastructural takes the defect channel — nobody writes domain logic for a
+  // dropped connection, they log it and 500, which is what `match`'s `defect`
+  // arm already does.
   it.each([
-    "PrismaClientValidationError",
-    "PrismaClientInitializationError",
-    "PrismaClientRustPanicError",
-  ])("routes %s to the DEFECT channel, not to E", (name) => {
-    const cause = named(name);
+    ["a connection-pool timeout", () => known("P2024")],
+    ["a write conflict / deadlock", () => known("P2034")],
+    ["an unreachable database server", () => known("P1001")],
+    ["any other unmapped P-code", () => known("P2021")],
+    ["a malformed query", () => named("PrismaClientValidationError")],
+    ["a client that could not start", () => named("PrismaClientInitializationError")],
+    ["an engine panic", () => named("PrismaClientRustPanicError")],
+    ["an unknown request error", () => named("PrismaClientUnknownRequestError")],
+    ["a non-Prisma rejection", () => new Error("socket hang up")],
+  ])("routes %s to the DEFECT channel, not to E", (_label, make) => {
+    const cause = make();
     expect(qualify(cause)).toEqual(defect(cause));
   });
 });

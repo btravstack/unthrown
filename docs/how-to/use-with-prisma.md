@@ -21,7 +21,7 @@ import { PrismaClient } from "./generated/prisma/client.ts";
 const db = new PrismaClient({ adapter }).$extends(unthrownPrisma);
 
 const users = db.user.tryFindMany({ select: { id: true } });
-//    ^? AsyncResult<{ id: number }[], DriverError>
+//    ^? AsyncResult<{ id: number }[], never>
 ```
 
 Qualification happens **once, inside the extension** — no raw `Promise`, and so no
@@ -30,21 +30,29 @@ inference survives the wrap, so the success type is still narrowed by your query
 
 ## Per-operation error unions
 
-Each operation's error channel is only what that operation can actually raise — a
-read cannot fail with a `UniqueConstraintViolation` _in the type_, so you never
-write a handler for a case that can't happen.
+`E` carries **only domain outcomes** — things a caller did, or a legitimate state
+conflict, that your code actually branches on. Each operation's channel is
+exactly what that operation can raise, so you never write a handler for a case
+that can't happen:
 
-| Method                                                                                        | Error channel                                                                       |
-| --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `tryFindMany` / `tryFindUnique` / `tryFindFirst` / `tryCount` / `tryAggregate` / `tryGroupBy` | `DriverError`                                                                       |
-| `tryFindUniqueOrThrow` / `tryFindFirstOrThrow`                                                | `RecordNotFound \| DriverError`                                                     |
-| `tryCreate` / `tryUpsert`                                                                     | `UniqueConstraintViolation \| ForeignKeyViolation \| RecordNotFound \| DriverError` |
-| `tryUpdate`                                                                                   | `RecordNotFound \| UniqueConstraintViolation \| ForeignKeyViolation \| DriverError` |
-| `tryDelete`                                                                                   | `RecordNotFound \| ForeignKeyViolation \| DriverError`                              |
-| `tryCreateMany` / `tryCreateManyAndReturn`                                                    | `UniqueConstraintViolation \| ForeignKeyViolation \| DriverError`                   |
-| `tryUpdateMany` / `tryUpdateManyAndReturn`                                                    | `UniqueConstraintViolation \| ForeignKeyViolation \| DriverError`                   |
-| `tryDeleteMany`                                                                               | `ForeignKeyViolation \| DriverError`                                                |
-| `tryPaginate(...).withCursor(...)`                                                            | `DriverError`                                                                       |
+| Method                                                                                        | Error channel                                                        |
+| --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `tryFindMany` / `tryFindUnique` / `tryFindFirst` / `tryCount` / `tryAggregate` / `tryGroupBy` | `never`                                                              |
+| `tryFindUniqueOrThrow` / `tryFindFirstOrThrow`                                                | `RecordNotFound`                                                     |
+| `tryCreate` / `tryUpsert` / `tryUpdate`                                                       | `UniqueConstraintViolation \| ForeignKeyViolation \| RecordNotFound` |
+| `tryDelete`                                                                                   | `ForeignKeyViolation \| RecordNotFound`                              |
+| `tryCreateMany` / `tryCreateManyAndReturn`                                                    | `UniqueConstraintViolation \| ForeignKeyViolation`                   |
+| `tryUpdateMany` / `tryUpdateManyAndReturn`                                                    | `UniqueConstraintViolation \| ForeignKeyViolation`                   |
+| `tryDeleteMany`                                                                               | `ForeignKeyViolation`                                                |
+| `tryPaginate(...).withCursor(...)`                                                            | `InvalidCursor`                                                      |
+
+`UniqueConstraintViolation` is `P2002` (a 409, and it carries the offending
+`fields`), `ForeignKeyViolation` is `P2003` (a 400), and `RecordNotFound` is
+`P2025` — plus `P2018`, which says the same thing from the to-many side of a
+nested write (a 404).
+
+A **read has no modeled failure at all**. Absence is `null`, and a database that
+will not answer is a defect — so `tryFindMany` is `AsyncResult<User[], never>`.
 
 Note where `RecordNotFound` does **not** appear: the **batch** mutations (`*Many`
 and their `*AndReturn` twins). Those are the only operations genuinely free of it —
@@ -58,40 +66,51 @@ db.post.tryCreate({ data: { title, author: { connect: { id: authorId } } } });
 // Err(RecordNotFound) when that author does not exist — P2025.
 ```
 
-The tagged errors map to Prisma's P-codes: `UniqueConstraintViolation` is `P2002`
-(and carries the offending `fields`), `ForeignKeyViolation` is `P2003`, and
-`RecordNotFound` is `P2025` — plus `P2018`, which says the same thing from the
-to-many side of a nested write. Other query failures — connection drops, timeouts,
-unmapped codes, non-Prisma causes — fold into `DriverError` with the original
-`cause` preserved.
-
 ::: tip Absence is not an error
 `tryFindUnique` returns `Ok(null)` for a miss — a missing row is an anticipated
 value, not a failure. Reach for `tryFindUniqueOrThrow` when the absence _is_ the
 error you want to model (`RecordNotFound`).
 :::
 
-## What does _not_ reach your error channel
+## Everything infrastructural is a defect
 
-`DriverError` is the "the database refused the query" bucket, not an
-everything-else bucket. Three of Prisma's error classes are bugs or environment
-faults rather than outcomes, so they go to the
-[defect channel](../explanation/the-defect-channel) instead:
+A dropped connection, a pool timeout, a deadlock, an unmapped P-code, a malformed
+query, a client that could not start, an engine panic — none of those reaches your
+error channel. They go to the
+[defect channel](../explanation/the-defect-channel), with the original cause
+preserved.
 
-| Prisma error                      | Why it is a defect                                                                                           |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `PrismaClientValidationError`     | The query is malformed. `try*` args are `Prisma.Exact`-typed — reaching this means the types were cast away. |
-| `PrismaClientInitializationError` | The client could not start: bad datasource URL, engine/version mismatch.                                     |
-| `PrismaClientRustPanicError`      | The query engine panicked.                                                                                   |
+That is not a demotion. **A defect is not a crash**: it flows through the pipeline
+untouched and is folded at the edge by `match`'s `defect` handler, exactly where
+you already turn unexpected failures into a 500. The channel means "not worth
+threading through domain code", not "fatal".
 
-`PrismaClientUnknownRequestError` is deliberately _not_ in that list: the query
-really did fail in the database, just without a P-code to name it — a `DriverError`.
+The test is simple — _would you branch on it?_ You genuinely handle a duplicate
+email (409) or a missing parent row (404). You do not write domain logic for a
+severed TCP connection; you log it and return a 500. Modelling it would only force
+every call site to carry an arm that does the same thing as the `defect` arm
+sitting right beside it:
+
+```ts
+// What modelling infrastructure failures would cost you, at EVERY call site:
+errCases: (matcher) => matcher
+  .with(P.tag("UniqueConstraintViolation"), (e) => resp.conflict(e.fields))
+  .with(P.tag("DriverError"), (e) => resp.serverError(e)),   // ← this
+defect: (cause) => resp.serverError(cause),                   // ← and this
+```
 
 ::: tip The one carve-out: pagination cursors
 A cursor is an **opaque string from the outside world**, turned into a query by
-your `parseCursor`. So a validation error out of `withCursor` stays a modeled
-`DriverError` — a client sending garbage is anticipated input you turn into a 400,
-not a bug. See [Cursor pagination](#cursor-pagination) below.
+your `parseCursor`. A client sending garbage is anticipated input you answer with
+a 400 — so it is modeled, as `InvalidCursor`. A throw out of `getCursor` (which
+reads rows _you_ fetched) is a bug, and stays a defect. See
+[Cursor pagination](#cursor-pagination) below.
+:::
+
+::: warning Retries
+Deadlocks (`P2034`) and pool timeouts (`P2024`) are defects too, so a retry
+wrapper reaches for `recoverDefect` and inspects the cause, rather than matching a
+tag. That is one place in a codebase — versus an arm at every call site.
 :::
 
 ## Handle the errors
@@ -114,13 +133,13 @@ return created.match({
       )
       .with(P.tag("ForeignKeyViolation"), P.tag("RecordNotFound"), () =>
         resp.badRequest("unknown reference"),
-      )
-      .with(P.tag("DriverError"), (e) => resp.serverError(e)),
+      ),
   defect: (cause) => resp.serverError(cause),
 });
-// Exactly the four cases a create can raise — no more, no fewer. Add a P-code
-// to the union and every call site like this one stops compiling until it is
-// handled.
+// Exactly the three cases a create can raise — no more, no fewer. Add a case to
+// the union and every call site like this one stops compiling until it is
+// handled. Everything else (a dropped connection, a deadlock, a bug) lands in
+// the one `defect` arm.
 ```
 
 When several tags deserve the same response, **group** them in one arm rather
@@ -128,14 +147,12 @@ than reaching for a wildcard — the list stays explicit, so a new P-code still
 lights the call site up:
 
 ```ts
-matcher
-  .with(
-    P.tag("UniqueConstraintViolation"),
-    P.tag("ForeignKeyViolation"),
-    P.tag("RecordNotFound"),
-    () => resp.badRequest("bad write"),
-  )
-  .with(P.tag("DriverError"), (e) => resp.serverError(e));
+matcher.with(
+  P.tag("UniqueConstraintViolation"),
+  P.tag("ForeignKeyViolation"),
+  P.tag("RecordNotFound"),
+  () => resp.badRequest("bad write"),
+);
 ```
 
 ## Transactions
@@ -153,7 +170,7 @@ const moved = db.$tryTransaction((tx) =>
       tx.account.tryUpdate({ where: { id: to }, data: { balance: { increment: amount } } }),
     ),
 );
-//    ^? AsyncResult<Account, RecordNotFound | UniqueConstraintViolation | ForeignKeyViolation | DriverError>
+//    ^? AsyncResult<Account, RecordNotFound | UniqueConstraintViolation | ForeignKeyViolation>
 // Any Err → both updates rolled back, and the Err is in `moved`.
 ```
 
@@ -177,11 +194,11 @@ import { P } from "unthrown";
 const page = await db.user
   .tryPaginate({ where: { active: true }, orderBy: { id: "asc" } })
   .withCursor({ limit: 20, after: req.query.cursor });
-//    ^? Result<[User[], CursorPaginationMeta], DriverError>
+//    ^? Result<[User[], CursorPaginationMeta], InvalidCursor>
 
 page.match({
   ok: ([users, meta]) => json({ users, nextCursor: meta.endCursor, hasMore: meta.hasNextPage }),
-  errCases: (matcher) => matcher.with(P.tag("DriverError"), (e) => serverError(e)),
+  errCases: (matcher) => matcher.with(P.tag("InvalidCursor"), () => badRequest("bad cursor")),
   defect: serverError,
 });
 ```
@@ -194,9 +211,11 @@ passing both used to silently drop `after`); `before` + `limit: null` is a compi
 error; and the default cursor preserves the id's type (all-digit → number/`bigint`,
 otherwise string). Provide `getCursor` / `parseCursor` for composite keys.
 
-A malformed cursor stays a modeled `DriverError` rather than becoming a defect —
-the one place a Prisma validation error is treated as anticipated input, because
-the cursor comes from the client rather than from your code.
+A malformed cursor is a modeled `InvalidCursor` rather than a defect — the one
+place a Prisma validation error is treated as anticipated input, because the
+cursor comes from the client rather than from your code. A throw out of
+`getCursor`, which reads rows the query just returned, is a bug and stays a
+defect.
 
 ## Raw methods and raw SQL
 
@@ -210,7 +229,7 @@ import { fromPromise } from "unthrown";
 import { qualifyPrismaError } from "@unthrown/prisma";
 
 const rows = fromPromise(db.$queryRaw`SELECT 1`, qualifyPrismaError);
-//    ^? AsyncResult<unknown, UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound | DriverError>
+//    ^? AsyncResult<unknown, UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound>
 ```
 
 `qualifyPrismaError` **is** a `qualify` — the boundary injects the `defect`
