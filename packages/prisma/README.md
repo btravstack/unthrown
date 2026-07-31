@@ -13,7 +13,7 @@ pnpm add @unthrown/prisma unthrown
 
 `$extends(unthrownPrisma)` adds `try*` variants of the model delegate operations
 **alongside** the raw promise ones. Each returns an `AsyncResult` whose error
-channel is exactly the set of P-codes that operation can produce, mapped to
+channel is exactly the **domain** outcomes that operation can produce, mapped to
 tagged errors — a read cannot fail with `UniqueConstraintViolation` _in the
 type_. Qualification happens once, inside the extension: no raw Promise ever
 reaches your code.
@@ -26,31 +26,52 @@ import { PrismaClient } from "./generated/prisma/client.ts";
 const db = new PrismaClient({ adapter }).$extends(unthrownPrisma);
 
 const users = db.user.tryFindMany({ select: { id: true } });
-//    ^? AsyncResult<{ id: number }[], DriverError>
-//       `select` / `include` payload inference survives the wrap.
+//    ^? AsyncResult<{ id: number }[], never>
+//       A read has no modeled failure. `select` / `include` payload
+//       inference survives the wrap.
 
 await db.user.tryCreate({ data }).match({
   ok: (user) => created(user),
-  // every P-code `tryCreate` can raise gets an arm — cases sharing a handler
+  // every case `tryCreate` can raise gets an arm — cases sharing a handler
   // are grouped, so nothing is absorbed unnamed:
   errCases: (matcher) =>
     matcher
       .with(P.tag("UniqueConstraintViolation"), (e) => conflict(e.fields))
-      .with(P.tag("ForeignKeyViolation"), P.tag("DriverError"), (e) => serverError(e)),
+      .with(P.tag("ForeignKeyViolation"), P.tag("RecordNotFound"), () =>
+        badRequest("unknown reference"),
+      ),
+  // a dropped connection, a deadlock, a bug — one arm, at the edge:
   defect: serverError,
 });
 ```
 
-- **Per-operation errors** — reads (`tryFindMany` / `tryFindUnique` /
-  `tryFindFirst` / `tryCount` / `tryAggregate` / `tryGroupBy`) fail only with
-  `DriverError`; writes (`tryCreate` / `tryCreateMany` / `tryCreateManyAndReturn`
-  / `tryUpsert` / `tryUpdateMany` / `tryUpdateManyAndReturn`) add
-  `UniqueConstraintViolation` (P2002) and `ForeignKeyViolation` (P2003);
-  `tryFindUniqueOrThrow` / `tryFindFirstOrThrow` / `tryUpdate` / `tryDelete` add
-  `RecordNotFound` (P2025) — the batch mutations and `tryUpsert` never carry it
-  (zero matches is `Ok({ count: 0 })`; an upsert miss creates). `tryDeleteMany`
-  models only `ForeignKeyViolation`. Everything else folds into `DriverError`
-  with the cause preserved.
+- **`E` is domain outcomes only** — things a caller did, or a legitimate state
+  conflict, that your code actually branches on:
+
+  | Operation                                                                                     | Error channel                                                        |
+  | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+  | `tryFindMany` / `tryFindUnique` / `tryFindFirst` / `tryCount` / `tryAggregate` / `tryGroupBy` | `never`                                                              |
+  | `tryFindUniqueOrThrow` / `tryFindFirstOrThrow`                                                | `RecordNotFound`                                                     |
+  | `tryCreate` / `tryUpsert` / `tryUpdate`                                                       | `UniqueConstraintViolation \| ForeignKeyViolation \| RecordNotFound` |
+  | `tryDelete`                                                                                   | `ForeignKeyViolation \| RecordNotFound`                              |
+  | `tryCreateMany` / `tryCreateManyAndReturn` / `tryUpdateMany` / `tryUpdateManyAndReturn`       | `UniqueConstraintViolation \| ForeignKeyViolation`                   |
+  | `tryDeleteMany`                                                                               | `ForeignKeyViolation`                                                |
+  | `tryPaginate(...).withCursor(...)`                                                            | `InvalidCursor`                                                      |
+
+  `UniqueConstraintViolation` is P2002 (409, and carries the offending
+  `fields`), `ForeignKeyViolation` is P2003 (400), `RecordNotFound` is
+  P2025/P2018 (404). Only the **batch** mutations are free of `RecordNotFound`:
+  they take no nested writes, and zero matches is `Ok({ count: 0 })`.
+  `tryCreate` and `tryUpsert` carry it because a nested `connect` can point at a
+  row that does not exist.
+
+- **Everything infrastructural is a defect** — a dropped connection, a pool
+  timeout, a deadlock, an unmapped P-code, a malformed query, an engine panic.
+  Nobody writes domain logic for those: they are logged and turned into a 500 by
+  the one `defect` arm you already have at the edge. Putting them in `E` would
+  only force every call site to carry an arm duplicating its own `defect` arm.
+  (A defect is not a crash — it flows through the pipeline untouched and is
+  folded at the edge like any other unmodeled failure.)
 - **`$tryTransaction`** — an interactive transaction whose callback speaks
   `AsyncResult`: an `Err` triggers a ROLLBACK and comes out as the same typed
   `Err`; a defect also rolls back and stays a defect. The `try*` methods are
@@ -79,7 +100,10 @@ const page = await db.user
   .tryPaginate({ where: { active: true }, orderBy: { id: "asc" } })
   .withCursor({ limit: 20, after: req.query.cursor });
 // Ok([users, { hasPreviousPage, hasNextPage, startCursor, endCursor }])
-// | Err(DriverError) — a malformed cursor included.
+// | Err(InvalidCursor) — the cursor is the only part of the query that came from
+//   outside, so it is the only modeled failure: answer it with a 400.
+// `after` and `before` are mutually exclusive, and `before` + `limit: null` is
+// a compile error.
 
 // Custom serialization (composite keys, non-id cursors):
 const liked = await db.like.tryPaginate({ orderBy: { postId: "asc" } }).withCursor({

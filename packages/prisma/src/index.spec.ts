@@ -8,7 +8,7 @@
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import "@unthrown/vitest";
-import { Err, fromSafePromise, TaggedError } from "unthrown";
+import { Err, fromSafePromise, P, TaggedError } from "unthrown";
 import { describe, expect, test } from "vitest";
 
 import { PrismaClient } from "./generated/prisma/client.ts";
@@ -98,6 +98,51 @@ describe("try* model methods", () => {
       "RecordNotFound",
     );
     await expect(db.user.tryDelete({ where: { id: 999 } })).toBeErrTagged("RecordNotFound");
+  });
+
+  // `create` and `upsert` have no row of their own to miss, but a nested
+  // `connect` pointing at a record that does not exist raises P2025 all the
+  // same — so RecordNotFound belongs in their unions.
+  it("models a nested connect to a missing record as RecordNotFound (create and upsert)", async ({
+    db,
+  }) => {
+    await expect(
+      db.post.tryCreate({ data: { title: "orphan", author: { connect: { id: 999 } } } }),
+    ).toBeErrTagged("RecordNotFound");
+    await expect(
+      db.post.tryUpsert({
+        where: { id: 999 },
+        create: { title: "orphan", author: { connect: { id: 999 } } },
+        update: {},
+      }),
+    ).toBeErrTagged("RecordNotFound");
+  });
+
+  // The regression this guards: while CreateError omitted RecordNotFound, the
+  // match below was exhaustive *by type* yet had no arm for the value that
+  // actually arrived — the matcher threw NonExhaustiveError and the
+  // throw-to-defect net turned a modeled database failure into a Defect.
+  it("keeps that nested-connect failure a VALUE under an exhaustive match (never a Defect)", async ({
+    db,
+  }) => {
+    await expect(
+      db.post
+        .tryCreate({ data: { title: "orphan", author: { connect: { id: 999 } } } })
+        .mapErrCases((matcher) =>
+          matcher
+            .with(P.tag("UniqueConstraintViolation"), () => "conflict" as const)
+            .with(P.tag("ForeignKeyViolation"), () => "bad-reference" as const)
+            .with(P.tag("RecordNotFound"), () => "missing" as const),
+        ),
+    ).toBeErrWith("missing");
+  });
+
+  // A malformed query is a BUG, not an anticipated outcome — `Prisma.Exact`
+  // rejects it in typed code, so reaching it means the types were cast away.
+  it("routes a malformed query (a Prisma validation error) to the DEFECT channel", async ({
+    db,
+  }) => {
+    await expect(db.user.tryFindMany({ where: { bogus: true } } as never)).toBeDefect();
   });
 
   it("updates, deletes, and counts through the bridge", async ({ db }) => {
@@ -232,12 +277,10 @@ describe("$tryTransaction", () => {
     await expect(db.user.tryCount()).toBeOkWith(0);
   });
 
-  it("a callback that THROWS (instead of returning an AsyncResult) is a defect, not a DriverError", async ({
-    db,
-  }) => {
+  it("a callback that THROWS (instead of returning an AsyncResult) is a defect", async ({ db }) => {
     // The throw bypasses every combinator (no AsyncResult exists yet), so it
     // reaches the transaction boundary raw. A bug must stay a defect — never
-    // be downgraded to a modeled DriverError.
+    // be downgraded into the modeled error channel.
     await expect(
       db.$tryTransaction(() => {
         throw new Error("sync callback bug");
@@ -252,7 +295,7 @@ describe("$tryTransaction", () => {
     // Out of contract: the callback resolves to `42` instead of a Result.
     // Dispatching on `result.isOk` would then throw a TypeError OUTSIDE the
     // sentinel try/catch, reject the transaction with a non-Rollback cause,
-    // and be downgraded into a modeled DriverError. A bug must stay a defect
+    // and be downgraded into the modeled error channel. A bug must stay a defect
     // — and the write made before the rogue return must be rolled back.
     const rogue = (async (tx: { user: { tryCreate: (args: unknown) => PromiseLike<unknown> } }) => {
       await tx.user.tryCreate({ data: { email: "rogue@example.com" } });
@@ -274,7 +317,7 @@ describe("$tryTransaction", () => {
     ).toBeErrTagged("UniqueConstraintViolation");
   });
 
-  it("qualifies a transaction-level failure (commit after timeout) as DriverError", async ({
+  it("routes a transaction-level failure (commit after timeout) to the defect channel", async ({
     db,
   }) => {
     // The callback outlives the transaction timeout WITHOUT touching `tx`, so the
@@ -284,7 +327,7 @@ describe("$tryTransaction", () => {
         () => fromSafePromise(new Promise((resolve) => setTimeout(resolve, 100))).map(() => "ok"),
         { timeout: 10 },
       ),
-    ).toBeErrTagged("DriverError");
+    ).toBeDefect();
   });
 });
 
@@ -356,7 +399,7 @@ describe("tryPaginate / withCursor", () => {
     ]);
   });
 
-  // The fix carried over from deptyped/prisma-extension-pagination#36 (#35):
+  // The fix carried over from deptyped/prisma-extension-pagination#35:
   // when the AFTER cursor row was mutated and no longer matches the filter, the
   // first element of the page must NOT be skipped.
   it("does not skip the first element when the after cursor no longer matches the filter", async ({
@@ -419,20 +462,56 @@ describe("tryPaginate / withCursor", () => {
     ]);
   });
 
-  it("surfaces a default cursor over a selection without id as DriverError", async ({
+  // `getCursor` reads rows WE fetched, so a throw there is a bug in the caller's
+  // selection, not bad input from a client — the defect channel, not InvalidCursor.
+  it("routes a default cursor over a selection without id to the DEFECT channel", async ({
     seededDb: db,
   }) => {
     await expect(
       db.user.tryPaginate({ select: { email: true } }).withCursor({ limit: 2 }),
-    ).toBeErrTagged("DriverError");
+    ).toBeDefect();
   });
 
-  it("surfaces a malformed cursor as DriverError", async ({ seededDb: db }) => {
+  // The pagination carve-out. Prisma rejects this with a
+  // PrismaClientValidationError, which the `try*` surface routes to the DEFECT
+  // channel — but here the cursor is an OPAQUE STRING from the outside world, so
+  // a client sending garbage is anticipated input, not a bug. It must stay a
+  // modeled Err the caller can turn into a 400.
+  it("models a malformed cursor as InvalidCursor, not a defect", async ({ seededDb: db }) => {
     // Default parseCursor keeps a non-numeric cursor as a string — invalid for
     // this model's Int id, so Prisma rejects it.
     await expect(
       db.user.tryPaginate({ orderBy: { id: "asc" } }).withCursor({ limit: 2, after: "not-an-id" }),
-    ).toBeErrTagged("DriverError");
+    ).toBeErrTagged("InvalidCursor");
+  });
+
+  // The other half of the carve-out: the caller's own `parseCursor` rejecting a
+  // client-supplied string is the same anticipated bad input.
+  it("models a throwing parseCursor on a request cursor as InvalidCursor", async ({
+    seededDb: db,
+  }) => {
+    await expect(
+      db.user.tryPaginate({ orderBy: { id: "asc" } }).withCursor({
+        limit: 2,
+        after: "garbage",
+        parseCursor: (cursor) => {
+          throw new Error(`unparseable: ${cursor}`);
+        },
+      }),
+    ).toBeErrTagged("InvalidCursor");
+  });
+
+  // ...but the SAME throw while re-parsing a cursor we generated ourselves is a
+  // bug in the caller's cursor functions, and stays a defect.
+  it("routes a throwing getCursor to the DEFECT channel", async ({ seededDb: db }) => {
+    await expect(
+      db.user.tryPaginate({ orderBy: { id: "asc" } }).withCursor({
+        limit: 2,
+        getCursor: () => {
+          throw new Error("no cursor for this row");
+        },
+      }),
+    ).toBeDefect();
   });
 
   // The `before` + `limit: null` combination is typed away at the public
@@ -576,9 +655,19 @@ describe("qualifyPrismaError", () => {
       ...(meta ? { meta } : {}),
     });
 
+  // Stands in for the `defect` helper a boundary injects: a distinguishable
+  // marker, so a test can tell "routed to the defect channel" from "mapped".
+  const DEFECTED = Symbol("defected");
+  const defect = (cause: unknown) => ({ [DEFECTED]: cause }) as const;
+  const qualify = (cause: unknown) => qualifyPrismaError(cause, defect);
+
+  // A Prisma error class the extension recognizes by `name` alone (the runtime
+  // module path moves between Prisma majors, so `instanceof` is not an option).
+  const named = (name: string) => Object.assign(new Error("boom"), { name });
+
   it("maps P2002 to UniqueConstraintViolation with the offending fields", () => {
     const cause = known("P2002", { target: ["email"] });
-    expect(qualifyPrismaError(cause)).toEqual(
+    expect(qualify(cause)).toEqual(
       expect.objectContaining({ _tag: "UniqueConstraintViolation", fields: ["email"], cause }),
     );
   });
@@ -587,13 +676,13 @@ describe("qualifyPrismaError", () => {
     const cause = known("P2002", {
       driverAdapterError: { cause: { constraint: { fields: ["email"] } } },
     });
-    expect(qualifyPrismaError(cause)).toEqual(
+    expect(qualify(cause)).toEqual(
       expect.objectContaining({ _tag: "UniqueConstraintViolation", fields: ["email"], cause }),
     );
   });
 
   it("maps P2002 without a target to an empty field list", () => {
-    expect(qualifyPrismaError(known("P2002"))).toEqual(
+    expect(qualify(known("P2002"))).toEqual(
       expect.objectContaining({ _tag: "UniqueConstraintViolation", fields: [] }),
     );
   });
@@ -604,36 +693,40 @@ describe("qualifyPrismaError", () => {
     { driverAdapterError: { cause: { constraint: "junk" } } },
     { driverAdapterError: { cause: { constraint: { fields: "email" } } } },
   ])("maps P2002 with a malformed meta (%j) to an empty field list", (meta) => {
-    expect(qualifyPrismaError(known("P2002", meta))).toEqual(
+    expect(qualify(known("P2002", meta))).toEqual(
       expect.objectContaining({ _tag: "UniqueConstraintViolation", fields: [] }),
     );
   });
 
   it("maps P2003 to ForeignKeyViolation", () => {
     const cause = known("P2003");
-    expect(qualifyPrismaError(cause)).toEqual(
-      expect.objectContaining({ _tag: "ForeignKeyViolation", cause }),
-    );
+    expect(qualify(cause)).toEqual(expect.objectContaining({ _tag: "ForeignKeyViolation", cause }));
   });
 
-  it("maps P2025 to RecordNotFound", () => {
-    const cause = known("P2025");
-    expect(qualifyPrismaError(cause)).toEqual(
-      expect.objectContaining({ _tag: "RecordNotFound", cause }),
-    );
-  });
+  it.each(["P2025", "P2018"])(
+    "maps %s to RecordNotFound (the to-one and to-many sides of the same failure)",
+    (code) => {
+      const cause = known(code);
+      expect(qualify(cause)).toEqual(expect.objectContaining({ _tag: "RecordNotFound", cause }));
+    },
+  );
 
-  it("maps an unhandled P-code to DriverError", () => {
-    const cause = known("P2024");
-    expect(qualifyPrismaError(cause)).toEqual(
-      expect.objectContaining({ _tag: "DriverError", cause }),
-    );
-  });
-
-  it("maps a non-Prisma rejection to DriverError, preserving the cause", () => {
-    const cause = new Error("socket hang up");
-    expect(qualifyPrismaError(cause)).toEqual(
-      expect.objectContaining({ _tag: "DriverError", cause }),
-    );
+  // Thesis #1: `E` lists only the failures a caller branches on. Everything
+  // infrastructural takes the defect channel — nobody writes domain logic for a
+  // dropped connection, they log it and 500, which is what `match`'s `defect`
+  // arm already does.
+  it.each([
+    ["a connection-pool timeout", () => known("P2024")],
+    ["a write conflict / deadlock", () => known("P2034")],
+    ["an unreachable database server", () => known("P1001")],
+    ["any other unmapped P-code", () => known("P2021")],
+    ["a malformed query", () => named("PrismaClientValidationError")],
+    ["a client that could not start", () => named("PrismaClientInitializationError")],
+    ["an engine panic", () => named("PrismaClientRustPanicError")],
+    ["an unknown request error", () => named("PrismaClientUnknownRequestError")],
+    ["a non-Prisma rejection", () => new Error("socket hang up")],
+  ])("routes %s to the DEFECT channel, not to E", (_label, make) => {
+    const cause = make();
+    expect(qualify(cause)).toEqual(defect(cause));
   });
 });

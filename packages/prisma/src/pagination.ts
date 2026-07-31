@@ -26,6 +26,9 @@ export type CursorPaginationMeta = {
  * Options of `withCursor`, in the style of `prisma-extension-pagination`.
  *
  * @remarks
+ * `after` and `before` are mutually exclusive — a page runs in one direction,
+ * and passing both used to silently drop `after`. Pick a direction.
+ *
  * `limit: null` returns everything (from the `after` cursor when given).
  * Combining `limit: null` with `before` is a compile error — "everything
  * before the cursor, backwards, unbounded" is not something Prisma's negative
@@ -42,8 +45,6 @@ export type CursorPaginationMeta = {
  * @typeParam Cursor - the model's `cursor` input (its unique-where shape).
  */
 export type CursorPaginationOptions<Row, Cursor> = {
-  /** An opaque cursor: results strictly AFTER this record. */
-  after?: string;
   /** Serialize a row into an opaque cursor. Defaults to `String(row.id)`. */
   getCursor?: (row: Row) => string;
   /** Parse an opaque cursor back into the model's `cursor` input. */
@@ -52,12 +53,24 @@ export type CursorPaginationOptions<Row, Cursor> = {
   | {
       /** Page size. */
       limit: number;
+      /** An opaque cursor: results strictly AFTER this record. */
+      after?: string;
+      /** Cannot be combined with `after` — a page runs in one direction. */
+      before?: never;
+    }
+  | {
+      /** Page size. */
+      limit: number;
       /** An opaque cursor: results strictly BEFORE this record. */
       before?: string;
+      /** Cannot be combined with `before` — a page runs in one direction. */
+      after?: never;
     }
   | {
       /** `null` returns all results. Cannot be combined with `before`. */
       limit: null;
+      /** An opaque cursor: results strictly AFTER this record. */
+      after?: string;
       before?: never;
     }
 );
@@ -92,6 +105,26 @@ const defaultParseCursor = (cursor: string): unknown => {
   const n = Number(cursor);
   return { id: Number.isSafeInteger(n) ? n : BigInt(cursor) };
 };
+
+/**
+ * Sentinel marking a throw out of the caller's `parseCursor` on a **request**
+ * cursor — the one pagination failure caused by outside input rather than by
+ * our own code.
+ *
+ * @remarks
+ * It exists so the boundary can tell that case apart from an identical-looking
+ * throw out of `getCursor` (which reads rows the query just returned, so a
+ * failure there is a bug). Only the two request cursors — `after` / `before` —
+ * are wrapped; the round-trip parse inside `sameCursor` is not.
+ */
+export class CursorParseFailure extends Error {
+  constructor(
+    readonly cursor: string,
+    override readonly cause: unknown,
+  ) {
+    super("@unthrown/prisma: the cursor could not be parsed");
+  }
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
@@ -144,8 +177,20 @@ export const paginateWithCursor = async (
   const getCursor = (options.getCursor ?? defaultGetCursor) as (row: unknown) => string;
   const parseCursor = options.parseCursor ?? defaultParseCursor;
 
+  // The two cursors that came from OUTSIDE. A throw here is bad input, not a
+  // bug, so it is marked for the boundary to model as an InvalidCursor.
+  const parseRequestCursor = (cursor: string): unknown => {
+    try {
+      return parseCursor(cursor);
+    } catch (cause) {
+      throw new CursorParseFailure(cursor, cause);
+    }
+  };
+
   // Is this row the cursor row? Compared through the cursor round-trip, so it
-  // works for any serialization the caller chose.
+  // works for any serialization the caller chose. Deliberately NOT wrapped: this
+  // parses a cursor we just produced from a row we just fetched, so a throw is a
+  // bug in `getCursor` / `parseCursor`, and stays a defect.
   const sameCursor = (row: unknown, cursor: unknown): boolean =>
     cursorEquals(parseCursor(getCursor(row)), cursor);
 
@@ -154,7 +199,7 @@ export const paginateWithCursor = async (
   let hasNextPage = false;
 
   if (typeof before === "string") {
-    const cursor = parseCursor(before);
+    const cursor = parseRequestCursor(before);
     // Backwards from the cursor, over-fetched by two: one slot for the cursor
     // row itself (present only when it still matches the filter), one to know
     // whether a previous page exists. The forward probe answers hasNextPage —
@@ -174,7 +219,7 @@ export const paginateWithCursor = async (
     }
     hasNextPage = nextProbe.length > 0;
   } else if (typeof after === "string") {
-    const cursor = parseCursor(after);
+    const cursor = parseRequestCursor(after);
     // Forwards from the cursor, over-fetched by two (same slots as above,
     // mirrored). The backward probe answers hasPreviousPage.
     const [rows, previousProbe] = await Promise.all([

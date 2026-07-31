@@ -6,17 +6,19 @@
 // nothing is an unused local); `@ts-expect-error` guards the cases that must NOT
 // compile.
 
-import type { AsyncErrOf, AsyncOkOf } from "unthrown";
+import type { AsyncErrOf, AsyncOkOf, AsyncResult } from "unthrown";
+import { fromPromise } from "unthrown";
 
 import type { PrismaClient } from "./generated/prisma/client.ts";
 import type {
   CursorPaginationMeta,
-  DriverError,
+  InvalidCursor,
   ForeignKeyViolation,
+  PrismaQueryError,
   RecordNotFound,
   UniqueConstraintViolation,
 } from "./index.js";
-import { unthrownPrisma } from "./index.js";
+import { qualifyPrismaError, unthrownPrisma } from "./index.js";
 
 type Equal<X, Y> =
   (<T>() => T extends X ? 1 : 2) extends <T>() => T extends Y ? 1 : 2 ? true : false;
@@ -45,8 +47,10 @@ const createdRows = db.user.tryCreateManyAndReturn({
   data: [{ email: "a@example.com" }],
   select: { id: true },
 });
+const updated = db.user.tryUpdate({ where: { id: 1 }, data: { name: "x" } });
 const updatedMany = db.user.tryUpdateMany({ where: {}, data: { name: "x" } });
 const updatedRows = db.user.tryUpdateManyAndReturn({ data: { name: "x" }, select: { id: true } });
+const deleted = db.user.tryDelete({ where: { id: 1 } });
 const deletedMany = db.user.tryDeleteMany();
 const aggregated = db.user.tryAggregate({ _count: true });
 const grouped = db.user.tryGroupBy({ by: ["name"] });
@@ -56,6 +60,15 @@ selected.map((rows) => rows.map((r) => r.email));
 
 // @ts-expect-error — an unknown arg key is rejected (`Prisma.Exact`).
 db.user.tryFindMany({ bogus: true });
+
+// --- qualifyPrismaError drops straight into a boundary --------------------------
+
+// It IS a `qualify`: the boundary injects `defect`, and the Defect arm of its
+// return is subtracted from E — so the channel is exactly PrismaQueryError, with
+// no `Defect` leaking into it (E is covariant, so a stray `| Defect` would fail
+// this `satisfies`).
+declare const rawQuery: Promise<unknown>;
+fromPromise(rawQuery, qualifyPrismaError) satisfies AsyncResult<unknown, PrismaQueryError>;
 
 // --- the error channel is per-operation ----------------------------------------
 
@@ -73,6 +86,13 @@ db.user.tryPaginate({ take: 1 });
 db.user.tryPaginate({ cursor: { id: 1 } });
 // @ts-expect-error — `limit: null` cannot be combined with `before`.
 db.user.tryPaginate().withCursor({ limit: null, before: "1" });
+// @ts-expect-error — `after` and `before` are mutually exclusive; a page runs one way.
+db.user.tryPaginate().withCursor({ limit: 1, after: "1", before: "9" });
+
+// Each direction on its own is fine, with or without a bound.
+db.user.tryPaginate().withCursor({ limit: 1, after: "1" });
+db.user.tryPaginate().withCursor({ limit: 1, before: "9" });
+db.user.tryPaginate().withCursor({ limit: null, after: "1" });
 
 db.user.tryPaginate({ select: { id: true } }).withCursor({
   limit: 1,
@@ -117,48 +137,61 @@ export type _Assertions = [
   Expect<Equal<AsyncOkOf<typeof created>["email"], string>>,
   // reads fail only in the driver; writes carry their constraint violations;
   // `*OrThrow` adds P2025
-  Expect<Equal<AsyncErrOf<typeof all>, DriverError>>,
+  // a read has NO modeled failure: absence is `null`, and a database that will
+  // not answer is a defect
+  Expect<Equal<AsyncErrOf<typeof all>, never>>,
+  Expect<Equal<AsyncErrOf<typeof maybe>, never>>,
+  Expect<Equal<AsyncErrOf<typeof counted>, never>>,
+  // `create` carries RecordNotFound too: a nested `connect` to a row that does
+  // not exist raises P2025 even though a create misses no row of its own.
   Expect<
-    Equal<AsyncErrOf<typeof created>, UniqueConstraintViolation | ForeignKeyViolation | DriverError>
+    Equal<
+      AsyncErrOf<typeof created>,
+      UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound
+    >
   >,
-  Expect<Equal<AsyncErrOf<typeof fetched>, RecordNotFound | DriverError>>,
+  Expect<Equal<AsyncErrOf<typeof fetched>, RecordNotFound>>,
+  // the specific-row mutations: the missing row, plus what their SQL can raise
+  Expect<
+    Equal<
+      AsyncErrOf<typeof updated>,
+      RecordNotFound | UniqueConstraintViolation | ForeignKeyViolation
+    >
+  >,
+  Expect<Equal<AsyncErrOf<typeof deleted>, RecordNotFound | ForeignKeyViolation>>,
   // findFirst: selection narrows, a miss is `null`, and only OrThrow adds P2025
   Expect<Equal<AsyncOkOf<typeof first>, { id: number } | null>>,
-  Expect<Equal<AsyncErrOf<typeof first>, DriverError>>,
-  Expect<Equal<AsyncErrOf<typeof firstOrThrow>, RecordNotFound | DriverError>>,
-  // upsert never carries RecordNotFound — a miss creates
+  Expect<Equal<AsyncErrOf<typeof first>, never>>,
+  Expect<Equal<AsyncErrOf<typeof firstOrThrow>, RecordNotFound>>,
+  // upsert: a missing *target* is never an error (a miss creates), but a nested
+  // `connect` in either branch still raises RecordNotFound
   Expect<
     Equal<
       AsyncErrOf<typeof upserted>,
-      UniqueConstraintViolation | ForeignKeyViolation | DriverError
+      UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound
     >
   >,
-  // the batch mutations: counts / rows, and no P2025 in their unions
+  // the batch mutations: counts / rows, and genuinely no RecordNotFound — they
+  // accept no nested writes, and zero matches is `Ok({ count: 0 })`
   Expect<Equal<AsyncOkOf<typeof createdMany>["count"], number>>,
   Expect<Equal<AsyncOkOf<typeof createdRows>, { id: number }[]>>,
-  Expect<
-    Equal<
-      AsyncErrOf<typeof updatedMany>,
-      UniqueConstraintViolation | ForeignKeyViolation | DriverError
-    >
-  >,
+  Expect<Equal<AsyncErrOf<typeof createdMany>, UniqueConstraintViolation | ForeignKeyViolation>>,
+  Expect<Equal<AsyncErrOf<typeof createdRows>, UniqueConstraintViolation | ForeignKeyViolation>>,
+  Expect<Equal<AsyncErrOf<typeof updatedMany>, UniqueConstraintViolation | ForeignKeyViolation>>,
   Expect<Equal<AsyncOkOf<typeof updatedRows>, { id: number }[]>>,
-  Expect<Equal<AsyncErrOf<typeof deletedMany>, ForeignKeyViolation | DriverError>>,
-  // the aggregations are reads: DriverError only
-  Expect<Equal<AsyncErrOf<typeof aggregated>, DriverError>>,
-  Expect<Equal<AsyncErrOf<typeof grouped>, DriverError>>,
+  Expect<Equal<AsyncErrOf<typeof deletedMany>, ForeignKeyViolation>>,
+  // the aggregations are reads too
+  Expect<Equal<AsyncErrOf<typeof aggregated>, never>>,
+  Expect<Equal<AsyncErrOf<typeof grouped>, never>>,
   Expect<Equal<AsyncOkOf<typeof aggregated>["_count"], number>>,
   // pagination: the payload is the narrowed page + meta; the error is read-only
   Expect<Equal<AsyncOkOf<typeof paged>[0][number]["email"], string>>,
   Expect<Equal<AsyncOkOf<typeof paged>[1], CursorPaginationMeta>>,
-  Expect<Equal<AsyncErrOf<typeof paged>, DriverError>>,
+  Expect<Equal<AsyncErrOf<typeof paged>, InvalidCursor>>,
   Expect<Equal<AsyncOkOf<typeof pagedSelect>[0], { id: number }[]>>,
   // the transaction unions the callback's errors with the transaction's own
   Expect<
-    Equal<
-      AsyncErrOf<typeof tx>,
-      UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound | DriverError
-    >
+    Equal<AsyncErrOf<typeof tx>, UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound>
   >,
   Expect<Equal<AsyncOkOf<typeof tx>["email"], string>>,
 ];
