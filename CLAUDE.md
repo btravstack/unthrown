@@ -242,6 +242,21 @@ was planned).
   runtime belt-and-braces: a thenable slipped past the types becomes a
   `Defect` and its orphaned rejection is silenced (see Thesis #3). `match`
   handlers are deliberately exempt (edge elimination).
+- **A sync boundary's `fn` is sync too — enforced at RUNTIME, not by the
+  types.** `fromThrowable` / `fromSafeThrowable` wrap a synchronous function, so
+  they only ever see a synchronous `throw`: an `async` `fn` rejects long after
+  the boundary has returned, and its rejection can never reach `qualify`. Left
+  alone that produced `Ok(<Promise>)` — un-triaged — whose rejection then floated
+  as an unhandled rejection (process-fatal on Node by default). Both helpers now
+  probe the return value and mint a **`Defect`** for a thenable, adopting and
+  silencing the orphan — the sibling of `qualifyToResult`'s thenable-`qualify`
+  net. Deliberately **not** a compile error, unlike every other thenable ban:
+  `T & NotThenable<T>` on `fn`'s return makes a _generic_ function unassignable,
+  so `fromSafeThrowable(structuredClone)` would stop compiling with `T` collapsed
+  to `unknown` (the `fromPromise` phantom rest-tuple guard fares worse still).
+  The type therefore over-states the success channel — `Result<Promise<T>, E>` is
+  spellable but never inhabited — the mirror of `recoverErrCases`'s `never`
+  under-stating the error channel. Guarded in `interop.spec.ts`.
 - **Result instances are frozen — and so is the machinery around them.**
   `okRes`/`errRes`/`defectRes` return `Object.freeze`d objects, so a variant
   cannot be forged by mutation; the `readonly` types are real at runtime.
@@ -885,7 +900,12 @@ channel?**
    `toBeErr`, `toBeErrWith` (the error-value mirror of `toBeOkWith` — a deep
    compare of the `Err` value), `toBeErrTagged` (optional second arg also matches
    the tagged error's payload — exact for a plain object, partial for an
-   asymmetric matcher like `expect.objectContaining`), `toBeDefect`, registered
+   asymmetric matcher like `expect.objectContaining`; "payload" excludes
+   **every** key `TaggedError` reserves — `_tag`/`name`/`message`/`stack`, the
+   same list `TaggedErrorInstance` omits — because a subclass's documented
+   `override message = "…"` lands as an own **enumerable** property and would
+   otherwise leak into the exact form, breaking the very pattern Thesis #4
+   prescribes), `toBeDefect`, registered
    via `expect.extend`
    and augmenting Vitest's `Matchers` interface. They detect a thenable
    `AsyncResult` and await internally, so a test reads

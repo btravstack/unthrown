@@ -83,6 +83,27 @@ otherwise write out — an on-the-record "I decided this is all defects", not a
 convenience that quietly drops the triage. Keep `fromThrowable` / `fromPromise`
 wherever some failures are genuinely anticipated.
 
+## Sync boundaries are sync on both sides
+
+`fromThrowable` / `fromSafeThrowable` wrap a **synchronous** function, and that
+applies to `fn` as much as to `qualify`. A synchronous boundary only ever sees a
+synchronous `throw`, so an `async` `fn` rejects long after the boundary has
+returned — its rejection could never reach `qualify`. Rather than hand back an
+`Ok` wrapping a live promise whose rejection escapes triage (and then floats as an
+unhandled rejection), the boundary produces a **defect**:
+
+```ts
+const bad = fromSafeThrowable(async () => fetchUser(id));
+bad(); // => Defect(TypeError: … `fn` returned a thenable …)
+
+const good = fromSafePromise(() => fetchUser(id)); // AsyncResult<User, never>
+```
+
+Reach for `fromPromise` / `fromSafePromise` for async work. (This one is caught at
+runtime rather than by the type system: banning a thenable return at compile time
+would also reject generic functions, so `fromSafeThrowable(structuredClone)` would
+stop compiling.)
+
 ## The payoff
 
 Because every boundary is qualified and every in-pipeline throw becomes a defect,

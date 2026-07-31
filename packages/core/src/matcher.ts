@@ -242,9 +242,14 @@ export class NonExhaustiveError extends Error {
   /** The value no arm matched. */
   readonly input: unknown;
   constructor(input: unknown) {
-    let printed: string;
+    let printed: string | undefined;
     try {
-      printed = JSON.stringify(input);
+      // `JSON.stringify` RETURNS undefined (it does not throw) for a function, a
+      // symbol, or `undefined` — so `?? String(input)` is load-bearing, not
+      // belt-and-braces: without it the message reads "the value undefined" for
+      // exactly the rogue inputs this error exists to describe. The `catch` is
+      // for the inputs that genuinely throw (a bigint, a circular object).
+      printed = JSON.stringify(input) ?? String(input);
     } catch {
       printed = String(input);
     }

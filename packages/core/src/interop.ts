@@ -60,6 +60,11 @@ export function fromNullable<T, E>(
  * — and a thenable slipped past the types at runtime becomes a `Defect` (never
  * an `Err(Promise)`), its orphaned rejection silenced.
  *
+ * `fn` is **synchronous** too. An `async` `fn` rejects *after* this boundary has
+ * already returned, so its rejection could never reach `qualify`: it becomes a
+ * `Defect` (never `Ok(<Promise>)`) and the orphaned rejection is silenced rather
+ * than left to float. Reach for {@link fromPromise} to wrap async work.
+ *
  * The modeled error type is `Exclude<R, Defect>` — the `Defect` arm of
  * `qualify`'s return is **subtracted** from `E`, never inferred into it. So a
  * `qualify` that returns *only* `defect(cause)` yields `E = never` (a Defect is
@@ -100,7 +105,8 @@ export function fromThrowable<A extends unknown[], T, R>(
   const triage = qualify as (cause: unknown, defect: (cause: unknown) => Defect) => E | Defect;
   return (...args: A): Result<T, E> => {
     try {
-      return Ok(fn(...args)) as Result<T, E>;
+      const value = fn(...args);
+      return isThenable(value) ? thenableReturnDefect<T, E>(value) : (Ok(value) as Result<T, E>);
     } catch (cause) {
       return qualifyToResult<T, E>(cause, triage);
     }
@@ -117,6 +123,10 @@ export function fromThrowable<A extends unknown[], T, R>(
  * error channel is `never`, so there is nothing to triage; there is no
  * `qualify`. When some throws *are* anticipated, reach for
  * {@link fromThrowable} and triage them.
+ *
+ * `fn` is **synchronous**: an `async` `fn` becomes a `Defect` (never
+ * `Ok(<Promise>)`), with its orphaned rejection silenced rather than left to
+ * float. Reach for {@link fromSafePromise} to wrap async work.
  *
  * @typeParam A - the wrapped function's argument tuple.
  * @typeParam T - the wrapped function's return type.
@@ -141,7 +151,8 @@ export function fromSafeThrowable<A extends unknown[], T>(
 ): (...args: A) => Result<T, never> {
   return (...args: A): Result<T, never> => {
     try {
-      return Ok(fn(...args));
+      const value = fn(...args);
+      return isThenable(value) ? thenableReturnDefect<T, never>(value) : Ok(value);
     } catch (cause) {
       return defectRes<T, never>(cause);
     }
@@ -292,7 +303,38 @@ function qualifyToResult<T, E>(
 }
 
 /**
- * Runtime thenable probe for the belt-and-braces guard above. Called inside the
+ * The Defect minted when a **synchronous** boundary's `fn` returns a thenable —
+ * i.e. an `async` function was handed to {@link fromThrowable} /
+ * {@link fromSafeThrowable}.
+ *
+ * @remarks
+ * This is the sibling of the thenable-`qualify` net in {@link qualifyToResult},
+ * and it closes a strictly worse hole. A synchronous boundary only ever sees a
+ * synchronous `throw`, so an async `fn`'s rejection never reaches `qualify` at
+ * all: it would sit inside `Ok(<Promise>)`, un-triaged, and then float as an
+ * unhandled rejection — which terminates the process on Node by default.
+ *
+ * Unlike the combinator callbacks, this cannot be banned at compile time
+ * without collateral damage: `T & NotThenable<T>` on `fn`'s return makes a
+ * **generic** function unassignable, so `fromSafeThrowable(structuredClone)`
+ * stops compiling and `T` collapses to `unknown`. (The phantom rest-tuple guard
+ * `fromPromise` uses fares worse.) So the ban is enforced here, at runtime,
+ * where it costs nothing: a Defect, plus adopt-and-silence so the orphaned
+ * rejection cannot float.
+ *
+ * @internal
+ */
+function thenableReturnDefect<T, E>(value: unknown): Result<T, E> {
+  void Promise.resolve(value).then(undefined, () => undefined);
+  return defectRes<T, E>(
+    new TypeError(
+      "unthrown: fromThrowable/fromSafeThrowable wrap a SYNCHRONOUS function, but `fn` returned a thenable — its rejection would escape qualification. Use fromPromise/fromSafePromise instead.",
+    ),
+  );
+}
+
+/**
+ * Runtime thenable probe for the belt-and-braces guards above. Called inside the
  * caller's `try`, so even a hostile `.then` getter lands on the Defect path.
  *
  * @internal

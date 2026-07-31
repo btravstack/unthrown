@@ -39,15 +39,30 @@ function render(result: SomeResult, stringify: Stringify): string {
   /* v8 ignore stop */
 }
 
-// The "payload" of a TaggedError: its own enumerable properties minus the
-// `_tag` discriminant and the `name` (both set by TaggedError itself, not by
-// you). This is the data you passed to the constructor, so `toBeErrTagged`'s
-// optional second argument matches it: a plain object asserts it exactly, and an
-// asymmetric matcher (e.g. `expect.objectContaining(...)`) asserts it partially.
+// The keys `TaggedError` RESERVES — never payload, so never part of what
+// `toBeErrTagged`'s second argument asserts. This mirrors the reservation
+// exactly: `TaggedErrorInstance` is `Omit<A, "name" | "message" | "stack">` and
+// the constructor types all three `?: never`, so none of them can legitimately
+// be payload.
+//
+// `message` is the one that bites. The documented way to set it is a subclass
+// field — `override message = "…"` — which lands as an OWN ENUMERABLE property,
+// so `Object.keys` sees it and an exact payload assertion
+// (`toBeErrTagged("HttpError", { status: 500 })`) would fail on the very pattern
+// the library prescribes. (`stack` is already invisible here — the constructor
+// re-defines it non-enumerable — but it is listed so this set is the
+// reservation list, not a subset that happens to work.)
+const RESERVED_KEYS: ReadonlySet<string> = new Set(["_tag", "name", "message", "stack"]);
+
+// The "payload" of a TaggedError: its own enumerable properties minus the keys
+// TaggedError owns. This is the data you passed to the constructor, so
+// `toBeErrTagged`'s optional second argument matches it: a plain object asserts
+// it exactly, and an asymmetric matcher (e.g. `expect.objectContaining(...)`)
+// asserts it partially.
 function payloadOf(error: object): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const key of Object.keys(error)) {
-    if (key !== "_tag" && key !== "name") out[key] = (error as Record<string, unknown>)[key];
+    if (!RESERVED_KEYS.has(key)) out[key] = (error as Record<string, unknown>)[key];
   }
   return out;
 }
@@ -367,8 +382,10 @@ export type UnthrownMatchers<R = unknown> = {
   toBeErr: () => R;
   /**
    * Assert an `Err` whose error has `_tag === tag`. Optionally pass `expected`
-   * to also match the error's payload (its own props minus `_tag`/`name`): a
-   * plain object matches exactly, an asymmetric matcher (e.g.
+   * to also match the error's payload — its own props minus the keys
+   * `TaggedError` reserves (`_tag`, `name`, `message`, `stack`), so a subclass's
+   * `override message = "…"` does not leak into an exact assertion. A plain
+   * object matches exactly, an asymmetric matcher (e.g.
    * `expect.objectContaining(...)`) matches partially. An explicitly-passed
    * `undefined` asserts the payload equals `undefined` (it does not degrade
    * to tag-only).

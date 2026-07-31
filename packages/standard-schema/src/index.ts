@@ -14,7 +14,7 @@
 //   parseUser(input); // Result<{ id: string }, readonly StandardSchemaV1.Issue[]>
 
 import type { StandardSchemaV1 } from "@standard-schema/spec";
-import { Err, fromSafePromise, fromThrowable, Ok } from "unthrown";
+import { Err, fromSafePromise, fromSafeThrowable, Ok } from "unthrown";
 import type { AsyncResult, Result } from "unthrown";
 
 /** The error channel both entry points produce: a schema's validation issues. */
@@ -65,25 +65,34 @@ export function fromSchema<S extends StandardSchemaV1>(
 ): (input: unknown) => Result<StandardSchemaV1.InferOutput<S>, SchemaIssues> {
   type Output = StandardSchemaV1.InferOutput<S>;
   // Run `validate` at a boundary so a *throwing* validator lands in the Defect
-  // channel instead of escaping; `qualify` only ever mints a Defect, so E = never.
-  const validate = fromThrowable(
-    (input: unknown) => schema["~standard"].validate(input),
-    (cause, defect) => defect(cause),
-  );
+  // channel instead of escaping.
+  //
+  // The return is BOXED deliberately. A Standard Schema may legitimately
+  // validate asynchronously, and `fromSafeThrowable` (rightly) turns a thenable
+  // return into a Defect — a synchronous boundary cannot qualify a rejection.
+  // But here an async schema is a *usage* error with its own actionable message,
+  // not an anonymous defect, so the thenable has to reach the check below rather
+  // than being swallowed. Wrapping it in an object keeps the boundary's value
+  // non-thenable while still catching a throwing validator.
+  const validate = fromSafeThrowable((input: unknown) => ({
+    returned: schema["~standard"].validate(input) as
+      | StandardSchemaV1.Result<Output>
+      | PromiseLike<StandardSchemaV1.Result<Output>>,
+  }));
   return (input) => {
     const settled = validate(input);
     // An async schema can't be represented synchronously — fail loud and early.
-    if (settled.isOk() && isThenable(settled.value)) {
+    if (settled.isOk() && isThenable(settled.value.returned)) {
       // The in-flight validation promise is deliberately dropped — adopt its
       // eventual rejection (if any) so a validator that later fails cannot
       // fire as an unhandled rejection after this throw.
-      Promise.resolve(settled.value).then(undefined, () => {});
+      Promise.resolve(settled.value.returned).then(undefined, () => {});
       throw new TypeError(
         "@unthrown/standard-schema: this schema validates asynchronously — use fromSchemaAsync instead.",
       );
     }
-    return settled.flatMap((result) => {
-      const sync = result as StandardSchemaV1.Result<Output>;
+    return settled.flatMap((box) => {
+      const sync = box.returned as StandardSchemaV1.Result<Output>;
       return sync.issues ? Err(sync.issues) : Ok(sync.value);
     });
   };
