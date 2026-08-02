@@ -11,8 +11,8 @@ import {
   OkAsync,
   type Result,
 } from "./index.js";
+import { boom, expectErr, expectOk } from "./test-helpers.js";
 
-const boom = new Error("boom");
 const asyncOk = <T>(v: T): AsyncResult<T, never> => Ok(v).toAsync();
 const asyncErr = <E>(e: E): AsyncResult<never, E> => Err(e).toAsync();
 const asyncDefect = (): AsyncResult<number, never> =>
@@ -64,15 +64,13 @@ describe("AsyncResult is awaitable and never rejects", () => {
 
   it("fromPromise: a resolved value becomes Ok (promise and thunk forms)", async () => {
     const r1 = await fromPromise(Promise.resolve(5), (c) => c as string);
-    expect(r1.isOk()).toBe(true);
-    if (r1.isOk()) expect(r1.value).toBe(5);
+    expectOk(r1, 5);
 
     const r2 = await fromPromise(
       () => Promise.resolve(6),
       (c) => c as string,
     );
-    expect(r2.isOk()).toBe(true);
-    if (r2.isOk()) expect(r2.value).toBe(6);
+    expectOk(r2, 6);
   });
 });
 
@@ -143,8 +141,7 @@ describe("AsyncResult success channel", () => {
 
   it("flatTap short-circuits to the effect's Err", async () => {
     const r = await asyncOk(5).flatTap(() => Err("denied"));
-    expect(r.isErr()).toBe(true);
-    if (r.isErr()) expect(r.error).toBe("denied");
+    expectErr(r, "denied");
   });
 
   it("flatTap composes an async effect via a qualified boundary, keeping the value", async () => {
@@ -172,8 +169,7 @@ describe("AsyncResult success channel", () => {
       (n) => n > 0,
       (n) => `neg:${n}`,
     );
-    expect(r.isErr()).toBe(true);
-    if (r.isErr()) expect(r.error).toBe("neg:-2");
+    expectErr(r, "neg:-2");
   });
 
   it("ensure refines the success type with a type-guard predicate", async () => {
@@ -222,16 +218,14 @@ describe("AsyncResult success channel", () => {
   it("as replaces the Ok value, and passes Err/Defect through", async () => {
     expect((await asyncOk(1).as("x")).get()).toBe("x");
     const r = await asyncErr("e").as("x");
-    expect(r.isErr()).toBe(true);
-    if (r.isErr()) expect(r.error).toBe("e");
+    expectErr(r, "e");
     expect((await asyncDefect().as("x")).isDefect()).toBe(true);
   });
 
   it("discard drops the Ok value, and passes Err/Defect through", async () => {
     expect((await asyncOk(1).discard()).get()).toBeUndefined();
     const r = await asyncErr("e").discard();
-    expect(r.isErr()).toBe(true);
-    if (r.isErr()) expect(r.error).toBe("e");
+    expectErr(r, "e");
     expect((await asyncDefect().discard()).isDefect()).toBe(true);
   });
 });
@@ -432,11 +426,9 @@ describe("AsyncResult Defect channel", () => {
   it("recoverDefect passes Ok and Err through and does not call the callback", async () => {
     const f = vi.fn();
     const okR = await asyncOk(1).recoverDefect(f);
-    expect(okR.isOk()).toBe(true);
-    if (okR.isOk()) expect(okR.value).toBe(1);
+    expectOk(okR, 1);
     const errR = await asyncErr("e").recoverDefect(f);
-    expect(errR.isErr()).toBe(true);
-    if (errR.isErr()) expect(errR.error).toBe("e");
+    expectErr(errR, "e");
     expect(f).not.toHaveBeenCalled();
   });
 

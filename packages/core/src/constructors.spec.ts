@@ -13,12 +13,7 @@ import {
   type Result,
   GetError,
 } from "./index.js";
-
-const boom = new Error("boom");
-const defectOf = (cause: unknown): Result<number, never> =>
-  Ok(0).map<number>(() => {
-    throw cause;
-  });
+import { boom, defectOf } from "./test-helpers.js";
 
 describe("constructors", () => {
   it("Ok wraps a value in the success channel", () => {
