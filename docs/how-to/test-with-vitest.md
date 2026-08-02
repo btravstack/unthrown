@@ -62,7 +62,10 @@ import { expect } from "vitest";
 class NotFound extends TaggedError("NotFound")<{ id: number; msg: string }> {}
 
 // exact — every payload field must match
-expect(Err(new NotFound({ id: 1, msg: "nope" }))).toBeErrTagged("NotFound", { id: 1, msg: "nope" });
+expect(Err(new NotFound({ id: 1, msg: "nope" }))).toBeErrTagged("NotFound", {
+  id: 1,
+  msg: "nope",
+});
 
 // partial — only the listed fields are checked
 expect(Err(new NotFound({ id: 1, msg: "nope" }))).toBeErrTagged(
@@ -81,7 +84,9 @@ class HttpError extends TaggedError("HttpError")<{ status: number }> {
 }
 
 // the payload is `{ status }` — the message is not part of it
-expect(Err(new HttpError({ status: 500 }))).toBeErrTagged("HttpError", { status: 500 });
+expect(Err(new HttpError({ status: 500 }))).toBeErrTagged("HttpError", {
+  status: 500,
+});
 ```
 
 ## Async results — `await` is required

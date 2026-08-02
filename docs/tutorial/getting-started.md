@@ -97,7 +97,9 @@ const message = parseAge("-3").match({
   // `errCases` receives an exhaustive matcher — one branch per error. It
   // matches plain strings too (no tag required), and a missing case won't compile.
   errCases: (matcher) =>
-    matcher.with("negative", () => "must be positive").with("not_a_number", () => "not a number"),
+    matcher
+      .with("negative", () => "must be positive")
+      .with("not_a_number", () => "not a number"),
   defect: (cause) => {
     console.error(cause); // a bug slipped through — log it, don't leak it
     return "something went wrong";

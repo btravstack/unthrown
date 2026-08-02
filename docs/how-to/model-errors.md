@@ -38,7 +38,9 @@ it's reserved (a payload `message` is a compile error, like `name` and `stack`).
 Set it the standard way, **once per subclass**, with `override message`:
 
 ```ts
-class TicketNotFound extends TaggedError("TicketNotFound")<{ ticketId: string }> {
+class TicketNotFound extends TaggedError("TicketNotFound")<{
+  ticketId: string;
+}> {
   override message = "ticket not found";
 }
 
@@ -49,7 +51,10 @@ The field may interpolate the payload via `this` — the base populates the payl
 fields before the subclass field initialiser runs:
 
 ```ts
-class InvalidState extends TaggedError("InvalidState")<{ got: string; want: string }> {
+class InvalidState extends TaggedError("InvalidState")<{
+  got: string;
+  want: string;
+}> {
   override message = `expected ${this.want}, got ${this.got}`;
 }
 ```

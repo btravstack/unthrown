@@ -71,7 +71,9 @@ const profile = await Do()
       c instanceof MissingRowError ? new UserNotFound() : defect(c),
     ),
   )
-  .bind("posts", ({ user }) => fromPromise(fetchPosts(user.id), (c, defect) => defect(c)))
+  .bind("posts", ({ user }) =>
+    fromPromise(fetchPosts(user.id), (c, defect) => defect(c)),
+  )
   .let("count", ({ posts }) => posts.length)
   .match({
     ok: (s) => s,

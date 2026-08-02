@@ -97,7 +97,9 @@ Two honest options:
 ```ts
 // Model it yourself — a small discriminated union, matchable natively
 type ItemState =
-  { tag: "NotAsked" } | { tag: "Loading" } | { tag: "Done"; result: Result<Item, FetchFailed> };
+  | { tag: "NotAsked" }
+  | { tag: "Loading" }
+  | { tag: "Done"; result: Result<Item, FetchFailed> };
 ```
 
 or keep using Boxed's `AsyncData` for view state while the data layer speaks

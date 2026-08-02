@@ -120,7 +120,10 @@ Result.all([Result.Ok(1), Result.Ok(2)]);
 
 // AsyncResult.* — everything that yields an AsyncResult
 await AsyncResult.fromPromise(fetchUser(id), (c, defect) => defect(c));
-await AsyncResult.all([AsyncResult.fromSafePromise(loadA()), AsyncResult.fromSafePromise(loadB())]);
+await AsyncResult.all([
+  AsyncResult.fromSafePromise(loadA()),
+  AsyncResult.fromSafePromise(loadB()),
+]);
 ```
 
 The free functions remain the primary, tree-shakeable API; the companions are an
@@ -152,7 +155,9 @@ rules, inputs resolved concurrently (order preserved), and (like every
 ```ts
 import { allAsync, fromSafePromise } from "unthrown";
 
-const [a, b] = (await allAsync([fromSafePromise(loadA()), fromSafePromise(loadB())])).get();
+const [a, b] = (
+  await allAsync([fromSafePromise(loadA()), fromSafePromise(loadB())])
+).get();
 ```
 
 ## Interop constructors

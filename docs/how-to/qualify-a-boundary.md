@@ -104,7 +104,8 @@ import { fromNullable, TaggedError } from "unthrown";
 
 class NotFound extends TaggedError("NotFound")<{ id: string }> {}
 
-const fromCache = (id: string) => fromNullable(cache.get(id), () => new NotFound({ id }));
+const fromCache = (id: string) =>
+  fromNullable(cache.get(id), () => new NotFound({ id }));
 
 fromCache("u_1").map((p) => p.name); // Result<string, NotFound>
 ```
@@ -122,7 +123,9 @@ class InvalidProfile extends TaggedError("InvalidProfile")<{ field: string }> {}
 const parseProfile = fromThrowable(
   (raw: string) => JSON.parse(raw) as Profile,
   (cause, defect) =>
-    cause instanceof SyntaxError ? new InvalidProfile({ field: "json" }) : defect(cause),
+    cause instanceof SyntaxError
+      ? new InvalidProfile({ field: "json" })
+      : defect(cause),
 );
 
 parseProfile('{"name":"Ada"}'); // Result<Profile, InvalidProfile>

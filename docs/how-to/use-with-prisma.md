@@ -165,9 +165,15 @@ transaction client `tx`:
 ```ts
 const moved = db.$tryTransaction((tx) =>
   tx.account
-    .tryUpdate({ where: { id: from }, data: { balance: { decrement: amount } } })
+    .tryUpdate({
+      where: { id: from },
+      data: { balance: { decrement: amount } },
+    })
     .flatMap(() =>
-      tx.account.tryUpdate({ where: { id: to }, data: { balance: { increment: amount } } }),
+      tx.account.tryUpdate({
+        where: { id: to },
+        data: { balance: { increment: amount } },
+      }),
     ),
 );
 //    ^? AsyncResult<Account, RecordNotFound | UniqueConstraintViolation | ForeignKeyViolation>
@@ -197,8 +203,10 @@ const page = await db.user
 //    ^? Result<[User[], CursorPaginationMeta], InvalidCursor>
 
 page.match({
-  ok: ([users, meta]) => json({ users, nextCursor: meta.endCursor, hasMore: meta.hasNextPage }),
-  errCases: (matcher) => matcher.with(P.tag("InvalidCursor"), () => badRequest("bad cursor")),
+  ok: ([users, meta]) =>
+    json({ users, nextCursor: meta.endCursor, hasMore: meta.hasNextPage }),
+  errCases: (matcher) =>
+    matcher.with(P.tag("InvalidCursor"), () => badRequest("bad cursor")),
   defect: serverError,
 });
 ```

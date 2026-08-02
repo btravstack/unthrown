@@ -70,11 +70,14 @@ function validateSignup(input: unknown): ValidationResult {
       // oxlint-disable-next-line unthrown/no-catch-all-pattern -- E is a single issues array, not a union
       matcher.with(P._, (issues) => ({
         ok: false as const,
-        fieldErrors: issues.reduce<Record<string, string[]>>((byField, issue) => {
-          const field = fieldOf(issue);
-          (byField[field] ??= []).push(issue.message);
-          return byField;
-        }, {}),
+        fieldErrors: issues.reduce<Record<string, string[]>>(
+          (byField, issue) => {
+            const field = fieldOf(issue);
+            (byField[field] ??= []).push(issue.message);
+            return byField;
+          },
+          {},
+        ),
       })),
     defect: (cause) => {
       logger.error(cause); // the validator itself threw — a real bug, not a bad form

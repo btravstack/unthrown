@@ -160,7 +160,12 @@ import { P } from "unthrown";
 
 // log whatever the error is, then let it flow through unchanged
 loadUser(id).tapErrCases((matcher) =>
-  matcher.with(P.tag("NotFound"), P.tag("Forbidden"), P.tag("Unavailable"), (e) => logger.error(e)),
+  matcher.with(
+    P.tag("NotFound"),
+    P.tag("Forbidden"),
+    P.tag("Unavailable"),
+    (e) => logger.error(e),
+  ),
 );
 ```
 
@@ -233,13 +238,17 @@ Use this table to move between the two:
 const status = await findUser(id) // Result<User, NotFound>  (sync)
   .toAsync() // AsyncResult<User, NotFound>
   // the boundary's qualify decides what it adds to E — here, LoadFailed
-  .flatMap((user) => fromPromise(loadOrders(user.id), () => ({ _tag: "LoadFailed" as const })))
+  .flatMap((user) =>
+    fromPromise(loadOrders(user.id), () => ({ _tag: "LoadFailed" as const })),
+  )
   .map((orders) => orders.length) // sync callback, still AsyncResult
   .match({
     ok: (n) => n,
     // the boundary widened E, so both cases are named here
     errCases: (matcher) =>
-      matcher.with(P.tag("NotFound"), () => 0).with(P.tag("LoadFailed"), () => -2),
+      matcher
+        .with(P.tag("NotFound"), () => 0)
+        .with(P.tag("LoadFailed"), () => -2),
     defect: () => -1,
   }); // await collapses it
 ```

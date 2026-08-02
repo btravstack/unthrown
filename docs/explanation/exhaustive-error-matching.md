@@ -140,7 +140,9 @@ matcher exists to eliminate.
 result.match({
   ok: (v) => v,
   errCases: (matcher) =>
-    matcher.with(P.tag("NotFound"), () => 404).with(P.tag("Forbidden"), () => 403),
+    matcher
+      .with(P.tag("NotFound"), () => 404)
+      .with(P.tag("Forbidden"), () => 403),
   defect: (cause) => 500,
 });
 ```
@@ -191,7 +193,9 @@ input. There is no way to widen this hole from user code.
 // ❌ Still won't compile — and shouldn't: tag arms can never be shown to cover
 // an unresolved E. Only the catch-all (or a concrete union) can.
 function partial<T, E>(result: Result<T, E>) {
-  return result.mapErrCases((matcher) => matcher.with(P.tag("NotFound"), () => 404));
+  return result.mapErrCases((matcher) =>
+    matcher.with(P.tag("NotFound"), () => 404),
+  );
 }
 ```
 
@@ -233,7 +237,9 @@ of failing.
 const toApiError = <T, E>(result: Result<T, E>): Result<T, ApiError> =>
   result.mapErrCases((matcher) =>
     // oxlint-disable-next-line unthrown/no-catch-all-pattern -- generic in E
-    matcher.returnType<ApiError>().with(P._, (error) => new ApiError({ status: 500, error })),
+    matcher
+      .returnType<ApiError>()
+      .with(P._, (error) => new ApiError({ status: 500, error })),
   );
 ```
 

@@ -39,7 +39,9 @@ const find = os
     handlerResult(({ input, errors }) =>
       repo
         .findPlanet(input.id)
-        .mapErrCases((matcher) => matcher.with(P.tag("NotFound"), () => errors.NOT_FOUND())),
+        .mapErrCases((matcher) =>
+          matcher.with(P.tag("NotFound"), () => errors.NOT_FOUND()),
+        ),
     ),
   );
 ```
@@ -59,7 +61,9 @@ const find = os
   .result(({ input, errors }) =>
     repo
       .findPlanet(input.id)
-      .mapErrCases((matcher) => matcher.with(P.tag("NotFound"), () => errors.NOT_FOUND())),
+      .mapErrCases((matcher) =>
+        matcher.with(P.tag("NotFound"), () => errors.NOT_FOUND()),
+      ),
   );
 ```
 

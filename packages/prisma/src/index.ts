@@ -618,9 +618,13 @@ export const unthrownPrisma = Prisma.defineExtension({
      * @example
      * ```ts
      * const moved = db.$tryTransaction((tx) =>
-     *   tx.account.tryUpdate({ where: { id: from }, data: { balance: { decrement: amount } } })
+     *   tx.account
+     *     .tryUpdate({ where: { id: from }, data: { balance: { decrement: amount } } })
      *     .flatMap(() =>
-     *       tx.account.tryUpdate({ where: { id: to }, data: { balance: { increment: amount } } }),
+     *       tx.account.tryUpdate({
+     *         where: { id: to },
+     *         data: { balance: { increment: amount } },
+     *       }),
      *     ),
      * );
      * // Err anywhere → both updates rolled back, and the Err is in `moved`.

@@ -72,8 +72,12 @@ app.get("/users/:id", async (req, res) => {
     ok: (view) => res.status(200).json(view),
     errCases: (matcher) =>
       matcher
-        .with(P.tag("NotFound"), () => res.status(404).json({ error: "not found" }))
-        .with(P.tag("Forbidden"), () => res.status(403).json({ error: "forbidden" })),
+        .with(P.tag("NotFound"), () =>
+          res.status(404).json({ error: "not found" }),
+        )
+        .with(P.tag("Forbidden"), () =>
+          res.status(403).json({ error: "forbidden" }),
+        ),
     defect: (cause) => {
       console.error(cause); // everything the pipeline caught lands here
       res.status(500).json({ error: "internal error" });

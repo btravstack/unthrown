@@ -30,7 +30,8 @@ import { fromThrowable } from "unthrown";
 
 const parseConfig = fromThrowable(
   (text: string) => JSON.parse(text) as Config,
-  (cause, defect) => (cause instanceof SyntaxError ? ("invalid_json" as const) : defect(cause)),
+  (cause, defect) =>
+    cause instanceof SyntaxError ? ("invalid_json" as const) : defect(cause),
 );
 // (text: string) => Result<Config, "invalid_json">
 ```
@@ -56,7 +57,8 @@ function getUser(id: string) {
       if (!res.ok) throw new NotFoundError(id);
       return res.json() as Promise<User>;
     }),
-    (cause, defect) => (cause instanceof NotFoundError ? ("not_found" as const) : defect(cause)),
+    (cause, defect) =>
+      cause instanceof NotFoundError ? ("not_found" as const) : defect(cause),
   ); // AsyncResult<User, "not_found">
 }
 ```
@@ -113,7 +115,9 @@ so that is what the arms spell out:
 ```ts
 // before: throw new ConfigError(cause)
 // after:  ConfigError becomes a modeled Err, not a throw
-parseConfig(text).mapErrCases((matcher) => matcher.with("invalid_json", (e) => new ConfigError(e)));
+parseConfig(text).mapErrCases((matcher) =>
+  matcher.with("invalid_json", (e) => new ConfigError(e)),
+);
 ```
 
 `catch-log-rethrow` — log, keep the original error, still propagate as an `Err`:

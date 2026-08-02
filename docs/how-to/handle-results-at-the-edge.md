@@ -28,12 +28,16 @@ import { fromPromise, Err, P } from "unthrown";
 
 const loadProfile = (id: string) =>
   // A network error (a rejected fetch) is unexpected → defect.
-  fromPromise(fetch(`/api/users/${id}`), (c, defect) => defect(c)).flatMap((res) => {
-    if (res.status === 404) return Err(new NotFound({ id }));
-    if (res.status === 403) return Err(new Forbidden());
-    if (!res.ok) throw new Error(`unexpected status ${res.status}`); // → Defect
-    return fromPromise(res.json() as Promise<Profile>, (c, defect) => defect(c)); // malformed JSON → Defect
-  });
+  fromPromise(fetch(`/api/users/${id}`), (c, defect) => defect(c)).flatMap(
+    (res) => {
+      if (res.status === 404) return Err(new NotFound({ id }));
+      if (res.status === 403) return Err(new Forbidden());
+      if (!res.ok) throw new Error(`unexpected status ${res.status}`); // → Defect
+      return fromPromise(res.json() as Promise<Profile>, (c, defect) =>
+        defect(c),
+      ); // malformed JSON → Defect
+    },
+  );
 // AsyncResult<Profile, NotFound | Forbidden>
 
 async function handler(id: string): Promise<HttpResponse> {
@@ -97,7 +101,9 @@ app.get("/users/:id", (c) => {
     errCases: (matcher) =>
       matcher
         .with(P.tag("InvalidId"), () => c.json({ error: "invalid id" }, 400))
-        .with(P.tag("NotFound"), (e) => c.json({ error: `no user ${e.id}` }, 404)),
+        .with(P.tag("NotFound"), (e) =>
+          c.json({ error: `no user ${e.id}` }, 404),
+        ),
     defect: (cause) => {
       logger.error(cause);
       return c.json({ error: "Internal Error" }, 500);
