@@ -44,7 +44,7 @@ import { handlerResult } from "@unthrown/orpc/server";
 import { os } from "@orpc/server";
 import * as z from "zod";
 
-// repo.findPlanet: (id: string) => AsyncResult<Planet, NotFound | Conflict | DriverError>
+// repo.findPlanet: (id: string) => AsyncResult<Planet, NotFound | Conflict | Unavailable>
 
 const find = os
   .input(z.object({ id: z.string() }))
@@ -56,7 +56,7 @@ const find = os
           matcher
             .with(P.tag("NotFound"), () => errors.NOT_FOUND()) // modeled → typed for the client
             .with(P.tag("Conflict"), () => errors.CONFLICT())
-            .with(P.tag("DriverError"), (e) => defect(e.cause)), // infrastructure → defect
+            .with(P.tag("Unavailable"), (e) => defect(e.cause)), // infrastructure → defect
       ),
     ),
   );
@@ -109,7 +109,7 @@ const find = os
       matcher
         .with(P.tag("NotFound"), () => errors.NOT_FOUND())
         .with(P.tag("Conflict"), () => errors.CONFLICT())
-        .with(P.tag("DriverError"), (e) => defect(e.cause)),
+        .with(P.tag("Unavailable"), (e) => defect(e.cause)),
     ),
   );
 ```
@@ -200,7 +200,7 @@ const createUser = os
             .with(P.tag("UniqueConstraintViolation"), () => errors.EMAIL_TAKEN())
             .with(
               P.tag("ForeignKeyViolation"),
-              P.tag("DriverError"),
+              P.tag("Unavailable"),
               (e) => new ORPCError("INTERNAL_SERVER_ERROR", { cause: e }),
             ),
         ),

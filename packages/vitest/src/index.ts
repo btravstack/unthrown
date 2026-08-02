@@ -16,6 +16,7 @@ import { isDefect, isErr, isOk, isResult, type Result } from "unthrown";
 import { afterEach, expect } from "vitest";
 import type { MatcherResult, MatcherState } from "vitest";
 
+// oxlint-disable-next-line unthrown/no-ambiguous-error-type -- untyped boundary: a matcher accepts ANY Result, so `E` has no cases to name (the `isResult` case)
 type SomeResult = Result<unknown, unknown>;
 type Stringify = (value: unknown) => string;
 type Outcome = { pass: boolean; message: () => string };

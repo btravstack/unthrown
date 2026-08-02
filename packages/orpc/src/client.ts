@@ -139,6 +139,13 @@ export function createResultClient<T extends AnyNestedClient>(client: T): Result
   };
   const proxy = new Proxy(target, {
     get(_, prop) {
+      // Never expose a callable `then`. The trap wraps every object/function
+      // property, so on a client whose own proxy answers *any* key with a
+      // nested procedure, `rc.then` would become callable and `await rc` would
+      // invoke it — the classic accidental-thenable trap. oRPC's own client
+      // proxy happens to guard `then` today, but that is its invariant to
+      // change, not ours to depend on.
+      if (prop === "then") return undefined;
       const value = (client as Record<PropertyKey, unknown>)[prop];
       // A nested router segment (object) or procedure (function) is wrapped
       // recursively; anything else (a symbol-keyed well-known, an own field

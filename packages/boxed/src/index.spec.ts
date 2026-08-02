@@ -4,8 +4,13 @@ import { describe, expect, it } from "vitest";
 
 import { fromBoxed, fromBoxedFuture, toBoxed, toBoxedFuture } from "./index.js";
 
+// The fixtures' error channel, spelled as the concrete literal union it
+// actually is: `string` would be an ambiguous `E` (Thesis #1), and these
+// bridges only ever carry "nope" (a modeled Err) or "x" (an onDefect fold).
+type Boom = "nope" | "x";
+
 const boom = new Error("boom");
-const aDefect: Result<number, string> = Ok(0).map<number>(() => {
+const aDefect: Result<number, Boom> = Ok(0).map<number>(() => {
   throw boom;
 });
 
@@ -13,7 +18,7 @@ describe("toBoxed", () => {
   it("maps Ok and Err across", () => {
     const okR = toBoxed(Ok(1), () => "x");
     expect(okR.isOk() && okR.get()).toBe(1);
-    const errR = toBoxed(Err("nope") as Result<number, string>, () => "x");
+    const errR = toBoxed(Err("nope") as Result<number, Boom>, () => "x");
     expect(errR.isError() && errR.getError()).toBe("nope");
   });
 

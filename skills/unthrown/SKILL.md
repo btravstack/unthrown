@@ -98,6 +98,12 @@ const cfg = fromSafePromise(loadConfig()); // async twin
 fromNullable(map.get(key), () => "absent" as const); // Result<V, "absent">
 ```
 
+`fromThrowable` / `fromSafeThrowable` wrap a **synchronous** function on both
+sides: `qualify` is sync (an `async` one is a compile error), and so is `fn`. An
+`async` `fn` rejects after the boundary has returned, so its rejection could
+never be triaged — it becomes a `Defect` rather than an `Ok` wrapping a live
+promise. Use `fromPromise` / `fromSafePromise` for async work.
+
 The `Defect` arm of `qualify`'s return is **subtracted** from `E` — a
 defect-only qualify yields `E = never`. The `defect` helper is **injected** as
 the second argument; never import it.
@@ -117,7 +123,7 @@ result.mapErrCases(
   (matcher, defect) =>
     matcher
       .with(P.tag("RecordNotFound"), () => new ReadingNotFound(id)) // transform a case
-      .with(P.tag("DriverError"), (e) => defect(e.cause)), // deliberately defect a case
+      .with(P.tag("Unavailable"), (e) => defect(e.cause)), // deliberately defect a case
 );
 ```
 
@@ -235,7 +241,7 @@ tag is namespaced (`TaggedError("pkg/NotFound", { name: "NotFound" })`).
   facade namespaces (`Result.*`/`AsyncResult.*`), and utility types. Read when
   choosing a combinator or writing anything beyond the basics above.
 - **[references/ecosystem.md](references/ecosystem.md)** — the `@unthrown/*`
-  satellite packages: vitest matchers (`toBeOk`/`toBeErrTagged`/…), the six
+  satellite packages: vitest matchers (`toBeOk`/`toBeErrTagged`/…), the seven
   oxlint rules, Prisma extension (`try*` delegates), oRPC bridge,
   standard-schema validation, and the effect/neverthrow/boxed interop bridges.
   Read when tests, lint config, or one of those integrations is involved.

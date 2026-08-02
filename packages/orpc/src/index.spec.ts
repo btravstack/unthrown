@@ -24,7 +24,7 @@ import {
 } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import "@unthrown/vitest";
-import { type AsyncResult, Err, fromSafePromise, Ok, P, type Result } from "unthrown";
+import { type AsyncResult, Err, fromSafePromise, Ok, type Result } from "unthrown";
 import { describe, expect, test } from "vitest";
 
 import { createResultClient, fromCall } from "./client.js";
@@ -201,13 +201,27 @@ describe("createResultClient", () => {
     await expect(nested.find({ id: 1 })).toBeOkWith({ name: "Mars" });
   });
 
+  test("never exposes a callable `then` — the wrapped client is not thenable", async () => {
+    // The `get` trap wraps every object/function property, so on a client whose
+    // own proxy answers ANY key with a nested procedure, `rc.then` would be
+    // callable and `await rc` would invoke it. oRPC guards `then` today, but
+    // that is its invariant to change, not ours to lean on.
+    const asRecord = rc as unknown as Record<string, unknown>;
+    expect(asRecord["then"]).toBeUndefined();
+    expect((rc.planet as unknown as Record<string, unknown>)["then"]).toBeUndefined();
+    // …so awaiting it resolves to the client itself rather than hanging.
+    await expect(Promise.resolve(rc as unknown as Promise<unknown>)).resolves.toBe(rc);
+  });
+
   test("results chain with combinators", async () => {
     const greeting = await rc.planet
       .find({ id: 1 })
       .map((planet) => `Hello, ${planet.name}!`)
       .match({
         ok: (msg) => msg,
-        errCases: (matcher) => matcher.with(P._, () => "not found"),
+        // `find` declares exactly one error, so the case is nameable — the
+        // client's `E` is discriminated by `code`, not by `_tag`.
+        errCases: (matcher) => matcher.with({ code: "NOT_FOUND" }, () => "not found"),
         defect: () => "bug",
       });
     expect(greeting).toBe("Hello, Mars!");

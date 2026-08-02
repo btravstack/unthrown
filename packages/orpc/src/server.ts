@@ -42,7 +42,8 @@ export type ResultHandler<
 > = (
   opts: ProcedureHandlerOptions<TCurrentContext, TInput, ORPCErrorConstructorMap<TErrorMap>>,
   input: TInput,
-) => Result<TOutput, TError> | Promise<Result<TOutput, TError>> | AsyncResult<TOutput, TError>;
+) => // oxlint-disable-next-line unthrown/prefer-async-result -- an `async` handler is deliberately admitted here: this is an elimination edge, exempt from the no-thenable rule like `match`
+  Result<TOutput, TError> | Promise<Result<TOutput, TError>> | AsyncResult<TOutput, TError>;
 
 /**
  * Adapt a `Result`-returning handler into a plain oRPC procedure handler.

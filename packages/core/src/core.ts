@@ -91,7 +91,7 @@ class Res<T, E> {
     if (this.tag !== "Ok") return passThrough(this);
     try {
       const r = f(this.value);
-      return isResult(r) ? r : nonResultCallbackDefect();
+      return isResult(r) ? r : nonResultCallbackDefect(r);
     } catch (cause) {
       return defectRes(cause);
     }
@@ -100,7 +100,7 @@ class Res<T, E> {
   tap<R>(this: Result<T, E>, f: (value: T) => R & NotThenable<R>): Result<T, E> {
     if (this.tag !== "Ok") return this;
     try {
-      f(this.value);
+      silenceIfThenable(f(this.value));
       return this;
     } catch (cause) {
       return defectRes(cause);
@@ -111,7 +111,7 @@ class Res<T, E> {
     if (this.tag !== "Ok") return this;
     try {
       const r = f(this.value);
-      if (!isResult(r)) return nonResultCallbackDefect();
+      if (!isResult(r)) return nonResultCallbackDefect(r);
       // Keep the original value on success; an Err/Defect from `f` short-circuits.
       return r.tag === "Ok" ? this : passThrough(r);
     } catch (cause) {
@@ -127,7 +127,7 @@ class Res<T, E> {
     if (this.tag !== "Ok") return passThrough(this);
     try {
       const r = f(this.value);
-      if (!isResult(r)) return nonResultCallbackDefect();
+      if (!isResult(r)) return nonResultCallbackDefect(r);
       if (r.tag !== "Ok") return passThrough(r);
       // The merged scope can't be spelled at the type level (a computed key
       // widens to an index signature), so the constructed Ok is cast to `Bound`.
@@ -206,7 +206,7 @@ class Res<T, E> {
     try {
       const out = runMatch(f, this.error);
       if (isDefectMarker(out)) return defectRes(out.cause);
-      if (!isResult(out)) return nonResultCallbackDefect();
+      if (!isResult(out)) return nonResultCallbackDefect(out);
       return out as Result<OkOf<MatchOut<M>>, ErrOf<MatchOut<M>>>;
     } catch (cause) {
       return defectRes(cause);
@@ -239,6 +239,7 @@ class Res<T, E> {
       // a `throw` (Thesis #5). So it takes the same route a `throw` in this
       // branch would: the observed error survives alongside the caller's cause.
       if (isDefectMarker(out)) return observerThrowToDefect(out.cause, this.error);
+      silenceIfThenable(out);
       return this;
     } catch (cause) {
       return observerThrowToDefect(cause, this.error);
@@ -258,7 +259,7 @@ class Res<T, E> {
       // (Contrast a branch returning a Defect-state `Result` below — an effect
       // that blew up on its own, which short-circuits and replaces the error.)
       if (isDefectMarker(r)) return observerThrowToDefect(r.cause, this.error);
-      if (!isResult(r)) return nonResultCallbackDefect();
+      if (!isResult(r)) return nonResultCallbackDefect(r);
       // Keep the original error on the effect's success; an Err/Defect threads through.
       return r.tag === "Ok" ? this : passThrough(r);
     } catch (cause) {
@@ -273,7 +274,7 @@ class Res<T, E> {
     if (this.tag !== "Defect") return this;
     try {
       const r = f(this.cause);
-      return isResult(r) ? r : nonResultCallbackDefect();
+      return isResult(r) ? r : nonResultCallbackDefect(r);
     } catch (cause) {
       return defectRes(cause);
     }
@@ -282,7 +283,7 @@ class Res<T, E> {
   tapDefect<R>(this: Result<T, E>, f: (cause: unknown) => R & NotThenable<R>): Result<T, E> {
     if (this.tag !== "Defect") return this;
     try {
-      f(this.cause);
+      silenceIfThenable(f(this.cause));
       return this;
     } catch (cause) {
       return observerThrowToDefect(cause, this.cause);
@@ -295,7 +296,7 @@ class Res<T, E> {
   ): Result<T, E> {
     if (this.tag === "Ok") return this;
     try {
-      f(this);
+      silenceIfThenable(f(this));
       return this;
     } catch (cause) {
       return observerThrowToDefect(cause, this.tag === "Err" ? this.error : this.cause);
@@ -523,6 +524,39 @@ function passThrough<T, E>(self: Result<unknown, unknown>): Result<T, E> {
 }
 
 /**
+ * Adopt-and-silence a thenable a combinator is about to **discard**.
+ *
+ * @remarks
+ * The observers (`tap`, `tapErrCases`, `tapDefect`, `tapFailure`) throw their
+ * callback's return value away, and the `Result`-returning combinators reject a
+ * non-`Result` one. Either way, a thenable that slipped past `NotThenable` (a
+ * cast, a raw-JS caller) is dropped while still in flight — and if it later
+ * rejects, nothing is holding it, so the rejection floats unhandled and takes
+ * the process down on Node by default. Worse for an observer: its whole job is
+ * to make a failure visible, and this is the one path where the failure is
+ * invisible.
+ *
+ * Adopting it costs one microtask and makes the rejection a no-op. The
+ * boundaries already do exactly this for a thenable `qualify` and a thenable
+ * `fn` (see `interop.ts`); this is the same net on the combinator side.
+ *
+ * @internal
+ */
+function silenceIfThenable(value: unknown): void {
+  try {
+    if (
+      (typeof value === "object" || typeof value === "function") &&
+      value !== null &&
+      typeof (value as { then?: unknown }).then === "function"
+    ) {
+      void Promise.resolve(value).then(undefined, () => undefined);
+    }
+  } catch {
+    // A hostile `then` getter threw — there is nothing adoptable here.
+  }
+}
+
+/**
  * The Defect minted when a callback constrained to return a `Result` returns
  * something else — reachable only from untyped/cast callers (in typed code the
  * constraint is a compile error). The combinator-side sibling of the
@@ -532,7 +566,10 @@ function passThrough<T, E>(self: Result<unknown, unknown>): Result<T, E> {
  *
  * @internal
  */
-function nonResultCallbackDefect<T, E>(): Result<T, E> {
+function nonResultCallbackDefect<T, E>(returned?: unknown): Result<T, E> {
+  // The out-of-contract value is discarded — silence it first if it is a
+  // thenable, so a later rejection cannot float (see `silenceIfThenable`).
+  silenceIfThenable(returned);
   return defectRes(new TypeError("unthrown: a combinator callback returned a non-Result value"));
 }
 
@@ -644,7 +681,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
         if (r.tag !== "Ok") return passThrough(r);
         try {
           const inner = await f(r.value);
-          return isResult(inner) ? inner : nonResultCallbackDefect<U, E | E2>();
+          return isResult(inner) ? inner : nonResultCallbackDefect<U, E | E2>(inner);
         } catch (cause) {
           return defectRes(cause);
         }
@@ -657,7 +694,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
       this.#promise.then((r) => {
         if (r.tag !== "Ok") return r;
         try {
-          f(r.value);
+          silenceIfThenable(f(r.value));
           return r;
         } catch (cause) {
           return defectRes<T, E>(cause);
@@ -674,7 +711,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
         if (r.tag !== "Ok") return passThrough(r);
         try {
           const inner = await f(r.value);
-          if (!isResult(inner)) return nonResultCallbackDefect();
+          if (!isResult(inner)) return nonResultCallbackDefect(inner);
           // Keep the original value on success; an Err/Defect from `f` wins.
           return inner.tag === "Ok" ? r : passThrough(inner);
         } catch (cause) {
@@ -693,7 +730,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
         if (r.tag !== "Ok") return passThrough(r);
         try {
           const inner = await f(r.value);
-          if (!isResult(inner)) return nonResultCallbackDefect();
+          if (!isResult(inner)) return nonResultCallbackDefect(inner);
           if (inner.tag !== "Ok") return passThrough(inner);
           return okRes({ ...scopeOf(r.value), [name]: inner.value }) as unknown as Result<
             Bound<T, K, U>,
@@ -795,7 +832,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
           const out = runMatch(f, r.error);
           if (isDefectMarker(out)) return defectRes<T, never>(out.cause);
           const inner = await (out as Result<unknown, unknown> | AsyncResult<unknown, unknown>);
-          if (!isResult(inner)) return nonResultCallbackDefect<T, never>();
+          if (!isResult(inner)) return nonResultCallbackDefect<T, never>(inner);
           return inner as Result<T, never>;
         } catch (cause) {
           return defectRes(cause);
@@ -833,6 +870,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
           // `defect(…)` is the expression-position form of a `throw`, not a
           // discarded branch value.
           if (isDefectMarker(out)) return observerThrowToDefect<T, E>(out.cause, r.error);
+          silenceIfThenable(out);
           return r;
         } catch (cause) {
           return observerThrowToDefect<T, E>(cause, r.error);
@@ -858,7 +896,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
           // survives alongside the caller's cause.
           if (isDefectMarker(out)) return observerThrowToDefect(out.cause, r.error);
           const inner = await (out as Result<unknown, unknown> | AsyncResult<unknown, unknown>);
-          if (!isResult(inner)) return nonResultCallbackDefect();
+          if (!isResult(inner)) return nonResultCallbackDefect(inner);
           // Keep the original error on success; an Err/Defect from the effect wins.
           return inner.tag === "Ok" ? passThrough(r) : passThrough(inner);
         } catch (cause) {
@@ -876,7 +914,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
         if (r.tag !== "Defect") return r;
         try {
           const inner = await f(r.cause);
-          return isResult(inner) ? inner : nonResultCallbackDefect<T | U, E | E2>();
+          return isResult(inner) ? inner : nonResultCallbackDefect<T | U, E | E2>(inner);
         } catch (cause) {
           return defectRes(cause);
         }
@@ -889,7 +927,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
       this.#promise.then((r) => {
         if (r.tag !== "Defect") return r;
         try {
-          f(r.cause);
+          silenceIfThenable(f(r.cause));
           return r;
         } catch (cause) {
           return observerThrowToDefect<T, E>(cause, r.cause);
@@ -903,7 +941,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
       this.#promise.then((r) => {
         if (r.tag === "Ok") return r;
         try {
-          f(r);
+          silenceIfThenable(f(r));
           return r;
         } catch (cause) {
           return observerThrowToDefect<T, E>(cause, r.tag === "Err" ? r.error : r.cause);

@@ -89,7 +89,7 @@ db.reading.tryFindUniqueOrThrow({ where: { id } }).mapErrCases(
   (matcher, defect) =>
     matcher
       .with(P.tag("RecordNotFound"), () => new ReadingNotFoundException(id))
-      .with(P.tag("DriverError"), (e) => defect(e.cause)), // deliberate defect — the tag leaves E
+      .with(P.tag("Unavailable"), (e) => defect(e.cause)), // deliberate defect — the tag leaves E
 );
 ```
 
@@ -156,11 +156,11 @@ the day `E` grows the call site still lights up:
 ```ts
 import { P } from "unthrown";
 
-// loadUser: (id: string) => Result<User, NotFound | Forbidden | DriverError>
+// loadUser: (id: string) => Result<User, NotFound | Forbidden | Unavailable>
 
 // log whatever the error is, then let it flow through unchanged
 loadUser(id).tapErrCases((matcher) =>
-  matcher.with(P.tag("NotFound"), P.tag("Forbidden"), P.tag("DriverError"), (e) => logger.error(e)),
+  matcher.with(P.tag("NotFound"), P.tag("Forbidden"), P.tag("Unavailable"), (e) => logger.error(e)),
 );
 ```
 

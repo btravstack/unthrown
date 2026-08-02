@@ -124,7 +124,7 @@ describe("the built-in matcher engine", () => {
 
   it("exhaustive() returns the result; a rogue unmatched value throws NonExhaustiveError", () => {
     expect(
-      match("a" as "a")
+      match("a" as const)
         .with("a", () => 1)
         .exhaustive(),
     ).toBe(1);
