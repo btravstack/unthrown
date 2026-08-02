@@ -985,6 +985,28 @@ configured outside the repo).
 - **oxlint rules are binding:** no `interface` (use `type`), no `any` (use
   `unknown`). Genuine exceptions (e.g. the `vitest` `Matchers` augmentation, the
   `AsyncRes.then` thenable) carry a targeted `oxlint-disable` with a reason.
+- **Test conventions.** Core's specs share `src/test-helpers.ts` (excluded from
+  coverage): `boom` / `defectOf` fixtures, and `expectOk` / `expectErr` /
+  `expectDefect`, which do the narrowing so a spec reads `expectErr(r, "e")`
+  instead of the two-line `isErr()` dance. Core cannot use `@unthrown/vitest`'s
+  matchers — that package takes core as a **peer**, so importing it would be
+  circular — and these recover most of the readability without the dependency.
+  **No test asserts the absence of a global `unhandledRejection` after a
+  `setTimeout`**: a negative assertion on a timing window cannot distinguish
+  "never fires" from "fires later than we waited", so it can silently stop
+  protecting. Adoption is asserted **positively** instead, via
+  `adoptionProbe()` — `Promise.resolve(x)` calls `x.then(onFulfilled,
+onRejected)`, so the fixture records the handler _and invokes it_, proving both
+  that it was installed and that it swallows the rejection, in one microtask
+  with no timer.
+- **TSDoc `@example` blocks are compiled** (`doc-examples.spec.ts`): every
+  ```ts fence under an `@example` is extracted, given an import preamble of the
+  whole public surface, and typechecked. Examples are the primary teaching
+  surface and they rot silently — the same gap shipped a curried API documented
+  as two-argument in the agent skill. Placeholder names (`findUser`, `id`)
+  surface as TS2304/7006/18046 and are ignored; everything else fails, and a
+  renamed export fails on the _preamble import_ rather than as an ignorable
+  TS2304. `@unthrown/prisma`'s 34 examples are the obvious next application.
 - Tests: Vitest. Every load-bearing invariant above gets an explicit test
   (`invariants.spec.ts` guards them 1:1); core holds 100% line/function coverage,
   enforced by thresholds in its `vitest.config.ts`.

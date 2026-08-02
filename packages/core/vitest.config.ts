@@ -12,8 +12,9 @@ export default defineConfig({
       enabled: true,
       provider: "v8",
       include: ["src/**"],
-      // Type-only tests carry no runtime; they're checked by `tsc`, not coverage.
-      exclude: ["src/**/*.test-d.ts"],
+      // Type-only tests carry no runtime (they are checked by `tsc`), and
+      // `test-helpers.ts` is spec scaffolding, not library code.
+      exclude: ["src/**/*.test-d.ts", "src/test-helpers.ts"],
       // Lock in the full-coverage suite. Branches sit below 100 only because of
       // the deliberately-unreachable defensive `then` rejection path.
       thresholds: {
