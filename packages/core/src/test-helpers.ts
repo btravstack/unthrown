@@ -31,22 +31,40 @@ export const defectOf = (cause: unknown = boom): Result<number, never> =>
     throw cause;
   });
 
-/** Assert `Ok`, and its value, doing the narrowing for you. */
+/**
+ * Assert `Ok`, and its value, doing the narrowing for you. Structural
+ * (`toEqual`), matching `@unthrown/vitest`'s `toBeOkWith` — a success value is
+ * compared by what it is, not by reference. For identity, see
+ * {@link expectDefect}.
+ */
 export function expectOk<T, E>(result: Result<T, E>, value: T): void {
   expect(result.isOk()).toBe(true);
   if (result.isOk()) expect(result.value).toEqual(value);
 }
 
-/** Assert `Err`, and its error, doing the narrowing for you. */
+/**
+ * Assert `Err`, and its error, doing the narrowing for you. Structural
+ * (`toEqual`), matching `@unthrown/vitest`'s `toBeErrWith`.
+ */
 export function expectErr<T, E>(result: Result<T, E>, error: E): void {
   expect(result.isErr()).toBe(true);
   if (result.isErr()) expect(result.error).toEqual(error);
 }
 
-/** Assert a `Defect`, and its cause, doing the narrowing for you. */
+/**
+ * Assert a `Defect`, and its cause, doing the narrowing for you.
+ *
+ * @remarks
+ * Compares by **identity** (`toBe`), unlike {@link expectOk} / {@link expectErr}.
+ * That asymmetry is the point: the ok/err channels carry a *value*, so a
+ * structural compare is the right claim, but the defect channel's contract is
+ * that the ORIGINAL cause survives untouched — `get()` rethrows it with its
+ * original stack. `toEqual` would accept a freshly-built `Error` with the same
+ * message and quietly stop guarding that.
+ */
 export function expectDefect<T, E>(result: Result<T, E>, cause: unknown = boom): void {
   expect(result.isDefect()).toBe(true);
-  if (result.isDefect()) expect(result.cause).toEqual(cause);
+  if (result.isDefect()) expect(result.cause).toBe(cause);
 }
 
 /**

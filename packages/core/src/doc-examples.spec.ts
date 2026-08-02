@@ -18,6 +18,7 @@
 
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,7 +26,11 @@ import { fileURLToPath } from "node:url";
 import { afterAll, expect, it } from "vitest";
 
 const SRC = dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = join(SRC, "..", "..", "..");
+
+// Resolve the compiler's own JS entry and run it under `process.execPath`,
+// rather than the `node_modules/.bin/tsc` shim: that shim is `tsc.cmd` on
+// Windows, so spawning the extensionless path only works on POSIX.
+const TSC = createRequire(import.meta.url).resolve("typescript/bin/tsc");
 
 /** Placeholder-name artifacts of extracting a snippet out of its prose. */
 const PLACEHOLDER_CODES = ["TS2304", "TS7006", "TS18046"];
@@ -108,7 +113,7 @@ it("every TSDoc @example in this package typechecks", () => {
 
   let output = "";
   try {
-    execFileSync(join(REPO_ROOT, "node_modules", ".bin", "tsc"), ["-p", "tsconfig.json"], {
+    execFileSync(process.execPath, [TSC, "-p", "tsconfig.json"], {
       cwd: workdir,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
