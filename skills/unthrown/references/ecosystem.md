@@ -70,18 +70,30 @@ import { unthrownPrisma } from "@unthrown/prisma";
 const db = new PrismaClient({ adapter }).$extends(unthrownPrisma);
 
 db.user.tryFindUniqueOrThrow({ where: { id } });
-// AsyncResult<User, RecordNotFound | DriverError>
+// AsyncResult<User, RecordNotFound>
+
+db.user.tryFindMany();
+// AsyncResult<User[], never> — a read has NO modeled failure
 ```
 
-- `try*` variants of all seventeen model delegate operations; the error
-  channel is exactly the P-codes that operation can raise:
-  `UniqueConstraintViolation` (P2002), `ForeignKeyViolation` (P2003),
-  `RecordNotFound` (P2025), everything else `DriverError` with the cause
-  preserved. `upsert` and `*Many` batch mutations never carry `RecordNotFound`.
+- `try*` variants of all seventeen model delegate operations. `E` carries only
+  **domain outcomes**: `UniqueConstraintViolation` (P2002, 409),
+  `ForeignKeyViolation` (P2003, 400), `RecordNotFound` (P2025 _and_ P2018,
+  404). Only the **batch** mutations (`createMany` / `updateMany` and their
+  `*AndReturn` twins) are free of `RecordNotFound` — they take no nested
+  writes. `create` and `upsert` DO carry it: a nested `connect` can point at a
+  row that does not exist.
+- **Everything infrastructural is a defect** — dropped connections, pool
+  timeouts, deadlocks, unmapped P-codes, malformed queries, engine panics.
+  There is no `DriverError` class. Nobody branches on those in domain code, so
+  modelling them would only make every call site carry an arm duplicating its
+  own `defect` arm.
 - `$tryTransaction(cb)` — interactive transaction whose callback speaks
   `AsyncResult`: an `Err` rolls back and re-surfaces typed; a defect (throwing
   callback included) rolls back and stays a defect.
-- `tryPaginate(...).withCursor(...)` — cursor pagination.
+- `tryPaginate(...).withCursor(...)` — cursor pagination; its `E` is
+  `InvalidCursor` (the cursor is the only part of the query that came from
+  outside). `after` and `before` are mutually exclusive.
 - `qualifyPrismaError` — the exported qualify, for hand-rolled boundaries.
 - Raw methods remain the escape hatch for batch `$transaction([...])` and raw
   SQL.
@@ -109,8 +121,18 @@ or returned as a value), `Defect` ↔ everything else (collapses to
 
 Bridges any Standard Schema validator (Zod, Valibot, ArkType) to `Result`:
 
-- `fromSchema(schema, input)` → `Result<Output, SchemaIssues>`
-- `fromSchemaAsync(schema, input)` → `AsyncResult<Output, SchemaIssues>`
+- `fromSchema(schema)` → `(input) => Result<Output, SchemaIssues>`
+- `fromSchemaAsync(schema)` → `(input) => AsyncResult<Output, SchemaIssues>`
+
+Both are **curried** — build the parser once, call it per input:
+
+```ts
+const parseUser = fromSchema(userSchema);
+parseUser(input); // Result<User, SchemaIssues>
+```
+
+`fromSchema` throws a `TypeError` if the schema turns out to validate
+asynchronously — use `fromSchemaAsync` for those.
 
 The validation issues are the modeled `E` — no throwing parse.
 

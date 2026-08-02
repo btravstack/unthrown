@@ -257,6 +257,18 @@ was planned).
   The type therefore over-states the success channel — `Result<Promise<T>, E>` is
   spellable but never inhabited — the mirror of `recoverErrCases`'s `never`
   under-stating the error channel. Guarded in `interop.spec.ts`.
+- **A DISCARDED thenable is adopted, so its rejection never floats.** The
+  observers (`tap`, `tapErrCases`, `tapDefect`, `tapFailure`) throw their
+  callback's return away, and the `Result`-returning combinators reject a
+  non-`Result` one — so a thenable that slipped past `NotThenable` (a cast, a
+  raw-JS caller) was dropped mid-flight and its later rejection floated
+  unhandled (process-fatal on Node by default). Worse for an observer: its whole
+  job is to surface a failure, and that was the one path where the failure was
+  invisible. Every such site now routes the discarded value through
+  `silenceIfThenable`, the combinator-side sibling of the boundary nets in
+  `interop.ts`. Silencing changes no outcome — the observed result passes through
+  unchanged. Guarded in `invariants.spec.ts` (each case verified to fail without
+  the net).
 - **Result instances are frozen — and so is the machinery around them.**
   `okRes`/`errRes`/`defectRes` return `Object.freeze`d objects, so a variant
   cannot be forged by mutation; the `readonly` types are real at runtime.
@@ -939,6 +951,27 @@ configured outside the repo).
   lint/format with **oxlint** / **oxfmt**; **knip** for dead-code/deps; **vitest**
   (+ v8 coverage); **typedoc** (markdown) feeding **vitepress**; **changesets**
   for releases; **lefthook** + **commitlint** (conventional commits) on commit.
+- **The agent skill (`skills/unthrown/`) is a hand-maintained second copy of the
+  docs, and it drifts.** It is markdown, so nothing typechecks it and knip does
+  not see it; it has already shipped a curried API documented as two-argument
+  (`fromSchema(schema, input)`), a stale Prisma error model, and "the six oxlint
+  rules" after the seventh landed. `packages/oxlint/src/skill.test.ts` pins the
+  mechanically-checkable part — the rule inventory, the spelled-out count, and
+  which rules sit under the preset vs opt-in headings. The **prose still needs a
+  human**: when a package's public surface changes, update the skill in the same
+  PR as the docs site.
+- **The repo dogfoods `@unthrown/oxlint`.** `.oxlintrc.json` enables the plugin
+  (via the `@unthrown/oxlint` workspace devDependency) with the five
+  `recommended` rules, so the library is held to the conventions it ships. The
+  plugin is loaded from its **build output**, so the root `lint` script builds it
+  first (`turbo run build --filter=@unthrown/oxlint && oxlint .`) — turbo-cached,
+  and pointing the specifier at `src/` does not work (oxlint cannot resolve the
+  NodeNext `.js` imports of a raw TS tree). The exceptions carry targeted
+  `oxlint-disable` comments with reasons: the three interop `settle()` bridges
+  and `@unthrown/orpc`'s `ResultHandler` union must stay a native `Promise`
+  (`prefer-async-result`), and `@unthrown/vitest`'s `SomeResult` is the untyped
+  boundary (`no-ambiguous-error-type`). The interop specs spell their fixture `E`
+  as a concrete literal union rather than `string`.
 - **Gate (all must stay green):** `pnpm format --check`, `pnpm lint`,
   `pnpm typecheck`, `pnpm knip`, `pnpm test`, `pnpm build`. CI mirrors these.
 - TypeScript `strict` + `exactOptionalPropertyTypes` + `noUncheckedIndexedAccess`;

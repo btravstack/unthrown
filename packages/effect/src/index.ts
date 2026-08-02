@@ -236,6 +236,7 @@ function dieToResult<T, E>(cause: unknown): Result<T, E> {
   )() as Result<T, E>;
 }
 
+// oxlint-disable-next-line unthrown/prefer-async-result -- the bridge INTO Effect: a native Promise is what `Effect.promise` consumes, so an AsyncResult here would be circular
 function settle<T, E>(asyncResult: AsyncResult<T, E>): Promise<Result<T, E>> {
   return (async () => await asyncResult)();
 }

@@ -132,6 +132,9 @@ importers:
       '@commitlint/cli':
         specifier: 'catalog:'
         version: 21.2.1(@types/node@26.1.1)(conventional-commits-parser@7.1.0)(typescript@6.0.3)
+      '@unthrown/oxlint':
+        specifier: workspace:*
+        version: link:packages/oxlint
       knip:
         specifier: 'catalog:'
         version: 6.27.0

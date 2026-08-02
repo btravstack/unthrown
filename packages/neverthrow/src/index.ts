@@ -149,6 +149,7 @@ export function fromNeverthrowAsync<T, E>(
   return fromSafePromise(Promise.resolve(resultAsync)).flatMap((result) => fromNeverthrow(result));
 }
 
+// oxlint-disable-next-line unthrown/prefer-async-result -- the bridge INTO neverthrow: a native Promise is what `ResultAsync.fromSafePromise` consumes, so an AsyncResult here would be circular
 function settle<T, E>(asyncResult: AsyncResult<T, E>): Promise<Result<T, E>> {
   return (async () => await asyncResult)();
 }

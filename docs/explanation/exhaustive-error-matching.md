@@ -39,7 +39,7 @@ db.reading.tryFindUniqueOrThrow({ where: { id } }).mapErrCases(
   (matcher, defect) =>
     matcher
       .with(P.tag("RecordNotFound"), () => new ReadingNotFoundException(id))
-      .with(P.tag("DriverError"), (e) => defect(e.cause)), // deliberate defect — the tag leaves E
+      .with(P.tag("Unavailable"), (e) => defect(e.cause)), // deliberate defect — the tag leaves E
 );
 ```
 
@@ -260,7 +260,7 @@ result.mapErrCases(
     matcher
       .returnType<ApiError>()
       .with(P.tag("RecordNotFound"), () => new ApiError({ status: 404 }))
-      .with(P.tag("DriverError"), (e) => defect(e.cause)), // still fine
+      .with(P.tag("Unavailable"), (e) => defect(e.cause)), // still fine
 );
 ```
 

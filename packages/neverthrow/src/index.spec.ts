@@ -10,8 +10,13 @@ import { describe, expect, it } from "vitest";
 
 import { fromNeverthrow, fromNeverthrowAsync, toNeverthrow, toNeverthrowAsync } from "./index.js";
 
+// The fixtures' error channel, spelled as the concrete literal union it
+// actually is: `string` would be an ambiguous `E` (Thesis #1), and these
+// bridges only ever carry "nope" (a modeled Err) or "x" (an onDefect fold).
+type Boom = "nope" | "x";
+
 const boom = new Error("boom");
-const aDefect: Result<number, string> = Ok(0).map<number>(() => {
+const aDefect: Result<number, Boom> = Ok(0).map<number>(() => {
   throw boom;
 });
 
@@ -19,7 +24,7 @@ describe("toNeverthrow", () => {
   it("maps Ok and Err across", () => {
     const okR = toNeverthrow(Ok(1), () => "x");
     expect(okR.isOk() && okR.value).toBe(1);
-    const errR = toNeverthrow(Err("nope") as Result<number, string>, () => "x");
+    const errR = toNeverthrow(Err("nope") as Result<number, Boom>, () => "x");
     expect(errR.isErr() && errR.error).toBe("nope");
   });
 

@@ -4,8 +4,13 @@ import { describe, expect, it } from "vitest";
 
 import { fromEffect, fromEither, fromExit, toEffect, toEither, toExit } from "./index.js";
 
+// The fixtures' error channel, spelled as the concrete literal union it
+// actually is: `string` would be an ambiguous `E` (Thesis #1), and these
+// bridges only ever carry "nope" (a modeled Err) or "x" (an onDefect fold).
+type Boom = "nope" | "x";
+
 const boom = new Error("boom");
-const aDefect: Result<number, string> = Ok(0).map<number>(() => {
+const aDefect: Result<number, Boom> = Ok(0).map<number>(() => {
   throw boom;
 });
 
@@ -16,7 +21,7 @@ describe("toExit", () => {
   });
 
   it("maps Err to a modeled failure (Cause.fail)", () => {
-    const exit = toExit(Err("nope") as Result<number, string>);
+    const exit = toExit(Err("nope") as Result<number, Boom>);
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
       expect(Option.getOrNull(Cause.failureOption(exit.cause))).toBe("nope");
@@ -60,7 +65,7 @@ describe("fromExit", () => {
 
   it("round-trips Ok/Err/Defect through toExit", () => {
     expect(fromExit(toExit(Ok(1)))).toMatchObject({ tag: "Ok", value: 1 });
-    expect(fromExit(toExit(Err("nope") as Result<number, string>))).toMatchObject({
+    expect(fromExit(toExit(Err("nope") as Result<number, Boom>))).toMatchObject({
       tag: "Err",
       error: "nope",
     });
@@ -71,7 +76,7 @@ describe("fromExit", () => {
 describe("toEither", () => {
   it("maps Ok to Right and Err to Left", () => {
     expect(Either.getOrNull(toEither(Ok(1), () => "x"))).toBe(1);
-    const left = toEither(Err("nope") as Result<number, string>, () => "x");
+    const left = toEither(Err("nope") as Result<number, Boom>, () => "x");
     expect(Either.isLeft(left) ? left.left : undefined).toBe("nope");
   });
 
@@ -91,7 +96,7 @@ describe("fromEither", () => {
 describe("toEffect", () => {
   it("maps a Result's three channels to succeed/fail/die", () => {
     expect(Effect.runSyncExit(toEffect(Ok(1)))).toStrictEqual(Exit.succeed(1));
-    expect(Effect.runSyncExit(toEffect(Err("nope") as Result<number, string>))).toStrictEqual(
+    expect(Effect.runSyncExit(toEffect(Err("nope") as Result<number, Boom>))).toStrictEqual(
       Exit.fail("nope"),
     );
     const exit = Effect.runSyncExit(toEffect(aDefect));

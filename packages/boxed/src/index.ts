@@ -165,6 +165,7 @@ export function fromBoxedFuture<T, E>(future: Future<BoxedResult<T, E>>): AsyncR
   return fromSafePromise(future.toPromise()).flatMap((result) => fromBoxed(result));
 }
 
+// oxlint-disable-next-line unthrown/prefer-async-result -- the bridge INTO Boxed: a native Promise is what `Future.make`'s resolver consumes, so an AsyncResult here would be circular
 function settle<T, E>(asyncResult: AsyncResult<T, E>): Promise<Result<T, E>> {
   return (async () => await asyncResult)();
 }

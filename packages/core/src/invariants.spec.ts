@@ -283,3 +283,80 @@ describe("Invariant 5: an AsyncResult's internal promise never rejects", () => {
     expect(defectR.isDefect()).toBe(true);
   });
 });
+
+describe("Invariant 6: a DISCARDED thenable is adopted, so its rejection never floats", () => {
+  // The observers throw their callback's return value away, and the
+  // Result-returning combinators reject a non-Result one. A thenable that
+  // slipped past `NotThenable` (a cast, a raw-JS caller) is therefore dropped
+  // mid-flight — and an unhandled rejection is process-fatal on Node by
+  // default. Worse for an observer: its whole job is to surface a failure, and
+  // this is the one path where the failure would be invisible.
+  const rejecting = () => Promise.reject(new Error("floated"));
+
+  const withRejectionProbe = async (body: () => void): Promise<unknown[]> => {
+    const floated: unknown[] = [];
+    const probe = (reason: unknown): void => {
+      floated.push(reason);
+    };
+    process.on("unhandledRejection", probe);
+    try {
+      body();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return floated;
+    } finally {
+      process.off("unhandledRejection", probe);
+    }
+  };
+
+  it.each([
+    ["tap", () => Ok(1).tap(rejecting as never)],
+    ["tapDefect", () => defectOf(boom).tapDefect(rejecting as never)],
+    ["tapFailure", () => Err("e" as const).tapFailure(rejecting as never)],
+    [
+      "tapErrCases",
+      () =>
+        Err("e" as const).tapErrCases(
+          // oxlint-disable-next-line unthrown/no-catch-all-pattern -- `E` here is a single type, not a union of cases
+          (m) => m.with(P._, rejecting) as never,
+        ),
+    ],
+    ["flatMap", () => Ok(1).flatMap(rejecting as never)],
+    ["flatTap", () => Ok(1).flatTap(rejecting as never)],
+    ["bind", () => Do().bind("a", rejecting as never)],
+  ])("%s discards a smuggled thenable without letting it float", async (_label, run) => {
+    const floated = await withRejectionProbe(() => {
+      run();
+    });
+    expect(floated).toEqual([]);
+  });
+
+  it("the async surface adopts it too", async () => {
+    const floated = await withRejectionProbe(() => {
+      void Ok(1)
+        .toAsync()
+        .tap(rejecting as never);
+      void defectOf(boom)
+        .toAsync()
+        .tapDefect(rejecting as never);
+      void Err("e" as const)
+        .toAsync()
+        .tapFailure(rejecting as never);
+    });
+    expect(floated).toEqual([]);
+  });
+
+  it("the observer still passes the original result through unchanged", () => {
+    // Silencing must not change the outcome: `tap` observes, it does not decide.
+    expect(
+      Ok(1)
+        .tap(rejecting as never)
+        .getOr(0),
+    ).toBe(1);
+    expect(
+      Err("e" as const)
+        .tapFailure(rejecting as never)
+        .getOr("fallback"),
+    ).toBe("fallback");
+  });
+});
