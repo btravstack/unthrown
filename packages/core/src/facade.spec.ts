@@ -21,7 +21,8 @@ import {
   Ok,
   Result,
 } from "./index.js";
-import { boom } from "./test-helpers.js";
+
+const boom = new Error("boom");
 
 describe("Result facade mirrors the free functions", () => {
   it("exposes the same constructors", () => {

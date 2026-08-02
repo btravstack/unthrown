@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { Err, Ok, P, type Result } from "./index.js";
-import { boom, defectOf, expectDefect, expectErr, expectOk } from "./test-helpers.js";
+
+const boom = new Error("boom");
+const defectOf = (cause: unknown): Result<number, never> =>
+  Ok(0).map<number>(() => {
+    throw cause;
+  });
 
 describe("Ok() with no argument", () => {
   it("constructs a void success", () => {
@@ -23,7 +28,8 @@ describe("Result.map", () => {
     const f = vi.fn();
     const r = Err<string>("e").map(f);
     expect(f).not.toHaveBeenCalled();
-    expectErr(r, "e");
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toBe("e");
   });
 
   it("passes a Defect through untouched without calling the callback", () => {
@@ -62,7 +68,8 @@ describe("Result.flatMap", () => {
   it("passes Err through and does not call the callback", () => {
     const f = vi.fn();
     const r = Err<string>("e").flatMap(f);
-    expectErr(r, "e");
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toBe("e");
     expect(f).not.toHaveBeenCalled();
   });
 
@@ -122,7 +129,8 @@ describe("Result.flatTap", () => {
 
   it("short-circuits to the effect's Err", () => {
     const r = Ok(5).flatTap(() => Err("denied"));
-    expectErr(r, "denied");
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toBe("denied");
   });
 
   it("propagates a Defect from the effect", () => {
@@ -164,7 +172,8 @@ describe("Result.ensure", () => {
       (n) => n > 0,
       (n) => `neg:${n}`,
     );
-    expectErr(r, "neg:-2");
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toBe("neg:-2");
   });
 
   it("refines the success type with a type-guard predicate", () => {
@@ -180,7 +189,8 @@ describe("Result.ensure", () => {
     const p = vi.fn(() => true);
     const f = vi.fn(() => "e2");
     const e = Err("e").ensure(p, f);
-    expectErr(e, "e");
+    expect(e.isErr()).toBe(true);
+    if (e.isErr()) expect(e.error).toBe("e");
     expect(defectOf(boom).ensure(p, f).isDefect()).toBe(true);
     expect(p).not.toHaveBeenCalled();
     expect(f).not.toHaveBeenCalled();
@@ -217,7 +227,8 @@ describe("Result.as", () => {
 
   it("passes Err and Defect through", () => {
     const r = Err("e").as("x");
-    expectErr(r, "e");
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toBe("e");
     expect(defectOf(boom).as("x").isDefect()).toBe(true);
   });
 });
@@ -229,7 +240,8 @@ describe("Result.discard", () => {
 
   it("passes Err and Defect through", () => {
     const r = Err("e").discard();
-    expectErr(r, "e");
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toBe("e");
     expect(defectOf(boom).discard().isDefect()).toBe(true);
   });
 });
@@ -276,7 +288,8 @@ describe("Result.mapErrCases (matcher)", () => {
     const d = errB("x").mapErrCases((matcher, defect) =>
       matcher.with(P.tag("A"), (e) => e.a).with(P.tag("B"), (_e) => defect(boom)),
     );
-    expectDefect(d, boom);
+    expect(d.isDefect()).toBe(true);
+    if (d.isDefect()) expect(d.cause).toBe(boom);
   });
 
   it("throws NonExhaustiveError → Defect when a value slips past the types", () => {
@@ -288,7 +301,8 @@ describe("Result.mapErrCases (matcher)", () => {
   it("passes Ok through and does not run the matcher", () => {
     const f = vi.fn();
     const r = Ok(1).mapErrCases((matcher) => matcher.with(P._, f));
-    expectOk(r, 1);
+    expect(r.isOk()).toBe(true);
+    if (r.isOk()) expect(r.value).toBe(1);
     expect(f).not.toHaveBeenCalled();
   });
 
@@ -333,7 +347,8 @@ describe("Result.flatMapErrCases (matcher)", () => {
 
   it("a branch may return defect(cause)", () => {
     const d = Err("e").flatMapErrCases((matcher, defect) => matcher.with(P._, (e) => defect(e)));
-    expectDefect(d, "e");
+    expect(d.isDefect()).toBe(true);
+    if (d.isDefect()) expect(d.cause).toBe("e");
   });
 
   it("passes Ok and Defect through without running the matcher", () => {
@@ -402,7 +417,8 @@ describe("Result.recoverErrCases (matcher)", () => {
 
   it("a branch returning defect(cause) stays a Defect (not a recovery)", () => {
     const d = Err("e").recoverErrCases((matcher, defect) => matcher.with(P._, (e) => defect(e)));
-    expectDefect(d, "e");
+    expect(d.isDefect()).toBe(true);
+    if (d.isDefect()) expect(d.cause).toBe("e");
   });
 
   it("converts a throw into a Defect", () => {
@@ -554,15 +570,18 @@ describe("Result.recoverDefect (the only door to a Defect)", () => {
 
   it("replaces a Defect with an Err", () => {
     const r = defectOf(boom).recoverDefect(() => Err("modeled now"));
-    expectErr(r, "modeled now");
+    expect(r.isErr()).toBe(true);
+    if (r.isErr()) expect(r.error).toBe("modeled now");
   });
 
   it("passes Ok and Err through and does not call the callback", () => {
     const f = vi.fn();
     const okR = Ok(1).recoverDefect(f);
-    expectOk(okR, 1);
+    expect(okR.isOk()).toBe(true);
+    if (okR.isOk()) expect(okR.value).toBe(1);
     const errR = Err("e").recoverDefect(f);
-    expectErr(errR, "e");
+    expect(errR.isErr()).toBe(true);
+    if (errR.isErr()) expect(errR.error).toBe("e");
     expect(f).not.toHaveBeenCalled();
   });
 

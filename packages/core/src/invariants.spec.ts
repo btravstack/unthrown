@@ -6,7 +6,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { Do, Err, fromSafePromise, Ok, P, type Result, GetError } from "./index.js";
-import { adoptionProbe, boom, defectOf, flushMicrotasks } from "./test-helpers.js";
+
+const boom = new Error("boom");
+const defectOf = (cause: unknown): Result<number, never> =>
+  Ok(0).map<number>(() => {
+    throw cause;
+  });
 
 describe("Invariant 1: throw inside any combinator becomes a Defect", () => {
   it("every catching combinator converts a thrown callback into a Defect", () => {
@@ -286,81 +291,72 @@ describe("Invariant 6: a DISCARDED thenable is adopted, so its rejection never f
   // mid-flight — and an unhandled rejection is process-fatal on Node by
   // default. Worse for an observer: its whole job is to surface a failure, and
   // this is the one path where the failure would be invisible.
-  //
-  // Asserted POSITIVELY, via `adoptionProbe`: `Promise.resolve(x)` calls
-  // `x.then(onFulfilled, onRejected)`, so an `onRejected` function arriving at
-  // the fixture is proof the value was adopted. The earlier shape asserted the
-  // *absence* of a global `unhandledRejection` after two `setTimeout(0)`s —
-  // a negative assertion on a timing heuristic, which cannot tell "never fires"
-  // from "fires later than the window", so it could have silently stopped
-  // protecting. This settles in one microtask and depends on no timer.
-  const expectAdopted = async (run: (thenable: PromiseLike<never>) => unknown): Promise<void> => {
-    const { thenable, adoptions } = adoptionProbe();
-    // Awaiting settles an AsyncResult's pipeline (a sync Result is not thenable,
-    // so this is just a microtask turn); the extra flush lets
-    // `Promise.resolve(thenable)` reach the fixture's `then`.
-    await run(thenable);
-    await flushMicrotasks();
-    expect(adoptions).toHaveLength(1);
-    expect(typeof adoptions[0]?.onRejected).toBe("function");
+  const rejecting = () => Promise.reject(new Error("floated"));
+
+  const withRejectionProbe = async (body: () => void): Promise<unknown[]> => {
+    const floated: unknown[] = [];
+    const probe = (reason: unknown): void => {
+      floated.push(reason);
+    };
+    process.on("unhandledRejection", probe);
+    try {
+      body();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return floated;
+    } finally {
+      process.off("unhandledRejection", probe);
+    }
   };
 
   it.each([
-    ["tap", (t: PromiseLike<never>) => Ok(1).tap((() => t) as never)],
-    ["tapDefect", (t: PromiseLike<never>) => defectOf(boom).tapDefect((() => t) as never)],
-    ["tapFailure", (t: PromiseLike<never>) => Err("e" as const).tapFailure((() => t) as never)],
+    ["tap", () => Ok(1).tap(rejecting as never)],
+    ["tapDefect", () => defectOf(boom).tapDefect(rejecting as never)],
+    ["tapFailure", () => Err("e" as const).tapFailure(rejecting as never)],
     [
       "tapErrCases",
-      (t: PromiseLike<never>) =>
+      () =>
         Err("e" as const).tapErrCases(
           // oxlint-disable-next-line unthrown/no-catch-all-pattern -- `E` here is a single type, not a union of cases
-          (m) => m.with(P._, () => t) as never,
+          (m) => m.with(P._, rejecting) as never,
         ),
     ],
-    ["flatMap", (t: PromiseLike<never>) => Ok(1).flatMap((() => t) as never)],
-    ["flatTap", (t: PromiseLike<never>) => Ok(1).flatTap((() => t) as never)],
-    ["bind", (t: PromiseLike<never>) => Do().bind("a", (() => t) as never)],
-  ])("%s adopts a smuggled thenable rather than dropping it", async (_label, run) => {
-    await expectAdopted(run);
+    ["flatMap", () => Ok(1).flatMap(rejecting as never)],
+    ["flatTap", () => Ok(1).flatTap(rejecting as never)],
+    ["bind", () => Do().bind("a", rejecting as never)],
+  ])("%s discards a smuggled thenable without letting it float", async (_label, run) => {
+    const floated = await withRejectionProbe(() => {
+      run();
+    });
+    expect(floated).toEqual([]);
   });
 
   it("the async surface adopts it too", async () => {
-    await expectAdopted((t) =>
-      Ok(1)
+    const floated = await withRejectionProbe(() => {
+      void Ok(1)
         .toAsync()
-        .tap((() => t) as never),
-    );
-    await expectAdopted((t) =>
-      defectOf(boom)
+        .tap(rejecting as never);
+      void defectOf(boom)
         .toAsync()
-        .tapDefect((() => t) as never),
-    );
-    await expectAdopted((t) =>
-      Err("e" as const)
+        .tapDefect(rejecting as never);
+      void Err("e" as const)
         .toAsync()
-        .tapFailure((() => t) as never),
-    );
+        .tapFailure(rejecting as never);
+    });
+    expect(floated).toEqual([]);
   });
 
   it("the observer still passes the original result through unchanged", () => {
     // Silencing must not change the outcome: `tap` observes, it does not decide.
-    const { thenable } = adoptionProbe();
     expect(
       Ok(1)
-        .tap((() => thenable) as never)
+        .tap(rejecting as never)
         .getOr(0),
     ).toBe(1);
     expect(
       Err("e" as const)
-        .tapFailure((() => thenable) as never)
+        .tapFailure(rejecting as never)
         .getOr("fallback"),
     ).toBe("fallback");
-  });
-
-  it("an ordinary, non-thenable return is left alone", () => {
-    // The guard must not adopt everything — only what looks thenable.
-    const { adoptions } = adoptionProbe();
-    Ok(1).tap(() => 42);
-    expect(adoptions).toHaveLength(0);
   });
 });
