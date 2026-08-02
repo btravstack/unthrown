@@ -78,7 +78,9 @@ import { P, type Result } from "unthrown";
 const toApiError = <T, E>(result: Result<T, E>): Result<T, ApiError> =>
   result.mapErrCases((matcher) =>
     // oxlint-disable-next-line unthrown/no-catch-all-pattern -- generic in `E`: no arm list can prove exhaustiveness
-    matcher.returnType<ApiError>().with(P._, (error) => new ApiError({ status: 500, error })),
+    matcher
+      .returnType<ApiError>()
+      .with(P._, (error) => new ApiError({ status: 500, error })),
   );
 ```
 
@@ -92,7 +94,11 @@ import { P } from "unthrown";
 result.mapErrCases((matcher) =>
   matcher
     .with(P.tag("NotFound"), () => new ApiError({ status: 404 }))
-    .with(P.tag("Conflict"), P.tag("DriverError"), (e) => new ApiError({ status: 500, error: e })),
+    .with(
+      P.tag("Conflict"),
+      P.tag("DriverError"),
+      (e) => new ApiError({ status: 500, error: e }),
+    ),
 );
 ```
 

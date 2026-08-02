@@ -514,7 +514,10 @@ export function allFromDict<R extends ResultRecord>(
  * ```ts
  * import { allAsync, fromSafePromise } from "unthrown";
  *
- * const both = allAsync([fromSafePromise(Promise.resolve(1)), fromSafePromise(Promise.resolve(2))]);
+ * const both = allAsync([
+ *   fromSafePromise(Promise.resolve(1)),
+ *   fromSafePromise(Promise.resolve(2)),
+ * ]);
  * (await both).get(); // => [1, 2]
  * ```
  */

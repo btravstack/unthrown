@@ -86,7 +86,8 @@ const user = fromPromise(fetchUser(id), (cause, defect) =>
 // Throwing fn → wrapped fn returning Result (wraps the FUNCTION, not a call)
 const parse = fromThrowable(
   (text: string) => JSON.parse(text) as unknown,
-  (cause, defect) => (cause instanceof SyntaxError ? ("invalid_json" as const) : defect(cause)),
+  (cause, defect) =>
+    cause instanceof SyntaxError ? ("invalid_json" as const) : defect(cause),
 );
 parse("nope"); // => Err("invalid_json")
 
@@ -153,7 +154,9 @@ surrounding `try/catch`:
 const message = result.match({
   ok: (age) => `age is ${age}`,
   errCases: (matcher) =>
-    matcher.with("negative", () => "must be positive").with("not_a_number", () => "not a number"),
+    matcher
+      .with("negative", () => "must be positive")
+      .with("not_a_number", () => "not a number"),
   defect: (cause) => {
     logger.error(cause);
     return "something went wrong";

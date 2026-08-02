@@ -58,7 +58,9 @@ declare const loadUser: Effect.Effect<User, NotFound | Timeout>;
 await fromEffect(loadUser).match({
   ok: (user) => user.name,
   errCases: (matcher) =>
-    matcher.with(P.tag("NotFound"), () => "missing").with(P.tag("Timeout"), () => "timed out"),
+    matcher
+      .with(P.tag("NotFound"), () => "missing")
+      .with(P.tag("Timeout"), () => "timed out"),
   defect: String,
 });
 ```

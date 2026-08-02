@@ -45,7 +45,9 @@ import { allAsync } from "unthrown";
 const page = allAsync([loadProfile(id), loadPosts(id), loadFollowers(id)]);
 // AsyncResult<[Profile, Post[], User[]], ProfileError>
 
-page.map(([profile, posts, followers]) => renderPage(profile, posts, followers));
+page.map(([profile, posts, followers]) =>
+  renderPage(profile, posts, followers),
+);
 ```
 
 Use `allFromDictAsync` to key the concurrent results by name instead of position.

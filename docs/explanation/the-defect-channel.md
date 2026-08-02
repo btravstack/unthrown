@@ -78,7 +78,9 @@ runtime:
 
 ```ts
 // the "boom" branch is what supplies the `U` in `Result<T | U, never>`
-const recovered = d.recoverErrCases((matcher) => matcher.with("boom", () => 99));
+const recovered = d.recoverErrCases((matcher) =>
+  matcher.with("boom", () => 99),
+);
 // type: Result<number, never>
 recovered.isDefect(); // => true — `never` does NOT mean "total"
 ```
@@ -133,7 +135,9 @@ only combinator that can observe a defect, and it re-enters the modeled world by
 returning a `Result`:
 
 ```ts
-d.recoverDefect((cause) => (cause instanceof RangeError ? Err("out_of_range") : Err("unknown")));
+d.recoverDefect((cause) =>
+  cause instanceof RangeError ? Err("out_of_range") : Err("unknown"),
+);
 ```
 
 Use `tapDefect` to observe a defect's cause (e.g. logging) without changing it.

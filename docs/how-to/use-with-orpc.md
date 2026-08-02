@@ -197,7 +197,9 @@ const createUser = os
         .tryCreate({ data: input })
         .mapErrCases((matcher) =>
           matcher
-            .with(P.tag("UniqueConstraintViolation"), () => errors.EMAIL_TAKEN())
+            .with(P.tag("UniqueConstraintViolation"), () =>
+              errors.EMAIL_TAKEN(),
+            )
             .with(
               P.tag("ForeignKeyViolation"),
               P.tag("Unavailable"),

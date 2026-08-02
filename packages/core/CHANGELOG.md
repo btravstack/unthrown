@@ -433,7 +433,9 @@
   const toApiError = <T, E>(result: Result<T, E>): Result<T, ApiError> =>
     result.mapErrCases((matcher) =>
       // oxlint-disable-next-line unthrown/no-catch-all-pattern -- generic in `E`: no arm list can prove exhaustiveness
-      matcher.returnType<ApiError>().with(P._, (error) => new ApiError({ status: 500, error })),
+      matcher
+        .returnType<ApiError>()
+        .with(P._, (error) => new ApiError({ status: 500, error })),
     );
   ```
 
@@ -621,7 +623,9 @@ type 'never'`. The `never` receiver now carries a message, so the diagnostic
   ```ts
   const toApiError = <T, E>(result: Result<T, E>): Result<T, ApiError> =>
     result.mapErrCases((matcher) =>
-      matcher.returnType<ApiError>().with(P._, (error) => new ApiError({ status: 500, error })),
+      matcher
+        .returnType<ApiError>()
+        .with(P._, (error) => new ApiError({ status: 500, error })),
     );
   ```
 
@@ -943,7 +947,9 @@ type 'never'`. The `never` receiver now carries a message, so the diagnostic
     ok: (n) => `got ${n}`,
     defect: (cause) => `bug: ${String(cause)}`,
     err: (matcher) =>
-      matcher.with(tag("NotFound"), () => "404").with(tag("Forbidden"), (e) => `403 for ${e.user}`),
+      matcher
+        .with(tag("NotFound"), () => "404")
+        .with(tag("Forbidden"), (e) => `403 for ${e.user}`),
   });
   ```
 

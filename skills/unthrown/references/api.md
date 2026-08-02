@@ -111,8 +111,16 @@ parameter — return it **un-terminated**. Standalone (e.g. matching a whole
   `defect(…)` branch in `flatTapErrCases`.
 - Deliberately unsupported: deep structural inversion, `P.select`, array
   patterns.
-- Matching a whole `Result` works natively:
-  `match(r).with({ tag: "Ok" }, ({ value }) => …).with({ tag: "Err" }, …).with({ tag: "Defect" }, …).exhaustive()`.
+- Matching a whole `Result` works natively — it is a discriminated union:
+
+  ```ts
+  match(r)
+    .with({ tag: "Ok" }, ({ value }) => value)
+    .with({ tag: "Err" }, ({ error }) => fallback(error))
+    .with({ tag: "Defect" }, ({ cause }) => report(cause))
+    .exhaustive();
+  ```
+
 - `NonExhaustiveError` (exported) is thrown when a rogue value slips past the
   types with no matching arm; inside combinators the throw-to-defect net turns
   it into a `Defect`, in `match` it throws.

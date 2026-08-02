@@ -80,9 +80,15 @@ await db.user.tryCreate({ data }).match({
 ```ts
 const moved = db.$tryTransaction((tx) =>
   tx.account
-    .tryUpdate({ where: { id: from }, data: { balance: { decrement: amount } } })
+    .tryUpdate({
+      where: { id: from },
+      data: { balance: { decrement: amount } },
+    })
     .flatMap(() =>
-      tx.account.tryUpdate({ where: { id: to }, data: { balance: { increment: amount } } }),
+      tx.account.tryUpdate({
+        where: { id: to },
+        data: { balance: { increment: amount } },
+      }),
     ),
 );
 // Err anywhere → both updates rolled back, and the Err is in `moved`.
@@ -106,14 +112,18 @@ const page = await db.user
 // a compile error.
 
 // Custom serialization (composite keys, non-id cursors):
-const liked = await db.like.tryPaginate({ orderBy: { postId: "asc" } }).withCursor({
-  limit: 20,
-  getCursor: ({ postId, userId }) => `${postId}:${userId}`,
-  parseCursor: (cursor) => {
-    const [postId, userId] = cursor.split(":");
-    return { userId_postId: { postId: Number(postId), userId: Number(userId) } };
-  },
-});
+const liked = await db.like
+  .tryPaginate({ orderBy: { postId: "asc" } })
+  .withCursor({
+    limit: 20,
+    getCursor: ({ postId, userId }) => `${postId}:${userId}`,
+    parseCursor: (cursor) => {
+      const [postId, userId] = cursor.split(":");
+      return {
+        userId_postId: { postId: Number(postId), userId: Number(userId) },
+      };
+    },
+  });
 ```
 
 The raw promise methods stay available on purpose: they are the escape hatch for

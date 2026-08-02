@@ -71,12 +71,22 @@ pin — but **only where the pin declares the error channel**, which is inside a
 
 ```ts
 // result: Result<User, NotFound>
-result.mapErrCases((m) => m.returnType<unknown>().with(P.tag("NotFound"), (e) => e)); // ✗ flagged — this is E
-result.mapErrCases((m) => m.returnType<ApiError>().with(P.tag("NotFound"), () => new ApiError())); // ✓
+result.mapErrCases((m) =>
+  m.returnType<unknown>().with(P.tag("NotFound"), (e) => e),
+); // ✗ flagged — this is E
+result.mapErrCases((m) =>
+  m.returnType<ApiError>().with(P.tag("NotFound"), () => new ApiError()),
+); // ✓
 
-result.recoverErrCases((m) => m.returnType<unknown>().with(P.tag("NotFound"), (e) => e)); // ✓ — the SUCCESS type
+result.recoverErrCases((m) =>
+  m.returnType<unknown>().with(P.tag("NotFound"), (e) => e),
+); // ✓ — the SUCCESS type
 result.tapErrCases((m) => m.returnType<void>().with(P.tag("NotFound"), log)); // ✓ — discarded
-result.match({ ok, defect, errCases: (m) => m.returnType<unknown>().with(P.tag("NotFound"), id) }); // ✓ — a folded value
+result.match({
+  ok,
+  defect,
+  errCases: (m) => m.returnType<unknown>().with(P.tag("NotFound"), id),
+}); // ✓ — a folded value
 ```
 
 `flatMapErrCases` / `flatTapErrCases` need no separate check: their builder output
@@ -240,7 +250,9 @@ compiling as `E` grows and silently absorbs each new case.
 ```ts
 result.mapErrCases((m) => m.with(P._, (e) => e)); // ✗ — the catch-all
 // ✓ — enumerate every case; group cases that share a handler
-result.mapErrCases((m) => m.with(P.tag("NotFound"), P.tag("Forbidden"), (e) => e));
+result.mapErrCases((m) =>
+  m.with(P.tag("NotFound"), P.tag("Forbidden"), (e) => e),
+);
 ```
 
 Because a matched builder must still be exhaustive, removing `P._` makes the
