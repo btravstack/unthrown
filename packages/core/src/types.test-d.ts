@@ -516,6 +516,9 @@ class WithMsg extends TaggedError("WithMsg")<{ ticketId: string }> {
 new WithMsg({ ticketId: "t1" });
 
 // ---------------------------------------------------------------------------
+declare const sometimesFlag: boolean;
+declare function sometimesWork(): Promise<number>;
+
 // Thenable callbacks are rejected: an async callback's rejection would bypass
 // qualification and float as an unhandled rejection (Thesis #3).
 // ---------------------------------------------------------------------------
@@ -540,6 +543,22 @@ new WithMsg({ ticketId: "t1" });
   r.flatTapErrCases((matcher) => matcher.with(P._, async () => Ok(1)));
   // @ts-expect-error — an async tapErrCases branch is banned (discarded, would float)
   r.tapErrCases((matcher) => matcher.with(P._, async () => {}));
+  // A SOMETIMES-async callback is banned too. `[R] extends [PromiseLike<…>]`
+  // is false for a partial union, so `sometimesFlag ? 1 : sometimesWork()` used to compile on
+  // every one of these — an unawaited effect whose rejection the pipeline never
+  // sees. `NotThenable` is spelled with `Extract` for exactly this, the same
+  // reasoning `fromPromise`'s async-qualify guard already used.
+  // @ts-expect-error — sometimes-async map callback is banned
+  r.map(() => (sometimesFlag ? 1 : sometimesWork()));
+  // @ts-expect-error — sometimes-async tap callback is banned
+  r.tap(() => (sometimesFlag ? 1 : sometimesWork()));
+  // @ts-expect-error — sometimes-async let callback is banned
+  r.let("k", () => (sometimesFlag ? 1 : sometimesWork()));
+  // @ts-expect-error — sometimes-async tapDefect callback is banned
+  r.tapDefect(() => (sometimesFlag ? 1 : sometimesWork()));
+  // @ts-expect-error — sometimes-async tapFailure callback is banned
+  r.tapFailure(() => (sometimesFlag ? 1 : sometimesWork()));
+
   // @ts-expect-error — async tapDefect callback is banned
   r.tapDefect(async () => {});
   // @ts-expect-error — async tapFailure callback is banned

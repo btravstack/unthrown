@@ -241,7 +241,13 @@ was planned).
   not ban it. The boundary `qualify` is constrained the same way, with a
   runtime belt-and-braces: a thenable slipped past the types becomes a
   `Defect` and its orphaned rejection is silenced (see Thesis #3). `match`
-  handlers are deliberately exempt (edge elimination).
+  handlers are deliberately exempt (edge elimination). `NotThenable` is spelled
+  `[Extract<R, PromiseLike<unknown>>] extends [never]`, **not** the tuple-wrapped
+  `[R] extends [PromiseLike<…>]`: the latter is false for a PARTIAL union, so a
+  _sometimes_-async callback (`flag ? 1 : work()`) compiled on every guarded
+  surface — still an unawaited effect whose rejection the pipeline never sees.
+  Same reasoning `fromPromise`'s async-qualify guard always used; the type
+  itself only picked it up in 5.1. Guarded in `types.test-d.ts`.
 - **A sync boundary's `fn` is sync too — enforced at RUNTIME, not by the
   types.** `fromThrowable` / `fromSafeThrowable` wrap a synchronous function, so
   they only ever see a synchronous `throw`: an `async` `fn` rejects long after
