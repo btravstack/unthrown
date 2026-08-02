@@ -12,12 +12,7 @@ import {
   Ok,
   type Result,
 } from "./index.js";
-
-const boom = new Error("boom");
-const defectOf = (cause: unknown): Result<number, never> =>
-  Ok(0).map<number>(() => {
-    throw cause;
-  });
+import { boom, defectOf, expectErr, expectOk } from "./test-helpers.js";
 
 describe("all", () => {
   it("collects a tuple of Ok values, preserving positional types", () => {
@@ -35,16 +30,14 @@ describe("all", () => {
 
   it("short-circuits on the first Err", () => {
     const r = all([Ok(1), Err("first"), Err("second")]);
-    expect(r.isErr()).toBe(true);
-    if (r.isErr()) expect(r.error).toBe("first");
+    expectErr(r, "first");
   });
 
   it("lets any Defect dominate, even over an earlier Err", () => {
     const r = all([Ok(1), Err("e"), defectOf(boom)]);
     expect(r.isDefect()).toBe(true);
     const recovered = r.recoverDefect((c) => Ok(c === boom));
-    expect(recovered.isOk()).toBe(true);
-    if (recovered.isOk()) expect(recovered.value).toBe(true);
+    expectOk(recovered, true);
   });
 
   it("keeps the first Defect when several are present", () => {
@@ -57,12 +50,10 @@ describe("all", () => {
     // The array overload: no `as` needed, even in a generic-feeling shape.
     const combine = <T, E>(rs: Result<T, E>[]): Result<T[], E> => all(rs);
     const r = combine([Ok(1), Ok(2), Ok(3)] as Result<number, string>[]);
-    expect(r.isOk()).toBe(true);
-    if (r.isOk()) expect(r.value).toEqual([1, 2, 3]);
+    expectOk(r, [1, 2, 3]);
 
     const e = combine([Ok(1), Err("bad")] as Result<number, string>[]);
-    expect(e.isErr()).toBe(true);
-    if (e.isErr()) expect(e.error).toBe("bad");
+    expectErr(e, "bad");
   });
 
   it("surfaces an out-of-contract non-Result element as a Defect (never throws)", () => {
@@ -83,13 +74,11 @@ describe("allFromDict", () => {
 
   it("short-circuits a record on the first Err and lets a Defect dominate", () => {
     const r = allFromDict({ a: Ok(1), b: Err("bad") });
-    expect(r.isErr()).toBe(true);
-    if (r.isErr()) expect(r.error).toBe("bad");
+    expectErr(r, "bad");
     const d = allFromDict({ a: Ok(1), b: Err("e"), c: defectOf(boom) });
     expect(d.isDefect()).toBe(true);
     const recovered = d.recoverDefect((c) => Ok(c === boom));
-    expect(recovered.isOk()).toBe(true);
-    if (recovered.isOk()) expect(recovered.value).toBe(true);
+    expectOk(recovered, true);
   });
 
   it("returns Ok({}) for an empty record", () => {
@@ -128,8 +117,7 @@ describe("allAsync", () => {
       fromPromise(Promise.reject("first"), (c) => c as string),
       fromPromise(Promise.reject("second"), (c) => c as string),
     ]);
-    expect(r.isErr()).toBe(true);
-    if (r.isErr()) expect(r.error).toBe("first");
+    expectErr(r, "first");
   });
 
   it("lets any Defect dominate, even over an earlier Err", async () => {
@@ -139,8 +127,7 @@ describe("allAsync", () => {
     ]);
     expect(r.isDefect()).toBe(true);
     const recovered = await r.toAsync().recoverDefect((c) => Ok(c === boom));
-    expect(recovered.isOk()).toBe(true);
-    if (recovered.isOk()) expect(recovered.value).toBe(true);
+    expectOk(recovered, true);
   });
 
   it("never rejects — await always yields a Result", async () => {
@@ -191,8 +178,7 @@ describe("allFromDictAsync", () => {
       a: fromSafePromise(Promise.resolve(1)),
       b: fromPromise(Promise.reject("bad"), (c) => c as string),
     });
-    expect(r.isErr()).toBe(true);
-    if (r.isErr()) expect(r.error).toBe("bad");
+    expectErr(r, "bad");
   });
 
   it("lets any Defect dominate over an earlier Err", async () => {

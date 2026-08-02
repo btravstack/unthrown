@@ -10,8 +10,14 @@ import {
   Ok,
   type Result,
 } from "./index.js";
-
-const boom = new Error("boom");
+import {
+  adoptionProbe,
+  boom,
+  expectDefect,
+  expectErr,
+  expectOk,
+  flushMicrotasks,
+} from "./test-helpers.js";
 
 describe("fromNullable", () => {
   it("turns null/undefined into a modeled Err", () => {
@@ -21,20 +27,16 @@ describe("fromNullable", () => {
 
   it("keeps a present value as Ok (and treats falsy non-null as present)", () => {
     const r1 = fromNullable(5, () => "absent");
-    expect(r1.isOk()).toBe(true);
-    if (r1.isOk()) expect(r1.value).toBe(5);
+    expectOk(r1, 5);
 
     const r2 = fromNullable(0, () => "absent");
-    expect(r2.isOk()).toBe(true);
-    if (r2.isOk()) expect(r2.value).toBe(0);
+    expectOk(r2, 0);
 
     const r3 = fromNullable("", () => "absent");
-    expect(r3.isOk()).toBe(true);
-    if (r3.isOk()) expect(r3.value).toBe("");
+    expectOk(r3, "");
 
     const r4 = fromNullable(false, () => "absent");
-    expect(r4.isOk()).toBe(true);
-    if (r4.isOk()) expect(r4.value).toBe(false);
+    expectOk(r4, false);
   });
 });
 
@@ -45,8 +47,7 @@ describe("fromThrowable", () => {
       () => "qualified",
     );
     const r = add(2, 3);
-    expect(r.isOk()).toBe(true);
-    if (r.isOk()) expect(r.value).toBe(5);
+    expectOk(r, 5);
   });
 
   it("triages a thrown cause into Err when qualify returns E", () => {
@@ -55,12 +56,10 @@ describe("fromThrowable", () => {
       () => "invalid-json",
     );
     const err = parse("{not json}");
-    expect(err.isErr()).toBe(true);
-    if (err.isErr()) expect(err.error).toBe("invalid-json");
+    expectErr(err, "invalid-json");
 
     const ok = parse('{"a":1}');
-    expect(ok.isOk()).toBe(true);
-    if (ok.isOk()) expect(ok.value).toEqual({ a: 1 });
+    expectOk(ok, { a: 1 });
   });
 
   it("triages a thrown cause into a Defect when qualify returns the injected defect marker", () => {
@@ -114,8 +113,7 @@ describe("fromThrowable", () => {
       (c, defect) => (c === boom ? ("known" as const) : defect(c)),
     );
     const r: Result<number, "known"> = fn();
-    expect(r.isOk()).toBe(true);
-    if (r.isOk()) expect(r.value).toBe(1);
+    expectOk(r, 1);
   });
 });
 
@@ -123,8 +121,7 @@ describe("fromSafeThrowable", () => {
   it("wraps a successful call as Ok and forwards arguments", () => {
     const add = fromSafeThrowable((a: number, b: number) => a + b);
     const r = add(2, 3);
-    expect(r.isOk()).toBe(true);
-    if (r.isOk()) expect(r.value).toBe(5);
+    expectOk(r, 5);
   });
 
   it("turns every throw into a Defect with the original cause — never an Err", () => {
@@ -150,8 +147,7 @@ describe("fromSafeThrowable", () => {
       throw "nope";
     });
     const r = fn();
-    expect(r.isDefect()).toBe(true);
-    if (r.isDefect()) expect(r.cause).toBe("nope");
+    expectDefect(r, "nope");
   });
 });
 
@@ -214,26 +210,19 @@ describe("qualify must be synchronous (runtime belt-and-braces)", () => {
     if (r.isDefect()) expect(r.cause).toBeInstanceOf(TypeError);
   });
 
-  it("an async-THROWING qualify still yields a Defect and its rejection never floats", async () => {
-    const floated: unknown[] = [];
-    const probe = (reason: unknown): void => {
-      floated.push(reason);
-    };
-    process.on("unhandledRejection", probe);
-    try {
-      const r = await fromPromise(Promise.reject(boom), (async () => {
-        throw new Error("late rejection");
-      }) as never);
-      expect(r.isDefect()).toBe(true);
-      // Give the orphaned promise time to settle and Node's unhandled-rejection
-      // detection a macrotask to fire — the adopt-and-silence handler must have
-      // claimed the rejection.
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      expect(floated).toEqual([]);
-    } finally {
-      process.off("unhandledRejection", probe);
-    }
+  it("an async qualify's orphaned thenable is ADOPTED, not left to float", async () => {
+    // Positive and deterministic: `Promise.resolve(x)` calls
+    // `x.then(onFulfilled, onRejected)`, so an `onRejected` reaching the fixture
+    // proves the orphan was adopted. The previous shape asserted the *absence*
+    // of a global `unhandledRejection` after two `setTimeout(0)`s — a negative
+    // assertion on a timing window, which cannot distinguish "never fires" from
+    // "fires later than we waited".
+    const { thenable, adoptions } = adoptionProbe();
+    const r = await fromPromise(Promise.reject(boom), (() => thenable) as never);
+    expect(r.isDefect()).toBe(true);
+    await flushMicrotasks();
+    expect(adoptions).toHaveLength(1);
+    expect(typeof adoptions[0]?.onRejected).toBe("function");
   });
 });
 
@@ -244,54 +233,45 @@ describe("the SYNC boundaries reject an async fn", () => {
   // floated as an unhandled rejection, which terminates the process on Node by
   // default. This cannot be banned at compile time without breaking generic
   // functions (`fromSafeThrowable(structuredClone)`), so it is caught here.
-  const withRejectionProbe = async (body: () => void): Promise<unknown[]> => {
-    const floated: unknown[] = [];
-    const probe = (reason: unknown): void => {
-      floated.push(reason);
-    };
-    process.on("unhandledRejection", probe);
-    try {
-      body();
-      // Two macrotasks: let the orphan settle, then let Node's
-      // unhandled-rejection detection run.
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      return floated;
-    } finally {
-      process.off("unhandledRejection", probe);
+  it("fromThrowable: an async fn is a Defect, never Ok(Promise)", () => {
+    const fn = fromThrowable(
+      async (): Promise<number> => {
+        throw boom;
+      },
+      (cause, defect) => defect(cause),
+    );
+    const r = fn();
+    expect(r.isOk()).toBe(false);
+    expect(r.isDefect()).toBe(true);
+    if (r.isDefect()) {
+      expect(r.cause).toBeInstanceOf(TypeError);
+      expect(String((r.cause as TypeError).message)).toContain("returned a thenable");
     }
-  };
-
-  it("fromThrowable: an async fn is a Defect, never Ok(Promise)", async () => {
-    const floated = await withRejectionProbe(() => {
-      const fn = fromThrowable(
-        async (): Promise<number> => {
-          throw boom;
-        },
-        (cause, defect) => defect(cause),
-      );
-      const r = fn();
-      expect(r.isOk()).toBe(false);
-      expect(r.isDefect()).toBe(true);
-      if (r.isDefect()) {
-        expect(r.cause).toBeInstanceOf(TypeError);
-        expect(String((r.cause as TypeError).message)).toContain("returned a thenable");
-      }
-    });
-    // The orphaned rejection was adopted and silenced, not left to float.
-    expect(floated).toEqual([]);
   });
 
-  it("fromSafeThrowable: an async fn is a Defect, never Ok(Promise)", async () => {
-    const floated = await withRejectionProbe(() => {
-      const fn = fromSafeThrowable(async (): Promise<number> => {
-        throw boom;
-      });
-      const r = fn();
-      expect(r.isOk()).toBe(false);
-      expect(r.isDefect()).toBe(true);
+  it("fromSafeThrowable: an async fn is a Defect, never Ok(Promise)", () => {
+    const fn = fromSafeThrowable(async (): Promise<number> => {
+      throw boom;
     });
-    expect(floated).toEqual([]);
+    expect(fn().isDefect()).toBe(true);
+  });
+
+  it.each([
+    [
+      "fromThrowable",
+      (t: PromiseLike<never>) =>
+        fromThrowable(
+          () => t,
+          (cause, defect) => defect(cause),
+        )(),
+    ],
+    ["fromSafeThrowable", (t: PromiseLike<never>) => fromSafeThrowable(() => t)()],
+  ])("%s ADOPTS the orphaned thenable rather than dropping it", async (_label, run) => {
+    const { thenable, adoptions } = adoptionProbe();
+    run(thenable);
+    await flushMicrotasks();
+    expect(adoptions).toHaveLength(1);
+    expect(typeof adoptions[0]?.onRejected).toBe("function");
   });
 
   it("a RESOLVING async fn is a Defect too — the hazard is the shape, not the outcome", async () => {
