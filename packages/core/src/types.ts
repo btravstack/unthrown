@@ -34,12 +34,19 @@ export type Bound<T, K extends string, U> = Prettify<Omit<T, K> & { readonly [P 
  * would escape the pipeline as an unhandled rejection instead of a `Defect`.
  * Lift async work with {@link fromPromise} and compose it with `flatMap`.
  *
+ * Spelled with `Extract`, not `[R] extends [PromiseLike<…>]`, so the ban also
+ * fires when only SOME arms of a union return are thenable — a *sometimes*-async
+ * callback (`flag ? 1 : work()`) is still an unawaited effect whose rejection
+ * the pipeline never sees. The tuple-wrapped form is false for a partial union
+ * and let exactly that through. This is the same reasoning `fromPromise`'s
+ * async-qualify guard already used.
+ *
  * @typeParam R - the callback's inferred return type.
  * @category Types
  */
-export type NotThenable<R> = [R] extends [PromiseLike<unknown>]
-  ? "unthrown: combinator callbacks are synchronous — lift async work with fromPromise and compose with flatMap"
-  : unknown;
+export type NotThenable<R> = [Extract<R, PromiseLike<unknown>>] extends [never]
+  ? unknown
+  : "unthrown: combinator callbacks are synchronous — lift async work with fromPromise and compose with flatMap";
 
 /**
  * The built-in match builder over an error union `E`, as produced by

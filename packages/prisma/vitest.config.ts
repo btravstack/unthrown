@@ -5,6 +5,11 @@ export default defineConfig({
     environment: "node",
     include: ["src/**/*.spec.ts"],
     coverage: {
+      // Always on, so a bare `vitest run` enforces the thresholds below.
+      // CI appends `--coverage`; a second CLI flag would crash vitest, so this
+      // lives in the config rather than in the `test` script — and local runs
+      // can no longer pass while the gate fails.
+      enabled: true,
       provider: "v8",
       include: ["src/**"],
       // The generated test client is Prisma's output, not ours.
