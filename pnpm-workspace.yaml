@@ -31,7 +31,7 @@ catalog:
   "@vitest/coverage-v8": 4.1.10
   better-sqlite3: 13.0.1
   effect: 3.22.0
-  knip: 6.27.0
+  knip: 6.29.0
   lefthook: 2.1.10
   neverthrow: 8.2.0
   oxfmt: 0.59.0
