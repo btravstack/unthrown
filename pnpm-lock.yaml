@@ -34,14 +34,14 @@ catalogs:
       specifier: 21.2.1
       version: 21.2.1
     '@orpc/client':
-      specifier: 2.0.0-beta.18
-      version: 2.0.0-beta.18
+      specifier: 2.0.0-beta.21
+      version: 2.0.0-beta.21
     '@orpc/contract':
-      specifier: 2.0.0-beta.18
-      version: 2.0.0-beta.18
+      specifier: 2.0.0-beta.21
+      version: 2.0.0-beta.21
     '@orpc/server':
-      specifier: 2.0.0-beta.18
-      version: 2.0.0-beta.18
+      specifier: 2.0.0-beta.21
+      version: 2.0.0-beta.21
     '@prisma/adapter-better-sqlite3':
       specifier: 7.8.0
       version: 7.8.0
@@ -346,13 +346,13 @@ importers:
         version: 0.1.0(typedoc-plugin-markdown@4.12.0(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3))
       '@orpc/client':
         specifier: 'catalog:'
-        version: 2.0.0-beta.18
+        version: 2.0.0-beta.21
       '@orpc/contract':
         specifier: 'catalog:'
-        version: 2.0.0-beta.18
+        version: 2.0.0-beta.21
       '@orpc/server':
         specifier: 'catalog:'
-        version: 2.0.0-beta.18
+        version: 2.0.0-beta.21
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.1
@@ -1249,22 +1249,22 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
-  '@orpc/client@2.0.0-beta.18':
-    resolution: {integrity: sha512-PZengUM+bbElAV/ci+cxvpjbeQkxFYj+c72IfktOp5hz0gekq5hkdVPiz/YTsvGxqe4H1yjwRBOmDoeQOTWGNg==}
+  '@orpc/client@2.0.0-beta.21':
+    resolution: {integrity: sha512-WzTZxmLZF9OXr6KYl/xXgkMBkwNFdCuANgVl2rHqItIlIyZQJAcayKUTJtzC9PFmNKGW+ilITNXnyEhfpILdJQ==}
 
-  '@orpc/contract@2.0.0-beta.18':
-    resolution: {integrity: sha512-IAA3L5GCtnScsLqapJ+nJkfFK1T4YBJgR+aYbJQJdX4Gu+8Eb1u10kqddurZUWKk7wJgx7yuA0VNfzB0IPlC+g==}
+  '@orpc/contract@2.0.0-beta.21':
+    resolution: {integrity: sha512-WFcf6nKR6ti5DdhjWn6vr8WkbyRrka1NLTzJbTshu/kzwoBmZBfuHNMbr+akkdt76zy99wJfD6o4jmnXlDvxLw==}
 
-  '@orpc/server@2.0.0-beta.18':
-    resolution: {integrity: sha512-5GwkBpGYd5ekSFs/PNd5T9VXt02PA1HM1zgOOnIXZvHE2RWHqI4pcZQpnjEPrto70e14xHBg+OTNlbrbt7dyUQ==}
+  '@orpc/server@2.0.0-beta.21':
+    resolution: {integrity: sha512-qMmO6aE6B0qfUwdZ444zvoswk62rqrS7ySn6x0MUN+2NBeXZp8xHfUmNUGfyZZXUh8yRmjr6BCT329nsGDAjXg==}
     peerDependencies:
       crossws: '>=0.3.4'
     peerDependenciesMeta:
       crossws:
         optional: true
 
-  '@orpc/shared@2.0.0-beta.18':
-    resolution: {integrity: sha512-b7CTKKCmHutKAGKxFu9Gd4T1JEZ0yknLZbpQAbhrphcujkKFSdIBKBr4cDRP+Rif56phJ+2qmfVDbJ6fjj1D8A==}
+  '@orpc/shared@2.0.0-beta.21':
+    resolution: {integrity: sha512-plgPrtbTgTc/JAUWjpckhHD6NKgLRKv62YZbOIadpMnBVeKPM73Bq7bXgyB2vLi64DGIhIEq64fhGXAs33+AAQ==}
     peerDependencies:
       '@opentelemetry/api': '>=1.9.0'
     peerDependenciesMeta:
@@ -4768,28 +4768,28 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
 
-  '@orpc/client@2.0.0-beta.18':
+  '@orpc/client@2.0.0-beta.21':
     dependencies:
-      '@orpc/shared': 2.0.0-beta.18
+      '@orpc/shared': 2.0.0-beta.21
       '@standardserver/core': 0.5.0
       '@standardserver/fetch': 0.5.0
       '@standardserver/peer': 0.5.0
     transitivePeerDependencies:
       - '@opentelemetry/api'
 
-  '@orpc/contract@2.0.0-beta.18':
+  '@orpc/contract@2.0.0-beta.21':
     dependencies:
-      '@orpc/client': 2.0.0-beta.18
-      '@orpc/shared': 2.0.0-beta.18
+      '@orpc/client': 2.0.0-beta.21
+      '@orpc/shared': 2.0.0-beta.21
       '@standard-schema/spec': 1.1.0
     transitivePeerDependencies:
       - '@opentelemetry/api'
 
-  '@orpc/server@2.0.0-beta.18':
+  '@orpc/server@2.0.0-beta.21':
     dependencies:
-      '@orpc/client': 2.0.0-beta.18
-      '@orpc/contract': 2.0.0-beta.18
-      '@orpc/shared': 2.0.0-beta.18
+      '@orpc/client': 2.0.0-beta.21
+      '@orpc/contract': 2.0.0-beta.21
+      '@orpc/shared': 2.0.0-beta.21
       '@standardserver/core': 0.5.0
       '@standardserver/fetch': 0.5.0
       '@standardserver/node': 0.5.0
@@ -4798,7 +4798,7 @@ snapshots:
     transitivePeerDependencies:
       - '@opentelemetry/api'
 
-  '@orpc/shared@2.0.0-beta.18':
+  '@orpc/shared@2.0.0-beta.21':
     dependencies:
       '@standardserver/shared': 0.5.0
       radash: 12.1.1
