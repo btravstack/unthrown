@@ -29,7 +29,7 @@ catalog:
   "@standard-schema/spec": ^1.1.0
   "@types/node": 26.1.1
   "@vitest/coverage-v8": 4.1.10
-  better-sqlite3: 12.11.1
+  better-sqlite3: 13.0.1
   effect: 3.22.0
   knip: 6.27.0
   lefthook: 2.1.10
