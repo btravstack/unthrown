@@ -21,8 +21,8 @@ catalog:
   "@orpc/client": 2.0.0-beta.21
   "@orpc/contract": 2.0.0-beta.21
   "@orpc/server": 2.0.0-beta.21
-  "@prisma/adapter-better-sqlite3": 7.8.0
-  "@prisma/client": 7.8.0
+  "@prisma/adapter-better-sqlite3": 7.9.0
+  "@prisma/client": 7.9.0
   # Ranged, not pinned: published as a regular dependency of
   # @unthrown/standard-schema — an exact pin would block dedupe with a
   # consumer's own copy of the (types-only) spec package.
@@ -36,7 +36,7 @@ catalog:
   neverthrow: 8.2.0
   oxfmt: 0.59.0
   oxlint: 1.74.0
-  prisma: 7.8.0
+  prisma: 7.9.0
   tsdown: 0.22.14
   tsx: 4.23.1
   turbo: 2.10.7
