@@ -8,7 +8,7 @@ import type {
 import type { AsyncResult } from "unthrown";
 
 import type { PgQueryError } from "../errors.js";
-import { type ResultThen, settle } from "./awaitable.js";
+import { type ResultThen, resultThen, runQuery } from "./awaitable.js";
 import type { UnthrownPgPreparedQuery, UnthrownPgSession } from "./session.js";
 
 /**
@@ -55,11 +55,10 @@ export class PgUnthrownRefreshMaterializedView<
   execute(
     placeholderValues?: Record<string, unknown>,
   ): AsyncResult<PgQueryResultKind<TQueryResult, never>, PgQueryError> {
-    return this._prepare().execute(placeholderValues);
+    return runQuery(() => this._prepare(), placeholderValues);
   }
 
   /** {@inheritDoc ResultThen} */
   // oxlint-disable-next-line no-thenable -- deliberate: a builder is thenable so `await db.select()...` runs it, exactly as drizzle's own promise and Effect trees make theirs. It settles to a Result and never rejects — see ResultThen.
-  readonly then: ResultThen<PgQueryResultKind<TQueryResult, never>> = (onFulfilled, onRejected) =>
-    settle(this.execute()).then(onFulfilled, onRejected);
+  readonly then: ResultThen<PgQueryResultKind<TQueryResult, never>> = resultThen(this);
 }

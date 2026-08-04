@@ -600,6 +600,24 @@ export class UnthrownPgDatabase<
   /**
    * Run a statement drizzle does not model — a raw `SQL` fragment or a string.
    *
+   * @remarks
+   * Unlike every other entry point, this one compiles its argument **eagerly**,
+   * because `PgUnthrownRaw` is defined as holding an already-prepared query
+   * (that is what makes its `getSQL`, `getQuery` and `_prepare` synchronous
+   * accessors, exactly as in drizzle). Compilation therefore happens here rather
+   * than at `await`, and a `SQLWrapper` that cannot compile **throws at this call
+   * site** instead of yielding a defect.
+   *
+   * That is a deliberate line, not an oversight: the contract this package makes
+   * is about *running* a query — awaiting a builder, or calling its `execute()` —
+   * and `db.execute(…)` is the factory that produces one, not the run itself. The
+   * builder it returns is fully guarded. Reaching the throw takes handing in a
+   * query builder that is already broken (`db.execute(db.select({ t:
+   * other.col }).from(users))`); a string or a `sql` template — the documented
+   * use — cannot. Closing the gap would mean deferring compilation, which would
+   * cost `PgRaw`'s shape and its synchronous accessors for a case where the
+   * argument, not the statement, is the bug.
+   *
    * @example
    * ```ts
    * const result = await db.execute(sql`select now()`);

@@ -4,7 +4,7 @@ import type { PgTransactionConfig, PreparedQueryConfig } from "drizzle-orm/pg-co
 import { defineRelations } from "drizzle-orm/relations";
 import { eq } from "drizzle-orm/sql/expressions/conditions";
 import { type Query, sql } from "drizzle-orm/sql/sql";
-import type { AsyncResult } from "unthrown";
+import { type AsyncResult, isDefect } from "unthrown";
 import { describe, expect, it } from "vitest";
 // Registers the Result matchers used throughout this file (`toBeOkWith`, …).
 import "@unthrown/vitest";
@@ -21,12 +21,18 @@ const users = pgTable("users", {
   name: text("name").notNull(),
 });
 
+/** A second table, never joined, used to provoke a compilation failure. */
+const posts = pgTable("posts", {
+  id: integer("id").primaryKey(),
+  title: text("title").notNull(),
+});
+
 const userCounts = pgMaterializedView("user_counts", {
   name: text("name").notNull(),
   total: integer("total").notNull(),
 }).as(sql`select "name", count(*) as "total" from "users" group by "name"`);
 
-const relations = defineRelations({ users });
+const relations = defineRelations({ users, posts });
 
 /** The driver-result kind a fake node-postgres would expose. */
 type FakeQueryResultHKT = {
@@ -312,10 +318,18 @@ describe("UnthrownPgDatabase — CTEs and relational queries", () => {
     await db.with(adults).delete(users);
     await db.with(adults).update(users).set({ name: "grace" });
     await db.with(adults).insert(users).values({ id: 2, name: "grace" });
-    db.with(adults).selectDistinct();
-    db.with(adults).selectDistinctOn([users.id]);
+    await db.with(adults).selectDistinct().from(users);
+    await db.with(adults).selectDistinctOn([users.id]).from(users);
 
-    expect(session.asked.map((a) => a.sql.startsWith('with "adults"'))).toEqual([true, true, true]);
+    expect(session.asked.map((a) => a.sql.startsWith('with "adults"'))).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+    ]);
+    expect(session.asked[3]?.sql).toContain("select distinct");
+    expect(session.asked[4]?.sql).toContain("select distinct on");
   });
 
   it("builds a CTE from a raw SQL fragment and an explicit selection", async () => {
@@ -372,6 +386,85 @@ describe("UnthrownPgDatabase — refreshMaterializedView", () => {
     const prepared = db.refreshMaterializedView(userCounts).concurrently().prepare("refresh");
 
     expect(await prepared.execute()).toBeOk();
+  });
+});
+
+/**
+ * A session that refuses to prepare anything, standing in for every way the
+ * compile-and-prepare step can blow up. Preparing a query is not bookkeeping —
+ * it runs `getSQL()` and the dialect's query builders — so a throw there must
+ * land in the defect channel rather than escaping as a rejection.
+ */
+class ThrowingSession extends UnthrownPgSession<never> {
+  constructor() {
+    super(new PgDialect());
+  }
+
+  override prepareQuery(): never {
+    throw new Error("prepare exploded");
+  }
+
+  override transaction<A, E>(
+    _fn: (tx: never) => AsyncResult<A, E>,
+    _config?: PgTransactionConfig,
+  ): AsyncResult<A, E | PgQueryError> {
+    throw new Error("not part of this task");
+  }
+}
+
+const throwingDb = () =>
+  new UnthrownPgDatabase<FakeQueryResultHKT, typeof relations>(
+    new PgDialect(),
+    new ThrowingSession(),
+    relations,
+  );
+
+describe("UnthrownPgDatabase — a failure while compiling the query", () => {
+  // The reachable, type-legal mistake: `posts.title` is selected but `posts` is
+  // never joined, so drizzle throws out of `buildSelectQuery` — inside
+  // `_prepare`, ahead of any driver call. Before this was moved inside the
+  // failure boundary the throw escaped `then`, and `await` REJECTED: a consumer
+  // folding with `match({ ok, errCases, defect })` and no try/catch crashed.
+  const broken = () => makeDb(rows([])).db.select({ t: posts.title }).from(users);
+
+  it("yields a Defect when the builder is awaited, rather than rejecting", async () => {
+    await expect(broken()).toBeDefect();
+  });
+
+  it("yields a Defect from execute(), rather than throwing", async () => {
+    expect(await broken().execute()).toBeDefect();
+  });
+
+  it("carries drizzle's own compilation error as the defect's cause", async () => {
+    const result = await broken();
+
+    expect(isDefect(result)).toBe(true);
+    if (isDefect(result)) {
+      expect(result.cause).toBeInstanceOf(Error);
+      expect((result.cause as Error).message).toContain('the table "posts" is not part of');
+    }
+  });
+
+  it("does not reject even when the compiled query is never reached", async () => {
+    // `.resolves` is the direct statement of the contract: the thenable settles.
+    await expect(broken().execute()).resolves.toBeDefined();
+  });
+
+  // Every builder prepares inside `execute()`, so each needs the same guard.
+  // A session that throws from `prepareQuery` stands in for the whole
+  // compile-and-prepare path — including `PgUnthrownCountBuilder.build()`, which
+  // compiles without a `_prepare` of its own.
+  it.each([
+    ["select", () => throwingDb().select().from(users)],
+    ["insert", () => throwingDb().insert(users).values({ id: 1, name: "ada" })],
+    ["update", () => throwingDb().update(users).set({ name: "grace" })],
+    ["delete", () => throwingDb().delete(users)],
+    ["$count", () => throwingDb().$count(users)],
+    ["relational query", () => throwingDb().query.users.findMany()],
+    ["refreshMaterializedView", () => throwingDb().refreshMaterializedView(userCounts)],
+  ])("routes a %s prepare failure to the defect channel", async (_name, build) => {
+    await expect(build()).toBeDefect();
+    expect(await build().execute()).toBeDefect();
   });
 });
 
