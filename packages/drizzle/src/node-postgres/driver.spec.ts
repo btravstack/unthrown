@@ -57,12 +57,13 @@ describe("drizzle()", () => {
     if (isOk(r)) expect(typeof r.value[0]?.id).toBe("number");
   });
 
-  // Deliberately ahead of every error-provoking case below. `pg-pool` destroys
-  // and reopens its connection on ANY query error (see `startPg`'s note), and a
-  // replacement racing the dying one's server-side teardown intermittently
-  // desynced this read's response framing — an `Ok([])` for a row that is
-  // certainly there. Nothing to do with the relational API; it was simply the
-  // first read after three consecutive failures.
+  // Deliberately ahead of every error-provoking case below, and kept that way.
+  // Under the old PGlite harness `pg-pool`'s destroy-and-reopen on a query
+  // error raced the one shared backend's teardown and intermittently desynced
+  // this read — an `Ok([])` for a row that is certainly there. A real
+  // PostgreSQL gives every connection a backend of its own, so the race is
+  // gone; the ordering costs nothing and this read is a stronger check when
+  // the table is known to hold exactly the seed row.
   it("wires the relational query API when relations are configured", async () => {
     const related = drizzle({ client: fixture.pool, relations });
     const r = await related.query.users.findMany({ where: { id: 1 } });

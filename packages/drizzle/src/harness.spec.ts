@@ -34,10 +34,10 @@ describe("test harness", () => {
 
 describe("collectErrors", () => {
   // Unit-level coverage of the collect-and-continue discipline `stop()` and
-  // `startPg`'s partial-startup failure paths both rely on (test-harness.ts
+  // `startPg`'s partial-startup failure path both rely on (test-harness.ts
   // review finding: a failing release step must never mask or skip another
   // one). Exercised directly against the real exported function with
-  // deliberately failing steps — no PGlite/pg mocking required, since the
+  // deliberately failing steps — no server/pg mocking required, since the
   // behaviour under test lives entirely in `collectErrors` itself.
 
   it("runs every step and returns an empty array when all succeed", async () => {
@@ -99,11 +99,11 @@ describe("collectErrors", () => {
 
 describe("test harness isolation", () => {
   it("does not let two concurrent fixtures see each other's tables", async () => {
-    // Booting two PGlite (WASM) instances concurrently reliably exceeds
-    // vitest's 5s default test timeout on a loaded machine, even though
-    // neither fixture is hung — confirmed by running this with a 30s
-    // timeout and observing ~8-9s total. Widened rather than optimised
-    // away: startup cost is inherent to two independent WASM instances.
+    // Two fixtures at once, which is also the shape the suite itself runs in:
+    // every worker creates databases on the one shared server concurrently.
+    // The timeout stays generous because the work is a real `CREATE DATABASE`
+    // on a server other workers are hammering, not because it is expected to
+    // be slow.
     const [a, b] = await Promise.all([startPg(), startPg()]);
 
     try {

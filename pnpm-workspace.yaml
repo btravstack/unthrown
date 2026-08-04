@@ -18,8 +18,6 @@ catalog:
   "@btravstack/typedoc": 0.1.0
   "@changesets/cli": 2.31.1
   "@commitlint/cli": 21.2.1
-  "@electric-sql/pglite": 0.5.4
-  "@electric-sql/pglite-socket": 0.2.7
   "@orpc/client": 2.0.0-beta.21
   "@orpc/contract": 2.0.0-beta.21
   "@orpc/server": 2.0.0-beta.21
@@ -29,6 +27,7 @@ catalog:
   # @unthrown/standard-schema — an exact pin would block dedupe with a
   # consumer's own copy of the (types-only) spec package.
   "@standard-schema/spec": ^1.1.0
+  "@testcontainers/postgresql": 12.0.4
   "@types/node": 26.1.1
   # 8.20.1/8.20.2/8.20.3 are all within the minimumReleaseAge window as of
   # pinning; 8.20.0 is the newest release past it.
@@ -103,22 +102,18 @@ peerDependencyRules:
     - react
     - react-dom
     - "@types/react"
-    # `@electric-sql/pglite-socket`'s optional extension peers (pgvector, age,
-    # pg_hashids, pg_ivm, pg_textsearch, pg_uuidv7, pgtap) — declared as
-    # peerDependencies with no `peerDependenciesMeta` marking them optional, but
-    # only needed when actually loading that extension into PGlite. The test
-    # harness (`@unthrown/drizzle`) serves a plain PGlite instance.
-    - "@electric-sql/pglite-pgvector"
-    - "@electric-sql/pglite-age"
-    - "@electric-sql/pglite-pg_hashids"
-    - "@electric-sql/pglite-pg_ivm"
-    - "@electric-sql/pglite-pg_textsearch"
-    - "@electric-sql/pglite-pg_uuidv7"
-    - "@electric-sql/pglite-pgtap"
 
 allowBuilds:
   # Prisma 7 is engine-less (WASM query compiler); nothing to build or download.
   "@prisma/engines": false
+  # `testcontainers`' Docker transport (dockerode > ssh2) and its protobuf codec.
+  # All three are optional native/codegen accelerations: `ssh2` only matters for
+  # a Docker host reached over SSH (ours is the local daemon socket), and
+  # `cpu-features` is `ssh2`'s own optional speed-up. Declared `false` rather
+  # than left unanswered so `pnpm install` stays warning-free.
+  cpu-features: false
+  protobufjs: false
+  ssh2: false
   # Native SQLite bindings for `@unthrown/prisma`'s tests (prebuilt binaries).
   better-sqlite3: true
   esbuild: true

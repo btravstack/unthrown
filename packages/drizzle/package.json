@@ -66,8 +66,7 @@
   "devDependencies": {
     "@btravstack/tsconfig": "catalog:",
     "@btravstack/typedoc": "catalog:",
-    "@electric-sql/pglite": "catalog:",
-    "@electric-sql/pglite-socket": "catalog:",
+    "@testcontainers/postgresql": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
     "@unthrown/vitest": "workspace:*",
