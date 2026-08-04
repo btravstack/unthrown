@@ -1,5 +1,5 @@
 import { integer, pgMaterializedView, pgTable, text } from "drizzle-orm/pg-core";
-import { eq } from "drizzle-orm/sql/expressions/conditions";
+import { eq, inArray } from "drizzle-orm/sql/expressions/conditions";
 import { sql } from "drizzle-orm/sql/sql";
 import pg from "pg";
 import { DoAsync, isDefect, isErr, isOk, P, type Result } from "unthrown";
@@ -187,8 +187,7 @@ const expectDefectCause = <E>(result: Result<unknown, E>): unknown => {
 };
 
 /**
- * How many rows the table holds under `id` — the after-the-fact check that a
- * rollback really happened, rather than merely being reported.
+ * How many rows the table holds — for the checks that assert a row is PRESENT.
  *
  * @remarks
  * Read through `$count` on the database under test rather than through a second
@@ -201,11 +200,37 @@ const expectDefectCause = <E>(result: Result<unknown, E>): unknown => {
  * exactly one live connection. Nothing is lost: the transaction has already
  * ended by the time this runs, so the rows it reads are committed state either
  * way.
+ *
+ * Only ever compared against a NON-zero expectation. `$count` maps a missing
+ * cell to `0` (`countOf` in `count.ts`, keeping drizzle's own coercion), so a
+ * read that came back empty is indistinguishable from a genuine zero — which
+ * makes this the wrong instrument for proving a row is absent. Use
+ * {@link survivorsOf} for that.
  */
 const rowsUnder = async (count: PromiseLike<Result<number, never>>): Promise<number> =>
   // `get()` only type-checks on a `Result<T, never>`, so this line is also the
   // compile-time half of the reads-are-defect-only ruling.
   (await count).get();
+
+/**
+ * Which of a set of candidate ids actually survived — the after-the-fact check
+ * that a rollback really happened, rather than merely being reported.
+ *
+ * @remarks
+ * A **set**, not a count, and always asked about at least one row that MUST
+ * still be there. An absence check phrased as `count(id) === 0` is satisfied by
+ * a read that returned nothing at all — the very symptom (an empty rowset from
+ * a response-framing desync) that this file's one-connection rule exists to
+ * prevent, and therefore the one failure mode these assertions have to be able
+ * to see. Naming a surviving row makes the expectation non-empty, so a vacuous
+ * `[]` fails instead of passing.
+ *
+ * `orderBy` is not decoration: without it the surviving set comes back in
+ * whatever order the scan produced, and the comparison would be flaky.
+ */
+const survivorsOf = async (
+  rows: PromiseLike<Result<readonly { id: number }[], never>>,
+): Promise<number[]> => (await rows).get().map((row) => row.id);
 
 describe("SQLSTATE mapping against a real PostgreSQL", () => {
   let fixture: PgFixture;
@@ -344,14 +369,27 @@ describe("defect routing against a real PostgreSQL", () => {
     // that is still very much alive — a genuine infrastructure failure, not a
     // "you already ended this pool" guard.
     const pool = new pg.Pool(solo.pool.options);
+    // Stopping the fixture is a STEP of this test, not only its cleanup, so it
+    // needs a guard rather than a second `stop()` in the `finally`: `stop()`
+    // closes the WASM instance, and calling it twice makes `db.close()` throw
+    // "PGlite is closed", which `collectErrors` would surface as an
+    // `AggregateError` out of the cleanup. With the guard, an assertion that
+    // fails before the planned stop still releases the fixture below.
+    let stopped = false;
+    const stopSolo = async (): Promise<void> => {
+      if (stopped) return;
+      stopped = true;
+      await solo.stop();
+    };
     try {
       const soloDb = drizzle({ client: pool });
       await expect(soloDb.execute(sql`SELECT 1`).execute()).toBeOk();
-      await solo.stop();
+      await stopSolo();
       const result = await soloDb.execute(sql`SELECT 1`).execute();
       expectDefectCause(result);
     } finally {
       await pool.end();
+      await stopSolo();
     }
   });
 
@@ -464,9 +502,18 @@ describe("transactions on a connection pool", () => {
         .bind("clash", () => tx.insert(users).values({ id: 12, email: "a@b.c" }).execute()),
     );
     expect(expectErrOf(result, UniqueConstraintViolation).constraint).toBe("users_email_key");
-    // The Result says it rolled back; the database is what proves it.
-    expect(await rowsUnder(db.$count(users, eq(users.id, 11)))).toBe(0);
-    expect(await rowsUnder(db.$count(users, eq(users.id, 12)))).toBe(0);
+    // The Result says it rolled back; the database is what proves it. Of the
+    // seed row and the two the transaction wrote, only the seed survives — the
+    // seed being named is what stops an empty read passing (see `survivorsOf`).
+    expect(
+      await survivorsOf(
+        db
+          .select({ id: users.id })
+          .from(users)
+          .where(inArray(users.id, [1, 11, 12]))
+          .orderBy(users.id),
+      ),
+    ).toEqual([1]);
   });
 
   it("rolls back and stays a Defect when the callback throws", async () => {
@@ -480,7 +527,15 @@ describe("transactions on a connection pool", () => {
         }),
     );
     expect(expectDefectCause(result)).toBeInstanceOf(Error);
-    expect(await rowsUnder(db.$count(users, eq(users.id, 13)))).toBe(0);
+    expect(
+      await survivorsOf(
+        db
+          .select({ id: users.id })
+          .from(users)
+          .where(inArray(users.id, [1, 13]))
+          .orderBy(users.id),
+      ),
+    ).toEqual([1]);
   });
 
   it("surfaces a DEFERRABLE constraint raised by COMMIT as a modeled error", async () => {
@@ -493,7 +548,17 @@ describe("transactions on a connection pool", () => {
     const error = expectErrOf(result, UniqueConstraintViolation);
     expect(error.constraint).toBe("deferred_code_key");
     expect(sqlstateOf(error.cause)).toBe("23505");
-    expect(await rowsUnder(db.$count(deferred, eq(deferred.id, 2)))).toBe(0);
+    // Row 1 was written by this very test, so it is the control: the rollback
+    // took row 2 and nothing else.
+    expect(
+      await survivorsOf(
+        db
+          .select({ id: deferred.id })
+          .from(deferred)
+          .where(inArray(deferred.id, [1, 2]))
+          .orderBy(deferred.id),
+      ),
+    ).toEqual([1]);
   });
 
   it("undoes only the nested scope, so the enclosing transaction still commits", async () => {
@@ -513,8 +578,17 @@ describe("transactions on a connection pool", () => {
         .flatMap(() => tx.insert(users).values({ id: 15, email: "t5@x.y" }).execute()),
     );
     expect(isOk(result)).toBe(true);
-    expect(await rowsUnder(db.$count(users, eq(users.id, 14)))).toBe(0);
-    expect(await rowsUnder(db.$count(users, eq(users.id, 15)))).toBe(1);
+    // The nested scope's row is gone and the enclosing one's is not — as a set,
+    // so neither half can be satisfied by a read that came back empty.
+    expect(
+      await survivorsOf(
+        db
+          .select({ id: users.id })
+          .from(users)
+          .where(inArray(users.id, [14, 15]))
+          .orderBy(users.id),
+      ),
+    ).toEqual([15]);
   });
 
   it("renders the transaction config into the BEGIN", async () => {
@@ -570,7 +644,17 @@ describe("transactions on a bare pg.Client", () => {
         .bind("clash", () => tx.insert(users).values({ id: 22, email: "a@b.c" }).execute()),
     );
     expect(expectErrOf(result, UniqueConstraintViolation).constraint).toBe("users_email_key");
-    expect(await rowsUnder(db.$count(users, eq(users.id, 21)))).toBe(0);
+    // The seed and the row the previous case committed are the controls; both
+    // of this transaction's rows are gone.
+    expect(
+      await survivorsOf(
+        db
+          .select({ id: users.id })
+          .from(users)
+          .where(inArray(users.id, [1, 20, 21, 22]))
+          .orderBy(users.id),
+      ),
+    ).toEqual([1, 20]);
     // The same client, immediately after a rolled-back transaction: a session
     // left mid-transaction would fail this, and a pool would have hidden it by
     // handing out a different connection.
@@ -590,6 +674,14 @@ describe("transactions on a bare pg.Client", () => {
         }),
     );
     expect(expectDefectCause(result)).toBeInstanceOf(Error);
-    expect(await rowsUnder(db.$count(users, eq(users.id, 23)))).toBe(0);
+    expect(
+      await survivorsOf(
+        db
+          .select({ id: users.id })
+          .from(users)
+          .where(inArray(users.id, [1, 23]))
+          .orderBy(users.id),
+      ),
+    ).toEqual([1]);
   });
 });
