@@ -862,8 +862,11 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   `PgQueryError` **whatever the callback's own channel**, since a `DEFERRABLE`
   constraint is checked at `COMMIT` and the commit can raise 23505 on its own
   account; nesting is a savepoint, named from a counter **shared by every
-  handle descended from one transaction** (depth-based naming, drizzle's
-  scheme, collides under concurrently-started nested transactions). A query
+  handle descended from one transaction** and claimed before anything is
+  issued — **not** by nesting depth, which is drizzle's scheme and collides:
+  two nested transactions started concurrently (which `allAsync` makes easy to
+  write) would both be `sp1` on the one connection, and the first
+  `rollback to savepoint sp1` would unwind the other's work. A query
   builder is a **thenable**, not an `AsyncResult` — `await` it into a `Result`,
   or end the chain in `.execute()` to reach the combinators; compilation runs
   _inside_ the boundary (`prepare` is a thunk), so a `getSQL()` throw is a

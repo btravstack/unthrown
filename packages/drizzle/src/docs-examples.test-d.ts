@@ -1,4 +1,4 @@
-// Every code sample this package ships in prose, compiled.
+// The SHAPE of every code sample this package ships in prose, compiled.
 //
 // The samples in `docs/how-to/use-with-drizzle.md`, in this package's README and
 // in the `@example` blocks on `pg-core/db.ts` are markdown: nothing typechecks
@@ -13,10 +13,30 @@
 // stops compiling fails the gate. Keep it in step with the prose: when you edit
 // a sample in either place, edit it here too.
 //
-// Placeholder bindings the prose leaves to the reader (`pool`, `id`, `email`, a
-// `resp` responder) are `declare const`s — the point is the shape of the call,
-// not where its inputs come from.
+// WHAT THIS DOES NOT GUARANTEE. This is a hand-maintained MIRROR, not an
+// extraction: unlike core's `doc-examples.spec.ts`, nothing here reads the
+// markdown, so a sample added to the prose and not to this file is simply
+// unchecked. It also checks each call's shape against a schema declared BELOW,
+// not against the schema the prose implies, so three kinds of divergence are
+// deliberate and are marked at the site where they occur:
+//
+//   1. Table and column names. The `db.ts` blocks are drizzle's own, written
+//      against `cars` (with `brand` / `color`) and a `users.name`; the fixtures
+//      here are `users` / `posts` / `logs` / `accounts`. The methods and the
+//      chaining are what is under test, not the identifiers.
+//   2. Columns the prose omits. `logs.id` has no default here, so the mirror
+//      passes an `id` the guide's `values({ message })` leaves out — a reader's
+//      `logs` table would generate it.
+//   3. Placeholder bindings the prose leaves to the reader (`pool`, `id`,
+//      `email`, a `resp` responder) are `declare const`s.
+//
+// What it DOES guarantee is the part that actually broke: that every method
+// exists on the receiver the prose hangs it off, in that order, with arguments
+// of the right kind, and that each channel is what the prose claims (a `.get()`
+// only compiles on `Result<T, never>`, so every `.get()` below is an assertion
+// that the read really has an empty error channel).
 import { eq, sql } from "drizzle-orm";
+import { drizzle as drizzleStock } from "drizzle-orm/node-postgres";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import { defineRelations } from "drizzle-orm/relations";
 import pg from "pg";
@@ -174,6 +194,9 @@ export const txSample = async () =>
 export const nestedTxSample = async () =>
   await db.transaction((tx) =>
     tx
+      // Divergence (2): the guide writes `values({ message })`, on a `logs`
+      // table whose id is generated. The fixture's `logs.id` has no default, so
+      // the mirror supplies one. The savepoint nesting is the point.
       .transaction((nested) => nested.insert(logs).values({ id, message }).execute())
       .recoverErrCases((matcher) =>
         matcher.with(
@@ -198,10 +221,23 @@ export const readmeTxSample = async () =>
   );
 
 // --- escape hatch --------------------------------------------------------------
+//
+// The `$client` hand-off is the sample most exposed to rot: it is the only one
+// whose shape depends on a FOREIGN factory's signature, across a peer range
+// (`drizzle-orm` ^1.0.0-rc) whose rcs are free to change it. That is exactly why
+// it is compiled here rather than trusted.
+export const stockDbSample = drizzleStock({ client: db.$client, relations });
+
 export const rawSample = async () =>
   await fromPromise(() => pool.query("insert into users values ($1)", [id]), qualifyPgError);
 
 // --- db.ts @example samples ----------------------------------------------------
+//
+// Divergence (1) applies throughout this block: drizzle's inherited blocks are
+// written against a `cars` table (`brand`, `color`) and a `users.name`, and the
+// mirror rewrites them onto the `users` fixture above (`email` standing in for
+// `brand` / `name`). The identifiers are not what these samples teach — the
+// builder chain and the `Result` wrapping are.
 export const countSample = async () => (await db.$count(users, eq(users.id, id))).get();
 
 export const cteSample = async () => {
