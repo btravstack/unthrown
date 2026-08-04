@@ -3,7 +3,7 @@ import { PgDialect } from "drizzle-orm/pg-core/dialect";
 import { defineRelations } from "drizzle-orm/relations";
 import { eq } from "drizzle-orm/sql/expressions/conditions";
 import pg from "pg";
-import { ErrAsync, fromSafePromise, isDefect, OkAsync, P } from "unthrown";
+import { allAsync, ErrAsync, fromSafePromise, isDefect, OkAsync, P } from "unthrown";
 import { describe, expect, it } from "vitest";
 // Registers the Result matchers used throughout this file (`toBeOkWith`, …).
 import "@unthrown/vitest";
@@ -80,9 +80,20 @@ class FakeClient {
  * A recording stand-in for a pool. Named so that the session's own pool
  * detection — `instanceof pg.Pool`, then a constructor-name check for the
  * cross-copy case — recognises it exactly as it recognises pg's `BoundPool`.
+ *
+ * @remarks
+ * It records into its **own** `ran`, and deliberately does not delegate to the
+ * checked-out client. A pool's `query` takes an arbitrary connection out of the
+ * pool for each statement, so a transaction that ran through it would fan
+ * `begin` / the work / `commit` across different connections — committing on a
+ * connection with no transaction open, leaving the work uncommitted, and handing
+ * a stale open transaction back to the pool. Two separate recorders are what
+ * makes that visible: the checked-out client must hold the whole sequence and
+ * the pool must hold nothing.
  */
 class FakePool {
   readonly client: FakeClient;
+  readonly ran: Ran[] = [];
   connects = 0;
 
   constructor(
@@ -99,10 +110,22 @@ class FakePool {
   }
 
   query(
-    config: { text: string; rowMode?: string; name?: string; types?: pg.CustomTypesConfig },
+    config: {
+      text: string;
+      rowMode?: string;
+      name?: string;
+      types?: pg.CustomTypesConfig;
+    },
     params: unknown[],
   ): Promise<{ rows: unknown[] }> {
-    return this.client.query(config, params);
+    this.ran.push({
+      sql: config.text,
+      params,
+      rowMode: config.rowMode,
+      name: config.name,
+      types: config.types,
+    });
+    return Promise.resolve({ rows: [] });
   }
 }
 
@@ -114,8 +137,8 @@ const asClient = (fake: FakeClient | FakePool): NodePgClient => fake as unknown 
 const sessionOn = (client: FakeClient | FakePool) =>
   new NodePgUnthrownSession(asClient(client), new PgDialect(), relations);
 
-/** The SQL text of everything the client was asked to run, in order. */
-const statements = (client: FakeClient) => client.ran.map((r) => r.sql);
+/** The SQL text of everything a recorder was asked to run, in order. */
+const statements = (recorder: FakeClient | FakePool) => recorder.ran.map((r) => r.sql);
 
 describe("NodePgUnthrownSession — prepareQuery", () => {
   it("runs a query through the client and hands back its rows", async () => {
@@ -388,6 +411,29 @@ describe("NodePgUnthrownSession — pooling", () => {
 
     expect(pool.connects).toBe(1);
     expect(statements(pool.client)).toEqual(["begin", "commit"]);
+    // Nothing went through the pool itself: every statement of a transaction
+    // must run on the one checked-out connection, or `commit` lands on a
+    // connection with no transaction open and the work is never committed.
+    expect(statements(pool)).toEqual([]);
+    expect(pool.client.released).toBe(1);
+    expect(result).toBeOk();
+  });
+
+  it("runs the callback's own queries on the checked-out connection too", async () => {
+    const pool = new FakePool();
+
+    const result = await sessionOn(pool).transaction((tx) =>
+      tx.select().from(users).where(eq(users.id, 1)).execute(),
+    );
+
+    // The realistic shape: a builder query inside a pooled transaction. It is
+    // the transaction's session — the one built on the checked-out client —
+    // that the builder must have been handed.
+    expect(statements(pool.client)).toHaveLength(3);
+    expect(statements(pool.client)[0]).toBe("begin");
+    expect(statements(pool.client)[1]).toContain('from "users"');
+    expect(statements(pool.client)[2]).toBe("commit");
+    expect(statements(pool)).toEqual([]);
     expect(pool.client.released).toBe(1);
     expect(result).toBeOk();
   });
@@ -406,6 +452,8 @@ describe("NodePgUnthrownSession — pooling", () => {
       ),
     );
 
+    expect(statements(pool.client)).toEqual(["begin", "rollback"]);
+    expect(statements(pool)).toEqual([]);
     expect(pool.client.released).toBe(1);
   });
 
@@ -416,7 +464,23 @@ describe("NodePgUnthrownSession — pooling", () => {
       throw new Error("boom");
     });
 
+    expect(statements(pool.client)).toEqual(["begin", "rollback"]);
+    expect(statements(pool)).toEqual([]);
     expect(pool.client.released).toBe(1);
+  });
+
+  it("runs a nested transaction's savepoints on the checked-out connection", async () => {
+    const pool = new FakePool();
+
+    await sessionOn(pool).transaction((tx) => tx.transaction(() => OkAsync(1)));
+
+    expect(statements(pool.client)).toEqual([
+      "begin",
+      "savepoint sp1",
+      "release savepoint sp1",
+      "commit",
+    ]);
+    expect(statements(pool)).toEqual([]);
   });
 
   it("releases the client when the begin fails", async () => {
@@ -424,6 +488,8 @@ describe("NodePgUnthrownSession — pooling", () => {
 
     const result = await sessionOn(pool).transaction(() => OkAsync(1));
 
+    expect(statements(pool.client)).toEqual(["begin"]);
+    expect(statements(pool)).toEqual([]);
     expect(pool.client.released).toBe(1);
     expect(result).toBeDefect();
   });
@@ -433,6 +499,8 @@ describe("NodePgUnthrownSession — pooling", () => {
 
     await sessionOn(pool).transaction(() => OkAsync(1));
 
+    expect(statements(pool.client)).toEqual(["begin", "commit"]);
+    expect(statements(pool)).toEqual([]);
     expect(pool.client.released).toBe(1);
   });
 
@@ -445,6 +513,8 @@ describe("NodePgUnthrownSession — pooling", () => {
     expect(isDefect(result) && result.cause).toBe(failure);
     expect(pool.client.released).toBe(0);
     expect(statements(pool.client)).toEqual([]);
+    // In particular it does not fall back to running the transaction on the pool.
+    expect(statements(pool)).toEqual([]);
   });
 
   it("recognises a real pg.Pool by identity, not only by name", async () => {
@@ -545,7 +615,7 @@ describe("NodePgUnthrownTransaction — nested transactions", () => {
     expect(result).toBeDefect();
   });
 
-  it("numbers savepoints by nesting depth", async () => {
+  it("gives each savepoint in a nested chain its own name", async () => {
     const client = new FakeClient();
 
     await sessionOn(client).transaction((tx) =>
@@ -560,6 +630,77 @@ describe("NodePgUnthrownTransaction — nested transactions", () => {
       "release savepoint sp1",
       "commit",
     ]);
+  });
+
+  it("hands a nested transaction the enclosing one's parseRqbJson", async () => {
+    // Dead until the driver factory sets it, and silently wrong from then on:
+    // a nested handle built with the 4-argument form would default it to false
+    // and decode relational JSON differently from its parent. Read off the
+    // handle because that is the only place it is observable — the database
+    // base class forwards it to its query builders without keeping it.
+    const readParseRqbJson = (tx: NodePgUnthrownTransaction<typeof relations>): unknown =>
+      (tx as unknown as { parseRqbJson: unknown }).parseRqbJson;
+
+    const outer = new NodePgUnthrownTransaction(
+      new PgDialect(),
+      sessionOn(new FakeClient()),
+      relations,
+      undefined,
+      true,
+    );
+    let nested: NodePgUnthrownTransaction<typeof relations> | undefined;
+
+    await outer.transaction((tx) => {
+      nested = tx;
+      return OkAsync(1);
+    });
+
+    expect(readParseRqbJson(outer)).toBe(true);
+    expect(nested).toBeDefined();
+    expect(nested === undefined ? undefined : readParseRqbJson(nested)).toBe(true);
+  });
+
+  it("gives sequential sibling savepoints distinct names", async () => {
+    const client = new FakeClient();
+
+    await sessionOn(client).transaction((tx) =>
+      tx.transaction(() => OkAsync(1)).flatMap(() => tx.transaction(() => OkAsync(2))),
+    );
+
+    expect(statements(client)).toEqual([
+      "begin",
+      "savepoint sp1",
+      "release savepoint sp1",
+      "savepoint sp2",
+      "release savepoint sp2",
+      "commit",
+    ]);
+  });
+
+  it("gives concurrent sibling savepoints distinct names", async () => {
+    // Two nested transactions in flight at once on the one connection. Named by
+    // nesting depth they would both be `sp1`, and the first `rollback to
+    // savepoint sp1` would unwind the other's work — `allAsync` makes that an
+    // easy thing to write, so the counter has to be shared, not per-depth.
+    const client = new FakeClient();
+
+    const result = await sessionOn(client).transaction((tx) =>
+      allAsync([tx.transaction(() => OkAsync(1)), tx.transaction(() => OkAsync(2))]),
+    );
+
+    const savepoints = statements(client).filter((s) => s.startsWith("savepoint "));
+    expect(savepoints).toHaveLength(2);
+    expect(new Set(savepoints).size).toBe(2);
+    // Each one is released under its own name, and both are live at once.
+    expect(statements(client)).toEqual([
+      "begin",
+      "savepoint sp1",
+      "savepoint sp2",
+      "release savepoint sp1",
+      "release savepoint sp2",
+      "commit",
+    ]);
+    expect(result).toBeOkWith([1, 2]);
   });
 });
 

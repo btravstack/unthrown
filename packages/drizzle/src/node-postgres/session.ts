@@ -369,12 +369,17 @@ export class NodePgUnthrownTransaction<
 > extends UnthrownPgDatabase<NodePgQueryResultHKT, TRelations> {
   static override readonly [entityKind]: string = "NodePgUnthrownTransaction";
 
+  /**
+   * @param savepoints - the savepoint-name counter, **shared by every handle
+   * descended from one transaction** (see {@link transaction}). Defaults to a
+   * fresh one, which is what a root transaction wants.
+   */
   constructor(
     dialect: PgDialect,
     session: UnthrownPgSession<unknown>,
     relations: TRelations,
-    private readonly nestedIndex = 0,
-    parseRqbJson = false,
+    private readonly savepoints: { count: number } = { count: 0 },
+    private readonly parseRqbJson = false,
   ) {
     super(dialect, session, relations, parseRqbJson);
   }
@@ -399,6 +404,14 @@ export class NodePgUnthrownTransaction<
    * `Defect` roll back to it. Only the nested scope is undone, so the enclosing
    * transaction stays open and decides for itself — recover the inner `Err` and
    * the outer scope still commits.
+   *
+   * Savepoint names come from a counter **shared by every handle descended from
+   * one transaction**, so no two live savepoints on that connection can share a
+   * name. Naming them by nesting depth (drizzle's scheme) is safe only while
+   * nested transactions are started one after another; two started concurrently
+   * — which `allAsync` makes an easy thing to write — would both be `sp1` on the
+   * one connection, and the first `rollback to savepoint sp1` would unwind the
+   * other's work.
    *
    * @example
    * ```ts
@@ -432,9 +445,20 @@ export class NodePgUnthrownTransaction<
     fn: (tx: NodePgUnthrownTransaction<TRelations>) => AsyncResult<A, E>,
     // oxlint-disable-next-line unthrown/prefer-async-result -- see `runScope`: this promise must stay able to reject, so `transaction` can qualify the whole sequence exactly once.
   ): Promise<Result<A, E>> {
-    const depth = this.nestedIndex + 1;
-    const name = `sp${depth}`;
-    const tx = new NodePgUnthrownTransaction(this.dialect, this.session, this._.relations, depth);
+    // Claimed before anything is issued, so two concurrent nested transactions
+    // cannot both take the same number.
+    this.savepoints.count += 1;
+    const name = `sp${this.savepoints.count}`;
+    const tx = new NodePgUnthrownTransaction(
+      this.dialect,
+      this.session,
+      this._.relations,
+      // The same counter, so a savepoint nested inside this one is numbered
+      // against every other live savepoint on the connection, not just its
+      // siblings.
+      this.savepoints,
+      this.parseRqbJson,
+    );
 
     return await runScope(
       controlOn(this.session, this.dialect),
