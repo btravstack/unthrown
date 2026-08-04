@@ -21,24 +21,20 @@ import { type PgFixture, startPg } from "./test-harness.js";
 // Why most of this file drives a bare `pg.Client` rather than the harness pool
 // ---------------------------------------------------------------------------
 //
-// Originally a workaround: the harness used to serve PGlite over
-// `pglite-socket`, which multiplexes every TCP connection onto ONE backend, and
-// `pg.Pool` destroys and reopens its connection on ANY query error
-// (`Pool.prototype.query` calls `client.release(err)`, and `_release` with an
-// error goes straight to `_remove` → `client.end()`). A suite that provokes an
-// error in nearly every case therefore churned the one session constantly, and
-// a `SELECT` intermittently resolved to `Ok([])` for a row that was certainly
-// there. A standalone `pg.Client` is never released with the error, so it does
-// not churn — which removed the precondition instead of waiting it out.
+// Originally a workaround for electric-sql/pglite#958, under the PGlite harness
+// this suite no longer uses: a `SELECT` intermittently resolved to `Ok([])` for
+// a row that was certainly there. (See test-harness.ts for the real cause — a
+// duplicate `ReadyForQuery` after an errored extended-query batch. `pg.Pool`'s
+// destroy-and-reopen on a failing query was an early suspect, but the reducer
+// inverted that: the churn was a mitigation, not the fault.)
 //
-// The harness now runs a real PostgreSQL, where every connection gets a backend
-// of its own and the churn is harmless. The bare-client form stays because it
-// is worth covering on its own account: `isPool` is false for a `Client`, so
-// `transaction` runs on the session as-is with nothing checked out, and the
-// statements below then all run on ONE connection whose state is observable
-// across cases (see "rolls back on Err and leaves the client usable"). The pool
-// keeps a block of its own below for the paths that are about being a pool
-// (`isPool` → `pool.connect()` inside `transaction`).
+// The bare-client form stays because it is worth covering on its own account:
+// `isPool` is false for a `Client`, so `transaction` runs on the session as-is
+// with nothing checked out, and the statements below then all run on ONE
+// connection whose state is observable across cases (see "rolls back on Err and
+// leaves the client usable"). The pool keeps a block of its own below for the
+// paths that are about being a pool (`isPool` → `pool.connect()` inside
+// `transaction`).
 
 const users = pgTable("users", {
   id: integer("id").primaryKey(),
@@ -361,7 +357,7 @@ describe("defect routing against a real PostgreSQL", () => {
     expect(sqlstateOf(expectDefectCause(result))).toBe("22P02");
   });
 
-  it("routes a lost connection to the defect channel", async () => {
+  it("routes a database dropped underneath a live pool to the defect channel", async () => {
     const solo = await startPg();
     // A pool of our own, so stopping the fixture pulls the database out from
     // under a client that is still very much alive — a genuine infrastructure
@@ -389,7 +385,19 @@ describe("defect routing against a real PostgreSQL", () => {
       await expect(soloDb.execute(sql`SELECT 1`).execute()).toBeOk();
       await stopSolo();
       const result = await soloDb.execute(sql`SELECT 1`).execute();
-      expectDefectCause(result);
+      const cause = expectDefectCause(result);
+      // Two outcomes are reachable here, and the assertion names both rather
+      // than branching on them. Normally the FORCE drop's termination has
+      // already reached the pool, which discarded the dead client, so this
+      // query opens a FRESH connection and PostgreSQL answers 3D000
+      // (invalid_catalog_name) — measured on 4/4 probes. A query dispatched
+      // before the termination arrives instead dies on the socket, with no
+      // SQLSTATE at all. Pinning only 3D000 would make that unobserved race the
+      // very kind of flake this harness was rewritten to remove; asserting the
+      // pair still fails on anything else, including an `Ok`.
+      const sqlstate = sqlstateOf(cause);
+      const message = cause instanceof Error ? cause.message : String(cause);
+      expect(sqlstate ?? message).toMatch(/^3D000$|Connection terminated/);
     } finally {
       await pool.end();
       await stopSolo();

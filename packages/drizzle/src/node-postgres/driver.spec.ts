@@ -58,12 +58,12 @@ describe("drizzle()", () => {
   });
 
   // Deliberately ahead of every error-provoking case below, and kept that way.
-  // Under the old PGlite harness `pg-pool`'s destroy-and-reopen on a query
-  // error raced the one shared backend's teardown and intermittently desynced
-  // this read — an `Ok([])` for a row that is certainly there. A real
-  // PostgreSQL gives every connection a backend of its own, so the race is
-  // gone; the ordering costs nothing and this read is a stronger check when
-  // the table is known to hold exactly the seed row.
+  // Under the old PGlite harness this read intermittently came back `Ok([])`
+  // for a row that is certainly there — electric-sql/pglite#958, a duplicate
+  // `ReadyForQuery` after an errored extended-query batch desyncing the
+  // responses that followed it (see test-harness.ts). Real PostgreSQL does not
+  // send it, so the ordering is no longer load-bearing; it costs nothing, and
+  // this read is a stronger check while the table holds exactly the seed row.
   it("wires the relational query API when relations are configured", async () => {
     const related = drizzle({ client: fixture.pool, relations });
     const r = await related.query.users.findMany({ where: { id: 1 } });
