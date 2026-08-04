@@ -1,9 +1,12 @@
-import { placeholder, type Query } from "drizzle-orm/sql/sql";
-import { isDefect, isErr, isOk } from "unthrown";
+import { PgDialect } from "drizzle-orm/pg-core/dialect";
+import type { PreparedQueryConfig } from "drizzle-orm/pg-core/session";
+import { placeholder, type Query, sql } from "drizzle-orm/sql/sql";
+import { type AsyncResult, isDefect, isErr, isOk } from "unthrown";
 import { describe, expect, it } from "vitest";
 
+import type { PgQueryError } from "../errors.js";
 import { UniqueConstraintViolation } from "../errors.js";
-import { UnthrownPgPreparedQuery } from "./session.js";
+import { UnthrownPgPreparedQuery, UnthrownPgSession } from "./session.js";
 
 const noopLogger = { logQuery: () => undefined };
 const query: Query = { sql: "select 1", params: [] };
@@ -78,5 +81,66 @@ describe("UnthrownPgPreparedQuery", () => {
     const cause = new Error("raw");
 
     await expect(prepared(() => Promise.reject(cause)).runUnqualified()).rejects.toBe(cause);
+  });
+});
+
+/** The transaction handle the stub session below hands to a callback. */
+type StubTx = { readonly kind: "stub" };
+
+/**
+ * The smallest real subclass of the abstract session: it records what
+ * `prepareQuery` was asked for and answers with a prepared query over a fake
+ * executor. That makes the row shape each raw-SQL entry point requests
+ * observable — `execute`, `arrays` and `objects` differ by one string literal,
+ * so a copy-paste swap is otherwise silent.
+ */
+class StubSession extends UnthrownPgSession<StubTx> {
+  readonly asked: { sql: string; mode: "arrays" | "objects" | "raw" }[] = [];
+
+  constructor(private readonly rows: unknown) {
+    super(new PgDialect());
+  }
+
+  override prepareQuery<T extends PreparedQueryConfig = PreparedQueryConfig>(
+    q: Query,
+    mode: "arrays" | "objects" | "raw",
+  ): UnthrownPgPreparedQuery<T> {
+    this.asked.push({ sql: q.sql, mode });
+    return new UnthrownPgPreparedQuery<T>(async () => this.rows, q, undefined, mode, noopLogger);
+  }
+
+  override transaction<A, E>(
+    fn: (tx: StubTx) => AsyncResult<A, E>,
+  ): AsyncResult<A, E | PgQueryError> {
+    return fn({ kind: "stub" });
+  }
+}
+
+describe("UnthrownPgSession", () => {
+  it("asks for raw rows in execute, and returns the prepared query's result", async () => {
+    const session = new StubSession([{ n: 1 }]);
+
+    const r = await session.execute(sql`select 1`);
+
+    expect(session.asked).toEqual([{ sql: "select 1", mode: "raw" }]);
+    expect(isOk(r) && r.value).toEqual([{ n: 1 }]);
+  });
+
+  it("asks for array rows in arrays, and returns the prepared query's result", async () => {
+    const session = new StubSession([[1]]);
+
+    const r = await session.arrays(sql`select 1`);
+
+    expect(session.asked).toEqual([{ sql: "select 1", mode: "arrays" }]);
+    expect(isOk(r) && r.value).toEqual([[1]]);
+  });
+
+  it("asks for object rows in objects, and returns the prepared query's result", async () => {
+    const session = new StubSession([{ n: 1 }]);
+
+    const r = await session.objects(sql`select 1`);
+
+    expect(session.asked).toEqual([{ sql: "select 1", mode: "objects" }]);
+    expect(isOk(r) && r.value).toEqual([{ n: 1 }]);
   });
 });
