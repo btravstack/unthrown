@@ -98,6 +98,17 @@ type _dbFromString = Expect<
   Equal<typeof dbFromString, NodePgUnthrownDatabase & { $client: pg.Pool }>
 >;
 
+// The two-argument form shares overload 1 with the bare-string call above, but
+// that call leaves `TRelations` at its default — so this is the only place a
+// relational schema is pinned as flowing through the *string* overload.
+const dbFromStringWithConfig = drizzle("postgres://localhost/app", { relations });
+type _dbFromStringWithConfig = Expect<
+  Equal<
+    typeof dbFromStringWithConfig,
+    NodePgUnthrownDatabase<typeof relations> & { $client: pg.Pool }
+  >
+>;
+
 const dbFromConnection = drizzle({ connection: "postgres://localhost/app", relations });
 type _dbFromConnection = Expect<
   Equal<typeof dbFromConnection, NodePgUnthrownDatabase<typeof relations> & { $client: pg.Pool }>
@@ -113,6 +124,18 @@ drizzle(pool);
 //
 // `get()` is typed `this: Result<T, never>`, so every `.get()` below is itself
 // an assertion: it stops compiling the moment a read grows a modeled error.
+//
+// EVERY err-only assertion is paired with a success-channel pin (or a `.get()`
+// on the same route), and that pairing is load-bearing rather than decorative.
+// `ErrOf<R>` is `R extends { tag: "Err"; error: infer E } ? E : never`, so it
+// answers `never` for anything that is not a `Result` at all — including the
+// raw rows a builder would hand back if the `Result` wrapping were dropped.
+// An `Equal<ErrChannel<…>, never>` on its own therefore pins "empty channel OR
+// not wrapped", which is not the claim. The `OkChannel` pin is what forces the
+// value to still BE a `Result` carrying the right rows; the two together say
+// what one alone does not. (The reopening direction — a read growing a modeled
+// error — is caught by the err-only half regardless, since
+// `Equal<PgQueryError, never>` is false.)
 
 const selectRead = async () => await db.select().from(users);
 type _selectErr = Expect<Equal<ErrChannel<typeof selectRead>, never>>;
@@ -126,15 +149,20 @@ type _selectGet = Expect<
 // `execute()` is the second route into the same query and must agree.
 const selectExecute = async () => await db.select().from(users).where(eq(users.id, 1)).execute();
 type _selectExecuteErr = Expect<Equal<ErrChannel<typeof selectExecute>, never>>;
+type _selectExecuteOk = Expect<
+  Equal<OkChannel<typeof selectExecute>, { id: number; email: string }[]>
+>;
 
 const countRead = async () => (await db.$count(users)).get();
 type _count = Expect<Equal<Awaited<ReturnType<typeof countRead>>, number>>;
 
 const countExecute = async () => await db.$count(users, eq(users.id, 1)).execute();
 type _countErr = Expect<Equal<ErrChannel<typeof countExecute>, never>>;
+type _countExecuteOk = Expect<Equal<OkChannel<typeof countExecute>, number>>;
 
 const findMany = async () => await db.query.users.findMany();
 type _findManyErr = Expect<Equal<ErrChannel<typeof findMany>, never>>;
+type _findManyOk = Expect<Equal<OkChannel<typeof findMany>, { id: number; email: string }[]>>;
 
 const findFirstGet = async () => (await db.query.users.findFirst()).get();
 type _findFirstOk = Expect<
@@ -143,9 +171,13 @@ type _findFirstOk = Expect<
 
 const refresh = async () => await db.refreshMaterializedView(userCounts);
 type _refreshErr = Expect<Equal<ErrChannel<typeof refresh>, never>>;
+type _refreshOk = Expect<Equal<OkChannel<typeof refresh>, pg.QueryResult<never>>>;
 
 const refreshConcurrently = async () => await db.refreshMaterializedView(userCounts).concurrently();
 type _refreshConcurrentlyErr = Expect<Equal<ErrChannel<typeof refreshConcurrently>, never>>;
+type _refreshConcurrentlyOk = Expect<
+  Equal<OkChannel<typeof refreshConcurrently>, pg.QueryResult<never>>
+>;
 
 // No `Equal` here on purpose: `get()` returns the *unwrapped* value, so an
 // `ErrOf` of it would be `never` whatever the channel had been — a vacuous
@@ -170,13 +202,20 @@ type _preparedSelectOk = Expect<
 
 const preparedSelectErr = async () => await db.select().from(users).prepare("p_select2").execute();
 type _preparedSelectErr = Expect<Equal<ErrChannel<typeof preparedSelectErr>, never>>;
+type _preparedSelectErrOk = Expect<
+  Equal<OkChannel<typeof preparedSelectErr>, { id: number; email: string }[]>
+>;
 
 const preparedFindMany = async () => await db.query.users.findMany().prepare("p_rqb").execute();
 type _preparedFindManyErr = Expect<Equal<ErrChannel<typeof preparedFindMany>, never>>;
+type _preparedFindManyOk = Expect<
+  Equal<OkChannel<typeof preparedFindMany>, { id: number; email: string }[]>
+>;
 
 const preparedRefresh = async () =>
   await db.refreshMaterializedView(userCounts).prepare("p_refresh").execute();
 type _preparedRefreshErr = Expect<Equal<ErrChannel<typeof preparedRefresh>, never>>;
+type _preparedRefreshOk = Expect<Equal<OkChannel<typeof preparedRefresh>, pg.QueryResult<never>>>;
 
 // --- writes: the full constraint union ---------------------------------------
 
@@ -351,37 +390,3 @@ type _txScopedReadErr = Expect<Equal<ErrChannel<typeof txScopedRead>, PgQueryErr
 type _txScopedReadOk = Expect<
   Equal<OkChannel<typeof txScopedRead>, { id: number; email: string }[]>
 >;
-
-export {
-  countExecute,
-  countRead,
-  db,
-  defectBranch,
-  deleteWrite,
-  exhaustive,
-  findFirstGet,
-  findMany,
-  insertGet,
-  insertWrite,
-  missingArm,
-  preparedFindMany,
-  preparedInsert,
-  preparedRefresh,
-  preparedSelect,
-  preparedSelectErr,
-  rawWrite,
-  recovered,
-  refresh,
-  refreshConcurrently,
-  refreshGet,
-  returningWrite,
-  selectExecute,
-  selectGet,
-  selectRead,
-  txCleanCallback,
-  txDomainError,
-  txGet,
-  txScopedRead,
-  txWrite,
-  updateWrite,
-};
