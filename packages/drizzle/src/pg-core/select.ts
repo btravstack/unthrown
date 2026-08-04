@@ -16,7 +16,7 @@ import type { Assume } from "drizzle-orm/utils";
 import type { AsyncResult } from "unthrown";
 
 import { type ResultThen, resultThen, runSafeQuery } from "./awaitable.js";
-import type { UnthrownPgPreparedQuery, UnthrownPgSession } from "./session.js";
+import type { UnthrownPgSafePreparedQuery, UnthrownPgSession } from "./session.js";
 
 /**
  * The higher-kinded type that keeps every chained `select` method returning an
@@ -106,7 +106,7 @@ export class PgUnthrownSelectBase<
   _prepare(
     name?: string,
     generateName = false,
-  ): UnthrownPgPreparedQuery<PreparedQueryConfig & { execute: TResult }> {
+  ): UnthrownPgSafePreparedQuery<PreparedQueryConfig & { execute: TResult }> {
     const { session, dialect, cacheConfig, usedTables } = this;
     const query = this.config.tagged
       ? dialect._sqlToQuery(this.getSQL())
@@ -117,14 +117,19 @@ export class PgUnthrownSelectBase<
     // honest without a non-null assertion.
     const fieldsList = this.config.fieldsFlat ?? [];
     const mapper = this.dialect.mapperGenerators.rows(fieldsList, this.joinsNotNullableMap);
-    return session.prepareQuery(
-      query,
-      "arrays",
-      name ?? generateName,
-      mapper,
-      { type: "select", tables: [...usedTables] },
-      cacheConfig,
-    );
+    // `.asSafe()` is what keeps `prepare(name).execute()` — a third way to run
+    // this read, alongside `execute()` and `await` — on the same defect-only
+    // boundary as the other two.
+    return session
+      .prepareQuery<PreparedQueryConfig & { execute: TResult }>(
+        query,
+        "arrays",
+        name ?? generateName,
+        mapper,
+        { type: "select", tables: [...usedTables] },
+        cacheConfig,
+      )
+      .asSafe();
   }
 
   /**
@@ -132,9 +137,12 @@ export class PgUnthrownSelectBase<
    * remember this query for the given session and call it by name, rather than
    * specifying the full query.
    *
+   * Its `execute()` carries the same `never` error channel as this builder's —
+   * see {@link UnthrownPgSafePreparedQuery}.
+   *
    * {@link https://www.postgresql.org/docs/current/sql-prepare.html | Postgres prepare documentation}
    */
-  prepare(name: string): UnthrownPgPreparedQuery<PreparedQueryConfig & { execute: TResult }> {
+  prepare(name: string): UnthrownPgSafePreparedQuery<PreparedQueryConfig & { execute: TResult }> {
     return this._prepare(name, true);
   }
 

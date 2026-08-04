@@ -32,6 +32,7 @@ export {
   type PgQueryMode,
   type PgRowMapper,
   UnthrownPgPreparedQuery,
+  UnthrownPgSafePreparedQuery,
   UnthrownPgSession,
 } from "./pg-core/session.js";
 export {

@@ -3,7 +3,7 @@ import { defineRelations } from "drizzle-orm/relations";
 import { eq } from "drizzle-orm/sql/expressions/conditions";
 import { sql } from "drizzle-orm/sql/sql";
 import pg from "pg";
-import { Err, isDefect, isErr, isOk, P } from "unthrown";
+import { Err, isDefect, isErr, isOk, P, type Result } from "unthrown";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 // Registers the Result matchers used throughout this file (`toBeOkWith`, …).
 import "@unthrown/vitest";
@@ -55,6 +55,18 @@ describe("drizzle()", () => {
     // The real driver returns `int4` as a JS string over the wire; a row that
     // arrived undecoded would still pass a loose shape check.
     if (isOk(r)) expect(typeof r.value[0]?.id).toBe("number");
+  });
+
+  // Deliberately ahead of every error-provoking case below. `pg-pool` destroys
+  // and reopens its connection on ANY query error (see `startPg`'s note), and a
+  // replacement racing the dying one's server-side teardown intermittently
+  // desynced this read's response framing — an `Ok([])` for a row that is
+  // certainly there. Nothing to do with the relational API; it was simply the
+  // first read after three consecutive failures.
+  it("wires the relational query API when relations are configured", async () => {
+    const related = drizzle({ client: fixture.pool, relations });
+    const r = await related.query.users.findMany({ where: { id: 1 } });
+    await expect(r).toBeOkWith([{ id: 1, email: "a@b.c" }]);
   });
 
   it("routes a constraint violation to the modeled error channel", async () => {
@@ -110,12 +122,6 @@ describe("drizzle()", () => {
         ),
       );
     await expect(r).toBeErrWith("UniqueConstraintViolation");
-  });
-
-  it("wires the relational query API when relations are configured", async () => {
-    const related = drizzle({ client: fixture.pool, relations });
-    const r = await related.query.users.findMany({ where: { id: 1 } });
-    await expect(r).toBeOkWith([{ id: 1, email: "a@b.c" }]);
   });
 });
 
@@ -202,12 +208,15 @@ describe("read builders declare E = never, and the runtime enforces it", () => {
   /** A read whose selected field raises SQLSTATE 23505 when the row is produced. */
   const violatingRead = () => db.select({ v: sql<number>`dup_insert()` }).from(users);
 
-  const expect23505Defect = (r: { tag: string; cause?: unknown }): void => {
+  // Typed as what a read actually hands back — `Result<unknown, never>` — which
+  // is also the assertion: only a value whose error channel is already empty can
+  // be passed in. `isDefect` then narrows, so reading `cause` needs no cast.
+  const expect23505Defect = (r: Result<unknown, never>): void => {
     // `isErr` is asserted false explicitly: the whole point is that this failure
     // must NOT reach the modeled channel the type says is empty.
-    expect(isErr(r as never)).toBe(false);
-    expect(isDefect(r as never)).toBe(true);
-    expect((r.cause as { code?: string } | undefined)?.code).toBe("23505");
+    expect(isErr(r)).toBe(false);
+    expect(isDefect(r)).toBe(true);
+    if (isDefect(r)) expect((r.cause as { code?: string }).code).toBe("23505");
   };
 
   it("sends a 23505 raised on a read path to the defect channel via execute()", async () => {
@@ -234,6 +243,25 @@ describe("read builders declare E = never, and the runtime enforces it", () => {
     expect23505Defect(r);
   });
 
+  // `prepare(name).execute()` is the THIRD route to running a read, next to
+  // `execute()` and `await`. It hands back a prepared query object whose own
+  // `execute` used to qualify — so a prepared read produced the very `Err` the
+  // builder's `never` says is impossible. `$count` is absent below because
+  // drizzle's `PgCountBuilder` exposes no `prepare()` at all.
+  it("sends a 23505 to the defect channel through a prepared select", async () => {
+    const r = await violatingRead().prepare("prepared_select").execute();
+    expect23505Defect(r);
+  });
+
+  it("sends a 23505 to the defect channel through a prepared relational query", async () => {
+    const related = drizzle({ client: fixture.pool, relations });
+    const r = await related.query.users
+      .findMany({ extras: { v: sql<number>`dup_insert()`.as("v") } })
+      .prepare("prepared_rqb")
+      .execute();
+    expect23505Defect(r);
+  });
+
   it("keeps `.get()` compiling on a read — it only type-checks while E is never", async () => {
     // This is the compile guard, not a runtime assertion: `get()` is typed
     // `this: Result<T, never>`, so if a read builder's error channel ever
@@ -243,6 +271,10 @@ describe("read builders declare E = never, and the runtime enforces it", () => {
 
     const total = (await db.$count(users)).get();
     expect(total).toBe(1);
+
+    // The same guard on the prepared route — this is what Finding 1 was about.
+    const prepared = await db.select().from(users).prepare("get_guard").execute();
+    expect(prepared.get()).toEqual([{ id: 1, email: "a@b.c" }]);
   });
 
   it("still gives a WRITE the modeled error channel — reads are the exception", async () => {

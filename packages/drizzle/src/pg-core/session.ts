@@ -8,7 +8,7 @@ import {
   type PreparedQueryConfig,
 } from "drizzle-orm/pg-core/session";
 import { fillPlaceholders, type Query, type SQL } from "drizzle-orm/sql/sql";
-import { type AsyncResult, fromPromise } from "unthrown";
+import { type AsyncResult, fromPromise, fromSafePromise } from "unthrown";
 
 import { type PgQueryError, qualifyPgError } from "../errors.js";
 import { runQuery } from "./awaitable.js";
@@ -126,6 +126,77 @@ export class UnthrownPgPreparedQuery<
     placeholderValues: Record<string, unknown> = {},
   ): AsyncResult<T["execute"], PgQueryError> {
     return fromPromise(() => this.runUnqualified(placeholderValues), qualifyPgError);
+  }
+
+  /**
+   * The same prepared query, with **every** failure routed to the defect
+   * channel.
+   *
+   * @remarks
+   * What a read builder's `prepare(name)` hands back. Reads declare `E = never`,
+   * and `prepare()` is a third route to running one — alongside `execute()` and
+   * `await` — so it has to reach the same boundary or the claim is false for a
+   * prepared read. See {@link UnthrownPgSafePreparedQuery}.
+   *
+   * A fresh instance rather than a flag, so the failure boundary is fixed at
+   * construction and cannot be flipped on a live query.
+   *
+   * @internal
+   */
+  asSafe(): UnthrownPgSafePreparedQuery<T> {
+    return new UnthrownPgSafePreparedQuery<T>(
+      this.executor,
+      this.query,
+      this.mapper,
+      this.mode,
+      this.logger,
+    );
+  }
+}
+
+/**
+ * A prepared query whose every failure is a defect — the read builders' half of
+ * {@link UnthrownPgPreparedQuery}.
+ *
+ * @remarks
+ * A read has no modeled failure (see {@link runSafeQuery}), so the four read
+ * builders declare `E = never`. Their `prepare(name)` returns one of these, so
+ * running a *prepared* read reaches the same `fromSafePromise` boundary that
+ * `execute()` and `await` do — all three routes agree, and none of them can put
+ * a value in a channel the type calls empty.
+ *
+ * This is a subclass rather than a type parameter on
+ * {@link UnthrownPgPreparedQuery} deliberately. A parameterised `E` would have
+ * to pick its boundary from a constructor-injected function, and the injected
+ * default (`fromPromise` + `qualifyPgError`, typed `PgQueryError`) is not
+ * assignable to an unresolved `E` — so the single-class form needs a cast
+ * exactly where the type and the runtime must not be allowed to drift apart.
+ * Overriding `execute` needs none: `AsyncResult` is covariant in `E`, so
+ * `AsyncResult<T, never>` already satisfies the base's declaration, and the
+ * narrower type is reachable *only* through this class, whose `execute` is the
+ * safe one. The weld is by construction.
+ *
+ * @typeParam T - drizzle's per-query config, whose `execute` member is the value
+ * the query resolves to.
+ *
+ * @category Session
+ */
+export class UnthrownPgSafePreparedQuery<
+  T extends PreparedQueryConfig = PreparedQueryConfig,
+> extends UnthrownPgPreparedQuery<T> {
+  static override readonly [entityKind]: string = "UnthrownPgSafePreparedQuery";
+
+  /**
+   * Run the query. Every failure — a constraint violation raised by a volatile
+   * function the read called included — is a `Defect`; the error channel is
+   * `never`.
+   *
+   * @param placeholderValues - values for the query's named placeholders.
+   */
+  override execute(
+    placeholderValues: Record<string, unknown> = {},
+  ): AsyncResult<T["execute"], never> {
+    return fromSafePromise(() => this.runUnqualified(placeholderValues));
   }
 }
 

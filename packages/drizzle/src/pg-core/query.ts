@@ -7,7 +7,7 @@ import type { PreparedQueryConfig } from "drizzle-orm/pg-core/session";
 import type { AsyncResult } from "unthrown";
 
 import { type ResultThen, resultThen, runSafeQuery } from "./awaitable.js";
-import type { UnthrownPgPreparedQuery, UnthrownPgSession } from "./session.js";
+import type { UnthrownPgSafePreparedQuery, UnthrownPgSession } from "./session.js";
 
 /**
  * The higher-kinded type that makes `db.query.<table>.findMany()` build an
@@ -44,7 +44,7 @@ export class PgUnthrownRelationalQuery<TResult> extends PgRelationalQuery<
   _prepare(
     name?: string,
     generateName = false,
-  ): UnthrownPgPreparedQuery<PreparedQueryConfig & { execute: TResult }> {
+  ): UnthrownPgSafePreparedQuery<PreparedQueryConfig & { execute: TResult }> {
     const { query, builtQuery } = this._toSQL();
     const mapper = this.dialect.mapperGenerators.relationalRows({
       isFirst: this.mode === "first",
@@ -54,7 +54,16 @@ export class PgUnthrownRelationalQuery<TResult> extends PgRelationalQuery<
       selection: query.selection,
       arrayModeRoot: true,
     });
-    return this.session.prepareQuery(builtQuery, "arrays", name ?? generateName, mapper);
+    // `.asSafe()`: `prepare(name).execute()` is a third way to run this read —
+    // it belongs on the same defect-only boundary as `execute()` and `await`.
+    return this.session
+      .prepareQuery<PreparedQueryConfig & { execute: TResult }>(
+        builtQuery,
+        "arrays",
+        name ?? generateName,
+        mapper,
+      )
+      .asSafe();
   }
 
   /**
@@ -62,9 +71,12 @@ export class PgUnthrownRelationalQuery<TResult> extends PgRelationalQuery<
    * remember this query for the given session and call it by name, rather than
    * specifying the full query.
    *
+   * Its `execute()` carries the same `never` error channel as this builder's —
+   * see {@link UnthrownPgSafePreparedQuery}.
+   *
    * {@link https://www.postgresql.org/docs/current/sql-prepare.html | Postgres prepare documentation}
    */
-  prepare(name: string): UnthrownPgPreparedQuery<PreparedQueryConfig & { execute: TResult }> {
+  prepare(name: string): UnthrownPgSafePreparedQuery<PreparedQueryConfig & { execute: TResult }> {
     return this._prepare(name, true);
   }
 
