@@ -6,7 +6,6 @@ import type { PgCodecs } from "drizzle-orm/pg-core/codecs";
 import { PgDialect } from "drizzle-orm/pg-core/dialect";
 import type { PgTransactionConfig } from "drizzle-orm/pg-core/session";
 import type { AnyRelations, EmptyRelations } from "drizzle-orm/relations";
-import { isConfig } from "drizzle-orm/utils";
 import pg from "pg";
 import type { AsyncResult } from "unthrown";
 
@@ -51,21 +50,6 @@ type ClientConfig<TRelations extends AnyRelations> = UnthrownDrizzleConfig<TRela
   readonly client?: NodePgClient | undefined;
   readonly connection?: string | pg.PoolConfig | undefined;
 };
-
-/**
- * Is this first argument a configuration object rather than a driver client?
- *
- * @remarks
- * Delegates to drizzle's own `isConfig`, which decides on the value's
- * *constructor* (a config is a plain `Object`). That is the only sound test
- * here: a `pg.Client` carries a `connection` property of its own at runtime, so
- * a key-presence check would read a client as a `{ connection }` config.
- * `isConfig` reports a `boolean` rather than narrowing, so the predicate is
- * spelled here — the narrowing is the two overloads' own guarantee, restated.
- */
-const isClientConfig = <TRelations extends AnyRelations>(
-  value: NodePgClient | ClientConfig<TRelations>,
-): value is ClientConfig<TRelations> => isConfig(value);
 
 /**
  * A node-postgres database whose every query resolves to an `AsyncResult`.
@@ -199,15 +183,18 @@ const construct = <TRelations extends AnyRelations>(
  * the same pool — for a migration runner, or a batch API this package does not
  * model — is one line away.
  *
- * The first argument is a connection string, a `pg` client or pool, or a
- * configuration object carrying one under `client` or `connection`; the second
- * — {@link UnthrownDrizzleConfig} — is only for the first three forms, since the
- * object form already carries it. (`@param` is left unspelled deliberately: one
- * doc comment fronts four overloads whose parameters are named differently.)
+ * The call forms are **exactly** drizzle's own — a connection string (with an
+ * optional {@link UnthrownDrizzleConfig} second argument), or a configuration
+ * object carrying a client under `client` or connection details under
+ * `connection`. There is deliberately no positional-client form: drizzle has
+ * none, and a second spelling of `{ client: pool }` would mean a call site no
+ * longer ports back by changing the import. (`@param` is left unspelled
+ * deliberately: one doc comment fronts three overloads whose parameters are
+ * named differently.)
  *
  * @example
  * ```ts
- * const db = drizzle(pool, { relations });
+ * const db = drizzle({ client: pool, relations });
  *
  * const created = await db
  *   .insert(users)
@@ -235,29 +222,20 @@ export function drizzle<
   TClient extends NodePgClient,
   TRelations extends AnyRelations = EmptyRelations,
 >(
-  client: TClient,
-  config?: UnthrownDrizzleConfig<TRelations>,
-): NodePgUnthrownDatabase<TRelations> & { $client: TClient };
-export function drizzle<
-  TClient extends NodePgClient,
-  TRelations extends AnyRelations = EmptyRelations,
->(
   config: UnthrownDrizzleConfig<TRelations> & { client: TClient },
 ): NodePgUnthrownDatabase<TRelations> & { $client: TClient };
 export function drizzle<TRelations extends AnyRelations = EmptyRelations>(
   config: UnthrownDrizzleConfig<TRelations> & { connection: string | pg.PoolConfig },
 ): NodePgUnthrownDatabase<TRelations> & { $client: pg.Pool };
 export function drizzle<TRelations extends AnyRelations = EmptyRelations>(
-  clientOrConfig: string | NodePgClient | ClientConfig<TRelations>,
+  connectionStringOrConfig: string | ClientConfig<TRelations>,
   config: UnthrownDrizzleConfig<TRelations> = {},
 ): NodePgUnthrownDatabase<TRelations> & { $client: NodePgClient } {
-  if (typeof clientOrConfig === "string") {
-    return construct(new pg.Pool({ connectionString: clientOrConfig }), config);
+  if (typeof connectionStringOrConfig === "string") {
+    return construct(new pg.Pool({ connectionString: connectionStringOrConfig }), config);
   }
 
-  if (!isClientConfig(clientOrConfig)) return construct(clientOrConfig, config);
-
-  const { client, connection, ...rest } = clientOrConfig;
+  const { client, connection, ...rest } = connectionStringOrConfig;
   if (client !== undefined) return construct(client, rest);
 
   return construct(

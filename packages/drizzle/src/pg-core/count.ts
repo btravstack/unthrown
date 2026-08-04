@@ -7,8 +7,7 @@ import type { PgViewBase } from "drizzle-orm/pg-core/view-base";
 import type { SQL, SQLWrapper } from "drizzle-orm/sql/sql";
 import type { AsyncResult } from "unthrown";
 
-import type { PgQueryError } from "../errors.js";
-import { type ResultThen, resultThen, runQuery } from "./awaitable.js";
+import { type ResultThen, resultThen, runSafeQuery } from "./awaitable.js";
 import type { UnthrownPgSession } from "./session.js";
 
 /**
@@ -58,11 +57,16 @@ export class PgUnthrownCountBuilder extends PgCountBuilder {
     this.session = session;
   }
 
-  /** Run the count, resolving to the number of matching rows. */
-  execute(placeholderValues?: Record<string, unknown>): AsyncResult<number, PgQueryError> {
+  /**
+   * Run the count, resolving to the number of matching rows.
+   *
+   * The error channel is `never` — a count is a read, so every failure it can
+   * hit is a defect. See {@link runSafeQuery}.
+   */
+  execute(placeholderValues?: Record<string, unknown>): AsyncResult<number, never> {
     // `build()` compiles the count query and can throw, so it goes inside the
-    // boundary along with everything else — see `runQuery`.
-    return runQuery<number>(
+    // boundary along with everything else — see `runSafeQuery`.
+    return runSafeQuery<number>(
       () =>
         this.session.prepareQuery<PreparedQueryConfig & { execute: number }>(
           this.build(),
@@ -76,5 +80,5 @@ export class PgUnthrownCountBuilder extends PgCountBuilder {
 
   /** {@inheritDoc ResultThen} */
   // oxlint-disable-next-line no-thenable -- deliberate: a builder is thenable so `await db.select()...` runs it, exactly as drizzle's own promise and Effect trees make theirs. It settles to a Result and never rejects — see ResultThen.
-  readonly then: ResultThen<number> = resultThen(this);
+  readonly then: ResultThen<number, never> = resultThen(this);
 }

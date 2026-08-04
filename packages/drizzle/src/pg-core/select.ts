@@ -15,8 +15,7 @@ import type { ColumnsSelection } from "drizzle-orm/sql/sql";
 import type { Assume } from "drizzle-orm/utils";
 import type { AsyncResult } from "unthrown";
 
-import type { PgQueryError } from "../errors.js";
-import { type ResultThen, resultThen, runQuery } from "./awaitable.js";
+import { type ResultThen, resultThen, runSafeQuery } from "./awaitable.js";
 import type { UnthrownPgPreparedQuery, UnthrownPgSession } from "./session.js";
 
 /**
@@ -62,9 +61,10 @@ export type PgUnthrownSelectBuilder<TSelection extends SelectedFields | undefine
  * only the execution half — `_prepare`, `prepare`, `execute` — plus the `then`
  * that makes `await db.select().from(users)` yield a `Result`.
  *
- * A read cannot violate a constraint, but it can still be attempted against a
- * database that will not answer; that is a defect, so the error channel is
- * `PgQueryError` for uniformity with the writes and empty in practice.
+ * The error channel is **`never`**: a read has no modeled failure. A `SELECT`
+ * writes nothing, so it cannot violate an integrity constraint; a database that
+ * will not answer is an infrastructure failure, which is a defect. That is
+ * enforced at runtime as well as declared — see {@link runSafeQuery}.
  *
  * @category Builders
  */
@@ -138,12 +138,17 @@ export class PgUnthrownSelectBase<
     return this._prepare(name, true);
   }
 
-  /** Run the query, resolving to the selected rows or a {@link PgQueryError}. */
-  execute(placeholderValues?: Record<string, unknown>): AsyncResult<TResult, PgQueryError> {
-    return runQuery(() => this._prepare(), placeholderValues);
+  /**
+   * Run the query, resolving to the selected rows.
+   *
+   * The error channel is `never` — every failure a read can hit is a defect, and
+   * {@link runSafeQuery} is what makes that true at runtime, not just in the type.
+   */
+  execute(placeholderValues?: Record<string, unknown>): AsyncResult<TResult, never> {
+    return runSafeQuery(() => this._prepare(), placeholderValues);
   }
 
   /** {@inheritDoc ResultThen} */
   // oxlint-disable-next-line no-thenable -- deliberate: a builder is thenable so `await db.select()...` runs it, exactly as drizzle's own promise and Effect trees make theirs. It settles to a Result and never rejects — see ResultThen.
-  readonly then: ResultThen<TResult> = resultThen(this);
+  readonly then: ResultThen<TResult, never> = resultThen(this);
 }

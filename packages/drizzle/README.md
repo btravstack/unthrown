@@ -12,7 +12,7 @@
 pnpm add @unthrown/drizzle drizzle-orm pg unthrown
 ```
 
-`drizzle(pool, { relations })` (from `@unthrown/drizzle/node-postgres`) builds
+`drizzle({ client: pool, relations })` (from `@unthrown/drizzle/node-postgres`) builds
 a `db` that _replaces_ the stock drizzle db rather than wrapping one: every
 method already speaks `AsyncResult`, so there is no `try*` prefix to reach
 for.
@@ -22,7 +22,7 @@ import { drizzle } from "@unthrown/drizzle/node-postgres";
 import { eq } from "drizzle-orm";
 import { usersTable } from "./schema.ts";
 
-const db = drizzle(pool, { relations });
+const db = drizzle({ client: pool, relations });
 
 const users = (
   await db.select().from(usersTable).where(eq(usersTable.id, id))

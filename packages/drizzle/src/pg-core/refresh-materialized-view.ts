@@ -7,8 +7,7 @@ import type {
 } from "drizzle-orm/pg-core/session";
 import type { AsyncResult } from "unthrown";
 
-import type { PgQueryError } from "../errors.js";
-import { type ResultThen, resultThen, runQuery } from "./awaitable.js";
+import { type ResultThen, resultThen, runSafeQuery } from "./awaitable.js";
 import type { UnthrownPgPreparedQuery, UnthrownPgSession } from "./session.js";
 
 /**
@@ -51,14 +50,20 @@ export class PgUnthrownRefreshMaterializedView<
     return this._prepare(name, true);
   }
 
-  /** Run the refresh, resolving to the driver's result. */
+  /**
+   * Run the refresh, resolving to the driver's result.
+   *
+   * The error channel is `never` — a refresh rebuilds a view's stored rows from
+   * a query, so it raises no integrity-constraint violation of its own; every
+   * failure it can hit is a defect. See {@link runSafeQuery}.
+   */
   execute(
     placeholderValues?: Record<string, unknown>,
-  ): AsyncResult<PgQueryResultKind<TQueryResult, never>, PgQueryError> {
-    return runQuery(() => this._prepare(), placeholderValues);
+  ): AsyncResult<PgQueryResultKind<TQueryResult, never>, never> {
+    return runSafeQuery(() => this._prepare(), placeholderValues);
   }
 
   /** {@inheritDoc ResultThen} */
   // oxlint-disable-next-line no-thenable -- deliberate: a builder is thenable so `await db.select()...` runs it, exactly as drizzle's own promise and Effect trees make theirs. It settles to a Result and never rejects — see ResultThen.
-  readonly then: ResultThen<PgQueryResultKind<TQueryResult, never>> = resultThen(this);
+  readonly then: ResultThen<PgQueryResultKind<TQueryResult, never>, never> = resultThen(this);
 }

@@ -6,8 +6,7 @@ import {
 import type { PreparedQueryConfig } from "drizzle-orm/pg-core/session";
 import type { AsyncResult } from "unthrown";
 
-import type { PgQueryError } from "../errors.js";
-import { type ResultThen, resultThen, runQuery } from "./awaitable.js";
+import { type ResultThen, resultThen, runSafeQuery } from "./awaitable.js";
 import type { UnthrownPgPreparedQuery, UnthrownPgSession } from "./session.js";
 
 /**
@@ -69,12 +68,17 @@ export class PgUnthrownRelationalQuery<TResult> extends PgRelationalQuery<
     return this._prepare(name, true);
   }
 
-  /** Run the relational query, resolving to its rows. */
-  execute(placeholderValues?: Record<string, unknown>): AsyncResult<TResult, PgQueryError> {
-    return runQuery(() => this._prepare(), placeholderValues);
+  /**
+   * Run the relational query, resolving to its rows.
+   *
+   * The error channel is `never` — `db.query.*` is a read, so every failure it
+   * can hit is a defect. See {@link runSafeQuery}.
+   */
+  execute(placeholderValues?: Record<string, unknown>): AsyncResult<TResult, never> {
+    return runSafeQuery(() => this._prepare(), placeholderValues);
   }
 
   /** {@inheritDoc ResultThen} */
   // oxlint-disable-next-line no-thenable -- deliberate: a builder is thenable so `await db.select()...` runs it, exactly as drizzle's own promise and Effect trees make theirs. It settles to a Result and never rejects — see ResultThen.
-  readonly then: ResultThen<TResult> = resultThen(this);
+  readonly then: ResultThen<TResult, never> = resultThen(this);
 }

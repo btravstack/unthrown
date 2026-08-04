@@ -3,7 +3,7 @@ import { defineRelations } from "drizzle-orm/relations";
 import { eq } from "drizzle-orm/sql/expressions/conditions";
 import { sql } from "drizzle-orm/sql/sql";
 import pg from "pg";
-import { Err, isOk, P } from "unthrown";
+import { Err, isDefect, isErr, isOk, P } from "unthrown";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 // Registers the Result matchers used throughout this file (`toBeOkWith`, …).
 import "@unthrown/vitest";
@@ -25,7 +25,7 @@ describe("drizzle()", () => {
   beforeAll(async () => {
     fixture = await startPg();
     await fixture.pool.query(`CREATE TABLE users (id int primary key, email text NOT NULL UNIQUE)`);
-    db = drizzle(fixture.pool);
+    db = drizzle({ client: fixture.pool });
   });
   afterAll(async () => {
     await fixture.stop();
@@ -113,7 +113,7 @@ describe("drizzle()", () => {
   });
 
   it("wires the relational query API when relations are configured", async () => {
-    const related = drizzle(fixture.pool, { relations });
+    const related = drizzle({ client: fixture.pool, relations });
     const r = await related.query.users.findMany({ where: { id: 1 } });
     await expect(r).toBeOkWith([{ id: 1, email: "a@b.c" }]);
   });
@@ -140,7 +140,7 @@ describe("drizzle() client forms", () => {
   it("accepts a checked-out client", async () => {
     const checkedOut = await fixture.pool.connect();
     try {
-      const db = drizzle(checkedOut);
+      const db = drizzle({ client: checkedOut });
       expect(db.$client).toBe(checkedOut);
       await expect(db.insert(users).values({ id: 2, email: "pooled@b.c" })).toBeOk();
     } finally {
@@ -177,6 +177,83 @@ describe("drizzle() client forms", () => {
   });
 });
 
+describe("read builders declare E = never, and the runtime enforces it", () => {
+  let fixture: PgFixture;
+  let db: ReturnType<typeof drizzle>;
+
+  beforeAll(async () => {
+    fixture = await startPg();
+    await fixture.pool.query(`CREATE TABLE users (id int primary key, email text NOT NULL UNIQUE)`);
+    await fixture.pool.query(`INSERT INTO users VALUES (1, 'a@b.c')`);
+    // A SELECT writes nothing, so it cannot violate a constraint on its own —
+    // but it can CALL something that does. A volatile function that writes is
+    // the one realistic way a read reaches a 23xxx, and therefore the exact
+    // case that decides whether `E = never` is a promise or a lie.
+    await fixture.pool.query(
+      `CREATE FUNCTION dup_insert() RETURNS int LANGUAGE sql VOLATILE
+       AS $$ INSERT INTO users VALUES (1, 'dup@b.c'); SELECT 1; $$`,
+    );
+    db = drizzle({ client: fixture.pool });
+  });
+  afterAll(async () => {
+    await fixture.stop();
+  });
+
+  /** A read whose selected field raises SQLSTATE 23505 when the row is produced. */
+  const violatingRead = () => db.select({ v: sql<number>`dup_insert()` }).from(users);
+
+  const expect23505Defect = (r: { tag: string; cause?: unknown }): void => {
+    // `isErr` is asserted false explicitly: the whole point is that this failure
+    // must NOT reach the modeled channel the type says is empty.
+    expect(isErr(r as never)).toBe(false);
+    expect(isDefect(r as never)).toBe(true);
+    expect((r.cause as { code?: string } | undefined)?.code).toBe("23505");
+  };
+
+  it("sends a 23505 raised on a read path to the defect channel via execute()", async () => {
+    const r = await violatingRead().execute();
+    expect23505Defect(r);
+  });
+
+  it("does the same when the read builder is awaited directly", async () => {
+    // The `then` path, which is a separate route into `execute()`.
+    const r = await violatingRead();
+    expect23505Defect(r);
+  });
+
+  it("sends a 23505 raised under $count to the defect channel", async () => {
+    const r = await db.$count(users, sql`dup_insert() = 1`).execute();
+    expect23505Defect(r);
+  });
+
+  it("sends a 23505 raised under a relational query to the defect channel", async () => {
+    const related = drizzle({ client: fixture.pool, relations });
+    const r = await related.query.users.findMany({
+      extras: { v: sql<number>`dup_insert()`.as("v") },
+    });
+    expect23505Defect(r);
+  });
+
+  it("keeps `.get()` compiling on a read — it only type-checks while E is never", async () => {
+    // This is the compile guard, not a runtime assertion: `get()` is typed
+    // `this: Result<T, never>`, so if a read builder's error channel ever
+    // widened again this line would stop compiling.
+    const rows = (await db.select().from(users)).get();
+    expect(rows).toEqual([{ id: 1, email: "a@b.c" }]);
+
+    const total = (await db.$count(users)).get();
+    expect(total).toBe(1);
+  });
+
+  it("still gives a WRITE the modeled error channel — reads are the exception", async () => {
+    // The contrast that makes the rule above meaningful: an insert's 23505 is a
+    // value you branch on, and stays one.
+    const r = await db.insert(users).values({ id: 1, email: "clash@b.c" });
+    expect(isDefect(r)).toBe(false);
+    await expect(r).toBeErrTagged("UniqueConstraintViolation");
+  });
+});
+
 describe("drizzle() logger config", () => {
   let fixture: PgFixture;
 
@@ -190,7 +267,8 @@ describe("drizzle() logger config", () => {
 
   it("logs every statement through a logger of your own", async () => {
     const logged: string[] = [];
-    const db = drizzle(fixture.pool, {
+    const db = drizzle({
+      client: fixture.pool,
       logger: { logQuery: (query) => logged.push(query) },
     });
     await expect(db.insert(users).values({ id: 1, email: "logged@b.c" })).toBeOk();
@@ -199,7 +277,7 @@ describe("drizzle() logger config", () => {
   });
 
   it("logs nothing when the logger is off", async () => {
-    const db = drizzle(fixture.pool, { logger: false });
+    const db = drizzle({ client: fixture.pool, logger: false });
     await expect(db.insert(users).values({ id: 2, email: "quiet@b.c" })).toBeOk();
   });
 
@@ -207,7 +285,7 @@ describe("drizzle() logger config", () => {
     // Built, deliberately not run: `DefaultLogger` writes to the console, and a
     // suite's output stays pristine. That it *is* a `DefaultLogger` is drizzle's
     // to test; this covers the branch that chooses one.
-    const db = drizzle(fixture.pool, { logger: true });
+    const db = drizzle({ client: fixture.pool, logger: true });
     expect(db).toBeInstanceOf(NodePgUnthrownDatabase);
   });
 });
