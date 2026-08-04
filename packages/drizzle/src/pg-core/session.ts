@@ -38,7 +38,7 @@ export type PgQueryMode = "arrays" | "objects" | "raw";
 export type PgRowMapper = (rows: never[]) => unknown;
 
 /**
- * A prepared query whose execution yields an {@link AsyncResult}.
+ * A prepared query whose execution yields an `AsyncResult`.
  *
  * @remarks
  * This is the single place in the package where a driver rejection is triaged.
@@ -159,7 +159,7 @@ export class UnthrownPgPreparedQuery<
  * {@link UnthrownPgPreparedQuery}.
  *
  * @remarks
- * A read has no modeled failure (see {@link runSafeQuery}), so the four read
+ * A read has no modeled failure (see `runSafeQuery`), so the four read
  * builders declare `E = never`. Their `prepare(name)` returns one of these, so
  * running a *prepared* read reaches the same `fromSafePromise` boundary that
  * `execute()` and `await` do — all three routes agree, and none of them can put
@@ -246,7 +246,7 @@ export abstract class UnthrownPgSession<TTransaction> extends PgSession {
    * Run a raw `SQL` fragment, returning the driver's own result object.
    *
    * @remarks
-   * Compilation runs **inside** the failure boundary — see {@link runQuery}.
+   * Compilation runs **inside** the failure boundary — see `runQuery`.
    * `dialect.sqlToQuery` throws for mistakes that are type-legal and reachable,
    * and a throw escaping here would land on a caller who has no `try`/`catch`,
    * because this method's contract is a `Result`.

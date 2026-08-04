@@ -200,6 +200,7 @@ const construct = <TRelations extends AnyRelations>(
  *   .insert(users)
  *   .values({ id: 1, email: "ada@example.com" })
  *   .returning()
+ *   .execute()
  *   .mapErrCases((m) =>
  *     m.with(P.tag("UniqueConstraintViolation"), () => "email already taken" as const)
  *      .with(

@@ -86,17 +86,18 @@ defect, so the edge of your program needs a single `match` and no `try`/`catch`.
 
 ## Packages
 
-| Package                                                   | Description                                                                                                                                      |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [`unthrown`](./packages/core)                             | The core `Result` / `AsyncResult`, interop, `TaggedError`, built-in exhaustive error matching.                                                   |
-| [`@unthrown/vitest`](./packages/vitest)                   | Vitest matchers: `toBeOk`, `toBeOkWith`, `toBeErr`, `toBeErrWith`, `toBeErrTagged`, `toBeDefect`.                                                |
-| [`@unthrown/effect`](./packages/effect)                   | Effect interop: `Result ↔ Exit` (bijection), `Either`, `Effect`.                                                                                 |
-| [`@unthrown/neverthrow`](./packages/neverthrow)           | neverthrow interop: `Result ↔ Result`, `AsyncResult ↔ ResultAsync`.                                                                              |
-| [`@unthrown/boxed`](./packages/boxed)                     | Boxed interop: `Result ↔ Result`, `AsyncResult ↔ Future<Result>`.                                                                                |
-| [`@unthrown/prisma`](./packages/prisma)                   | Prisma Client extension: `try*` query methods returning `AsyncResult`, per-operation errors.                                                     |
-| [`@unthrown/orpc`](./packages/orpc)                       | oRPC (v2) bridge: `Result`-returning handlers, `AsyncResult` client, typed errors end-to-end.                                                    |
-| [`@unthrown/standard-schema`](./packages/standard-schema) | `fromSchema` / `fromSchemaAsync`: any Standard Schema validator into a `Result`.                                                                 |
-| [`@unthrown/oxlint`](./packages/oxlint)                   | oxlint plugin: `no-ambiguous-error-type`, `no-catch-all-pattern`, `no-unhandled-result`, `no-unused-matcher`, `prefer-async-result`, `no-throw`. |
+| Package                                                   | Description                                                                                                                                                       |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`unthrown`](./packages/core)                             | The core `Result` / `AsyncResult`, interop, `TaggedError`, built-in exhaustive error matching.                                                                    |
+| [`@unthrown/vitest`](./packages/vitest)                   | Vitest matchers: `toBeOk`, `toBeOkWith`, `toBeErr`, `toBeErrWith`, `toBeErrTagged`, `toBeDefect`.                                                                 |
+| [`@unthrown/effect`](./packages/effect)                   | Effect interop: `Result ↔ Exit` (bijection), `Either`, `Effect`.                                                                                                  |
+| [`@unthrown/neverthrow`](./packages/neverthrow)           | neverthrow interop: `Result ↔ Result`, `AsyncResult ↔ ResultAsync`.                                                                                               |
+| [`@unthrown/boxed`](./packages/boxed)                     | Boxed interop: `Result ↔ Result`, `AsyncResult ↔ Future<Result>`.                                                                                                 |
+| [`@unthrown/prisma`](./packages/prisma)                   | Prisma Client extension: `try*` query methods returning `AsyncResult`, per-operation errors.                                                                      |
+| [`@unthrown/drizzle`](./packages/drizzle)                 | Drizzle ORM Postgres database: every query an `AsyncResult`, tagged constraint violations, `Result` transactions.                                                 |
+| [`@unthrown/orpc`](./packages/orpc)                       | oRPC (v2) bridge: `Result`-returning handlers, `AsyncResult` client, typed errors end-to-end.                                                                     |
+| [`@unthrown/standard-schema`](./packages/standard-schema) | `fromSchema` / `fromSchemaAsync`: any Standard Schema validator into a `Result`.                                                                                  |
+| [`@unthrown/oxlint`](./packages/oxlint)                   | oxlint plugin: `no-ambiguous-error-type`, `no-catch-all-pattern`, `no-unhandled-result`, `no-unused-matcher`, `prefer-async-result`, `no-throw`, `prefer-ensure`. |
 
 ## Contributing
 
@@ -110,6 +111,10 @@ pnpm typecheck    # tsc --noEmit across packages
 pnpm lint         # oxlint
 pnpm format       # oxfmt
 ```
+
+`@unthrown/drizzle`'s suite runs against a real PostgreSQL started by
+[testcontainers](https://testcontainers.com), so **`pnpm test` needs a running
+Docker daemon**. Every other package's tests are self-contained.
 
 ## License
 

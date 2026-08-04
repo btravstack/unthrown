@@ -61,7 +61,7 @@ export class PgUnthrownCountBuilder extends PgCountBuilder {
    * Run the count, resolving to the number of matching rows.
    *
    * The error channel is `never` — a count is a read, so every failure it can
-   * hit is a defect. See {@link runSafeQuery}.
+   * hit is a defect. See `runSafeQuery`.
    */
   execute(placeholderValues?: Record<string, unknown>): AsyncResult<number, never> {
     // `build()` compiles the count query and can throw, so it goes inside the

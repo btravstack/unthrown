@@ -24,16 +24,19 @@ import { usersTable } from "./schema.ts";
 
 const db = drizzle({ client: pool, relations });
 
-const users = (
-  await db.select().from(usersTable).where(eq(usersTable.id, id))
-).get();
-//    ^? AsyncResult<User[], never>
+const found = await db.select().from(usersTable).where(eq(usersTable.id, id));
+//    ^? Result<User[], never>
 //       A read has no modeled failure — a database that will not answer at
 //       all is a Defect, not an absent value.
+
+const users = found.get();
+//    ^? User[] — `get()` compiles precisely because the channel is empty.
 ```
 
 Writes carry the full `PgQueryError` union — a `delete` can still raise
-`23505` through an `ON DELETE SET DEFAULT`, so nothing is narrowed away:
+`23505` through an `ON DELETE SET DEFAULT`, so nothing is narrowed away.
+A builder is a thenable, not an `AsyncResult`: reach for the combinators
+either by `await`ing it first, or by ending the chain in `.execute()`:
 
 ```ts
 import { P } from "unthrown";
@@ -41,6 +44,7 @@ import { P } from "unthrown";
 const r = await db
   .insert(usersTable)
   .values(v)
+  .execute()
   .mapErrCases((matcher, defect) =>
     matcher
       .with(P.tag("UniqueConstraintViolation"), (e) => conflict(e.constraint))
@@ -62,12 +66,23 @@ const r = await db.transaction((tx) =>
   tx
     .insert(usersTable)
     .values(v)
-    .flatMap((u) => tx.insert(postsTable).values({ userId: u[0].id })),
+    .execute()
+    .flatMap(() => tx.insert(postsTable).values(p).execute()),
 );
 // Ok → COMMIT; Err → ROLLBACK (error re-surfaces typed); Defect → ROLLBACK
 ```
 
 `drizzle-orm` (`^1.0.0-rc`) and `pg` (`^8.16.0`) are peer dependencies.
+
+## Contributing
+
+This package's test suite runs against a **real PostgreSQL**, started for the
+run by [testcontainers](https://testcontainers.com), so **a running Docker
+daemon is required** to run `pnpm --filter @unthrown/drizzle test` locally. That
+is a deliberate departure from the rest of this monorepo, whose suites are
+self-contained: the behaviour under test _is_ PostgreSQL's SQLSTATE reporting,
+constraint naming and transaction semantics, and a fake would only pin our own
+assumptions about them.
 
 ## License
 

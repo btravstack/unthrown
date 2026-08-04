@@ -92,7 +92,7 @@ const isPool = (client: NodePgClient): client is pg.Pool =>
 type Control = (statement: string) => Promise<unknown>;
 
 /**
- * Issue control statements through {@link UnthrownPgPreparedQuery.runUnqualified}.
+ * Issue control statements through `UnthrownPgPreparedQuery.runUnqualified`.
  *
  * @remarks
  * Not `execute()`: an `AsyncResult` never rejects, so a failed `COMMIT` run
@@ -271,7 +271,7 @@ export class NodePgUnthrownSession<
    *
    * The whole sequence is qualified **once**, here, and nothing inside it is
    * left to a channel that could swallow it: the control statements run on the
-   * raw rejecting path (see {@link UnthrownPgPreparedQuery.runUnqualified}), so
+   * raw rejecting path (see `UnthrownPgPreparedQuery.runUnqualified`), so
    * a failed `COMMIT` can never be mistaken for a successful one.
    *
    * The callback owes an `AsyncResult`, so each step ends in `.execute()` — a

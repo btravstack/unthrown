@@ -64,7 +64,7 @@ export type PgUnthrownSelectBuilder<TSelection extends SelectedFields | undefine
  * The error channel is **`never`**: a read has no modeled failure. A `SELECT`
  * writes nothing, so it cannot violate an integrity constraint; a database that
  * will not answer is an infrastructure failure, which is a defect. That is
- * enforced at runtime as well as declared — see {@link runSafeQuery}.
+ * enforced at runtime as well as declared — see `runSafeQuery`.
  *
  * @category Builders
  */
@@ -150,7 +150,7 @@ export class PgUnthrownSelectBase<
    * Run the query, resolving to the selected rows.
    *
    * The error channel is `never` — every failure a read can hit is a defect, and
-   * {@link runSafeQuery} is what makes that true at runtime, not just in the type.
+   * `runSafeQuery` is what makes that true at runtime, not just in the type.
    */
   execute(placeholderValues?: Record<string, unknown>): AsyncResult<TResult, never> {
     return runSafeQuery(() => this._prepare(), placeholderValues);

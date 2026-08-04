@@ -84,7 +84,7 @@ export class PgUnthrownRelationalQuery<TResult> extends PgRelationalQuery<
    * Run the relational query, resolving to its rows.
    *
    * The error channel is `never` — `db.query.*` is a read, so every failure it
-   * can hit is a defect. See {@link runSafeQuery}.
+   * can hit is a defect. See `runSafeQuery`.
    */
   execute(placeholderValues?: Record<string, unknown>): AsyncResult<TResult, never> {
     return runSafeQuery(() => this._prepare(), placeholderValues);

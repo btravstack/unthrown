@@ -75,7 +75,7 @@ export class PgUnthrownRefreshMaterializedView<
    * definition*, which you log and 500 on — exactly what `match`'s `defect` arm
    * already does. Nobody writes a recovery path for it, and modelling it would
    * put an arm at every refresh call site duplicating that same defect arm.
-   * Runtime and type agree either way; see {@link runSafeQuery}.
+   * Runtime and type agree either way; see `runSafeQuery`.
    */
   execute(
     placeholderValues?: Record<string, unknown>,

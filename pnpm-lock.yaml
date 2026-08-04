@@ -170,6 +170,9 @@ importers:
       '@unthrown/boxed':
         specifier: workspace:*
         version: link:../packages/boxed
+      '@unthrown/drizzle':
+        specifier: workspace:*
+        version: link:../packages/drizzle
       '@unthrown/effect':
         specifier: workspace:*
         version: link:../packages/effect

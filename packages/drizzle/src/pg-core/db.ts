@@ -144,9 +144,9 @@ export class UnthrownPgDatabase<
    *
    * ```ts
    * // Create a subquery with alias 'sq' and use it in the select query
-   * const sq = db.$with('sq').as(db.select().from(users).where(eq(users.id, 42)));
+   * const sq = db.$with("sq").as(db.select().from(users).where(eq(users.id, 42)));
    *
-   * const result = await db.with(sq).select().from(sq);
+   * const rows = (await db.with(sq).select().from(sq)).get();
    * ```
    *
    * To select arbitrary SQL values as fields in a CTE and reference them in
@@ -154,12 +154,15 @@ export class UnthrownPgDatabase<
    *
    * ```ts
    * // Select an arbitrary SQL value as a field in a CTE and reference it in the main query
-   * const sq = db.$with('sq').as(db.select({
-   *   name: sql<string>`upper(${users.name})`.as('name'),
-   * })
-   * .from(users));
+   * const sq = db.$with("sq").as(
+   *   db
+   *     .select({
+   *       name: sql<string>`upper(${users.name})`.as("name"),
+   *     })
+   *     .from(users),
+   * );
    *
-   * const result = await db.with(sq).select({ name: sq.name }).from(sq);
+   * const rows = (await db.with(sq).select({ name: sq.name }).from(sq)).get();
    * ```
    */
   // `WithBuilder` is a pair of overloads whose return type depends on the
@@ -208,7 +211,8 @@ export class UnthrownPgDatabase<
    *
    * @example
    * ```ts
-   * const total = await db.$count(users, eq(users.active, true));
+   * const total = (await db.$count(users, eq(users.active, true))).get();
+   * //    ^? number — a count is a read, so its error channel is `never`.
    * ```
    */
   $count(
@@ -238,10 +242,10 @@ export class UnthrownPgDatabase<
    *
    * ```ts
    * // Define a subquery 'sq' as a CTE using $with
-   * const sq = db.$with('sq').as(db.select().from(users).where(eq(users.id, 42)));
+   * const sq = db.$with("sq").as(db.select().from(users).where(eq(users.id, 42)));
    *
    * // Incorporate the CTE 'sq' into the main query and select from it
-   * const result = await db.with(sq).select().from(sq);
+   * const rows = (await db.with(sq).select().from(sq)).get();
    * ```
    */
   with(...queries: WithSubquery[]): {
@@ -368,20 +372,25 @@ export class UnthrownPgDatabase<
    *
    * See docs: {@link https://orm.drizzle.team/docs/select}
    *
-   * @param fields The selection object.
+   * Awaiting the builder resolves to a `Result`, never rows directly — a read
+   * has no modeled failure, so the error channel is `never` and `.get()`
+   * compiles.
    *
    * @example
    *
    * ```ts
    * // Select all columns and all rows from the 'cars' table
-   * const allCars = await db.select().from(cars);
+   * const allCars = (await db.select().from(cars)).get();
    *
    * // Select specific columns and all rows from the 'cars' table
-   * const carsIdsAndBrands = await db.select({
-   *   id: cars.id,
-   *   brand: cars.brand
-   * })
-   *   .from(cars);
+   * const carsIdsAndBrands = (
+   *   await db
+   *     .select({
+   *       id: cars.id,
+   *       brand: cars.brand,
+   *     })
+   *     .from(cars)
+   * ).get();
    * ```
    */
   select(): PgUnthrownSelectBuilder<undefined>;
@@ -407,23 +416,22 @@ export class UnthrownPgDatabase<
    * are selected, it returns rows with unique combinations of values in these
    * columns.
    *
-   * Use `.from()` method to specify which table to select from.
+   * Use `.from()` method to specify which table to select from. Pass a
+   * selection object to specify the columns you want to select.
    *
    * See docs: {@link https://orm.drizzle.team/docs/select#distinct}
-   *
-   * @param fields The selection object.
    *
    * @example
    * ```ts
    * // Select all unique rows from the 'cars' table
-   * await db.selectDistinct()
-   *   .from(cars)
-   *   .orderBy(cars.id, cars.brand, cars.color);
+   * const unique = (
+   *   await db.selectDistinct().from(cars).orderBy(cars.id, cars.brand, cars.color)
+   * ).get();
    *
    * // Select all unique brands from the 'cars' table
-   * await db.selectDistinct({ brand: cars.brand })
-   *   .from(cars)
-   *   .orderBy(cars.brand);
+   * const brands = (
+   *   await db.selectDistinct({ brand: cars.brand }).from(cars).orderBy(cars.brand)
+   * ).get();
    * ```
    */
   selectDistinct(): PgUnthrownSelectBuilder<undefined>;
@@ -448,24 +456,28 @@ export class UnthrownPgDatabase<
    *
    * Calling this method will specify how the unique rows are determined.
    *
-   * Use `.from()` method to specify which table to select from.
+   * Use `.from()` method to specify which table to select from. Pass a
+   * selection object as the second argument to specify the columns you want to
+   * select.
    *
    * See docs: {@link https://orm.drizzle.team/docs/select#distinct}
    *
    * @param on The expression defining uniqueness.
-   * @param fields The selection object.
    *
    * @example
    * ```ts
    * // Select the first row for each unique brand from the 'cars' table
-   * await db.selectDistinctOn([cars.brand])
-   *   .from(cars)
-   *   .orderBy(cars.brand);
+   * const firstPerBrand = (
+   *   await db.selectDistinctOn([cars.brand]).from(cars).orderBy(cars.brand)
+   * ).get();
    *
-   * // Selects the first occurrence of each unique car brand along with its color from the 'cars' table
-   * await db.selectDistinctOn([cars.brand], { brand: cars.brand, color: cars.color })
-   *   .from(cars)
-   *   .orderBy(cars.brand, cars.color);
+   * // The first occurrence of each unique brand, with its color
+   * const brandColors = (
+   *   await db
+   *     .selectDistinctOn([cars.brand], { brand: cars.brand, color: cars.color })
+   *     .from(cars)
+   *     .orderBy(cars.brand, cars.color)
+   * ).get();
    * ```
    */
   selectDistinctOn(on: (PgColumn | SQLWrapper)[]): PgUnthrownSelectBuilder<undefined>;
@@ -499,20 +511,26 @@ export class UnthrownPgDatabase<
    *
    * See docs: {@link https://orm.drizzle.team/docs/update}
    *
+   * A write carries the full `PgQueryError` union, so awaiting the builder
+   * resolves to a `Result` you fold with `mapErrCases` or `match` — never a
+   * rejection.
+   *
    * @param table The table to update.
    *
    * @example
    *
    * ```ts
    * // Update all rows in the 'cars' table
-   * await db.update(cars).set({ color: 'red' });
+   * const all = await db.update(cars).set({ color: "red" });
+   * //    ^? Result<UpdateResult<…>, PgQueryError>
    *
    * // Update rows with filters and conditions
-   * await db.update(cars).set({ color: 'red' }).where(eq(cars.brand, 'BMW'));
+   * await db.update(cars).set({ color: "red" }).where(eq(cars.brand, "BMW"));
    *
    * // Update with returning clause
-   * const updatedCar = await db.update(cars)
-   *   .set({ color: 'red' })
+   * const updated = await db
+   *   .update(cars)
+   *   .set({ color: "red" })
    *   .where(eq(cars.id, 1))
    *   .returning();
    * ```
@@ -531,21 +549,24 @@ export class UnthrownPgDatabase<
    *
    * See docs: {@link https://orm.drizzle.team/docs/insert}
    *
+   * A write carries the full `PgQueryError` union, so awaiting the builder
+   * resolves to a `Result` you fold with `mapErrCases` or `match` — never a
+   * rejection.
+   *
    * @param table The table to insert into.
    *
    * @example
    *
    * ```ts
    * // Insert one row
-   * await db.insert(cars).values({ brand: 'BMW' });
+   * const one = await db.insert(cars).values({ brand: "BMW" });
+   * //    ^? Result<InsertResult<…>, PgQueryError>
    *
    * // Insert multiple rows
-   * await db.insert(cars).values([{ brand: 'BMW' }, { brand: 'Porsche' }]);
+   * await db.insert(cars).values([{ brand: "BMW" }, { brand: "Porsche" }]);
    *
    * // Insert with returning clause
-   * const insertedCar = await db.insert(cars)
-   *   .values({ brand: 'BMW' })
-   *   .returning();
+   * const inserted = await db.insert(cars).values({ brand: "BMW" }).returning();
    * ```
    */
   insert<TTable extends PgTable>(
@@ -569,21 +590,24 @@ export class UnthrownPgDatabase<
    *
    * See docs: {@link https://orm.drizzle.team/docs/delete}
    *
+   * A write carries the full `PgQueryError` union — a delete can still raise
+   * `23505` through an `ON DELETE SET DEFAULT` — so awaiting the builder
+   * resolves to a `Result` you fold with `mapErrCases` or `match`.
+   *
    * @param table The table to delete from.
    *
    * @example
    *
    * ```ts
    * // Delete all rows in the 'cars' table
-   * await db.delete(cars);
+   * const all = await db.delete(cars);
+   * //    ^? Result<DeleteResult<…>, PgQueryError>
    *
    * // Delete rows with filters and conditions
-   * await db.delete(cars).where(eq(cars.color, 'green'));
+   * await db.delete(cars).where(eq(cars.color, "green"));
    *
    * // Delete with returning clause
-   * const deletedCar = await db.delete(cars)
-   *   .where(eq(cars.id, 1))
-   *   .returning();
+   * const deleted = await db.delete(cars).where(eq(cars.id, 1)).returning();
    * ```
    */
   delete<TTable extends PgTable>(table: TTable): PgUnthrownDeleteBase<TTable, TQueryResult> {

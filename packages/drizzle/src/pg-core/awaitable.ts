@@ -18,11 +18,11 @@ import type { UnthrownPgPreparedQuery } from "./session.js";
  * so merging its type would contradict the very method it delegates to. (Its
  * `applyMixins` helper is `@internal` and absent from drizzle's published
  * `.d.ts` besides.) Each builder therefore declares this `then` itself, built by
- * {@link resultThen}, with the awaited type it actually produces.
+ * `resultThen`, with the awaited type it actually produces.
  *
  * Awaiting a builder yields a `Result`, never a rejection: `execute()` returns
  * an `AsyncResult`, whose internal promise never rejects, and the compilation
- * step ahead of it runs inside the same boundary — see {@link runQuery}. `catch`
+ * step ahead of it runs inside the same boundary — see `runQuery`. `catch`
  * and `finally` are deliberately not offered: there is no rejection for them to
  * observe. `onRejected` is still forwarded, exactly as `AsyncResult.then`
  * forwards it, so a hypothetical internal rejection settles the `await` instead
@@ -33,7 +33,7 @@ import type { UnthrownPgPreparedQuery } from "./session.js";
  * @typeParam E - the query's modeled error channel. Defaults to
  * {@link PgQueryError}, which is what a **write** carries; the four read
  * builders pass `never`, because a read has no modeled failure at all — see
- * {@link runSafeQuery}.
+ * `runSafeQuery`.
  *
  * @category Builders
  */
@@ -116,7 +116,7 @@ export const runQuery = <T>(
  * Compile and run a **read**, where every failure is a defect.
  *
  * @remarks
- * The read counterpart of {@link runQuery}, and the reason the four read
+ * The read counterpart of `runQuery`, and the reason the four read
  * builders (`select`, `$count`, `db.query.*`, `refresh materialized view`) can
  * honestly declare `E = never`.
  *
@@ -139,7 +139,7 @@ export const runQuery = <T>(
  * `create`/`upsert`'s `E` while the runtime still produced it. Routing reads
  * through here makes the defect the *only* outcome, so the type cannot lie.
  *
- * `prepare` is a thunk for the same reason as in {@link runQuery}: compilation
+ * `prepare` is a thunk for the same reason as in `runQuery`: compilation
  * happens inside the boundary, so a `getSQL()` throw becomes a defect rather
  * than a rejection escaping a caller who has no `try`/`catch`.
  *
