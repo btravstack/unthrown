@@ -1,4 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import pg from "pg";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { collectErrors, type PgFixture, startPg } from "./test-harness.js";
 
@@ -117,4 +118,44 @@ describe("test harness isolation", () => {
       await Promise.all([a.stop(), b.stop()]);
     }
   }, 30_000);
+});
+
+describe("test harness startup", () => {
+  it("still hands back a usable fixture when the admin connection will not close", async () => {
+    // The admin helper throws if and only if the STATEMENT failed. A
+    // `CREATE DATABASE` that SUCCEEDED on a connection that then refuses to
+    // close must not reject startup: the caller would never receive a `stop()`,
+    // and the database just created would be orphaned with nothing left holding
+    // a handle to drop it. Forced here rather than reasoned about, because
+    // `pg.Client#end()` does not fail on its own.
+    // Annotated to the promise overload: `end` is overloaded with a callback
+    // form, and a bare `realEnd.call(this)` resolves to that one.
+    const realEnd: (this: pg.Client) => Promise<void> = pg.Client.prototype.end;
+    const end = vi.spyOn(pg.Client.prototype, "end");
+    end.mockImplementationOnce(async function endThatFailsAfterClosing(this: pg.Client) {
+      // Closed for real first, so the test leaks no connection of its own —
+      // only the REPORTING of the close is broken, which is the case under test.
+      await realEnd.call(this);
+      throw new Error("admin connection refused to close");
+    });
+
+    let fixture: PgFixture;
+    try {
+      fixture = await startPg();
+    } finally {
+      // Restored before any assertion, so a failure below cannot leave the
+      // prototype patched for the rest of the file.
+      end.mockRestore();
+    }
+
+    try {
+      // The database exists and is reachable: the close failure was swallowed,
+      // not turned into a startup failure that stranded it.
+      const r = await fixture.pool.query<{ n: number }>("SELECT 1 AS n");
+      expect(r.rows[0]?.n).toBe(1);
+    } finally {
+      // And the caller really does hold the handle that drops it.
+      await fixture.stop();
+    }
+  });
 });

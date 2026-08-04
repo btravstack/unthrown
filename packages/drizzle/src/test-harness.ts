@@ -55,6 +55,13 @@ export const collectErrors = async (
  * Run one statement on the maintenance database, on a connection opened and
  * closed for it.
  *
+ * Throws **if and only if the statement itself failed.** That biconditional is
+ * load-bearing, not incidental: `startPg` reads a rejection as "no database was
+ * created" and returns without giving the caller a `stop()`. Were a merely
+ * unclosable connection allowed to reject a `CREATE DATABASE` that had in fact
+ * succeeded, the database would be orphaned with nothing left holding a handle
+ * to drop it.
+ *
  * @remarks
  * Short-lived rather than a module-level admin pool on purpose: a pool kept
  * open would hold the worker's event loop past the last test, and nothing in a
@@ -68,15 +75,28 @@ const runOnAdminDatabase = async (server: PgServerAddress, statement: string): P
   // half-open socket — so it is outside the collect-and-continue block below.
   await client.connect();
 
-  const errors = await collectErrors([() => client.query(statement), () => client.end()]);
-  const [first] = errors;
-  // A single failure is re-thrown unchanged, so a caller (and a spec) still
-  // sees the real `pg` error with its SQLSTATE on it; only a genuine pair —
-  // the statement failed AND the connection would not close — needs wrapping.
-  if (errors.length === 1) throw first;
-  if (errors.length > 1) {
-    throw new AggregateError(errors, `test-harness admin statement failed: ${statement}`);
+  // Collected separately, not as one list: which step failed decides the
+  // outcome, and a single list cannot say. The close is still attempted
+  // regardless of how the statement went — the same collect-and-continue rule
+  // as everywhere else here, so a failed statement can never skip it.
+  const [statementError] = await collectErrors([() => client.query(statement)]);
+  const [closeError] = await collectErrors([() => client.end()]);
+
+  if (statementError === undefined) {
+    // Deliberately swallowed. `pg` destroys the socket on its way out of a
+    // failing `end()`, so there is no resource left for a caller to act on —
+    // and reporting it here would break the biconditional above, which is the
+    // only thing keeping a freshly created database from being orphaned.
+    return;
   }
+  // Re-thrown unchanged, so a caller (and a spec) still sees the real `pg`
+  // error with its SQLSTATE on it; only a genuine pair — the statement failed
+  // AND the connection would not close — needs wrapping.
+  if (closeError === undefined) throw statementError;
+  throw new AggregateError(
+    [statementError, closeError],
+    `test-harness admin statement failed: ${statement}`,
+  );
 };
 
 /**
@@ -104,8 +124,9 @@ export const startPg = async (): Promise<PgFixture> => {
   // in a debugging session need quoting too; 32 hex characters is still a UUID.
   const database = `unthrown_${randomUUID().replaceAll("-", "")}`;
 
-  // Nothing to release if this fails: no database was created, and
-  // `runOnAdminDatabase` closed its own connection.
+  // Nothing to release if this rejects: `runOnAdminDatabase` throws if and only
+  // if the STATEMENT failed, so a rejection here means no database exists — and
+  // it closed its own connection either way.
   await runOnAdminDatabase(server, `CREATE DATABASE "${database}"`);
 
   const dropDatabase = (): Promise<void> =>
