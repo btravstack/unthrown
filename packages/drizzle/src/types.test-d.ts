@@ -158,7 +158,9 @@ const refreshGet = async () => (await db.refreshMaterializedView(userCounts)).ge
 // used to hand back the qualifying `UnthrownPgPreparedQuery`, so a prepared
 // read reopened the error channel the builder had just declared closed. Reads
 // now return `UnthrownPgSafePreparedQuery`, whose `execute()` routes through
-// `fromSafePromise`. These pin all four preparable read paths.
+// `fromSafePromise`. These pin all three preparable read paths — `$count` is
+// the fourth read but exposes no `prepare()` at all (nor does drizzle's own
+// `PgCountBuilder`), so it has nothing to reopen.
 
 const preparedSelect = async () =>
   (await db.select().from(users).prepare("p_select").execute()).get();
