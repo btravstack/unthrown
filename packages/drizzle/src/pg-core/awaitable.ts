@@ -2,7 +2,7 @@ import type { PreparedQueryConfig } from "drizzle-orm/pg-core/session";
 import { type AsyncResult, fromPromise, fromSafePromise, type Result } from "unthrown";
 
 import { type PgQueryError, qualifyPgError } from "../errors.js";
-import type { UnthrownPgPreparedQuery } from "./session.js";
+import type { PgUnthrownPreparedQuery } from "./session.js";
 
 /**
  * The `then` that makes a query builder awaitable, resolving to a `Result`.
@@ -107,7 +107,7 @@ export const resultThen =
  * @internal
  */
 export const runQuery = <T>(
-  prepare: () => UnthrownPgPreparedQuery<PreparedQueryConfig & { execute: T }>,
+  prepare: () => PgUnthrownPreparedQuery<PreparedQueryConfig & { execute: T }>,
   placeholderValues?: Record<string, unknown>,
 ): AsyncResult<T, PgQueryError> =>
   fromPromise(() => prepare().runUnqualified(placeholderValues), qualifyPgError);
@@ -149,6 +149,6 @@ export const runQuery = <T>(
  * @internal
  */
 export const runSafeQuery = <T>(
-  prepare: () => UnthrownPgPreparedQuery<PreparedQueryConfig & { execute: T }>,
+  prepare: () => PgUnthrownPreparedQuery<PreparedQueryConfig & { execute: T }>,
   placeholderValues?: Record<string, unknown>,
 ): AsyncResult<T, never> => fromSafePromise(() => prepare().runUnqualified(placeholderValues));

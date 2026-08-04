@@ -16,7 +16,7 @@
 // receive forces a dead arm at every call site. The assertions below pin both
 // directions for every entry point, and for all three routes into a query
 // (`await`, `execute()`, and `prepare(name).execute()` — the last being the one
-// that was quietly wrong until `UnthrownPgSafePreparedQuery` landed).
+// that was quietly wrong until `PgUnthrownSafePreparedQuery` landed).
 
 import { integer, pgMaterializedView, pgTable, text } from "drizzle-orm/pg-core";
 import { defineRelations } from "drizzle-orm/relations";
@@ -187,9 +187,9 @@ const refreshGet = async () => (await db.refreshMaterializedView(userCounts)).ge
 // --- reads: a PREPARED read stays empty too ----------------------------------
 //
 // The third route into a read, and the one that was silently wrong: `prepare()`
-// used to hand back the qualifying `UnthrownPgPreparedQuery`, so a prepared
+// used to hand back the qualifying `PgUnthrownPreparedQuery`, so a prepared
 // read reopened the error channel the builder had just declared closed. Reads
-// now return `UnthrownPgSafePreparedQuery`, whose `execute()` routes through
+// now return `PgUnthrownSafePreparedQuery`, whose `execute()` routes through
 // `fromSafePromise`. These pin all three preparable read paths — `$count` is
 // the fourth read but exposes no `prepare()` at all (nor does drizzle's own
 // `PgCountBuilder`), so it has nothing to reopen.

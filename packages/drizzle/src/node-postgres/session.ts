@@ -7,12 +7,20 @@ import { preparedStatementName } from "drizzle-orm/query-name-generator";
 import type { AnyRelations, EmptyRelations } from "drizzle-orm/relations";
 import { type Query, sql } from "drizzle-orm/sql/sql";
 import pg from "pg";
-import { type AsyncResult, fromPromise, isErr, isOk, type Result } from "unthrown";
+import {
+  type AsyncResult,
+  fromPromise,
+  isErr,
+  isOk,
+  isResult,
+  OkAsync,
+  type Result,
+} from "unthrown";
 
 import { type PgQueryError, qualifyPgError } from "../errors.js";
-import { UnthrownPgDatabase } from "../pg-core/db.js";
+import { PgUnthrownDatabase } from "../pg-core/db.js";
 import type { PgQueryMode, PgRowMapper } from "../pg-core/session.js";
-import { UnthrownPgPreparedQuery, UnthrownPgSession } from "../pg-core/session.js";
+import { PgUnthrownPreparedQuery, PgUnthrownSession } from "../pg-core/session.js";
 
 const { Pool } = pg;
 
@@ -92,7 +100,7 @@ const isPool = (client: NodePgClient): client is pg.Pool =>
 type Control = (statement: string) => Promise<unknown>;
 
 /**
- * Issue control statements through `UnthrownPgPreparedQuery.runUnqualified`.
+ * Issue control statements through `PgUnthrownPreparedQuery.runUnqualified`.
  *
  * @remarks
  * Not `execute()`: an `AsyncResult` never rejects, so a failed `COMMIT` run
@@ -101,19 +109,35 @@ type Control = (statement: string) => Promise<unknown>;
  * failure reach {@link NodePgUnthrownSession.transaction}'s single boundary.
  */
 const controlOn =
-  (session: UnthrownPgSession<unknown>, dialect: PgDialect): Control =>
+  (session: PgUnthrownSession<unknown>, dialect: PgDialect): Control =>
   (statement) =>
     session.prepareQuery(dialect.sqlToQuery(sql.raw(statement)), "raw", false).runUnqualified();
 
-/** Render a transaction config as the SQL clauses that follow `begin`. */
-const transactionConfigSQL = (config: PgTransactionConfig): string => {
+/**
+ * Render a transaction config as the SQL clauses that follow `begin` or
+ * `set transaction`, or `undefined` when it asks for nothing at all.
+ *
+ * @remarks
+ * `undefined` rather than `""` because the empty config is the case that has to
+ * be *omitted*, not interpolated: `begin ` and `set transaction ` are both
+ * syntax errors, so `db.transaction(fn, {})` used to defect on its own BEGIN.
+ * Postgres' grammar requires at least one mode after `set transaction` as well,
+ * which is why an empty config issues no statement there at all.
+ */
+const transactionConfigSQL = (config: PgTransactionConfig): string | undefined => {
   const chunks: string[] = [];
   if (config.isolationLevel !== undefined) chunks.push(`isolation level ${config.isolationLevel}`);
   if (config.accessMode !== undefined) chunks.push(config.accessMode);
   if (typeof config.deferrable === "boolean") {
     chunks.push(config.deferrable ? "deferrable" : "not deferrable");
   }
-  return chunks.join(" ");
+  return chunks.length === 0 ? undefined : chunks.join(" ");
+};
+
+/** `begin`, with a config's clauses appended only when it renders any. */
+const beginStatement = (config: PgTransactionConfig | undefined): string => {
+  const clauses = config === undefined ? undefined : transactionConfigSQL(config);
+  return clauses === undefined ? "begin" : `begin ${clauses}`;
 };
 
 /**
@@ -129,6 +153,10 @@ const transactionConfigSQL = (config: PgTransactionConfig): string => {
  * outcome (as a defect — no SQLSTATE a caller branches on describes "the undo
  * broke"). It must not *destroy* what it was undoing, though, which is what the
  * aggregate is for — the same rule core applies to a throwing failure observer.
+ *
+ * The pair is ordered `[thrown, original]` — the undo's own failure first, then
+ * the failure it was undoing — which is core's convention for exactly this
+ * situation (a failure observer that throws aggregates `[thrown, original]`).
  */
 const undoScope = async (
   control: Control,
@@ -139,7 +167,7 @@ const undoScope = async (
     await control(statement);
     return undefined;
   } catch (cause) {
-    return new AggregateError([pending, cause], `${statement} failed`);
+    return new AggregateError([cause, pending], `${statement} failed`);
   }
 };
 
@@ -176,7 +204,15 @@ const runScope = async <A, E, TTx>(
     throw (await undoScope(control, scope.undo, cause)) ?? cause;
   }
 
-  if (isOk(inner)) {
+  // `isResult` first, and not merely for tidiness: `isOk`/`isErr` read `.tag`,
+  // which THROWS on `null`/`undefined` — the shape a JS (or `as`-cast) caller
+  // produces by writing `async (tx) => { await tx.insert(…) }` and forgetting
+  // the `return`. That TypeError was raised before any ROLLBACK was issued, so
+  // the pooled client went back to the pool with BEGIN still open and the next
+  // borrower ran inside a stale transaction. Anything that is not a `Result`
+  // now takes the undo path and surfaces as a `Defect`, which is core's own
+  // out-of-contract rule.
+  if (isResult(inner) && isOk(inner)) {
     // A failed keep rejects and is qualified at the boundary — which is how a
     // DEFERRABLE constraint's 23505, raised by the COMMIT itself, still reaches
     // the modeled error channel.
@@ -184,8 +220,12 @@ const runScope = async <A, E, TTx>(
     return inner;
   }
 
-  const raised = await undoScope(control, scope.undo, isErr(inner) ? inner.error : inner.cause);
+  const pending = isResult(inner) ? (isErr(inner) ? inner.error : inner.cause) : inner;
+  const raised = await undoScope(control, scope.undo, pending);
   if (raised !== undefined) throw raised;
+  // A non-`Result` is out of contract: the scope is undone, and returning it
+  // hands it to `transaction`'s `flatMap`, whose non-`Result` guard mints the
+  // TypeError defect. One rule, one place.
   return inner;
 };
 
@@ -202,7 +242,7 @@ const runScope = async <A, E, TTx>(
  */
 export class NodePgUnthrownSession<
   TRelations extends AnyRelations = EmptyRelations,
-> extends UnthrownPgSession<NodePgUnthrownTransaction<TRelations>> {
+> extends PgUnthrownSession<NodePgUnthrownTransaction<TRelations>> {
   static override readonly [entityKind]: string = "NodePgUnthrownSession";
 
   /**
@@ -227,7 +267,7 @@ export class NodePgUnthrownSession<
     mode: PgQueryMode,
     name: string | boolean,
     mapper?: PgRowMapper,
-  ): UnthrownPgPreparedQuery<T> {
+  ): PgUnthrownPreparedQuery<T> {
     const queryName =
       typeof name === "string"
         ? name
@@ -253,7 +293,7 @@ export class NodePgUnthrownSession<
         // result object, whose `rowCount` is the answer.
         .then((result) => (mode === "raw" ? result : result.rows));
 
-    return new UnthrownPgPreparedQuery<T>(executor, query, mapper, mode, this.logger);
+    return new PgUnthrownPreparedQuery<T>(executor, query, mapper, mode, this.logger);
   }
 
   /**
@@ -271,7 +311,7 @@ export class NodePgUnthrownSession<
    *
    * The whole sequence is qualified **once**, here, and nothing inside it is
    * left to a channel that could swallow it: the control statements run on the
-   * raw rejecting path (see `UnthrownPgPreparedQuery.runUnqualified`), so
+   * raw rejecting path (see `PgUnthrownPreparedQuery.runUnqualified`), so
    * a failed `COMMIT` can never be mistaken for a successful one.
    *
    * The callback owes an `AsyncResult`, so each step ends in `.execute()` — a
@@ -336,7 +376,7 @@ export class NodePgUnthrownSession<
       return await runScope(
         controlOn(session, this.dialect),
         {
-          begin: config === undefined ? "begin" : `begin ${transactionConfigSQL(config)}`,
+          begin: beginStatement(config),
           keep: "commit",
           undo: "rollback",
         },
@@ -366,7 +406,7 @@ export class NodePgUnthrownSession<
  */
 export class NodePgUnthrownTransaction<
   TRelations extends AnyRelations = EmptyRelations,
-> extends UnthrownPgDatabase<NodePgQueryResultHKT, TRelations> {
+> extends PgUnthrownDatabase<NodePgQueryResultHKT, TRelations> {
   static override readonly [entityKind]: string = "NodePgUnthrownTransaction";
 
   /**
@@ -376,7 +416,7 @@ export class NodePgUnthrownTransaction<
    */
   constructor(
     dialect: PgDialect,
-    session: UnthrownPgSession<unknown>,
+    session: PgUnthrownSession<unknown>,
     relations: TRelations,
     private readonly savepoints: { count: number } = { count: 0 },
     private readonly parseRqbJson = false,
@@ -387,13 +427,20 @@ export class NodePgUnthrownTransaction<
   /**
    * Set the characteristics of the transaction already in progress.
    *
+   * @remarks
+   * A config that asks for nothing (`{}`) issues no statement: Postgres requires
+   * at least one mode after `set transaction`, so the alternative is a syntax
+   * error reported as a defect for a call that requested no change.
+   *
    * @example
    * ```ts
    * await tx.setTransaction({ isolationLevel: "serializable" });
    * ```
    */
   setTransaction(config: PgTransactionConfig): AsyncResult<unknown, PgQueryError> {
-    return this.session.execute(sql.raw(`set transaction ${transactionConfigSQL(config)}`));
+    const clauses = transactionConfigSQL(config);
+    if (clauses === undefined) return OkAsync(undefined);
+    return this.session.execute(sql.raw(`set transaction ${clauses}`));
   }
 
   /**

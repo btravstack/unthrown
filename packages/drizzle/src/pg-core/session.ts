@@ -1,5 +1,6 @@
 import type { WithCacheConfig } from "drizzle-orm/cache/core/types";
 import { entityKind } from "drizzle-orm/entity";
+import { DrizzleQueryError } from "drizzle-orm/errors";
 import type { Logger } from "drizzle-orm/logger";
 import {
   PgBasePreparedQuery,
@@ -55,10 +56,10 @@ export type PgRowMapper = (rows: never[]) => unknown;
  *
  * @category Session
  */
-export class UnthrownPgPreparedQuery<
+export class PgUnthrownPreparedQuery<
   T extends PreparedQueryConfig = PreparedQueryConfig,
 > extends PgBasePreparedQuery {
-  static override readonly [entityKind]: string = "UnthrownPgPreparedQuery";
+  static override readonly [entityKind]: string = "PgUnthrownPreparedQuery";
 
   /**
    * @param executor - runs the query against the driver with the given bound
@@ -92,6 +93,16 @@ export class UnthrownPgPreparedQuery<
    * this method instead, letting the rejection propagate and qualifying the
    * whole sequence exactly once at its own boundary.
    *
+   * Whatever the driver rejects with is wrapped in drizzle's own
+   * `DrizzleQueryError` first, exactly as `PgAsyncPreparedQuery.execute` does.
+   * node-postgres' `DatabaseError` carries `code`, `constraint`, `table`,
+   * `column` and `detail` but **not the statement**, so without the wrapper a
+   * defect from a syntax error, a deadlock or a statement timeout would reach a
+   * caller's `defect` arm with no indication of which query produced it — the
+   * one thing stock drizzle hands you and the thing you log. Triage is
+   * unaffected: `qualifyPgError` reads the SQLSTATE through one `cause` level
+   * for precisely this shape.
+   *
    * @internal
    */
   runUnqualified(placeholderValues: Record<string, unknown> = {}): Promise<T["execute"]> {
@@ -99,7 +110,13 @@ export class UnthrownPgPreparedQuery<
     const params = fillPlaceholders(query.params, placeholderValues);
     this.logger.logQuery(query.sql, params);
 
-    const rows = this.executor(params);
+    const rows = this.executor(params).catch((cause: unknown) => {
+      // `DrizzleQueryError` types its `cause` as `Error`, but a driver may
+      // reject with anything at all. The assertion carries whatever was thrown
+      // through unchanged rather than discarding a non-`Error` rejection —
+      // `qualifyPgError` reads the SQLSTATE structurally, not by identity.
+      throw new DrizzleQueryError(query.sql, params, cause as Error);
+    });
     // The `unknown` execution container is drizzle's own seam: the driver hands
     // back untyped rows and `T["execute"]` is the shape the builder that created
     // this query promised. Narrowing it is the assertion drizzle's async and
@@ -136,15 +153,15 @@ export class UnthrownPgPreparedQuery<
    * What a read builder's `prepare(name)` hands back. Reads declare `E = never`,
    * and `prepare()` is a third route to running one — alongside `execute()` and
    * `await` — so it has to reach the same boundary or the claim is false for a
-   * prepared read. See {@link UnthrownPgSafePreparedQuery}.
+   * prepared read. See {@link PgUnthrownSafePreparedQuery}.
    *
    * A fresh instance rather than a flag, so the failure boundary is fixed at
    * construction and cannot be flipped on a live query.
    *
    * @internal
    */
-  asSafe(): UnthrownPgSafePreparedQuery<T> {
-    return new UnthrownPgSafePreparedQuery<T>(
+  asSafe(): PgUnthrownSafePreparedQuery<T> {
+    return new PgUnthrownSafePreparedQuery<T>(
       this.executor,
       this.query,
       this.mapper,
@@ -156,7 +173,7 @@ export class UnthrownPgPreparedQuery<
 
 /**
  * A prepared query whose every failure is a defect — the read builders' half of
- * {@link UnthrownPgPreparedQuery}.
+ * {@link PgUnthrownPreparedQuery}.
  *
  * @remarks
  * A read has no modeled failure (see `runSafeQuery`), so the four read
@@ -166,7 +183,7 @@ export class UnthrownPgPreparedQuery<
  * a value in a channel the type calls empty.
  *
  * This is a subclass rather than a type parameter on
- * {@link UnthrownPgPreparedQuery} deliberately. A parameterised `E` would have
+ * {@link PgUnthrownPreparedQuery} deliberately. A parameterised `E` would have
  * to pick its boundary from a constructor-injected function, and the injected
  * default (`fromPromise` + `qualifyPgError`, typed `PgQueryError`) is not
  * assignable to an unresolved `E` — so the single-class form needs a cast
@@ -181,10 +198,10 @@ export class UnthrownPgPreparedQuery<
  *
  * @category Session
  */
-export class UnthrownPgSafePreparedQuery<
+export class PgUnthrownSafePreparedQuery<
   T extends PreparedQueryConfig = PreparedQueryConfig,
-> extends UnthrownPgPreparedQuery<T> {
-  static override readonly [entityKind]: string = "UnthrownPgSafePreparedQuery";
+> extends PgUnthrownPreparedQuery<T> {
+  static override readonly [entityKind]: string = "PgUnthrownSafePreparedQuery";
 
   /**
    * Run the query. Every failure — a constraint violation raised by a volatile
@@ -210,15 +227,15 @@ export class UnthrownPgSafePreparedQuery<
  * be plugged in alongside promises and Effects.
  *
  * @typeParam TTransaction - the transaction handle passed to a
- * {@link UnthrownPgSession.transaction} callback. It is a parameter rather than
+ * {@link PgUnthrownSession.transaction} callback. It is a parameter rather than
  * a concrete type because the transaction class is built on top of the database
  * facade, which in turn is built on this session; the driver that owns both
  * supplies it.
  *
  * @category Session
  */
-export abstract class UnthrownPgSession<TTransaction> extends PgSession {
-  static override readonly [entityKind]: string = "UnthrownPgSession";
+export abstract class PgUnthrownSession<TTransaction> extends PgSession {
+  static override readonly [entityKind]: string = "PgUnthrownSession";
 
   abstract override prepareQuery<T extends PreparedQueryConfig = PreparedQueryConfig>(
     query: Query,
@@ -227,7 +244,7 @@ export abstract class UnthrownPgSession<TTransaction> extends PgSession {
     mapper?: PgRowMapper,
     queryMetadata?: { type: "select" | "update" | "delete" | "insert"; tables: string[] },
     cacheConfig?: WithCacheConfig,
-  ): UnthrownPgPreparedQuery<T>;
+  ): PgUnthrownPreparedQuery<T>;
 
   /**
    * Run `fn` inside a database transaction.

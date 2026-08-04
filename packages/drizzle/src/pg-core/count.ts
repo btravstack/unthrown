@@ -8,7 +8,7 @@ import type { SQL, SQLWrapper } from "drizzle-orm/sql/sql";
 import type { AsyncResult } from "unthrown";
 
 import { type ResultThen, resultThen, runSafeQuery } from "./awaitable.js";
-import type { UnthrownPgSession } from "./session.js";
+import type { PgUnthrownSession } from "./session.js";
 
 /**
  * Read the single cell a `select count(*)` produces.
@@ -37,7 +37,7 @@ const countOf = (rows: unknown[][]): number => {
 export class PgUnthrownCountBuilder extends PgCountBuilder {
   static override readonly [entityKind]: string = "PgUnthrownCountBuilder";
 
-  protected session: UnthrownPgSession<unknown>;
+  protected session: PgUnthrownSession<unknown>;
 
   constructor({
     source,
@@ -48,7 +48,7 @@ export class PgUnthrownCountBuilder extends PgCountBuilder {
     source: PgTable | PgViewBase | SQL | SQLWrapper;
     filters?: SQL<unknown>;
     dialect: PgDialect;
-    session: UnthrownPgSession<unknown>;
+    session: PgUnthrownSession<unknown>;
   }) {
     // `filters` is spread conditionally rather than passed through: under
     // `exactOptionalPropertyTypes` an explicit `undefined` is not the same as an

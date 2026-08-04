@@ -9,7 +9,7 @@ export {
 } from "./errors.js";
 export type { ResultThen } from "./pg-core/awaitable.js";
 export { PgUnthrownCountBuilder } from "./pg-core/count.js";
-export { UnthrownPgDatabase } from "./pg-core/db.js";
+export { PgUnthrownDatabase } from "./pg-core/db.js";
 export {
   type DeleteResult,
   PgUnthrownDeleteBase,
@@ -31,9 +31,9 @@ export {
 export {
   type PgQueryMode,
   type PgRowMapper,
-  UnthrownPgPreparedQuery,
-  UnthrownPgSafePreparedQuery,
-  UnthrownPgSession,
+  PgUnthrownPreparedQuery,
+  PgUnthrownSafePreparedQuery,
+  PgUnthrownSession,
 } from "./pg-core/session.js";
 export {
   PgUnthrownUpdateBase,

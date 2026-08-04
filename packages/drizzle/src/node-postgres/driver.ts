@@ -10,7 +10,7 @@ import pg from "pg";
 import type { AsyncResult } from "unthrown";
 
 import type { PgQueryError } from "../errors.js";
-import { UnthrownPgDatabase } from "../pg-core/db.js";
+import { PgUnthrownDatabase } from "../pg-core/db.js";
 import type { NodePgClient } from "./session.js";
 import { NodePgUnthrownSession, type NodePgUnthrownTransaction } from "./session.js";
 
@@ -65,14 +65,14 @@ type ClientConfig<TRelations extends AnyRelations> = UnthrownDrizzleConfig<TRela
  */
 export class NodePgUnthrownDatabase<
   TRelations extends AnyRelations = EmptyRelations,
-> extends UnthrownPgDatabase<NodePgQueryResultHKT, TRelations> {
+> extends PgUnthrownDatabase<NodePgQueryResultHKT, TRelations> {
   static override readonly [entityKind]: string = "NodePgUnthrownDatabase";
 
   /**
    * The node-postgres session this database runs on.
    *
    * @remarks
-   * Narrows the base's `UnthrownPgSession<unknown>` — whose transaction handle
+   * Narrows the base's `PgUnthrownSession<unknown>` — whose transaction handle
    * is deliberately unresolved, because the base facade is built *underneath*
    * the transaction class that extends it — to the one this driver actually
    * holds. `declare` because the base already assigns it; this only restates

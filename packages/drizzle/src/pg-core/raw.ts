@@ -5,7 +5,7 @@ import type { AsyncResult } from "unthrown";
 
 import type { PgQueryError } from "../errors.js";
 import { type ResultThen, resultThen } from "./awaitable.js";
-import type { UnthrownPgPreparedQuery } from "./session.js";
+import type { PgUnthrownPreparedQuery } from "./session.js";
 
 /**
  * A raw `db.execute(sql\`…\`)` query that resolves to an `AsyncResult`.
@@ -26,9 +26,9 @@ export class PgUnthrownRaw<TResult> extends PgRaw<TResult> {
    * Narrower than the base's `PgBasePreparedQuery`. `declare` because the base
    * constructor, called below, is what assigns it.
    */
-  declare protected prepared: UnthrownPgPreparedQuery<{ execute: TResult }>;
+  declare protected prepared: PgUnthrownPreparedQuery<{ execute: TResult }>;
 
-  constructor(prepared: UnthrownPgPreparedQuery<{ execute: TResult }>, sql: SQL, query: Query) {
+  constructor(prepared: PgUnthrownPreparedQuery<{ execute: TResult }>, sql: SQL, query: Query) {
     super(prepared, sql, query);
   }
 
@@ -37,7 +37,7 @@ export class PgUnthrownRaw<TResult> extends PgRaw<TResult> {
     return this.prepared.execute(placeholderValues);
   }
 
-  override _prepare(): UnthrownPgPreparedQuery<{ execute: TResult }> {
+  override _prepare(): PgUnthrownPreparedQuery<{ execute: TResult }> {
     return this.prepared;
   }
 

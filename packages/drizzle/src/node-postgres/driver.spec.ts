@@ -1,3 +1,4 @@
+import { DrizzleQueryError } from "drizzle-orm/errors";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import { defineRelations } from "drizzle-orm/relations";
 import { eq } from "drizzle-orm/sql/expressions/conditions";
@@ -217,7 +218,15 @@ describe("read builders declare E = never, and the runtime enforces it", () => {
     // must NOT reach the modeled channel the type says is empty.
     expect(isErr(r)).toBe(false);
     expect(isDefect(r)).toBe(true);
-    if (isDefect(r)) expect((r.cause as { code?: string }).code).toBe("23505");
+    // The SQLSTATE sits one level down: the query wraps a driver rejection in
+    // drizzle's `DrizzleQueryError` so the defect a caller logs names the
+    // statement. Asserting the wrapper too keeps that visible here.
+    if (isDefect(r)) {
+      expect(r.cause).toBeInstanceOf(DrizzleQueryError);
+      const wrapped = r.cause as DrizzleQueryError;
+      expect(wrapped.query).toContain("dup_insert()");
+      expect((wrapped.cause as { code?: string } | undefined)?.code).toBe("23505");
+    }
   };
 
   it("sends a 23505 raised on a read path to the defect channel via execute()", async () => {

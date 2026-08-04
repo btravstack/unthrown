@@ -134,6 +134,9 @@ const rows = (await db.select().from(users)).get();
   (40001), statement timeout (57014), too many connections (53300), syntax
   errors, connection loss, non-Postgres causes. Retry with one `recoverDefect`
   wrapper inspecting the cause, not an arm at every write call site.
+- The cause a defect carries is drizzle's own `DrizzleQueryError` (as in stock
+  drizzle): it names the failing `query` and its `params`, with the driver's
+  error one level down under `.cause`. Read a SQLSTATE through that level.
 - `db.transaction(fn)` — `Ok` commits; `Err` **and** `Defect` roll back, and an
   `Err` re-surfaces typed. There is deliberately **no `tx.rollback()`**:
   rollback _is_ returning an `Err`. `PgQueryError` joins the result's channel

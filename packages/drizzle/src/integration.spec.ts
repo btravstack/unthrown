@@ -1,8 +1,9 @@
 import { customType, integer, pgMaterializedView, pgTable, text } from "drizzle-orm/pg-core";
+import type { EmptyRelations } from "drizzle-orm/relations";
 import { eq, inArray } from "drizzle-orm/sql/expressions/conditions";
 import { sql } from "drizzle-orm/sql/sql";
 import pg from "pg";
-import { DoAsync, isDefect, isErr, isOk, P, type Result } from "unthrown";
+import { type AsyncResult, DoAsync, isDefect, isErr, isOk, P, type Result } from "unthrown";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 // Registers the Result matchers used below (`toBeOk`, `toBeOkWith`, …).
 import "@unthrown/vitest";
@@ -15,6 +16,7 @@ import {
   UniqueConstraintViolation,
 } from "./errors.js";
 import { drizzle } from "./node-postgres/driver.js";
+import type { NodePgUnthrownTransaction } from "./node-postgres/session.js";
 import { type PgFixture, startPg } from "./test-harness.js";
 
 // ---------------------------------------------------------------------------
@@ -139,6 +141,9 @@ type ClientDb = ReturnType<typeof clientDb>;
 
 const poolDb = (client: pg.Pool) => drizzle({ client });
 type PoolDb = ReturnType<typeof poolDb>;
+
+/** The transaction handle a {@link PoolDb} callback receives. */
+type PoolTx = NodePgUnthrownTransaction<EmptyRelations>;
 
 /** The SQLSTATE the driver reported, read off a modeled error's `cause`. */
 const sqlstateOf = (cause: unknown): string | undefined => {
@@ -610,6 +615,65 @@ describe("transactions on a connection pool", () => {
     );
     expect(isOk(result)).toBe(true);
     expect(isOk(result) && result.value.rows[0]?.transaction_isolation).toBe("serializable");
+  });
+
+  it("rolls back a callback that forgot its `return`, leaving a clean client", async () => {
+    // The exact JS shape: `async (tx) => { await tx.insert(…) }`. It hands back
+    // a `Promise<undefined>` where an `AsyncResult` was promised, so `inner` is
+    // `undefined` — and `isOk` reads `.tag`, which THROWS on `undefined`. That
+    // TypeError was raised BEFORE any ROLLBACK was issued, so
+    // `#runTransaction`'s `finally` released the pooled client with BEGIN still
+    // open and the next borrower ran inside a stale transaction. Reachable only
+    // from JS or through a cast, which is what this is.
+    const forgotTheReturn = (async (tx: PoolTx) => {
+      await tx.insert(users).values({ id: 16, email: "t6@x.y" }).execute();
+    }) as unknown as (tx: PoolTx) => AsyncResult<never, never>;
+
+    const result = await db.transaction(forgotTheReturn);
+
+    // Core's out-of-contract rule: a non-`Result` is a Defect, never a raw throw.
+    expect(expectDefectCause(result)).toBeInstanceOf(TypeError);
+    // The rollback really happened — row 16 is gone, and the seed row being
+    // named is what stops an empty read passing (see `survivorsOf`).
+    expect(
+      await survivorsOf(
+        db
+          .select({ id: users.id })
+          .from(users)
+          .where(inArray(users.id, [1, 16]))
+          .orderBy(users.id),
+      ),
+    ).toEqual([1]);
+    // And the connection went back to the pool clean: a fresh transaction on
+    // the same pool must commit. Inside a stale, still-open transaction this
+    // would be running in someone else's scope.
+    await expect(
+      db.transaction((tx) => tx.insert(users).values({ id: 17, email: "t7@x.y" }).execute()),
+    ).toBeOk();
+    expect(await rowsUnder(db.$count(users, eq(users.id, 17)))).toBe(1);
+  });
+
+  it("issues a bare BEGIN for a config that asks for nothing", async () => {
+    // `{}` renders no clauses; interpolating it produced `begin ` — with the
+    // trailing space — which a real server rejects as a syntax error, turning
+    // `db.transaction(fn, {})` into a defect on its own BEGIN.
+    const result = await db.transaction(
+      (tx) => tx.insert(users).values({ id: 18, email: "t8@x.y" }).execute(),
+      {},
+    );
+
+    expect(isOk(result)).toBe(true);
+    expect(await rowsUnder(db.$count(users, eq(users.id, 18)))).toBe(1);
+  });
+
+  it("issues no SET TRANSACTION for a config that asks for nothing", async () => {
+    // Postgres requires at least one mode after `set transaction`, so the
+    // statement has to be skipped rather than rendered empty.
+    const result = await db.transaction((tx) =>
+      tx.setTransaction({}).flatMap(() => tx.select({ id: users.id }).from(users).execute()),
+    );
+
+    expect(isOk(result)).toBe(true);
   });
 
   it("leaves the pool usable after every one of those failures", async () => {

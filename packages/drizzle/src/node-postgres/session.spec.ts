@@ -1,9 +1,18 @@
+import { DrizzleQueryError } from "drizzle-orm/errors";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import { PgDialect } from "drizzle-orm/pg-core/dialect";
 import { defineRelations } from "drizzle-orm/relations";
 import { eq } from "drizzle-orm/sql/expressions/conditions";
 import pg from "pg";
-import { allAsync, ErrAsync, fromSafePromise, isDefect, OkAsync, P } from "unthrown";
+import {
+  allAsync,
+  type AsyncResult,
+  ErrAsync,
+  fromSafePromise,
+  isDefect,
+  OkAsync,
+  P,
+} from "unthrown";
 import { describe, expect, it } from "vitest";
 // Registers the Result matchers used throughout this file (`toBeOkWith`, …).
 import "@unthrown/vitest";
@@ -136,6 +145,26 @@ const asClient = (fake: FakeClient | FakePool): NodePgClient => fake as unknown 
 
 const sessionOn = (client: FakeClient | FakePool) =>
   new NodePgUnthrownSession(asClient(client), new PgDialect(), relations);
+
+/**
+ * A transaction callback that hands back something which is not a `Result`.
+ *
+ * @remarks
+ * Introduced through a cast because the types forbid it — which is exactly the
+ * caller this guards: a JS consumer, or an `as`-cast one, writing
+ * `async (tx) => { await tx.insert(…) }` and forgetting the `return`.
+ * `isOk`/`isErr` read `.tag`, which *throws* on `null`/`undefined`, and that
+ * TypeError used to be raised before any `rollback` was issued.
+ */
+const returning = (value: unknown) => (() => value) as unknown as () => AsyncResult<never, never>;
+
+/** The non-`Result` returns a callback can plausibly leak. */
+const nonResults: readonly (readonly [string, unknown])[] = [
+  ["undefined", undefined],
+  ["null", null],
+  ["a plain object", {}],
+  ["a number", 0],
+];
 
 /** The SQL text of everything a recorder was asked to run, in order. */
 const statements = (recorder: FakeClient | FakePool) => recorder.ran.map((r) => r.sql);
@@ -367,11 +396,18 @@ describe("NodePgUnthrownSession — transaction", () => {
 
     // The transaction's state is now unknown, which is a bigger fact than the
     // domain error it was discarding — so the outcome is a defect. It must not
-    // *destroy* that domain error, though: both are carried.
+    // *destroy* that domain error, though: both are carried, ordered
+    // `[thrown, original]` as core's failure-observer convention has it — the
+    // rollback's own failure first, then the error it was rolling back.
     expect(result).toBeDefect();
     if (isDefect(result)) {
       expect(result.cause).toBeInstanceOf(AggregateError);
-      expect((result.cause as AggregateError).errors).toEqual([error, rollbackFailure]);
+      const errors = (result.cause as AggregateError).errors as unknown[];
+      expect(errors).toHaveLength(2);
+      expect(errors[0]).toBeInstanceOf(DrizzleQueryError);
+      expect((errors[0] as DrizzleQueryError).query).toBe("rollback");
+      expect((errors[0] as DrizzleQueryError).cause).toBe(rollbackFailure);
+      expect(errors[1]).toBe(error);
     }
   });
 
@@ -387,8 +423,41 @@ describe("NodePgUnthrownSession — transaction", () => {
     expect(isDefect(result)).toBe(true);
     if (isDefect(result)) {
       expect(result.cause).toBeInstanceOf(AggregateError);
-      expect((result.cause as AggregateError).errors).toEqual([boom, rollbackFailure]);
+      // `[thrown, original]`: the rollback's failure, then what was thrown.
+      const errors = (result.cause as AggregateError).errors as unknown[];
+      expect(errors).toHaveLength(2);
+      expect(errors[0]).toBeInstanceOf(DrizzleQueryError);
+      expect((errors[0] as DrizzleQueryError).cause).toBe(rollbackFailure);
+      expect(errors[1]).toBe(boom);
     }
+  });
+
+  it.each(nonResults)(
+    "rolls back a callback that returned %s, and surfaces a Defect",
+    async (_label, value) => {
+      const client = new FakeClient();
+
+      const result = await sessionOn(client).transaction(returning(value));
+
+      // The rollback is the assertion: `null`/`undefined` used to throw a
+      // TypeError out of `isOk` *before* this line was reached.
+      expect(statements(client)).toEqual(["begin", "rollback"]);
+      expect(result).toBeDefect();
+      // Core's out-of-contract rule: a non-`Result` becomes a TypeError-caused
+      // Defect at the `flatMap` guard, never a raw throw.
+      expect(isDefect(result) && result.cause).toBeInstanceOf(TypeError);
+    },
+  );
+
+  it("issues a bare begin when the config asks for nothing", async () => {
+    // `{}` renders no clauses, and `begin ` (with the trailing space) is a
+    // syntax error on a real server — so the clause has to be omitted entirely.
+    const client = new FakeClient();
+
+    const result = await sessionOn(client).transaction(() => OkAsync(1), {});
+
+    expect(statements(client)).toEqual(["begin", "commit"]);
+    expect(result).toBeOkWith(1);
   });
 
   it("hands the callback a transaction, not the database", async () => {
@@ -516,6 +585,30 @@ describe("NodePgUnthrownSession — pooling", () => {
     // In particular it does not fall back to running the transaction on the pool.
     expect(statements(pool)).toEqual([]);
   });
+
+  it.each(nonResults)(
+    "releases a CLEAN client when the callback returned %s",
+    async (_label, value) => {
+      const pool = new FakePool();
+
+      const first = await sessionOn(pool).transaction(returning(value));
+
+      expect(statements(pool.client)).toEqual(["begin", "rollback"]);
+      expect(pool.client.released).toBe(1);
+      expect(first).toBeDefect();
+
+      // The part that actually bites: without the guard the TypeError escaped
+      // before any `rollback` was issued, so `#runTransaction`'s `finally`
+      // handed the connection back to the pool with BEGIN still open — and the
+      // next borrower ran inside a stale transaction. Proving the client is
+      // clean means running another transaction on it.
+      const second = await sessionOn(pool).transaction(() => OkAsync(1));
+
+      expect(statements(pool.client)).toEqual(["begin", "rollback", "begin", "commit"]);
+      expect(pool.client.released).toBe(2);
+      expect(second).toBeOkWith(1);
+    },
+  );
 
   it("recognises a real pg.Pool by identity, not only by name", async () => {
     // The name check is the fallback for a second copy of `pg` in the tree; a
@@ -713,5 +806,19 @@ describe("NodePgUnthrownTransaction — setTransaction", () => {
     );
 
     expect(statements(client)).toContain("set transaction isolation level repeatable read");
+  });
+
+  it("issues nothing at all when the config asks for nothing", async () => {
+    // Postgres' grammar demands at least one mode after `set transaction`, so
+    // `set transaction ` was a syntax error reported as a defect for a call that
+    // requested no change.
+    const client = new FakeClient();
+
+    const result = await sessionOn(client).transaction((tx) =>
+      tx.setTransaction({}).flatMap(() => OkAsync(1)),
+    );
+
+    expect(statements(client)).toEqual(["begin", "commit"]);
+    expect(result).toBeOkWith(1);
   });
 });

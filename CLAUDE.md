@@ -849,7 +849,7 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   the trap `@unthrown/prisma` shipped in the other direction, and the runtime
   half is what stops the declaration from lying; all three routes into a read
   agree, `prepare(name).execute()` included (reads hand back
-  `UnthrownPgSafePreparedQuery`). `refreshMaterializedView` is a read **by
+  `PgUnthrownSafePreparedQuery`). `refreshMaterializedView` is a read **by
   explicit decision** even though `REFRESH … CONCURRENTLY` can raise a real
   23505 against the view's unique index — a duplicate-producing matview is a bug
   in the view definition, not a domain outcome. Writes (`insert`, `update`,
@@ -866,7 +866,24 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   issued — **not** by nesting depth, which is drizzle's scheme and collides:
   two nested transactions started concurrently (which `allAsync` makes easy to
   write) would both be `sp1` on the one connection, and the first
-  `rollback to savepoint sp1` would unwind the other's work. A query
+  `rollback to savepoint sp1` would unwind the other's work. A callback that
+  hands back something that is **not a `Result`** at all — reachable only from
+  JS or a cast, the `async (tx) => { await tx.insert(…) }` that forgot its
+  `return` — takes the **undo** path too and surfaces as a `Defect` (core's
+  out-of-contract rule): `isOk`/`isErr` read `.tag`, which _throws_ on
+  `null`/`undefined`, and that TypeError used to escape before any `ROLLBACK`
+  was issued, releasing the pooled client with `BEGIN` still open so the next
+  borrower ran inside a stale transaction. A config that renders **no clauses**
+  (`{}`) omits them entirely rather than interpolating an empty string —
+  `begin ` and `set transaction ` are both syntax errors, and `setTransaction({})`
+  issues no statement at all. When an undo **itself** fails it takes over the
+  outcome as an `AggregateError`, ordered `[thrown, original]` — core's
+  failure-observer convention. Every driver rejection is wrapped in drizzle's
+  own `DrizzleQueryError` first, exactly as `PgAsyncPreparedQuery.execute`
+  does, so a defect names the failing **statement and params** (node-postgres'
+  `DatabaseError` carries `code`/`constraint`/`table`/`column`/`detail` but not
+  the SQL); triage is unaffected because `qualifyPgError` already reads the
+  SQLSTATE through one `cause` level. A query
   builder is a **thenable**, not an `AsyncResult` — `await` it into a `Result`,
   or end the chain in `.execute()` to reach the combinators; compilation runs
   _inside_ the boundary (`prepare` is a thunk), so a `getSQL()` throw is a

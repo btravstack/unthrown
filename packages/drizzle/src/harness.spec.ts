@@ -13,7 +13,7 @@ describe("test harness", () => {
     await fixture.stop();
   });
 
-  it("serves a real Postgres over the wire protocol", async () => {
+  it("hands back a pool connected to a live, queryable database", async () => {
     const r = await fixture.pool.query<{ n: number }>("SELECT 1 AS n");
     expect(r.rows[0]?.n).toBe(1);
   });

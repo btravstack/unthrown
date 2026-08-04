@@ -16,7 +16,7 @@ import type { Assume } from "drizzle-orm/utils";
 import type { AsyncResult } from "unthrown";
 
 import { type ResultThen, resultThen, runSafeQuery } from "./awaitable.js";
-import type { UnthrownPgSafePreparedQuery, UnthrownPgSession } from "./session.js";
+import type { PgUnthrownSafePreparedQuery, PgUnthrownSession } from "./session.js";
 
 /**
  * The higher-kinded type that keeps every chained `select` method returning an
@@ -97,16 +97,16 @@ export class PgUnthrownSelectBase<
 
   /**
    * Narrower than the base's `PgSession | undefined`: this builder is only ever
-   * constructed by {@link UnthrownPgDatabase}, which owns an unthrown session.
+   * constructed by {@link PgUnthrownDatabase}, which owns an unthrown session.
    * `declare` because the base constructor already assigns it.
    */
-  declare protected session: UnthrownPgSession<unknown>;
+  declare protected session: PgUnthrownSession<unknown>;
 
   /** @internal */
   _prepare(
     name?: string,
     generateName = false,
-  ): UnthrownPgSafePreparedQuery<PreparedQueryConfig & { execute: TResult }> {
+  ): PgUnthrownSafePreparedQuery<PreparedQueryConfig & { execute: TResult }> {
     const { session, dialect, cacheConfig, usedTables } = this;
     const query = this.config.tagged
       ? dialect._sqlToQuery(this.getSQL())
@@ -138,11 +138,11 @@ export class PgUnthrownSelectBase<
    * specifying the full query.
    *
    * Its `execute()` carries the same `never` error channel as this builder's —
-   * see {@link UnthrownPgSafePreparedQuery}.
+   * see {@link PgUnthrownSafePreparedQuery}.
    *
    * {@link https://www.postgresql.org/docs/current/sql-prepare.html | Postgres prepare documentation}
    */
-  prepare(name: string): UnthrownPgSafePreparedQuery<PreparedQueryConfig & { execute: TResult }> {
+  prepare(name: string): PgUnthrownSafePreparedQuery<PreparedQueryConfig & { execute: TResult }> {
     return this._prepare(name, true);
   }
 

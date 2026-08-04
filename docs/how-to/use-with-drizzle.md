@@ -202,6 +202,14 @@ a non-Postgres cause: none of those reaches your error channel. They go to the
 [defect channel](../explanation/the-defect-channel), with the original cause
 preserved.
 
+The cause you receive is drizzle's own `DrizzleQueryError`, exactly as stock
+drizzle raises it: it names the failing statement (`query`) and its bound
+`params`, with the driver's error one level down under `.cause`. node-postgres'
+`DatabaseError` carries `code`, `constraint`, `table`, `column` and `detail` but
+_not_ the SQL, so the wrapper is what makes a logged defect say **which** query
+blew up. Anything reading the SQLSTATE should follow one `cause` level — the
+`sqlState` helper below does.
+
 That is not a demotion. **A defect is not a crash**: it flows through the
 pipeline untouched and is folded at the edge by `match`'s `defect` handler,
 exactly where you already turn unexpected failures into a 500.

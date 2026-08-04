@@ -12,7 +12,7 @@ import type { AsyncResult } from "unthrown";
 
 import type { PgQueryError } from "../errors.js";
 import { type ResultThen, resultThen, runQuery } from "./awaitable.js";
-import type { UnthrownPgPreparedQuery, UnthrownPgSession } from "./session.js";
+import type { PgUnthrownPreparedQuery, PgUnthrownSession } from "./session.js";
 
 /**
  * What an `insert` resolves to: the driver's own result object, or the returned
@@ -73,13 +73,13 @@ export class PgUnthrownInsertBase<
   static override readonly [entityKind]: string = "PgUnthrownInsert";
 
   /** See {@link PgUnthrownSelectBase}'s `session` for why this is redeclared. */
-  declare protected session: UnthrownPgSession<unknown>;
+  declare protected session: PgUnthrownSession<unknown>;
 
   /** @internal */
   _prepare(
     name?: string,
     generateName = false,
-  ): UnthrownPgPreparedQuery<
+  ): PgUnthrownPreparedQuery<
     PreparedQueryConfig & { execute: InsertResult<TQueryResult, TReturning> }
   > {
     const { session, config, dialect } = this;
@@ -102,7 +102,7 @@ export class PgUnthrownInsertBase<
    */
   prepare(
     name: string,
-  ): UnthrownPgPreparedQuery<
+  ): PgUnthrownPreparedQuery<
     PreparedQueryConfig & { execute: InsertResult<TQueryResult, TReturning> }
   > {
     return this._prepare(name, true);

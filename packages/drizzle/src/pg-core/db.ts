@@ -32,7 +32,7 @@ import { PgUnthrownRelationalQuery, type PgUnthrownRelationalQueryHKT } from "./
 import { PgUnthrownRaw } from "./raw.js";
 import { PgUnthrownRefreshMaterializedView } from "./refresh-materialized-view.js";
 import { PgUnthrownSelectBase, type PgUnthrownSelectBuilder } from "./select.js";
-import type { UnthrownPgSession } from "./session.js";
+import type { PgUnthrownSession } from "./session.js";
 import type { PgUnthrownUpdateHKT } from "./update.js";
 import { PgUnthrownUpdateBase } from "./update.js";
 
@@ -52,15 +52,15 @@ import { PgUnthrownUpdateBase } from "./update.js";
  *
  * @category Database
  */
-export class UnthrownPgDatabase<
+export class PgUnthrownDatabase<
   TQueryResult extends PgQueryResultHKT,
   TRelations extends AnyRelations = EmptyRelations,
 > {
-  static readonly [entityKind]: string = "UnthrownPgDatabase";
+  static readonly [entityKind]: string = "PgUnthrownDatabase";
 
   readonly _: {
     readonly relations: TRelations;
-    readonly session: UnthrownPgSession<unknown>;
+    readonly session: PgUnthrownSession<unknown>;
   };
 
   /**
@@ -79,7 +79,7 @@ export class UnthrownPgDatabase<
     /** @internal */
     readonly dialect: PgDialect,
     /** @internal */
-    readonly session: UnthrownPgSession<unknown>,
+    readonly session: PgUnthrownSession<unknown>,
     relations: TRelations,
     parseRqbJson = false,
     readonly tagged = false,
@@ -124,7 +124,7 @@ export class UnthrownPgDatabase<
     // The per-table builders are assembled by walking `relations` at runtime, so
     // the mapped type over `keyof TRelations` cannot be proven by construction —
     // the key set and the value types are the same ones the loop just wrote.
-    this.query = builders as UnthrownPgDatabase<TQueryResult, TRelations>["query"];
+    this.query = builders as PgUnthrownDatabase<TQueryResult, TRelations>["query"];
   }
 
   /**

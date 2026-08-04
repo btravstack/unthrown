@@ -11,10 +11,10 @@ import "@unthrown/vitest";
 
 import type { PgQueryError } from "../errors.js";
 import { PgUnthrownCountBuilder } from "./count.js";
-import { UnthrownPgDatabase } from "./db.js";
+import { PgUnthrownDatabase } from "./db.js";
 import { PgUnthrownRaw } from "./raw.js";
 import { PgUnthrownSelectBase } from "./select.js";
-import { type PgRowMapper, UnthrownPgPreparedQuery, UnthrownPgSession } from "./session.js";
+import { type PgRowMapper, PgUnthrownPreparedQuery, PgUnthrownSession } from "./session.js";
 
 const users = pgTable("users", {
   id: integer("id").primaryKey(),
@@ -52,7 +52,7 @@ type Asked = { readonly sql: string; readonly params: unknown[]; readonly mode: 
  * they only ever hand the session a compiled query and read back an
  * `AsyncResult`, so a fake driver exercises the whole tree without a database.
  */
-class FakeSession extends UnthrownPgSession<never> {
+class FakeSession extends PgUnthrownSession<never> {
   readonly asked: Asked[] = [];
 
   constructor(private readonly answer: () => Promise<unknown>) {
@@ -64,9 +64,9 @@ class FakeSession extends UnthrownPgSession<never> {
     mode: "arrays" | "objects" | "raw",
     _name: string | boolean,
     mapper?: PgRowMapper,
-  ): UnthrownPgPreparedQuery<T> {
+  ): PgUnthrownPreparedQuery<T> {
     this.asked.push({ sql: query.sql, params: query.params, mode });
-    return new UnthrownPgPreparedQuery<T>(this.answer, query, mapper, mode, noopLogger);
+    return new PgUnthrownPreparedQuery<T>(this.answer, query, mapper, mode, noopLogger);
   }
 
   override transaction<A, E>(
@@ -79,7 +79,7 @@ class FakeSession extends UnthrownPgSession<never> {
 
 const makeDb = (answer: () => Promise<unknown>) => {
   const session = new FakeSession(answer);
-  const db = new UnthrownPgDatabase<FakeQueryResultHKT, typeof relations>(
+  const db = new PgUnthrownDatabase<FakeQueryResultHKT, typeof relations>(
     new PgDialect(),
     session,
     relations,
@@ -96,7 +96,7 @@ const violation = () => {
   };
 };
 
-describe("UnthrownPgDatabase — select", () => {
+describe("PgUnthrownDatabase — select", () => {
   it("awaits to an Ok of the mapped rows, without an explicit execute()", async () => {
     const { db, session } = makeDb(rows([[1, "ada"]]));
 
@@ -141,7 +141,7 @@ describe("UnthrownPgDatabase — select", () => {
     const prepared = db.select().from(users).prepare("by_id");
     const result = await prepared.execute();
 
-    expect(prepared).toBeInstanceOf(UnthrownPgPreparedQuery);
+    expect(prepared).toBeInstanceOf(PgUnthrownPreparedQuery);
     expect(session.asked).toHaveLength(1);
     expect(result).toBeOkWith([{ id: 1, name: "ada" }]);
   });
@@ -157,7 +157,7 @@ describe("UnthrownPgDatabase — select", () => {
   });
 });
 
-describe("UnthrownPgDatabase — writes", () => {
+describe("PgUnthrownDatabase — writes", () => {
   it("qualifies a unique violation into the error channel", async () => {
     const { db } = makeDb(violation());
 
@@ -234,7 +234,7 @@ describe("UnthrownPgDatabase — writes", () => {
   });
 });
 
-describe("UnthrownPgDatabase — $count", () => {
+describe("PgUnthrownDatabase — $count", () => {
   it("coerces the bigint string Postgres returns for count(*)", async () => {
     const { db, session } = makeDb(rows([["7"]]));
 
@@ -271,7 +271,7 @@ describe("UnthrownPgDatabase — $count", () => {
   });
 });
 
-describe("UnthrownPgDatabase — raw execute", () => {
+describe("PgUnthrownDatabase — raw execute", () => {
   it("runs a tagged SQL fragment", async () => {
     const { db, session } = makeDb(rows({ rowCount: 0 }));
 
@@ -296,11 +296,11 @@ describe("UnthrownPgDatabase — raw execute", () => {
 
     const raw = db.execute("select 1");
 
-    expect(raw._prepare()).toBeInstanceOf(UnthrownPgPreparedQuery);
+    expect(raw._prepare()).toBeInstanceOf(PgUnthrownPreparedQuery);
   });
 });
 
-describe("UnthrownPgDatabase — CTEs and relational queries", () => {
+describe("PgUnthrownDatabase — CTEs and relational queries", () => {
   it("selects from a CTE built with $with", async () => {
     const { db, session } = makeDb(rows([[1, "ada"]]));
 
@@ -369,7 +369,7 @@ describe("UnthrownPgDatabase — CTEs and relational queries", () => {
   });
 });
 
-describe("UnthrownPgDatabase — refreshMaterializedView", () => {
+describe("PgUnthrownDatabase — refreshMaterializedView", () => {
   it("issues a refresh statement", async () => {
     const { db, session } = makeDb(rows({ rowCount: 0 }));
 
@@ -395,7 +395,7 @@ describe("UnthrownPgDatabase — refreshMaterializedView", () => {
  * it runs `getSQL()` and the dialect's query builders — so a throw there must
  * land in the defect channel rather than escaping as a rejection.
  */
-class ThrowingSession extends UnthrownPgSession<never> {
+class ThrowingSession extends PgUnthrownSession<never> {
   constructor() {
     super(new PgDialect());
   }
@@ -413,13 +413,13 @@ class ThrowingSession extends UnthrownPgSession<never> {
 }
 
 const throwingDb = () =>
-  new UnthrownPgDatabase<FakeQueryResultHKT, typeof relations>(
+  new PgUnthrownDatabase<FakeQueryResultHKT, typeof relations>(
     new PgDialect(),
     new ThrowingSession(),
     relations,
   );
 
-describe("UnthrownPgDatabase — a failure while compiling the query", () => {
+describe("PgUnthrownDatabase — a failure while compiling the query", () => {
   // The reachable, type-legal mistake: `posts.title` is selected but `posts` is
   // never joined, so drizzle throws out of `buildSelectQuery` — inside
   // `_prepare`, ahead of any driver call. Before this was moved inside the
@@ -468,7 +468,7 @@ describe("UnthrownPgDatabase — a failure while compiling the query", () => {
   });
 });
 
-describe("UnthrownPgDatabase — tagged mode", () => {
+describe("PgUnthrownDatabase — tagged mode", () => {
   it("threads the tagged flag to the select builder", async () => {
     const session = new FakeSession(rows([[1, "ada"]]));
     // `tagged` is the last constructor flag. It reaches `PgSelectBuilder`, which
@@ -478,7 +478,7 @@ describe("UnthrownPgDatabase — tagged mode", () => {
     // forwards it into the config, so the tagged path is unreachable today —
     // the code mirrors drizzle's own async tree, and this test pins the wiring
     // that exists.
-    const db = new UnthrownPgDatabase<FakeQueryResultHKT, typeof relations>(
+    const db = new PgUnthrownDatabase<FakeQueryResultHKT, typeof relations>(
       new PgDialect(),
       session,
       relations,
@@ -493,7 +493,7 @@ describe("UnthrownPgDatabase — tagged mode", () => {
   });
 });
 
-describe("UnthrownPgDatabase — prepared writes", () => {
+describe("PgUnthrownDatabase — prepared writes", () => {
   it("prepares an insert by name", async () => {
     const { db } = makeDb(rows({ rowCount: 1 }));
 

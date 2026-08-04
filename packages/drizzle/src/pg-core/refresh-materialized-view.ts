@@ -8,7 +8,7 @@ import type {
 import type { AsyncResult } from "unthrown";
 
 import { type ResultThen, resultThen, runSafeQuery } from "./awaitable.js";
-import type { UnthrownPgSafePreparedQuery, UnthrownPgSession } from "./session.js";
+import type { PgUnthrownSafePreparedQuery, PgUnthrownSession } from "./session.js";
 
 /**
  * A `refresh materialized view` statement that resolves to an `AsyncResult`.
@@ -21,13 +21,13 @@ export class PgUnthrownRefreshMaterializedView<
   static override readonly [entityKind]: string = "PgUnthrownRefreshMaterializedView";
 
   /** See {@link PgUnthrownSelectBase}'s `session` for why this is redeclared. */
-  declare protected session: UnthrownPgSession<unknown>;
+  declare protected session: PgUnthrownSession<unknown>;
 
   /** @internal */
   _prepare(
     name?: string,
     generateName = false,
-  ): UnthrownPgSafePreparedQuery<
+  ): PgUnthrownSafePreparedQuery<
     PreparedQueryConfig & { execute: PgQueryResultKind<TQueryResult, never> }
   > {
     // `toSQL()` is `dialect.sqlToQuery(this.getSQL())`; the `getSQL()` drizzle's
@@ -50,13 +50,13 @@ export class PgUnthrownRefreshMaterializedView<
    * specifying the full query.
    *
    * Its `execute()` carries the same `never` error channel as this builder's —
-   * see {@link UnthrownPgSafePreparedQuery}.
+   * see {@link PgUnthrownSafePreparedQuery}.
    *
    * {@link https://www.postgresql.org/docs/current/sql-prepare.html | Postgres prepare documentation}
    */
   prepare(
     name: string,
-  ): UnthrownPgSafePreparedQuery<
+  ): PgUnthrownSafePreparedQuery<
     PreparedQueryConfig & { execute: PgQueryResultKind<TQueryResult, never> }
   > {
     return this._prepare(name, true);

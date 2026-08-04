@@ -7,7 +7,7 @@ import type { PreparedQueryConfig } from "drizzle-orm/pg-core/session";
 import type { AsyncResult } from "unthrown";
 
 import { type ResultThen, resultThen, runSafeQuery } from "./awaitable.js";
-import type { UnthrownPgSafePreparedQuery, UnthrownPgSession } from "./session.js";
+import type { PgUnthrownSafePreparedQuery, PgUnthrownSession } from "./session.js";
 
 /**
  * The higher-kinded type that makes `db.query.<table>.findMany()` build an
@@ -38,13 +38,13 @@ export class PgUnthrownRelationalQuery<TResult> extends PgRelationalQuery<
   static override readonly [entityKind]: string = "PgUnthrownRelationalQuery";
 
   /** See {@link PgUnthrownSelectBase}'s `session` for why this is redeclared. */
-  declare protected session: UnthrownPgSession<unknown>;
+  declare protected session: PgUnthrownSession<unknown>;
 
   /** @internal */
   _prepare(
     name?: string,
     generateName = false,
-  ): UnthrownPgSafePreparedQuery<PreparedQueryConfig & { execute: TResult }> {
+  ): PgUnthrownSafePreparedQuery<PreparedQueryConfig & { execute: TResult }> {
     const { query, builtQuery } = this._toSQL();
     const mapper = this.dialect.mapperGenerators.relationalRows({
       isFirst: this.mode === "first",
@@ -72,11 +72,11 @@ export class PgUnthrownRelationalQuery<TResult> extends PgRelationalQuery<
    * specifying the full query.
    *
    * Its `execute()` carries the same `never` error channel as this builder's —
-   * see {@link UnthrownPgSafePreparedQuery}.
+   * see {@link PgUnthrownSafePreparedQuery}.
    *
    * {@link https://www.postgresql.org/docs/current/sql-prepare.html | Postgres prepare documentation}
    */
-  prepare(name: string): UnthrownPgSafePreparedQuery<PreparedQueryConfig & { execute: TResult }> {
+  prepare(name: string): PgUnthrownSafePreparedQuery<PreparedQueryConfig & { execute: TResult }> {
     return this._prepare(name, true);
   }
 
