@@ -58,7 +58,7 @@
     "build:docs": "typedoc",
     "dev": "tsdown src/index.ts src/node-postgres/index.ts --format cjs,esm --dts --watch",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test-d.json"
   },
   "dependencies": {
     "unthrown": "workspace:^"

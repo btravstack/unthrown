@@ -17,9 +17,9 @@ export default defineConfig({
       provider: "v8",
       include: ["src/**"],
       // src/test-harness.ts and src/test-container.ts are test infrastructure,
-      // not library code; src/types.test-d.ts (a later task) has no runtime.
-      // No thresholds yet — this task ships only a smoke test. A later task
-      // raises coverage to the family's usual 100%.
+      // not library code; src/types.test-d.ts has no runtime at all (it is
+      // checked by `tsc` through tsconfig.test-d.json, in the package's second
+      // typecheck pass).
       exclude: [
         "src/test-harness.ts",
         "src/test-container.ts",
