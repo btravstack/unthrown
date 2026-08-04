@@ -143,4 +143,23 @@ describe("UnthrownPgSession", () => {
     expect(session.asked).toEqual([{ sql: "select 1", mode: "objects" }]);
     expect(isOk(r) && r.value).toEqual([{ n: 1 }]);
   });
+
+  // `sqlToQuery` is not bookkeeping: it throws for fragments that are type-legal
+  // and entirely reachable. Compiled outside the boundary, that throw escapes
+  // synchronously — past a caller who has no `try`/`catch`, because these
+  // methods promise a `Result`. Inlining a parameter drizzle has no rendering
+  // for is its own deliberate failure there ("Unexpected param value").
+  const uncompilable = () => sql`select ${() => 1}`.inlineParams();
+
+  it.each(["execute", "arrays", "objects"] as const)(
+    "turns a compilation throw in %s into a Defect rather than a throw",
+    async (method) => {
+      const session = new StubSession([]);
+
+      const r = await session[method](uncompilable());
+
+      expect(isDefect(r)).toBe(true);
+      expect(session.asked).toEqual([]);
+    },
+  );
 });

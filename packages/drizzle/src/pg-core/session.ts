@@ -11,9 +11,14 @@ import { fillPlaceholders, type Query, type SQL } from "drizzle-orm/sql/sql";
 import { type AsyncResult, fromPromise } from "unthrown";
 
 import { type PgQueryError, qualifyPgError } from "../errors.js";
+import { runQuery } from "./awaitable.js";
 
-/** The row shapes a prepared query can be asked to produce. */
-type PgQueryMode = "arrays" | "objects" | "raw";
+/**
+ * The row shapes a prepared query can be asked to produce.
+ *
+ * @category Session
+ */
+export type PgQueryMode = "arrays" | "objects" | "raw";
 
 /**
  * A row mapper, as handed over by a drizzle query builder.
@@ -166,18 +171,26 @@ export abstract class UnthrownPgSession<TTransaction> extends PgSession {
     config?: PgTransactionConfig,
   ): AsyncResult<A, E | PgQueryError>;
 
-  /** Run a raw `SQL` fragment, returning the driver's own result object. */
+  /**
+   * Run a raw `SQL` fragment, returning the driver's own result object.
+   *
+   * @remarks
+   * Compilation runs **inside** the failure boundary — see {@link runQuery}.
+   * `dialect.sqlToQuery` throws for mistakes that are type-legal and reachable,
+   * and a throw escaping here would land on a caller who has no `try`/`catch`,
+   * because this method's contract is a `Result`.
+   */
   override execute(query: SQL): AsyncResult<unknown, PgQueryError> {
-    return this.prepareQuery(this.dialect.sqlToQuery(query), "raw", false).execute();
+    return runQuery(() => this.prepareQuery(this.dialect.sqlToQuery(query), "raw", false));
   }
 
   /** Run a raw `SQL` fragment, returning each row as an array of column values. */
   override arrays(query: SQL): AsyncResult<unknown, PgQueryError> {
-    return this.prepareQuery(this.dialect.sqlToQuery(query), "arrays", false).execute();
+    return runQuery(() => this.prepareQuery(this.dialect.sqlToQuery(query), "arrays", false));
   }
 
   /** Run a raw `SQL` fragment, returning each row as a column-keyed object. */
   override objects(query: SQL): AsyncResult<unknown, PgQueryError> {
-    return this.prepareQuery(this.dialect.sqlToQuery(query), "objects", false).execute();
+    return runQuery(() => this.prepareQuery(this.dialect.sqlToQuery(query), "objects", false));
   }
 }
