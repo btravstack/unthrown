@@ -16,6 +16,23 @@ import { type PgQueryError, qualifyPgError } from "../errors.js";
 type PgQueryMode = "arrays" | "objects" | "raw";
 
 /**
+ * A row mapper, as handed over by a drizzle query builder.
+ *
+ * @remarks
+ * The parameter is `never[]` — the bottom array type — deliberately. The
+ * session never inspects rows: it forwards whatever the driver produced to the
+ * mapper the builder supplied, and each builder asks for a different row shape
+ * (`unknown[][]` for a column-array select, `unknown[][] | Record<string,
+ * unknown>[]` for a relational query). Under `strictFunctionTypes` a parameter
+ * is checked contravariantly, so `never[]` is the one parameter type every such
+ * mapper is assignable to. Spelling it `any[]` would accept exactly the same
+ * set while giving up type-checking inside every mapper that reads it.
+ *
+ * @category Session
+ */
+export type PgRowMapper = (rows: never[]) => unknown;
+
+/**
  * A prepared query whose execution yields an {@link AsyncResult}.
  *
  * @remarks
@@ -50,7 +67,7 @@ export class UnthrownPgPreparedQuery<
   constructor(
     private readonly executor: (params: unknown[]) => Promise<unknown>,
     query: Query,
-    private readonly mapper: ((rows: unknown[]) => unknown) | undefined,
+    private readonly mapper: PgRowMapper | undefined,
     readonly mode: PgQueryMode,
     private readonly logger: Logger,
   ) {
@@ -81,9 +98,11 @@ export class UnthrownPgPreparedQuery<
     // The `unknown` execution container is drizzle's own seam: the driver hands
     // back untyped rows and `T["execute"]` is the shape the builder that created
     // this query promised. Narrowing it is the assertion drizzle's async and
-    // effect sessions each make in the same spot.
+    // effect sessions each make in the same spot. The `never[]` argument is the
+    // other half of that seam — see {@link PgRowMapper}: only the builder that
+    // supplied the mapper knows which row shape it asked the driver for.
     return (
-      mapper === undefined ? rows : rows.then((value) => mapper(value as unknown[]))
+      mapper === undefined ? rows : rows.then((value) => mapper(value as never[]))
     ) as Promise<T["execute"]>;
   }
 
@@ -129,7 +148,7 @@ export abstract class UnthrownPgSession<TTransaction> extends PgSession {
     query: Query,
     mode: PgQueryMode,
     name: string | boolean,
-    mapper?: (rows: unknown[]) => unknown,
+    mapper?: PgRowMapper,
     queryMetadata?: { type: "select" | "update" | "delete" | "insert"; tables: string[] },
     cacheConfig?: WithCacheConfig,
   ): UnthrownPgPreparedQuery<T>;

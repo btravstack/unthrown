@@ -1,0 +1,132 @@
+import { entityKind } from "drizzle-orm/entity";
+import type { Join, PgUpdateHKTBase } from "drizzle-orm/pg-core/query-builders/update";
+import { PgUpdateBase } from "drizzle-orm/pg-core/query-builders/update";
+import type {
+  PgQueryResultHKT,
+  PgQueryResultKind,
+  PreparedQueryConfig,
+} from "drizzle-orm/pg-core/session";
+import type { PgTable } from "drizzle-orm/pg-core/table";
+import { extractUsedTable } from "drizzle-orm/pg-core/utils";
+import type { PgViewBase } from "drizzle-orm/pg-core/view-base";
+import type { JoinNullability } from "drizzle-orm/query-builders/select.types";
+import type { ColumnsSelection, SQL } from "drizzle-orm/sql/sql";
+import type { Subquery } from "drizzle-orm/subquery";
+import type { Assume } from "drizzle-orm/utils";
+import type { AsyncResult } from "unthrown";
+
+import type { PgQueryError } from "../errors.js";
+import { type ResultThen, settle } from "./awaitable.js";
+import type { UnthrownPgPreparedQuery, UnthrownPgSession } from "./session.js";
+
+/**
+ * What an `update` resolves to: the driver's own result object, or the returned
+ * rows once `.returning()` has been called.
+ */
+type UpdateResult<TQueryResult extends PgQueryResultHKT, TReturning> = TReturning extends undefined
+  ? PgQueryResultKind<TQueryResult, never>
+  : TReturning[];
+
+/**
+ * The higher-kinded type that keeps every chained `update` method returning an
+ * unthrown builder rather than drizzle's own.
+ *
+ * @remarks
+ * See {@link PgUnthrownSelectHKT} for why this is an `interface`.
+ *
+ * @category Builders
+ */
+// oxlint-disable-next-line consistent-type-definitions -- drizzle's HKT encoding reads the polymorphic `this` type, which a type alias cannot express.
+export interface PgUnthrownUpdateHKT extends PgUpdateHKTBase {
+  _type: PgUnthrownUpdateBase<
+    Assume<this["table"], PgTable>,
+    Assume<this["queryResult"], PgQueryResultHKT>,
+    Assume<this["from"], PgTable | Subquery | PgViewBase | SQL | undefined>,
+    Assume<this["selectedFields"], ColumnsSelection | undefined>,
+    Assume<this["returning"], Record<string, unknown> | undefined>,
+    Assume<this["nullabilityMap"], Record<string, JoinNullability>>,
+    Assume<this["joins"], Join[]>,
+    this["dynamic"],
+    this["excludedMethods"]
+  >;
+}
+
+/**
+ * An `update` query that resolves to an `AsyncResult`.
+ *
+ * @category Builders
+ */
+export class PgUnthrownUpdateBase<
+  TTable extends PgTable,
+  TQueryResult extends PgQueryResultHKT,
+  TFrom extends PgTable | Subquery | PgViewBase | SQL | undefined = undefined,
+  TSelectedFields extends ColumnsSelection | undefined = undefined,
+  TReturning extends Record<string, unknown> | undefined = undefined,
+  TNullabilityMap extends Record<string, JoinNullability> = Record<TTable["_"]["name"], "not-null">,
+  TJoins extends Join[] = [],
+  TDynamic extends boolean = false,
+  TExcludedMethods extends string = never,
+> extends PgUpdateBase<
+  PgUnthrownUpdateHKT,
+  TTable,
+  TQueryResult,
+  TFrom,
+  TSelectedFields,
+  TReturning,
+  TNullabilityMap,
+  TJoins,
+  TDynamic,
+  TExcludedMethods
+> {
+  static override readonly [entityKind]: string = "PgUnthrownUpdate";
+
+  /** See {@link PgUnthrownSelectBase}'s `session` for why this is redeclared. */
+  declare protected session: UnthrownPgSession<unknown>;
+
+  /** @internal */
+  _prepare(
+    name?: string,
+    generateName = false,
+  ): UnthrownPgPreparedQuery<
+    PreparedQueryConfig & { execute: UpdateResult<TQueryResult, TReturning> }
+  > {
+    const { session, config, dialect, joinsNotNullableMap } = this;
+    const { returning: fields } = config;
+    const query = dialect.sqlToQuery(this.getSQL());
+    const mapper =
+      fields === undefined
+        ? undefined
+        : this.dialect.mapperGenerators.rows(fields, joinsNotNullableMap);
+    return session.prepareQuery(query, fields ? "arrays" : "raw", name ?? generateName, mapper, {
+      type: "update",
+      tables: [...extractUsedTable(config.table)],
+    });
+  }
+
+  /**
+   * Create a prepared statement for this query. This allows the database to
+   * remember this query for the given session and call it by name, rather than
+   * specifying the full query.
+   *
+   * {@link https://www.postgresql.org/docs/current/sql-prepare.html | Postgres prepare documentation}
+   */
+  prepare(
+    name: string,
+  ): UnthrownPgPreparedQuery<
+    PreparedQueryConfig & { execute: UpdateResult<TQueryResult, TReturning> }
+  > {
+    return this._prepare(name, true);
+  }
+
+  /** Run the update, resolving to its result or a {@link PgQueryError}. */
+  execute(
+    placeholderValues?: Record<string, unknown>,
+  ): AsyncResult<UpdateResult<TQueryResult, TReturning>, PgQueryError> {
+    return this._prepare().execute(placeholderValues);
+  }
+
+  /** {@inheritDoc ResultThen} */
+  // oxlint-disable-next-line no-thenable -- deliberate: a builder is thenable so `await db.select()...` runs it, exactly as drizzle's own promise and Effect trees make theirs. It settles to a Result and never rejects — see ResultThen.
+  readonly then: ResultThen<UpdateResult<TQueryResult, TReturning>> = (onFulfilled, onRejected) =>
+    settle(this.execute()).then(onFulfilled, onRejected);
+}
