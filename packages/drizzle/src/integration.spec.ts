@@ -1,4 +1,4 @@
-import { integer, pgMaterializedView, pgTable, text } from "drizzle-orm/pg-core";
+import { customType, integer, pgMaterializedView, pgTable, text } from "drizzle-orm/pg-core";
 import { eq, inArray } from "drizzle-orm/sql/expressions/conditions";
 import { sql } from "drizzle-orm/sql/sql";
 import pg from "pg";
@@ -21,39 +21,24 @@ import { type PgFixture, startPg } from "./test-harness.js";
 // Why most of this file drives a bare `pg.Client` rather than the harness pool
 // ---------------------------------------------------------------------------
 //
-// PGlite is ONE Postgres backend, and `pglite-socket` multiplexes every TCP
-// connection onto it: each handler's protocol messages go into one shared FIFO
-// (`QueryQueueManager`), with a `lastHandlerId` + `isInTransaction()` heuristic
-// standing in for real per-session isolation, and a fresh connection's startup
-// packet re-initialises that single backend (`_ProcessStartupPacket`). So a
-// second live connection is not a second session — it is contention on the one
-// session, and a connection being TORN DOWN while another is being OPENED is
-// the sharpest form of it: the dying handler's teardown runs
-// `clearQueueForHandler` and can issue a queue-bypassing `ROLLBACK`
-// (`clearTransactionIfNeeded`) while the replacement's startup packet is
-// already in flight.
+// Originally a workaround: the harness used to serve PGlite over
+// `pglite-socket`, which multiplexes every TCP connection onto ONE backend, and
+// `pg.Pool` destroys and reopens its connection on ANY query error
+// (`Pool.prototype.query` calls `client.release(err)`, and `_release` with an
+// error goes straight to `_remove` → `client.end()`). A suite that provokes an
+// error in nearly every case therefore churned the one session constantly, and
+// a `SELECT` intermittently resolved to `Ok([])` for a row that was certainly
+// there. A standalone `pg.Client` is never released with the error, so it does
+// not churn — which removed the precondition instead of waiting it out.
 //
-// `pg.Pool` manufactures exactly that on every failing query:
-// `Pool.prototype.query` calls `client.release(err)`, and `_release` with an
-// error goes straight to `_remove` → `client.end()`, so the connection is
-// destroyed and the next query opens a new one. Task 8 saw the result — a
-// `SELECT` resolving to `Ok([])` for a row that is certainly there, roughly one
-// run in twelve — and worked around it by ordering one read ahead of the error
-// cases. This suite provokes an error in nearly every case, which is precisely
-// the shape that would hit it repeatedly.
-//
-// A checked-out `PoolClient` and a standalone `pg.Client` are NOT released with
-// the error (`client.release(err)` is reached only from `Pool.prototype.query`),
-// so neither churns. Driving the SQLSTATE and defect blocks through a bare
-// `pg.Client` therefore removes the precondition rather than waiting it out:
-// one TCP connection, opened once, never destroyed — which is also the honest
-// model of what PGlite actually is, and a client form nothing else covered.
-// The pool keeps a block of its own below, for the paths that are about being a
-// pool (`isPool` → `pool.connect()` inside `transaction`); those run their
-// statements on a checked-out client, so they do not churn either.
-//
-// None of this is a limitation of the library: a real PostgreSQL gives every
-// connection its own backend, and `qualifyPgError` never sees the difference.
+// The harness now runs a real PostgreSQL, where every connection gets a backend
+// of its own and the churn is harmless. The bare-client form stays because it
+// is worth covering on its own account: `isPool` is false for a `Client`, so
+// `transaction` runs on the session as-is with nothing checked out, and the
+// statements below then all run on ONE connection whose state is observable
+// across cases (see "rolls back on Err and leaves the client usable"). The pool
+// keeps a block of its own below for the paths that are about being a pool
+// (`isPool` → `pool.connect()` inside `transaction`).
 
 const users = pgTable("users", {
   id: integer("id").primaryKey(),
@@ -66,9 +51,17 @@ const posts = pgTable("posts", {
   authorId: integer("author_id").notNull(),
 });
 
+/**
+ * `tstzrange`, which drizzle has no built-in column for — declared through the
+ * escape hatch it provides for exactly that, so the exclusion constraint below
+ * can be the real range-overlap form rather than a scalar stand-in.
+ */
+const tstzrange = customType<{ data: string }>({ dataType: () => "tstzrange" });
+
 const bookings = pgTable("bookings", {
   id: integer("id").primaryKey(),
   room: integer("room"),
+  during: tstzrange("during"),
 });
 
 const deferred = pgTable("deferred", {
@@ -94,16 +87,15 @@ const SCHEMA: readonly string[] = [
      id int primary key,
      author_id int NOT NULL REFERENCES users(id)
    )`,
-  // A scalar `EXCLUDE (room WITH =)` rather than the range-and-gist form: PGlite
-  // 0.5.4 ships no `btree_gist` (`pg_available_extensions` does not list it, and
-  // `CREATE EXTENSION btree_gist` fails 0A000), so `EXCLUDE USING gist (room
-  // WITH =, during WITH &&)` cannot be built here. The scalar form needs no
-  // extension and raises the same SQLSTATE 23P01 from the same code path — what
-  // is untested is Postgres's gist operator classes, which are not ours.
+  // `btree_gist` is what lets a scalar (`room`, an int) share a gist index with
+  // a range (`during`) — the canonical "no two bookings of the same room may
+  // overlap in time" constraint, and the reason `EXCLUDE` exists at all.
+  `CREATE EXTENSION IF NOT EXISTS btree_gist`,
   `CREATE TABLE bookings (
      id int primary key,
      room int,
-     EXCLUDE (room WITH =)
+     during tstzrange,
+     EXCLUDE USING gist (room WITH =, during WITH &&)
    )`,
   `CREATE TABLE deferred (
      id int primary key,
@@ -191,15 +183,10 @@ const expectDefectCause = <E>(result: Result<unknown, E>): unknown => {
  *
  * @remarks
  * Read through `$count` on the database under test rather than through a second
- * connection of its own. That is deliberate, and it is the flake remedy: PGlite
- * is ONE backend and `pglite-socket` multiplexes every TCP connection onto it
- * (see the note at the top of this file), so a dedicated probe connection is not
- * an independent observer — it is a second party contending for the one session,
- * and holding one open is what reproduced the desync (`Received unexpected
- * parseComplete message from backend`). Each fixture here therefore keeps
- * exactly one live connection. Nothing is lost: the transaction has already
+ * connection of its own. Nothing is lost by that: the transaction has already
  * ended by the time this runs, so the rows it reads are committed state either
- * way.
+ * way — and reading through the database under test is also what proves the
+ * session it left behind is still usable.
  *
  * Only ever compared against a NON-zero expectation. `$count` maps a missing
  * cell to `0` (`countOf` in `count.ts`, keeping drizzle's own coercion), so a
@@ -219,11 +206,11 @@ const rowsUnder = async (count: PromiseLike<Result<number, never>>): Promise<num
  * @remarks
  * A **set**, not a count, and always asked about at least one row that MUST
  * still be there. An absence check phrased as `count(id) === 0` is satisfied by
- * a read that returned nothing at all — the very symptom (an empty rowset from
- * a response-framing desync) that this file's one-connection rule exists to
- * prevent, and therefore the one failure mode these assertions have to be able
- * to see. Naming a surviving row makes the expectation non-empty, so a vacuous
- * `[]` fails instead of passing.
+ * a read that returned nothing at all — a rollback that never happened and a
+ * read that came back empty are then indistinguishable, and "the rows are gone"
+ * is exactly the claim that must not be provable by an empty rowset. Naming a
+ * surviving row makes the expectation non-empty, so a vacuous `[]` fails
+ * instead of passing.
  *
  * `orderBy` is not decoration: without it the surviving set comes back in
  * whatever order the scan produced, and the comparison would be flaky.
@@ -288,10 +275,21 @@ describe("SQLSTATE mapping against a real PostgreSQL", () => {
   });
 
   it("maps 23P01 — a real EXCLUDE — to ExclusionViolation", async () => {
-    await expect(db.insert(bookings).values({ id: 1, room: 7 })).toBeOk();
-    const result = await db.insert(bookings).values({ id: 2, room: 7 });
+    // Same room, overlapping half-open intervals: the second insert is what the
+    // gist exclusion constraint exists to refuse.
+    await expect(
+      db
+        .insert(bookings)
+        .values({ id: 1, room: 7, during: "[2026-08-04 09:00+00,2026-08-04 10:00+00)" }),
+    ).toBeOk();
+    const result = await db
+      .insert(bookings)
+      .values({ id: 2, room: 7, during: "[2026-08-04 09:30+00,2026-08-04 10:30+00)" });
     const error = expectErrOf(result, ExclusionViolation);
-    expect(error.constraint).toBe("bookings_room_excl");
+    // PostgreSQL derives the name from every column in the constraint, so the
+    // two-column form is `bookings_room_during_excl` — the server's own name,
+    // not one this schema chose.
+    expect(error.constraint).toBe("bookings_room_during_excl");
     expect(error.table).toBe("bookings");
     expect(sqlstateOf(error.cause)).toBe("23P01");
   });
@@ -365,14 +363,19 @@ describe("defect routing against a real PostgreSQL", () => {
 
   it("routes a lost connection to the defect channel", async () => {
     const solo = await startPg();
-    // A pool of our own, so stopping the fixture kills the server under a client
-    // that is still very much alive — a genuine infrastructure failure, not a
-    // "you already ended this pool" guard.
+    // A pool of our own, so stopping the fixture pulls the database out from
+    // under a client that is still very much alive — a genuine infrastructure
+    // failure, not a "you already ended this pool" guard.
     const pool = new pg.Pool(solo.pool.options);
+    // `stop()` drops the database `WITH (FORCE)`, which terminates this pool's
+    // idle backend. `pg.Pool` re-emits an idle client's error on itself, and an
+    // unlistened `error` event on an EventEmitter throws — so the listener is
+    // what keeps a DELIBERATE connection loss from crashing the run. It asserts
+    // nothing; the assertion is the defect below.
+    pool.on("error", () => undefined);
     // Stopping the fixture is a STEP of this test, not only its cleanup, so it
-    // needs a guard rather than a second `stop()` in the `finally`: `stop()`
-    // closes the WASM instance, and calling it twice makes `db.close()` throw
-    // "PGlite is closed", which `collectErrors` would surface as an
+    // needs a guard rather than a second `stop()` in the `finally`: `pg.Pool#end`
+    // throws on a second call, which `collectErrors` would surface as an
     // `AggregateError` out of the cleanup. With the guard, an assertion that
     // fails before the planned stop still releases the fixture below.
     let stopped = false;
