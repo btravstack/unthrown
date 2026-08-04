@@ -18,9 +18,10 @@ import type { UnthrownPgPreparedQuery, UnthrownPgSession } from "./session.js";
  * What an `insert` resolves to: the driver's own result object, or the returned
  * rows once `.returning()` has been called.
  */
-type InsertResult<TQueryResult extends PgQueryResultHKT, TReturning> = TReturning extends undefined
-  ? PgQueryResultKind<TQueryResult, never>
-  : TReturning[];
+export type InsertResult<
+  TQueryResult extends PgQueryResultHKT,
+  TReturning,
+> = TReturning extends undefined ? PgQueryResultKind<TQueryResult, never> : TReturning[];
 
 /**
  * The higher-kinded type that keeps every chained `insert` method returning an

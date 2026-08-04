@@ -23,9 +23,10 @@ import type { UnthrownPgPreparedQuery, UnthrownPgSession } from "./session.js";
  * What an `update` resolves to: the driver's own result object, or the returned
  * rows once `.returning()` has been called.
  */
-type UpdateResult<TQueryResult extends PgQueryResultHKT, TReturning> = TReturning extends undefined
-  ? PgQueryResultKind<TQueryResult, never>
-  : TReturning[];
+export type UpdateResult<
+  TQueryResult extends PgQueryResultHKT,
+  TReturning,
+> = TReturning extends undefined ? PgQueryResultKind<TQueryResult, never> : TReturning[];
 
 /**
  * The higher-kinded type that keeps every chained `update` method returning an
