@@ -2,7 +2,8 @@
 
 Contents: [Testing: @unthrown/vitest](#testing-unthrownvitest) ·
 [Linting: @unthrown/oxlint](#linting-unthrownoxlint) ·
-[Prisma](#prisma-unthrownprisma) · [oRPC](#orpc-unthrownorpc) ·
+[Prisma](#prisma-unthrownprisma) · [Drizzle](#drizzle-unthrowndrizzle) ·
+[oRPC](#orpc-unthrownorpc) ·
 [Validation: @unthrown/standard-schema](#validation-unthrownstandard-schema) ·
 [Interop bridges](#interop-bridges-effect-neverthrow-boxed)
 
@@ -97,6 +98,54 @@ db.user.tryFindMany();
 - `qualifyPrismaError` — the exported qualify, for hand-rolled boundaries.
 - Raw methods remain the escape hatch for batch `$transaction([...])` and raw
   SQL.
+
+## Drizzle: @unthrown/drizzle
+
+Peers `drizzle-orm` ^1.0.0-rc and `pg` ^8.16.0. Unlike the Prisma extension this
+**replaces** the stock database rather than adding to it — every method already
+speaks `AsyncResult`, so there is **no `try*` prefix**, and migrating a call
+site is an import change:
+
+```ts
+import { drizzle } from "@unthrown/drizzle/node-postgres";
+
+const db = drizzle({ client: pool, relations });
+// also: drizzle(connectionString), drizzle(connectionString, config),
+//       drizzle({ connection }). There is NO positional drizzle(pool) form.
+
+const rows = (await db.select().from(users)).get();
+// awaiting the builder yields Result<User[], never>, so get() compiles.
+// `.execute()` is what returns an AsyncResult.
+```
+
+- A query builder is a **thenable, not an `AsyncResult`**. To reach the
+  combinators, `await` it into a `Result` first, or end the chain in
+  `.execute()`: `db.insert(t).values(v).execute().mapErrCases(…)`.
+- **Reads infer `E = never`** — `select`, `$count`, `db.query.*`,
+  `refreshMaterializedView`, `prepare(name).execute()` included. Enforced at
+  runtime (they route through `fromSafePromise`), so a stray `23xxx` on a read
+  path becomes a `Defect`, never an `Err` the type denies. `never` does not mean
+  infallible: `get()` still panics on a defect.
+- **Writes carry the whole `PgQueryError` union**, unnarrowed —
+  `insert`, `update`, `delete`, ``db.execute(sql`…`)``, `transaction`:
+  `UniqueConstraintViolation` (23505), `ForeignKeyViolation` (23503),
+  `NotNullViolation` (23502 — carries `column`, not `constraint`),
+  `CheckViolation` (23514), `ExclusionViolation` (23P01).
+- **Everything else is a defect** — deadlock (40P01), serialization failure
+  (40001), statement timeout (57014), too many connections (53300), syntax
+  errors, connection loss, non-Postgres causes. Retry with one `recoverDefect`
+  wrapper inspecting the cause, not an arm at every write call site.
+- The cause a defect carries is drizzle's own `DrizzleQueryError` (as in stock
+  drizzle): it names the failing `query` and its `params`, with the driver's
+  error one level down under `.cause`. Read a SQLSTATE through that level.
+- `db.transaction(fn)` — `Ok` commits; `Err` **and** `Defect` roll back, and an
+  `Err` re-surfaces typed. There is deliberately **no `tx.rollback()`**:
+  rollback _is_ returning an `Err`. `PgQueryError` joins the result's channel
+  whatever the callback's own `E` (a `DEFERRABLE` constraint is checked at
+  `COMMIT`), so `get()` never compiles on a transaction. Nesting is a savepoint.
+- `qualifyPgError` — the exported qualify, for hand-rolled boundaries.
+- `db.$client` is the escape hatch: a stock `drizzle-orm/node-postgres` db over
+  the same `Pool` is one line.
 
 ## oRPC: @unthrown/orpc
 

@@ -11,6 +11,7 @@ import "@unthrown/neverthrow";
 import "@unthrown/boxed";
 import "@unthrown/standard-schema";
 import "@unthrown/prisma";
+import "@unthrown/drizzle";
 // @unthrown/orpc deliberately has NO root export (its API is split across
 // `./client` / `./server` / `./extensions/result`), so its dependency is
 // established through a subpath — a bare `import "@unthrown/orpc"` fails at
@@ -33,6 +34,7 @@ const packages: ReadonlyArray<{ readonly pkg: string; readonly out: string }> = 
   { pkg: "@unthrown/boxed", out: "boxed" },
   { pkg: "@unthrown/standard-schema", out: "standard-schema" },
   { pkg: "@unthrown/prisma", out: "prisma" },
+  { pkg: "@unthrown/drizzle", out: "drizzle" },
   { pkg: "@unthrown/orpc", out: "orpc" },
 ];
 

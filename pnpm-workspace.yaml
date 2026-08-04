@@ -27,15 +27,23 @@ catalog:
   # @unthrown/standard-schema — an exact pin would block dedupe with a
   # consumer's own copy of the (types-only) spec package.
   "@standard-schema/spec": ^1.1.0
+  "@testcontainers/postgresql": 12.0.4
   "@types/node": 26.1.1
+  # 8.20.1/8.20.2/8.20.3 are all within the minimumReleaseAge window as of
+  # pinning; 8.20.0 is the newest release past it.
+  "@types/pg": 8.20.0
   "@vitest/coverage-v8": 4.1.10
   better-sqlite3: 13.0.1
+  # Ranged peer, exact catalog pin: we subclass drizzle internals
+  # (`_prepare`, the `entityKind` brand), so bumps are deliberate.
+  drizzle-orm: 1.0.0-rc.4
   effect: 3.22.0
   knip: 6.29.0
   lefthook: 2.1.10
   neverthrow: 8.2.0
   oxfmt: 0.60.0
   oxlint: 1.75.0
+  pg: 8.22.0
   prisma: 7.9.0
   tsdown: 0.22.14
   tsx: 4.23.1
@@ -52,9 +60,16 @@ catalog:
 # version-scoped so only the affected line moves and unrelated lines are untouched.
 overrides:
   # GHSA-3jxr-9vmj-r5cp (ReDoS) + GHSA-mh99-v99m-4gvg (DoS via unbounded
-  # expansion length). Only the 5.x line is present (via typedoc > minimatch);
-  # 5.0.8 is the first release patched for both.
-  "brace-expansion@5": "5.0.8"
+  # expansion length) + the later DoS via unbounded intermediate arrays, which
+  # bypasses the CVE-2026-14257 mitigation and so is NOT fixed by 5.0.8.
+  # Reaches us via typedoc > minimatch. 5.0.9 is the first release patched for
+  # all three.
+  "brace-expansion@5": "5.0.9"
+  # The same unbounded-intermediate-arrays DoS in the 2.x line, plus the
+  # unbounded-expansion-length one. New in this tree: @testcontainers/postgresql
+  # > testcontainers > archiver pulls an old glob/minimatch. 2.1.4 is the first
+  # 2.x release patched for both.
+  "brace-expansion@2": "2.1.4"
   # GHSA-52cp-r559-cp3m: js-yaml quadratic-CPU merge keys in the legacy 3.x line
   # (via @changesets/cli > read-yaml-file). 3.15.0 is the patched 3.x release;
   # the unaffected 4.x line resolved elsewhere is left untouched.
@@ -73,9 +88,10 @@ overrides:
   "@hono/node-server@<2.0.10": "2.0.10"
   # GHSA-v2hh-gcrm-f6hx: fast-uri host confusion via literal backslash authority
   # delimiter. Only the 3.x line is present (via ajv, under commitlint's config
-  # loading and the `prisma` CLI); 3.1.4 is the first patched release. Scoped to
-  # the vulnerable range so future patched 3.x releases resolve normally.
-  "fast-uri@<3.1.4": "3.1.4"
+  # loading and the `prisma` CLI). 3.1.4 was believed patched; the advisory was
+  # subsequently widened to <3.1.5, so the floor moves with it. Scoped to the
+  # vulnerable range so future patched 3.x releases resolve normally.
+  "fast-uri@<3.1.5": "3.1.5"
   # GHSA-c96f-x56v-gq3h: find-my-way HTTP/2 DDoS (<=9.6.0), pulled in through
   # Prisma 7's @prisma/dev dependency chain. 9.7.0 is the first published
   # patched release.
@@ -98,6 +114,14 @@ peerDependencyRules:
 allowBuilds:
   # Prisma 7 is engine-less (WASM query compiler); nothing to build or download.
   "@prisma/engines": false
+  # `testcontainers`' Docker transport (dockerode > ssh2) and its protobuf codec.
+  # All three are optional native/codegen accelerations: `ssh2` only matters for
+  # a Docker host reached over SSH (ours is the local daemon socket), and
+  # `cpu-features` is `ssh2`'s own optional speed-up. Declared `false` rather
+  # than left unanswered so `pnpm install` stays warning-free.
+  cpu-features: false
+  protobufjs: false
+  ssh2: false
   # Native SQLite bindings for `@unthrown/prisma`'s tests (prebuilt binaries).
   better-sqlite3: true
   esbuild: true
@@ -118,3 +142,12 @@ minimumReleaseAgeExclude:
   - "@btravstack/theme"
   - "@btravstack/tsconfig"
   - "@btravstack/typedoc"
+  # Temporary security-patch exception: fast-uri 3.1.5 (the widened
+  # GHSA-v2hh-gcrm-f6hx fix forced by the override above) is younger than the
+  # cutoff. Remove this entry once 3.1.5 is 7 days old (published 2026-07-31).
+  - fast-uri
+  # Temporary security-patch exception: brace-expansion 5.0.9 and 2.1.4 (the
+  # unbounded-intermediate-arrays fixes forced by the overrides above) are
+  # younger than the cutoff. Remove this entry once both are 7 days old (both
+  # published 2026-07-30).
+  - brace-expansion

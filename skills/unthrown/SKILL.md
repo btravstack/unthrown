@@ -245,6 +245,7 @@ tag is namespaced (`TaggedError("pkg/NotFound", { name: "NotFound" })`).
   choosing a combinator or writing anything beyond the basics above.
 - **[references/ecosystem.md](references/ecosystem.md)** — the `@unthrown/*`
   satellite packages: vitest matchers (`toBeOk`/`toBeErrTagged`/…), the seven
-  oxlint rules, Prisma extension (`try*` delegates), oRPC bridge,
+  oxlint rules, Prisma extension (`try*` delegates), Drizzle database
+  (replaces the stock one — no `try*`), oRPC bridge,
   standard-schema validation, and the effect/neverthrow/boxed interop bridges.
   Read when tests, lint config, or one of those integrations is involved.

@@ -1,0 +1,7 @@
+{
+  "extends": "@btravstack/typedoc/base.json",
+  "entryPoints": ["src/index.ts", "src/node-postgres/index.ts"],
+  "out": "docs",
+  "name": "@unthrown/drizzle",
+  "intentionallyNotExported": ["ConstraintFields"]
+}

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@unthrown/boxed": "workspace:*",
+    "@unthrown/drizzle": "workspace:*",
     "@unthrown/effect": "workspace:*",
     "@unthrown/neverthrow": "workspace:*",
     "@unthrown/orpc": "workspace:*",
