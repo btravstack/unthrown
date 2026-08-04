@@ -1,6 +1,6 @@
 {
   "name": "@unthrown/drizzle",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "Drizzle ORM Postgres integration for unthrown: every query returns an AsyncResult with tagged constraint violations",
   "keywords": [
     "drizzle",

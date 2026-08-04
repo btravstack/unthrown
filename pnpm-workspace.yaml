@@ -60,9 +60,16 @@ catalog:
 # version-scoped so only the affected line moves and unrelated lines are untouched.
 overrides:
   # GHSA-3jxr-9vmj-r5cp (ReDoS) + GHSA-mh99-v99m-4gvg (DoS via unbounded
-  # expansion length). Only the 5.x line is present (via typedoc > minimatch);
-  # 5.0.8 is the first release patched for both.
-  "brace-expansion@5": "5.0.8"
+  # expansion length) + the later DoS via unbounded intermediate arrays, which
+  # bypasses the CVE-2026-14257 mitigation and so is NOT fixed by 5.0.8.
+  # Reaches us via typedoc > minimatch. 5.0.9 is the first release patched for
+  # all three.
+  "brace-expansion@5": "5.0.9"
+  # The same unbounded-intermediate-arrays DoS in the 2.x line, plus the
+  # unbounded-expansion-length one. New in this tree: @testcontainers/postgresql
+  # > testcontainers > archiver pulls an old glob/minimatch. 2.1.4 is the first
+  # 2.x release patched for both.
+  "brace-expansion@2": "2.1.4"
   # GHSA-52cp-r559-cp3m: js-yaml quadratic-CPU merge keys in the legacy 3.x line
   # (via @changesets/cli > read-yaml-file). 3.15.0 is the patched 3.x release;
   # the unaffected 4.x line resolved elsewhere is left untouched.
@@ -81,9 +88,10 @@ overrides:
   "@hono/node-server@<2.0.10": "2.0.10"
   # GHSA-v2hh-gcrm-f6hx: fast-uri host confusion via literal backslash authority
   # delimiter. Only the 3.x line is present (via ajv, under commitlint's config
-  # loading and the `prisma` CLI); 3.1.4 is the first patched release. Scoped to
-  # the vulnerable range so future patched 3.x releases resolve normally.
-  "fast-uri@<3.1.4": "3.1.4"
+  # loading and the `prisma` CLI). 3.1.4 was believed patched; the advisory was
+  # subsequently widened to <3.1.5, so the floor moves with it. Scoped to the
+  # vulnerable range so future patched 3.x releases resolve normally.
+  "fast-uri@<3.1.5": "3.1.5"
   # GHSA-c96f-x56v-gq3h: find-my-way HTTP/2 DDoS (<=9.6.0), pulled in through
   # Prisma 7's @prisma/dev dependency chain. 9.7.0 is the first published
   # patched release.
@@ -134,3 +142,12 @@ minimumReleaseAgeExclude:
   - "@btravstack/theme"
   - "@btravstack/tsconfig"
   - "@btravstack/typedoc"
+  # Temporary security-patch exception: fast-uri 3.1.5 (the widened
+  # GHSA-v2hh-gcrm-f6hx fix forced by the override above) is younger than the
+  # cutoff. Remove this entry once 3.1.5 is 7 days old (published 2026-07-31).
+  - fast-uri
+  # Temporary security-patch exception: brace-expansion 5.0.9 and 2.1.4 (the
+  # unbounded-intermediate-arrays fixes forced by the overrides above) are
+  # younger than the cutoff. Remove this entry once both are 7 days old (both
+  # published 2026-07-30).
+  - brace-expansion

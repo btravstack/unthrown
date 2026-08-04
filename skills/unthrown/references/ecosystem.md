@@ -114,7 +114,8 @@ const db = drizzle({ client: pool, relations });
 //       drizzle({ connection }). There is NO positional drizzle(pool) form.
 
 const rows = (await db.select().from(users)).get();
-// a read is AsyncResult<User[], never> — get() compiles
+// awaiting the builder yields Result<User[], never>, so get() compiles.
+// `.execute()` is what returns an AsyncResult.
 ```
 
 - A query builder is a **thenable, not an `AsyncResult`**. To reach the
