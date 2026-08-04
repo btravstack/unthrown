@@ -27,6 +27,36 @@ const parseServerConn = (conn: string): { host: string; port: number } | undefin
 };
 
 /**
+ * Run every step in order, continuing past a failing one instead of
+ * aborting, and return whatever errors were thrown (empty if none). This is
+ * the one piece of cleanup discipline `stop()` and both of `startPg`'s
+ * partial-startup failure paths share: a broken release step must never
+ * mask — or skip — the release step after it.
+ *
+ * Exported (this file ships to no consumer — it's test-only infrastructure,
+ * excluded from coverage and never re-exported from the package) so the
+ * collect-and-continue behaviour itself can be exercised directly with
+ * deliberately failing steps, without needing to force a real PGlite/socket
+ * failure to reach it.
+ */
+export const collectErrors = async (
+  steps: readonly (() => Promise<unknown>)[],
+): Promise<unknown[]> => {
+  const errors: unknown[] = [];
+  for (const step of steps) {
+    try {
+      // Sequential and independent by design: every step runs regardless of
+      // whether an earlier one threw, so one failure can never skip another
+      // resource's release.
+      await step();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  return errors;
+};
+
+/**
  * Start a real PostgreSQL, in-process, reachable by the real `pg` client.
  *
  * PGlite is PostgreSQL compiled to WASM; `pglite-socket` serves it over the
@@ -64,22 +94,42 @@ export const startPg = async (): Promise<PgFixture> => {
     maxConnections: 10,
   });
 
+  /**
+   * Startup failed after the WASM instance (and possibly the socket server)
+   * was already created — release what exists, since the caller never gets
+   * a `stop()` to do it for them, then surface the ORIGINAL triggering
+   * error unchanged. A cleanup failure is appended alongside it in an
+   * `AggregateError` rather than replacing it — the real cause of the
+   * failed startup must never be masked by a secondary teardown problem.
+   * `server.stop()` is safe to call even if `start()` never got as far as
+   * opening a socket (it no-ops when nothing is listening), so it is always
+   * included rather than assumed unnecessary.
+   */
+  const failStartup = async (primary: unknown): Promise<never> => {
+    const cleanupErrors = await collectErrors([() => server.stop(), () => db.close()]);
+    if (cleanupErrors.length > 0) {
+      throw new AggregateError(
+        [primary, ...cleanupErrors],
+        "startPg failed, and cleanup after the failure also failed to release all resources",
+      );
+    }
+    throw primary;
+  };
+
   try {
     await server.start();
   } catch (error) {
-    // Startup failed after the WASM instance was created but before we
-    // handed anything back to the caller — close it ourselves, since the
-    // caller never receives a `stop()` to do it for them.
-    await db.close();
-    throw error;
+    // `return`, not `await` + fall-through: failStartup always throws, and
+    // returning it (rather than awaiting then continuing) lets TS's control
+    // flow analysis see that `address` below is only ever reached once
+    // startup actually succeeded.
+    return failStartup(error);
   }
 
   const address = parseServerConn(server.getServerConn());
   if (address === undefined) {
-    await server.stop();
-    await db.close();
-    throw new Error(
-      `pglite-socket did not report a TCP host:port (got "${server.getServerConn()}")`,
+    return failStartup(
+      new Error(`pglite-socket did not report a TCP host:port (got "${server.getServerConn()}")`),
     );
   }
 
@@ -92,19 +142,13 @@ export const startPg = async (): Promise<PgFixture> => {
   });
 
   const stop = async (): Promise<void> => {
-    const errors: unknown[] = [];
-    // Attempt every release step even if an earlier one throws, so a
+    // Sequential by design: pool, then server, then db — see the `stop` doc
+    // comment above for why the order matters. `collectErrors` is what
+    // makes each step run regardless of whether an earlier one threw, so a
     // failure in e.g. `pool.end()` can never leak the socket server or the
-    // WASM instance behind it.
-    for (const step of [() => pool.end(), () => server.stop(), () => db.close()]) {
-      try {
-        // Sequential by design: pool, then server, then db — see the `stop`
-        // doc comment above for why the order matters.
-        await step();
-      } catch (error) {
-        errors.push(error);
-      }
-    }
+    // WASM instance behind it — the same discipline `failStartup` above
+    // uses for the partial-startup paths.
+    const errors = await collectErrors([() => pool.end(), () => server.stop(), () => db.close()]);
     if (errors.length > 0) {
       throw new AggregateError(errors, "test-harness stop() failed to release all resources");
     }

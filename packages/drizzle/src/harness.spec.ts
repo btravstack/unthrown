@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { type PgFixture, startPg } from "./test-harness.js";
+import { collectErrors, type PgFixture, startPg } from "./test-harness.js";
 
 describe("test harness", () => {
   let fixture: PgFixture;
@@ -29,6 +29,71 @@ describe("test harness", () => {
     expect(err?.["code"]).toBe("23505");
     expect(err?.["constraint"]).toBe("h_email_key");
     expect(err?.["table"]).toBe("h");
+  });
+});
+
+describe("collectErrors", () => {
+  // Unit-level coverage of the collect-and-continue discipline `stop()` and
+  // `startPg`'s partial-startup failure paths both rely on (test-harness.ts
+  // review finding: a failing release step must never mask or skip another
+  // one). Exercised directly against the real exported function with
+  // deliberately failing steps — no PGlite/pg mocking required, since the
+  // behaviour under test lives entirely in `collectErrors` itself.
+
+  it("runs every step and returns an empty array when all succeed", async () => {
+    const calls: number[] = [];
+    const errors = await collectErrors([
+      async () => {
+        calls.push(1);
+      },
+      async () => {
+        calls.push(2);
+      },
+    ]);
+
+    expect(errors).toEqual([]);
+    expect(calls).toEqual([1, 2]);
+  });
+
+  it("continues past a failing step instead of skipping the rest", async () => {
+    const calls: number[] = [];
+    const boom = new Error("step 2 failed");
+
+    const errors = await collectErrors([
+      async () => {
+        calls.push(1);
+      },
+      async () => {
+        calls.push(2);
+        throw boom;
+      },
+      async () => {
+        calls.push(3);
+      },
+    ]);
+
+    // The critical assertion: step 3 still ran even though step 2 threw —
+    // this is exactly the leak the review finding was about (a failing
+    // `server.stop()` must not skip `db.close()`).
+    expect(calls).toEqual([1, 2, 3]);
+    expect(errors).toEqual([boom]);
+  });
+
+  it("collects every failure, in order, rather than only the first", async () => {
+    const first = new Error("first failed");
+    const second = new Error("second failed");
+
+    const errors = await collectErrors([
+      async () => {
+        throw first;
+      },
+      async () => undefined,
+      async () => {
+        throw second;
+      },
+    ]);
+
+    expect(errors).toEqual([first, second]);
   });
 });
 
