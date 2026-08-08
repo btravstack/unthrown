@@ -29,12 +29,8 @@ const SRC = dirname(fileURLToPath(import.meta.url));
 
 // Resolve the compiler's own JS entry and run it under `process.execPath`,
 // rather than the `node_modules/.bin/tsc` shim: that shim is `tsc.cmd` on
-// Windows, so spawning the extensionless path only works on POSIX.
-//
-// Resolved via `package.json` — the one subpath TypeScript 7's `exports` map
-// allows. Asking for `typescript/bin/tsc` directly is
-// ERR_PACKAGE_PATH_NOT_EXPORTED there (7's package exports only `.`,
-// `./package.json` and `./unstable/*`; 6.x had no `exports` map at all).
+// Windows, so spawning the extensionless path only works on POSIX. Resolved via
+// `package.json` — the only subpath TypeScript 7's `exports` map allows.
 const TSC = join(
   dirname(createRequire(import.meta.url).resolve("typescript/package.json")),
   "bin",
@@ -42,14 +38,10 @@ const TSC = join(
 );
 
 /**
- * Placeholder-name artifacts of extracting a snippet out of its prose.
- *
- * TS2552 is TS2304 with a spelling suggestion attached ("Cannot find name
- * 'result'. Did you mean 'Result'?") — TypeScript 7 offers one where 6.x
- * reported the bare TS2304. Both are an unresolved identifier in the snippet
- * BODY, which is exactly what a placeholder is. Neither weakens the guard this
- * spec exists for: a renamed export fails on the preamble `import` as
- * TS2305/TS2724, and those are not ignored.
+ * Placeholder-name artifacts of extracting a snippet out of its prose. TS2552
+ * is TS2304 with a spelling suggestion attached, which TypeScript 7 offers
+ * where a similar name exists. Both are an unresolved identifier in the snippet
+ * body; a renamed export still fails on the preamble import (TS2305/TS2724).
  */
 const PLACEHOLDER_CODES = ["TS2304", "TS2552", "TS7006", "TS18046"];
 

@@ -956,16 +956,16 @@ code: "NOT_FOUND" }, …))`); non-inferable →
   `docs`.
 - `docs` → `@unthrown/docs`, the VitePress site (guide + TypeDoc-generated API
   reference). **TypeDoc runs from here, not from the packages** — it needs its
-  own TypeScript (see the toolchain section), and one `package.json` can name
-  `typescript` once. One `typedoc.<name>.json` per documented package points
-  its `entryPoints`/`tsconfig` back at that package's sources and writes
-  straight into `api/<name>/`; `scripts/build-api.ts` runs the nine
-  concurrently. There is no per-package `build:docs` task and no copy step —
-  the output lands in the site directly. Keep the package list in sync across
-  the configs, `build-api.ts`, `@unthrown/docs#build`'s `dependsOn` in
-  `turbo.json` (explicit `<pkg>#build` edges, since `docs` no longer _depends_
-  on the packages but still needs them built for cross-package imports to
-  resolve), and the `/api/` sidebar in `.vitepress/config.ts`. Deployed to
+  own TypeScript (see the toolchain section). One `typedoc.<name>.json` per
+  documented package points its `entryPoints`/`tsconfig` back at that package's
+  sources and writes straight into `api/<name>/`; `scripts/build-api.ts` runs
+  the nine concurrently. There is no per-package `build:docs` and no copy step.
+  The package list is repeated in four places that must stay in sync: the
+  configs, `build-api.ts`, `@unthrown/docs#build`'s `dependsOn` in `turbo.json`
+  (explicit `<pkg>#build` edges — `docs` no longer _depends_ on the packages, so
+  `^build` would resolve to nothing, but it still needs them built for a
+  cross-package import inside a documented source to resolve), and the `/api/`
+  sidebar in `.vitepress/config.ts`. Deployed to
   GitHub Pages by `deploy-docs.yml` — **versioned**:
   while a prerelease is in progress (`.changeset/pre.json` on main) the site is
   built twice, the latest stable tag's docs at the root (the default) and main's
@@ -1067,27 +1067,22 @@ configured outside the repo).
   lint/format with **oxlint** / **oxfmt**; **knip** for dead-code/deps; **vitest**
   (+ v8 coverage); **typedoc** (markdown) feeding **vitepress**; **changesets**
   for releases; **lefthook** + **commitlint** (conventional commits) on commit.
-- **Two TypeScripts, deliberately.** The default catalog is **7.0.2** — the
-  native port — and every `packages/*` builds, typechecks and tests on it. Its
-  npm package ships a platform binary plus `lib/version.cjs` and `./unstable/*`
-  entry points, and **no `typescript.js`**: the classic JS compiler API TypeDoc
-  is written against does not exist there, which is also what `typedoc@0.28`'s
-  peer range says (`… || 6.0.x`). So a named catalog (`catalogs.typedoc` in
-  `pnpm-workspace.yaml`) pins **6.0.3** — the last release carrying that API —
-  and only the `docs` workspace resolves it (`"typescript": "catalog:typedoc"`).
-  Since one `package.json` can name `typescript` once and TypeDoc resolves its
-  peer from the importing package, that split is _why_ TypeDoc moved out of the
-  packages and into `docs`. Raise the TypeDoc pin only when TypeDoc itself
-  supports 7; do not slave the two catalog entries together. Two consequences
-  worth knowing: `typescript`'s `exports` map means a subpath like
-  `typescript/bin/tsc` is now `ERR_PACKAGE_PATH_NOT_EXPORTED` — resolve
-  `typescript/package.json` and join the path (`doc-examples.spec.ts` and
-  `docs/scripts/build-api.ts` both do) — and TypeScript 7 reports an overload
-  failure at the offending **argument** node where 6.x reported it at the call
-  expression, which is why the two `ensure` async-`onFail` `@ts-expect-error`
-  directives in `types.test-d.ts` sit on the argument. `tsdown` prints a
-  "TypeScript 7.0 does not yet have a stable API" warning per build; the dual
-  CJS/ESM + d.ts emit is unaffected.
+- **Two TypeScripts, deliberately.** The default catalog is **7.0.2** (the
+  native port) and every `packages/*` runs on it. TypeDoc cannot: 7's package
+  ships no `typescript.js`, so the JS compiler API it is written against is
+  gone, which is what `typedoc@0.28`'s peer range says (`… || 6.0.x`). A named
+  catalog (`catalogs.typedoc`) pins **6.0.3**, the last release carrying that
+  API, and only `docs` resolves it. One `package.json` names `typescript` once
+  and TypeDoc resolves its peer from the importing package — which is _why_
+  TypeDoc moved into `docs`. Raise the TypeDoc pin only when TypeDoc supports 7;
+  do not slave the two entries together. Three consequences: `typescript` now
+  has an `exports` map, so `typescript/bin/tsc` is
+  `ERR_PACKAGE_PATH_NOT_EXPORTED` (resolve `typescript/package.json` and join —
+  `doc-examples.spec.ts` and `docs/scripts/build-api.ts` both do); an overload
+  failure is reported at the offending **argument** node, not the call, which is
+  why the `ensure` async-`onFail` `@ts-expect-error` directives in
+  `types.test-d.ts` sit on the argument; and `tsdown` prints a "TypeScript 7.0
+  does not yet have a stable API" warning per build, with emit unaffected.
 - **The agent skill (`skills/unthrown/`) is a hand-maintained second copy of the
   docs, and it drifts.** It is markdown, so nothing typechecks it and knip does
   not see it; it has already shipped a curried API documented as two-argument
@@ -1145,11 +1140,10 @@ onRejected)`, so the fixture records the handler _and invokes it_, proving both
   whole public surface, and typechecked. Examples are the primary teaching
   surface and they rot silently — the same gap shipped a curried API documented
   as two-argument in the agent skill. Placeholder names (`findUser`, `id`)
-  surface as TS2304/**2552**/7006/18046 and are ignored — TS2552 is TS2304 with
-  a spelling suggestion attached ("Did you mean 'Result'?"), which TypeScript 7
-  offers where 6.x reported the bare TS2304; everything else fails, and a
-  renamed export fails on the _preamble import_ (TS2305/TS2724, never ignored)
-  rather than as an ignorable unresolved-name code.
+  surface as TS2304/2552/7006/18046 and are ignored (TS2552 is TS2304 with a
+  spelling suggestion, which TypeScript 7 adds where a similar name exists);
+  everything else fails, and a renamed export fails on the _preamble import_ as
+  TS2305/TS2724, which is never ignored.
   `@unthrown/prisma`'s 34 examples are the obvious next application.
   `@unthrown/drizzle` takes the same idea from the other end:
   `src/docs-examples.test-d.ts` is a type-level file holding every sample its

@@ -55,18 +55,9 @@ catalog:
   vitest: 4.1.10
 
 catalogs:
-  # TypeDoc's own TypeScript, deliberately NOT the default catalog's.
-  #
-  # `typescript: 7.0.2` above is the native port: the package ships a platform
-  # binary plus `lib/version.cjs` and `./unstable/*` entry points, and no
-  # `typescript.js` — the compiler API TypeDoc is written against does not exist
-  # there. That is also what `typedoc@0.28`'s peer range says (`… || 6.0.x`).
-  # 6.0.3 is the last release carrying the JS API.
-  #
-  # One `package.json` can name `typescript` once, and TypeDoc resolves its peer
-  # from the importing package — so this split is also why `typedoc` runs from
-  # the `docs` workspace rather than from each package, as it used to. Every
-  # `packages/*` builds and typechecks on 7.0.2; only `docs` pins 6.0.3.
+  # TypeDoc's own TypeScript: 7.x is the native port and ships no `typescript.js`,
+  # so 6.0.3 is the last release carrying the JS API TypeDoc needs. Only `docs`
+  # resolves this catalog.
   typedoc:
     typescript: 6.0.3
 
