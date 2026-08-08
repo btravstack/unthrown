@@ -1,7 +1,8 @@
-/* unthrown accent — teal. Red is stop, green is all-clear; a modelled error is
+/* unthrown accent — teal. Red is stop, green is all-clear; a modeled error is
  * neither, so the accent sits outside the signal register: not a signal, a
- * value. The shared @btravstack/theme derives every accent shade
- * (deep/hover/soft/washes/hero glow/feature icons/AA text) from this token. */
+ * value. @btravstack/theme derives the accent shades (deep/hover/soft/washes/
+ * hero glow/AA text) from this token, and the hero glyph below tracks it
+ * through a mask. public/icons/*.svg do NOT — they hardcode the hex. */
 :root {
   --accent: #3fb0a5;
 }
