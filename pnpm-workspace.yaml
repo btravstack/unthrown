@@ -87,9 +87,12 @@ overrides:
   # 2.x release patched for both.
   "brace-expansion@2": "2.1.4"
   # GHSA-52cp-r559-cp3m: js-yaml quadratic-CPU merge keys in the legacy 3.x line
-  # (via @changesets/cli > read-yaml-file). 3.15.0 is the patched 3.x release;
-  # the unaffected 4.x line resolved elsewhere is left untouched.
-  "js-yaml@3": "3.15.0"
+  # (via @changesets/cli > read-yaml-file). GHSA-5p4m-2wfm-xmqj then widened the
+  # affected range to <3.15.1 and pulled in the 4.x line (<4.3.1) too.
+  "js-yaml@3": "3.15.1"
+  "js-yaml@4": "4.3.1"
+  # GHSA-2v37-7h3g-55p8: nanoid, via docs > vitepress > vite > postcss.
+  "nanoid@<3.3.17": "3.3.17"
   # GHSA-fx2h-pf6j-xcff: vite `server.fs.deny` bypass (dev-server only; the docs
   # ship as static HTML). Reaches us via docs > vitepress > vite. vitepress 1.6.x
   # pins vite ^5.4.14 and 5.x has no patched release, so lift any pre-6.4.3 vite
@@ -167,3 +170,5 @@ minimumReleaseAgeExclude:
   # younger than the cutoff. Remove this entry once both are 7 days old (both
   # published 2026-07-30).
   - brace-expansion
+  # Temporary: nanoid 3.3.17 (GHSA-2v37-7h3g-55p8) published 2026-08-03.
+  - nanoid
