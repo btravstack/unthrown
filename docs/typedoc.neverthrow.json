@@ -1,0 +1,7 @@
+{
+  "extends": "@btravstack/typedoc/base.json",
+  "name": "@unthrown/neverthrow",
+  "entryPoints": ["../packages/neverthrow/src/index.ts"],
+  "tsconfig": "../packages/neverthrow/tsconfig.json",
+  "out": "api/neverthrow"
+}

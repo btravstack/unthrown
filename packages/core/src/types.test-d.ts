@@ -632,15 +632,18 @@ declare function sometimesWork(): Promise<number>;
   );
   type _RefinedAsync = Expect<Equal<typeof refinedAsync, AsyncResult<string, "e" | "nas">>>;
 
-  // an async onFail would smuggle a Promise into E — banned (NotThenable)
-  // @ts-expect-error - an async onFail is banned (sync surface)
+  // an async onFail would smuggle a Promise into E — banned (NotThenable).
+  // The directive sits on the ARGUMENT, not on the call: TypeScript 7 reports
+  // the overload failure at the offending argument node, where 6.x reported it
+  // at the call expression.
   r.ensure(
     (n) => n > 0,
+    // @ts-expect-error - an async onFail is banned (sync surface)
     async () => "neg",
   );
-  // @ts-expect-error - an async onFail is banned (async surface)
   arE.ensure(
     (n) => n > 0,
+    // @ts-expect-error - an async onFail is banned (async surface)
     async () => "neg",
   );
   // an async predicate would be always-truthy — Promise<boolean> is not boolean

@@ -50,9 +50,25 @@ catalog:
   turbo: 2.10.7
   typedoc: 0.28.20
   typedoc-plugin-markdown: 4.12.0
-  typescript: 6.0.3
+  typescript: 7.0.2
   vitepress: 1.6.4
   vitest: 4.1.10
+
+catalogs:
+  # TypeDoc's own TypeScript, deliberately NOT the default catalog's.
+  #
+  # `typescript: 7.0.2` above is the native port: the package ships a platform
+  # binary plus `lib/version.cjs` and `./unstable/*` entry points, and no
+  # `typescript.js` — the compiler API TypeDoc is written against does not exist
+  # there. That is also what `typedoc@0.28`'s peer range says (`… || 6.0.x`).
+  # 6.0.3 is the last release carrying the JS API.
+  #
+  # One `package.json` can name `typescript` once, and TypeDoc resolves its peer
+  # from the importing package — so this split is also why `typedoc` runs from
+  # the `docs` workspace rather than from each package, as it used to. Every
+  # `packages/*` builds and typechecks on 7.0.2; only `docs` pins 6.0.3.
+  typedoc:
+    typescript: 6.0.3
 
 # Force patched versions of vulnerable transitive dependencies. Every advisory
 # below reaches us only through dev/build tooling (never a published package's

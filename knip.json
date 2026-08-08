@@ -15,6 +15,7 @@
     }
   },
   "ignoreDependencies": [
+    "typedoc",
     "typedoc-plugin-markdown",
     "@btravstack/typedoc",
     "@btravstack/oxlint",

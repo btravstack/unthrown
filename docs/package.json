@@ -6,25 +6,18 @@
   "author": "Benoit TRAVERS <benoit.travers.fr@gmail.com>",
   "type": "module",
   "scripts": {
-    "build": "tsx scripts/copy-docs.ts && vitepress build .",
-    "dev": "tsx scripts/copy-docs.ts && vitepress dev .",
+    "build": "tsx scripts/build-api.ts && vitepress build .",
+    "dev": "tsx scripts/build-api.ts && vitepress dev .",
     "preview": "vitepress preview ."
-  },
-  "dependencies": {
-    "@unthrown/boxed": "workspace:*",
-    "@unthrown/drizzle": "workspace:*",
-    "@unthrown/effect": "workspace:*",
-    "@unthrown/neverthrow": "workspace:*",
-    "@unthrown/orpc": "workspace:*",
-    "@unthrown/prisma": "workspace:*",
-    "@unthrown/standard-schema": "workspace:*",
-    "@unthrown/vitest": "workspace:*",
-    "unthrown": "workspace:*"
   },
   "devDependencies": {
     "@btravstack/theme": "catalog:",
+    "@btravstack/typedoc": "catalog:",
     "@types/node": "catalog:",
     "tsx": "catalog:",
+    "typedoc": "catalog:",
+    "typedoc-plugin-markdown": "catalog:",
+    "typescript": "catalog:typedoc",
     "vitepress": "catalog:"
   }
 }

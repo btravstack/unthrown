@@ -22,13 +22,38 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
-    "build:docs": {
-      "dependsOn": ["^build"],
-      "outputs": ["docs/**"]
-    },
     "@unthrown/docs#build": {
-      "dependsOn": ["^build", "^build:docs"],
-      "outputs": [".vitepress/dist/**"],
+      // TypeDoc runs from `docs` (it needs its own TypeScript — see the
+      // `catalogs:` block in pnpm-workspace.yaml) and reads each package's
+      // `src/` directly, so `docs` no longer DEPENDS on the packages in the
+      // package.json sense and `^build` would resolve to nothing. The edges are
+      // named explicitly instead: a cross-package import inside a documented
+      // source (`@unthrown/effect`'s `import … from "unthrown"`) resolves
+      // through that package's node_modules to core's built `dist/*.d.ts`, so
+      // the packages must be built before TypeDoc reflects them.
+      //
+      // Keep this list in sync with `scripts/build-api.ts`, the
+      // `typedoc.<name>.json` configs, and the `/api/` sidebar in
+      // `.vitepress/config.ts`. (`@unthrown/oxlint` is deliberately absent — an
+      // oxlint plugin, documented in the Linting guide, with no API page.)
+      "dependsOn": [
+        "unthrown#build",
+        "@unthrown/vitest#build",
+        "@unthrown/effect#build",
+        "@unthrown/neverthrow#build",
+        "@unthrown/boxed#build",
+        "@unthrown/standard-schema#build",
+        "@unthrown/prisma#build",
+        "@unthrown/drizzle#build",
+        "@unthrown/orpc#build"
+      ],
+      // The documented sources live outside this workspace, so the default
+      // input glob cannot see them and an edit to a TSDoc comment would hit a
+      // stale cache.
+      "inputs": ["$TURBO_DEFAULT$", "../packages/*/src/**"],
+      // `api/*/**` covers the generated per-package directories; the committed
+      // `api/index.md` overview is not an output and the glob leaves it alone.
+      "outputs": [".vitepress/dist/**", "api/*/**"],
       "env": ["DOCS_BASE", "DOCS_VERSIONS"]
     }
   }

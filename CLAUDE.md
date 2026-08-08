@@ -501,7 +501,7 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
   code importing a companion value forgoes tree-shaking). One concept, two import
   styles — not a second concept. (Each companion re-aliases its type in
   `facade.ts`, so the `types.ts` `Result`/`AsyncResult` declarations both sit in
-  `typedoc.json`'s `intentionallyNotExported`.)
+  `docs/typedoc.core.json`'s `intentionallyNotExported`.)
 - method surface: the fluent combinators live on two exported, **documentation-only**
   object-literal types — `ResultMethods<T, E>` (the sync surface every `Result`
   variant intersects) and `AsyncResultMethods<T, E>` (its async mirror, with
@@ -518,7 +518,7 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
   async delta. The `docs/reference/combinators.md` page (the docs site follows
   the Diátaxis layout — `tutorial/`, `how-to/`, `reference/`, `explanation/`)
   remains the "by intent" selection cheat-sheet — one table covering both — and
-  links to these API sections. The core `typedoc.json` sets an explicit `categoryOrder` (`Facade`,
+  links to these API sections. `docs/typedoc.core.json` sets an explicit `categoryOrder` (`Facade`,
   `Types`, `Methods`, `Constructors`, … then `Aggregate`, `Errors`) so the core
   surface leads the API reference instead of the default alphabetical order.
 - tagged errors: `TaggedError(tag, options?)` (the error-class factory; optional
@@ -955,7 +955,18 @@ code: "NOT_FOUND" }, …))`); non-inferable →
   `tools/` directory — `pnpm-workspace.yaml` declares only `packages/*` and
   `docs`.
 - `docs` → `@unthrown/docs`, the VitePress site (guide + TypeDoc-generated API
-  reference); deployed to GitHub Pages by `deploy-docs.yml` — **versioned**:
+  reference). **TypeDoc runs from here, not from the packages** — it needs its
+  own TypeScript (see the toolchain section), and one `package.json` can name
+  `typescript` once. One `typedoc.<name>.json` per documented package points
+  its `entryPoints`/`tsconfig` back at that package's sources and writes
+  straight into `api/<name>/`; `scripts/build-api.ts` runs the nine
+  concurrently. There is no per-package `build:docs` task and no copy step —
+  the output lands in the site directly. Keep the package list in sync across
+  the configs, `build-api.ts`, `@unthrown/docs#build`'s `dependsOn` in
+  `turbo.json` (explicit `<pkg>#build` edges, since `docs` no longer _depends_
+  on the packages but still needs them built for cross-package imports to
+  resolve), and the `/api/` sidebar in `.vitepress/config.ts`. Deployed to
+  GitHub Pages by `deploy-docs.yml` — **versioned**:
   while a prerelease is in progress (`.changeset/pre.json` on main) the site is
   built twice, the latest stable tag's docs at the root (the default) and main's
   under `/beta/`, linked by a nav version dropdown (`DOCS_BASE` /
@@ -1056,6 +1067,27 @@ configured outside the repo).
   lint/format with **oxlint** / **oxfmt**; **knip** for dead-code/deps; **vitest**
   (+ v8 coverage); **typedoc** (markdown) feeding **vitepress**; **changesets**
   for releases; **lefthook** + **commitlint** (conventional commits) on commit.
+- **Two TypeScripts, deliberately.** The default catalog is **7.0.2** — the
+  native port — and every `packages/*` builds, typechecks and tests on it. Its
+  npm package ships a platform binary plus `lib/version.cjs` and `./unstable/*`
+  entry points, and **no `typescript.js`**: the classic JS compiler API TypeDoc
+  is written against does not exist there, which is also what `typedoc@0.28`'s
+  peer range says (`… || 6.0.x`). So a named catalog (`catalogs.typedoc` in
+  `pnpm-workspace.yaml`) pins **6.0.3** — the last release carrying that API —
+  and only the `docs` workspace resolves it (`"typescript": "catalog:typedoc"`).
+  Since one `package.json` can name `typescript` once and TypeDoc resolves its
+  peer from the importing package, that split is _why_ TypeDoc moved out of the
+  packages and into `docs`. Raise the TypeDoc pin only when TypeDoc itself
+  supports 7; do not slave the two catalog entries together. Two consequences
+  worth knowing: `typescript`'s `exports` map means a subpath like
+  `typescript/bin/tsc` is now `ERR_PACKAGE_PATH_NOT_EXPORTED` — resolve
+  `typescript/package.json` and join the path (`doc-examples.spec.ts` and
+  `docs/scripts/build-api.ts` both do) — and TypeScript 7 reports an overload
+  failure at the offending **argument** node where 6.x reported it at the call
+  expression, which is why the two `ensure` async-`onFail` `@ts-expect-error`
+  directives in `types.test-d.ts` sit on the argument. `tsdown` prints a
+  "TypeScript 7.0 does not yet have a stable API" warning per build; the dual
+  CJS/ESM + d.ts emit is unaffected.
 - **The agent skill (`skills/unthrown/`) is a hand-maintained second copy of the
   docs, and it drifts.** It is markdown, so nothing typechecks it and knip does
   not see it; it has already shipped a curried API documented as two-argument
@@ -1113,9 +1145,12 @@ onRejected)`, so the fixture records the handler _and invokes it_, proving both
   whole public surface, and typechecked. Examples are the primary teaching
   surface and they rot silently — the same gap shipped a curried API documented
   as two-argument in the agent skill. Placeholder names (`findUser`, `id`)
-  surface as TS2304/7006/18046 and are ignored; everything else fails, and a
-  renamed export fails on the _preamble import_ rather than as an ignorable
-  TS2304. `@unthrown/prisma`'s 34 examples are the obvious next application.
+  surface as TS2304/**2552**/7006/18046 and are ignored — TS2552 is TS2304 with
+  a spelling suggestion attached ("Did you mean 'Result'?"), which TypeScript 7
+  offers where 6.x reported the bare TS2304; everything else fails, and a
+  renamed export fails on the _preamble import_ (TS2305/TS2724, never ignored)
+  rather than as an ignorable unresolved-name code.
+  `@unthrown/prisma`'s 34 examples are the obvious next application.
   `@unthrown/drizzle` takes the same idea from the other end:
   `src/docs-examples.test-d.ts` is a type-level file holding every sample its
   README, its guide page and its `@example` blocks ship, so a sample that stops
@@ -1142,8 +1177,8 @@ onRejected)`, so the fixture records the handler _and invokes it_, proving both
   `noUnusedLocals`), folded into the package's `typecheck` script — so a typing
   regression fails the gate. The file is excluded from the build, coverage,
   oxlint, and knip (it has no runtime).
-- Public API carries full **TSDoc**; `pnpm --filter <pkg> build:docs` must stay
-  typedoc-warning-free.
+- Public API carries full **TSDoc**; `pnpm --filter @unthrown/docs build` must
+  stay typedoc-warning-free (it runs all nine `typedoc.<name>.json` configs).
 - One concept = one name. Resist convenience aliases.
 - **The error-matcher combinators carry a `*Cases` suffix** (`mapErrCases`,
   `flatMapErrCases`, `recoverErrCases`, `tapErrCases`, `flatTapErrCases`) —

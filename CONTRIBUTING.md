@@ -55,8 +55,10 @@ before proposing a change. In particular:
   consumer-resolved third-party version. Add no dependencies — never pull
   `vitest` or any interop peer into core.
 - **One name per concept.** Resist convenience aliases.
-- Public API carries full **TSDoc**; `pnpm --filter <pkg> build:docs` must stay
-  warning-free.
+- Public API carries full **TSDoc**; `pnpm --filter @unthrown/docs build` must
+  stay warning-free. TypeDoc runs from the `docs` workspace (one
+  `typedoc.<name>.json` per documented package) — not from the packages, which
+  are on a TypeScript TypeDoc cannot load.
 
 If your change contradicts something in `CLAUDE.md`, either the change or the spec
 is wrong — resolve that in the PR discussion, and keep `CLAUDE.md` in sync (it

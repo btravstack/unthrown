@@ -12,13 +12,10 @@ coverage/
 # Turbo
 .turbo/
 
-# TypeDoc generated API docs
-packages/*/docs/
-
 # VitePress
 docs/.vitepress/cache/
 docs/.vitepress/dist/
-# Per-package API reference copied in from TypeDoc output at build time
+# Per-package API reference, generated into the site by TypeDoc at build time
 # (the hand-written docs/api/index.md overview is kept)
 docs/api/*/
 

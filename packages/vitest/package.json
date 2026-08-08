@@ -44,19 +44,15 @@
   },
   "scripts": {
     "build": "tsdown src/index.ts --format cjs,esm --dts --clean",
-    "build:docs": "typedoc",
     "dev": "tsdown src/index.ts --format cjs,esm --dts --watch",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@btravstack/tsconfig": "catalog:",
-    "@btravstack/typedoc": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "tsdown": "catalog:",
-    "typedoc": "catalog:",
-    "typedoc-plugin-markdown": "catalog:",
     "typescript": "catalog:",
     "unthrown": "workspace:^",
     "vitest": "catalog:"

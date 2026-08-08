@@ -64,7 +64,6 @@
   },
   "scripts": {
     "build": "tsdown src/client.ts src/server.ts src/extensions/result.ts --format cjs,esm --dts --clean",
-    "build:docs": "typedoc",
     "dev": "tsdown src/client.ts src/server.ts src/extensions/result.ts --format cjs,esm --dts --watch",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
@@ -74,7 +73,6 @@
   },
   "devDependencies": {
     "@btravstack/tsconfig": "catalog:",
-    "@btravstack/typedoc": "catalog:",
     "@orpc/client": "catalog:",
     "@orpc/contract": "catalog:",
     "@orpc/server": "catalog:",
@@ -82,8 +80,6 @@
     "@unthrown/vitest": "workspace:*",
     "@vitest/coverage-v8": "catalog:",
     "tsdown": "catalog:",
-    "typedoc": "catalog:",
-    "typedoc-plugin-markdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
