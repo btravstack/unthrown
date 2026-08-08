@@ -46,7 +46,6 @@
   },
   "scripts": {
     "build": "tsdown src/index.ts --format cjs,esm --dts --clean",
-    "build:docs": "typedoc",
     "dev": "tsdown src/index.ts --format cjs,esm --dts --watch",
     "generate": "prisma generate",
     "test": "prisma generate && vitest run",
@@ -57,7 +56,6 @@
   },
   "devDependencies": {
     "@btravstack/tsconfig": "catalog:",
-    "@btravstack/typedoc": "catalog:",
     "@prisma/adapter-better-sqlite3": "catalog:",
     "@prisma/client": "catalog:",
     "@types/node": "catalog:",
@@ -66,8 +64,6 @@
     "better-sqlite3": "catalog:",
     "prisma": "catalog:",
     "tsdown": "catalog:",
-    "typedoc": "catalog:",
-    "typedoc-plugin-markdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },

@@ -1,0 +1,7 @@
+{
+  "extends": "@btravstack/typedoc/base.json",
+  "name": "@unthrown/standard-schema",
+  "entryPoints": ["../packages/standard-schema/src/index.ts"],
+  "tsconfig": "../packages/standard-schema/tsconfig.json",
+  "out": "api/standard-schema"
+}

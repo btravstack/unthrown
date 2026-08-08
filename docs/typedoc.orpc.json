@@ -1,0 +1,11 @@
+{
+  "extends": "@btravstack/typedoc/base.json",
+  "name": "@unthrown/orpc",
+  "entryPoints": [
+    "../packages/orpc/src/client.ts",
+    "../packages/orpc/src/server.ts",
+    "../packages/orpc/src/extensions/result.ts"
+  ],
+  "tsconfig": "../packages/orpc/tsconfig.json",
+  "out": "api/orpc"
+}

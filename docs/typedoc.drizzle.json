@@ -1,0 +1,11 @@
+{
+  "extends": "@btravstack/typedoc/base.json",
+  "name": "@unthrown/drizzle",
+  "entryPoints": [
+    "../packages/drizzle/src/index.ts",
+    "../packages/drizzle/src/node-postgres/index.ts"
+  ],
+  "tsconfig": "../packages/drizzle/tsconfig.json",
+  "out": "api/drizzle",
+  "intentionallyNotExported": ["ConstraintFields"]
+}

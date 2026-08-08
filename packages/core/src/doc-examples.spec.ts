@@ -29,11 +29,21 @@ const SRC = dirname(fileURLToPath(import.meta.url));
 
 // Resolve the compiler's own JS entry and run it under `process.execPath`,
 // rather than the `node_modules/.bin/tsc` shim: that shim is `tsc.cmd` on
-// Windows, so spawning the extensionless path only works on POSIX.
-const TSC = createRequire(import.meta.url).resolve("typescript/bin/tsc");
+// Windows, so spawning the extensionless path only works on POSIX. Resolved via
+// `package.json` — the only subpath TypeScript 7's `exports` map allows.
+const TSC = join(
+  dirname(createRequire(import.meta.url).resolve("typescript/package.json")),
+  "bin",
+  "tsc",
+);
 
-/** Placeholder-name artifacts of extracting a snippet out of its prose. */
-const PLACEHOLDER_CODES = ["TS2304", "TS7006", "TS18046"];
+/**
+ * Placeholder-name artifacts of extracting a snippet out of its prose. TS2552
+ * is TS2304 with a spelling suggestion attached, which TypeScript 7 offers
+ * where a similar name exists. Both are an unresolved identifier in the snippet
+ * body; a renamed export still fails on the preamble import (TS2305/TS2724).
+ */
+const PLACEHOLDER_CODES = ["TS2304", "TS2552", "TS7006", "TS18046"];
 
 const publicExports = (): string[] => {
   const index = readFileSync(join(SRC, "index.ts"), "utf8");
