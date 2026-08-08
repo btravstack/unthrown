@@ -1,8 +1,10 @@
-/* unthrown accent — green. The shared @btravstack/theme derives every
- * accent shade (deep/hover/soft/washes/hero glow/feature icons/AA text)
- * from this single token. */
+/* unthrown accent — teal. Red is stop, green is all-clear; a modeled error is
+ * neither, so the accent sits outside the signal register: not a signal, a
+ * value. @btravstack/theme derives the accent shades (deep/hover/soft/washes/
+ * hero glow/AA text) from this token, and the hero glyph below tracks it
+ * through a mask. public/icons/*.svg do NOT — they hardcode the hex. */
 :root {
-  --accent: #46b86c;
+  --accent: #3fb0a5;
 }
 
 /* Hero name in the package accent — the BtravStack multi-accent rule: the
