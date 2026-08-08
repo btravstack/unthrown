@@ -19,5 +19,5 @@
     <circle cx="28" cy="70" r="4.2" fill="#EE9CC4" opacity="0.75"/>
     <circle cx="73" cy="70" r="4.2" fill="#EE9CC4" opacity="0.75"/>
     <path d="M50,116 C49,121 52,124 49,129 C47,132 44,132 43,130" stroke="#8E1A52" stroke-width="2.8" stroke-linecap="round" fill="none"/></g>
-  <circle cx="100" cy="100" r="49" stroke="#348A51" stroke-width="6.5" fill="none"/>
-  <path d="M66.5,66.5 L133.5,133.5" stroke="#348A51" stroke-width="6.5" stroke-linecap="round"/></svg>
+  <circle cx="100" cy="100" r="49" stroke="#2F847C" stroke-width="6.5" fill="none"/>
+  <path d="M66.5,66.5 L133.5,133.5" stroke="#2F847C" stroke-width="6.5" stroke-linecap="round"/></svg>
