@@ -1207,10 +1207,15 @@ onRejected)`, so the fixture records the handler _and invokes it_, proving both
   everything else fails, and a renamed export fails on the _preamble import_ as
   TS2305/TS2724, which is never ignored.
   This extractor stays **core-only** — rolling it out to the satellites is not
-  the direction taken; `@unthrown/prisma` alone carries 81 `@example` blocks,
-  and the runnable `examples/` packages are the repo's actual answer to prose
-  rot for satellite documentation. Those satellite `@example` blocks remain
-  unguarded. `@unthrown/drizzle` takes the same idea from the other end:
+  the direction taken (#191); the runnable `examples/` packages are the repo's
+  answer to prose rot outside core, and the satellites' `@example` blocks
+  remain unguarded. Beware the count that motivated that issue: a naive
+  `grep -c @example packages/prisma/src` reports **81**, but 47 of those are in
+  Prisma's own **generated** client and 30 more are in `index.spec.ts` /
+  `types.test-d.ts`, which the extractor skips by name. The public API surface
+  the extractor would actually see is `index.ts` alone — **4** blocks. The
+  earlier figures in this file (34) and on #191 (~80) were both artefacts of
+  counting generated and test files. `@unthrown/drizzle` takes the same idea from the other end:
   `src/docs-examples.test-d.ts` is a type-level file holding every sample its
   README, its guide page and its `@example` blocks ship, so a sample that stops
   compiling fails the gate. (It caught two live defects when it was written — a
