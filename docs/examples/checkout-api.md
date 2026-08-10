@@ -52,7 +52,10 @@ dogfooded `no-catch-all-pattern` lint rule, so there is no wildcard to quietly
 absorb a case that was never handled. Add a fifth error to
 `CheckoutError` and this `mapErrCases` stops compiling — every call site,
 this one included, must add its own arm before the build is green again. The
-tests pin three of the four outcomes as distinctly observable:
+tests exercise two of the four domain cases end to end — `CartNotFound` and
+`PaymentDeclined` — each landing on its own distinct `ORPCError` code
+(`CartEmpty` and `OutOfStock` follow the identical pattern and are covered at
+the domain layer already; see [Checkout domain](./checkout-domain)):
 
 ```ts
 await expect(caller.placeOrder({ cartId: "nope" })).rejects.toMatchObject({

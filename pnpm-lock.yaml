@@ -216,9 +216,6 @@ importers:
       '@unthrown/orpc':
         specifier: workspace:*
         version: link:../../packages/orpc
-      '@unthrown/standard-schema':
-        specifier: workspace:*
-        version: link:../../packages/standard-schema
       unthrown:
         specifier: workspace:^
         version: link:../../packages/core

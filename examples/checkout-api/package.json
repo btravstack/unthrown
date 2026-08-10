@@ -18,7 +18,6 @@
     "@orpc/server": "catalog:",
     "@unthrown/example-checkout-domain": "workspace:*",
     "@unthrown/orpc": "workspace:*",
-    "@unthrown/standard-schema": "workspace:*",
     "unthrown": "workspace:^",
     "zod": "catalog:"
   },
