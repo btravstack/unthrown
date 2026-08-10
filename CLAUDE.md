@@ -1064,8 +1064,15 @@ channel?**
    `await expect(asyncResult).toBeOk()`. A forgotten `await` is **loud**: the
    matchers track in-flight assertions and a module-registered `afterEach`
    (`failOnForgottenAwait`) fails the test at its end, naming the pending
-   matchers — the abandoned assertion is reported exactly once, correctly
-   attributed, and can never late-fire as an unhandled rejection.
+   matchers **and the call site that created them** — the abandoned assertion is
+   reported exactly once, correctly attributed, and can never late-fire as an
+   unhandled rejection. The call site comes from an `Error` captured in `settle`
+   on the **async path only** (the one that can be forgotten), whose stack is
+   walked past `node_modules` and this module to the first user frame; it lands
+   in the **message**, since that is the part every reporter shows, with the
+   full stack on the error's `cause`. Deliberately not filtered on a `/vitest/`
+   path segment — this package's own sources live under `packages/vitest/`, so
+   that rule would discard the very frame being looked for.
 4. ✅ **The built-in matcher** — Done. `matcher.ts` powers the exhaustive error
    matchers (Thesis #5), exporting `match`/`P`/`NonExhaustiveError` — `P`
    carrying every pattern constructor, `P.tag(t)` (the `{ _tag: t }` pattern)

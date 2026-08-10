@@ -104,8 +104,15 @@ await expect(fromSafePromise(Promise.reject(boom))).toBeDefect();
 ::: danger Don't forget the await
 Always `await expect(asyncResult)…`. As a safety net, importing the package also
 registers an `afterEach` hook: a test that ends with async assertions still pending
-**fails** with an explicit message naming the un-awaited matchers, instead of
-passing silently.
+**fails** with an explicit message naming the un-awaited matchers **and the line
+that created them**, instead of passing silently.
+
+```
+@unthrown/vitest: 1 async assertion(s) (toBeOk) were still pending when the
+test ended — a forgotten `await`. … Created at: loadUser (src/user.spec.ts:42:18).
+```
+
+The full stack is on the error's `cause`, for reporters that render it.
 :::
 
 ## Where to go next

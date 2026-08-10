@@ -29,7 +29,8 @@ await expect(asyncResult).toBeErrTagged("NotFound", { id: "42" });
 ```
 
 A forgotten `await` on an async assertion fails the test at its end
-(`failOnForgottenAwait`, auto-registered), naming the pending matchers. Manual
+(`failOnForgottenAwait`, auto-registered), naming the pending matchers and the
+call site that created them (full stack on the error's `cause`). Manual
 wiring exports: the seven raw matcher functions, `failOnForgottenAwait`, and the
 `UnthrownMatchers` type.
 

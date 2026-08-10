@@ -156,6 +156,32 @@ describe("forgotten await detection", () => {
     expect(() => failOnForgottenAwait()).not.toThrow();
   });
 
+  it("names the call site of the forgotten assertion, not a library frame", () => {
+    void expect(fromSafePromise(new Promise<number>(() => {}))).toBeOk();
+    let message = "";
+    try {
+      failOnForgottenAwait();
+    } catch (e) {
+      message = (e as Error).message;
+    }
+    // The user's `expect(...)` line — this spec file, with a line number.
+    expect(message).toMatch(/index\.spec\.ts:\d+:\d+/);
+    // …and NOT the matcher machinery that created the gate.
+    expect(message).not.toMatch(/src[/\\]index\.ts:/);
+  });
+
+  it("attaches the assertion-time stack as the error's cause", () => {
+    void expect(fromSafePromise(new Promise<number>(() => {}))).toBeErr();
+    let cause: unknown;
+    try {
+      failOnForgottenAwait();
+    } catch (e) {
+      cause = (e as Error).cause;
+    }
+    expect(cause).toBeInstanceOf(Error);
+    expect((cause as Error).stack).toMatch(/index\.spec\.ts:\d+:\d+/);
+  });
+
   it("names every pending matcher, negated assertions included", () => {
     void expect(fromSafePromise(new Promise<number>(() => {}))).toBeErr();
     void expect(fromSafePromise(new Promise<number>(() => {}))).not.toBeOk();
