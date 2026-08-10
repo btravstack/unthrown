@@ -97,8 +97,8 @@ catalogs:
       specifier: 0.22.14
       version: 0.22.14
     tsx:
-      specifier: 4.23.1
-      version: 4.23.1
+      specifier: 4.23.5
+      version: 4.23.5
     turbo:
       specifier: 2.10.7
       version: 2.10.7
@@ -176,7 +176,7 @@ importers:
     devDependencies:
       '@btravstack/theme':
         specifier: 'catalog:'
-        version: 1.7.0(vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.1)(jiti@2.7.0)(postcss@8.5.25)(tsx@4.23.1)(typescript@6.0.3)(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))
+        version: 1.7.0(vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.1)(jiti@2.7.0)(postcss@8.5.25)(tsx@4.23.5)(typescript@6.0.3)(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))
       '@btravstack/typedoc':
         specifier: 'catalog:'
         version: 0.1.0(typedoc-plugin-markdown@4.12.0(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3))
@@ -185,7 +185,7 @@ importers:
         version: 26.1.1
       tsx:
         specifier: 'catalog:'
-        version: 4.23.1
+        version: 4.23.5
       typedoc:
         specifier: 'catalog:'
         version: 0.28.20(typescript@6.0.3)
@@ -197,7 +197,7 @@ importers:
         version: 6.0.3
       vitepress:
         specifier: 'catalog:'
-        version: 1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.1)(jiti@2.7.0)(postcss@8.5.25)(tsx@4.23.1)(typescript@6.0.3)(yaml@2.9.0)
+        version: 1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.1)(jiti@2.7.0)(postcss@8.5.25)(tsx@4.23.5)(typescript@6.0.3)(yaml@2.9.0)
 
   packages/boxed:
     dependencies:
@@ -219,13 +219,13 @@ importers:
         version: 4.1.10(vitest@4.1.10)
       tsdown:
         specifier: 'catalog:'
-        version: 0.22.14(oxc-resolver@11.24.2)(tsx@4.23.1)(typescript@7.0.2)
+        version: 0.22.14(oxc-resolver@11.24.2)(tsx@4.23.5)(typescript@7.0.2)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+        version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0)
 
   packages/core:
     devDependencies:
@@ -240,13 +240,13 @@ importers:
         version: 4.1.10(vitest@4.1.10)
       tsdown:
         specifier: 'catalog:'
-        version: 0.22.14(oxc-resolver@11.24.2)(tsx@4.23.1)(typescript@7.0.2)
+        version: 0.22.14(oxc-resolver@11.24.2)(tsx@4.23.5)(typescript@7.0.2)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+        version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0)
 
   packages/drizzle:
     dependencies:
@@ -280,13 +280,13 @@ importers:
         version: 8.22.0
       tsdown:
         specifier: 'catalog:'
-        version: 0.22.14(oxc-resolver@11.24.2)(tsx@4.23.1)(typescript@7.0.2)
+        version: 0.22.14(oxc-resolver@11.24.2)(tsx@4.23.5)(typescript@7.0.2)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+        version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0)
 
   packages/effect:
     dependencies:
@@ -308,13 +308,13 @@ importers:
         version: 3.22.1
       tsdown:
         specifier: 'catalog:'
-        version: 0.22.14(oxc-resolver@11.24.2)(tsx@4.23.1)(typescript@7.0.2)
+        version: 0.22.14(oxc-resolver@11.24.2)(tsx@4.23.5)(typescript@7.0.2)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+        version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0)
 
   packages/neverthrow:
     dependencies:
@@ -336,13 +336,13 @@ importers:
         version: 8.2.0
       tsdown:
         specifier: 'catalog:'
-        version: 0.22.14(oxc-resolver@11.24.2)(tsx@4.23.1)(typescript@7.0.2)
+        version: 0.22.14(oxc-resolver@11.24.2)(tsx@4.23.5)(typescript@7.0.2)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+        version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0)
 
   packages/orpc:
     dependencies:
@@ -373,13 +373,13 @@ importers:
         version: 4.1.10(vitest@4.1.10)
       tsdown:
         specifier: 'catalog:'
-        version: 0.22.14(oxc-resolver@11.24.2)(tsx@4.23.1)(typescript@7.0.2)
+        version: 0.22.14(oxc-resolver@11.24.2)(tsx@4.23.5)(typescript@7.0.2)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+        version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0)
 
   packages/oxlint:
     dependencies:
@@ -401,13 +401,13 @@ importers:
         version: 1.75.0
       tsdown:
         specifier: 'catalog:'
-        version: 0.22.14(oxc-resolver@11.24.2)(tsx@4.23.1)(typescript@7.0.2)
+        version: 0.22.14(oxc-resolver@11.24.2)(tsx@4.23.5)(typescript@7.0.2)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+        version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0)
 
   packages/prisma:
     dependencies:
@@ -441,13 +441,13 @@ importers:
         version: 7.9.0(@types/react@19.2.17)(better-sqlite3@13.0.1)(magicast@0.5.3)(typescript@7.0.2)
       tsdown:
         specifier: 'catalog:'
-        version: 0.22.14(oxc-resolver@11.24.2)(tsx@4.23.1)(typescript@7.0.2)
+        version: 0.22.14(oxc-resolver@11.24.2)(tsx@4.23.5)(typescript@7.0.2)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+        version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0)
 
   packages/standard-schema:
     dependencies:
@@ -469,13 +469,13 @@ importers:
         version: 4.1.10(vitest@4.1.10)
       tsdown:
         specifier: 'catalog:'
-        version: 0.22.14(oxc-resolver@11.24.2)(tsx@4.23.1)(typescript@7.0.2)
+        version: 0.22.14(oxc-resolver@11.24.2)(tsx@4.23.5)(typescript@7.0.2)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+        version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0)
 
   packages/vitest:
     devDependencies:
@@ -490,7 +490,7 @@ importers:
         version: 4.1.10(vitest@4.1.10)
       tsdown:
         specifier: 'catalog:'
-        version: 0.22.14(oxc-resolver@11.24.2)(tsx@4.23.1)(typescript@7.0.2)
+        version: 0.22.14(oxc-resolver@11.24.2)(tsx@4.23.5)(typescript@7.0.2)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -499,7 +499,7 @@ importers:
         version: link:../core
       vitest:
         specifier: 'catalog:'
-        version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+        version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0)
 
 packages:
 
@@ -4616,8 +4616,8 @@ packages:
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
 
-  tsx@4.23.1:
-    resolution: {integrity: sha512-GQHnkIfxyx1wYCOS/wonik5MVRZU9hi1TEZmzGZSCJB1y9YgoZ8H6itNE/u4suE+yLmOzuE4E5S4TZ/ZX2wcWQ==}
+  tsx@4.23.5:
+    resolution: {integrity: sha512-rw55FUaqOoI7RvlQwLbhO4nSDApnQ4/CykPuiQ/EPvtrX3WA9Ig55jIt9VvbBJbzJuj12ueRu4PMZ2SxPVbihg==}
     engines: {node: '>=18.0.0'}
     hasBin: true
 
@@ -5053,9 +5053,9 @@ snapshots:
     dependencies:
       oxlint: 1.75.0
 
-  '@btravstack/theme@1.7.0(vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.1)(jiti@2.7.0)(postcss@8.5.25)(tsx@4.23.1)(typescript@6.0.3)(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))':
+  '@btravstack/theme@1.7.0(vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.1)(jiti@2.7.0)(postcss@8.5.25)(tsx@4.23.5)(typescript@6.0.3)(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))':
     dependencies:
-      vitepress: 1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.1)(jiti@2.7.0)(postcss@8.5.25)(tsx@4.23.1)(typescript@6.0.3)(yaml@2.9.0)
+      vitepress: 1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.1)(jiti@2.7.0)(postcss@8.5.25)(tsx@4.23.5)(typescript@6.0.3)(yaml@2.9.0)
     optionalDependencies:
       vue: 3.5.38(typescript@6.0.3)
 
@@ -6584,9 +6584,9 @@ snapshots:
       d3-time-format: 4.1.0
       internmap: 2.0.3
 
-  '@vitejs/plugin-vue@5.2.4(vite@6.4.3(@types/node@26.1.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))':
+  '@vitejs/plugin-vue@5.2.4(vite@6.4.3(@types/node@26.1.1)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))':
     dependencies:
-      vite: 6.4.3(@types/node@26.1.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+      vite: 6.4.3(@types/node@26.1.1)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0)
       vue: 3.5.38(typescript@6.0.3)
 
   '@vitest/coverage-v8@4.1.10(vitest@4.1.10)':
@@ -6601,7 +6601,7 @@ snapshots:
       obug: 2.1.4
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+      vitest: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0)
 
   '@vitest/expect@4.1.10':
     dependencies:
@@ -6612,13 +6612,13 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.0
 
-  '@vitest/mocker@4.1.10(vite@6.4.3(@types/node@26.1.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))':
+  '@vitest/mocker@4.1.10(vite@6.4.3(@types/node@26.1.1)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0))':
     dependencies:
       '@vitest/spy': 4.1.10
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 6.4.3(@types/node@26.1.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+      vite: 6.4.3(@types/node@26.1.1)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0)
 
   '@vitest/pretty-format@4.1.10':
     dependencies:
@@ -8593,7 +8593,7 @@ snapshots:
 
   trim-lines@3.0.1: {}
 
-  tsdown@0.22.14(oxc-resolver@11.24.2)(tsx@4.23.1)(typescript@7.0.2):
+  tsdown@0.22.14(oxc-resolver@11.24.2)(tsx@4.23.5)(typescript@7.0.2):
     dependencies:
       ansis: 4.3.1
       cac: 7.0.0
@@ -8611,7 +8611,7 @@ snapshots:
       unconfig-core: 7.5.0
       verkit: 0.3.0
     optionalDependencies:
-      tsx: 4.23.1
+      tsx: 4.23.5
       typescript: 7.0.2
     transitivePeerDependencies:
       - '@typescript/native-preview'
@@ -8622,7 +8622,7 @@ snapshots:
   tslib@2.8.1:
     optional: true
 
-  tsx@4.23.1:
+  tsx@4.23.5:
     dependencies:
       esbuild: 0.28.1
     optionalDependencies:
@@ -8743,7 +8743,7 @@ snapshots:
       '@types/unist': 3.0.3
       vfile-message: 4.0.3
 
-  vite@6.4.3(@types/node@26.1.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0):
+  vite@6.4.3(@types/node@26.1.1)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0):
     dependencies:
       esbuild: 0.25.12
       fdir: 6.5.0(picomatch@4.0.5)
@@ -8755,10 +8755,10 @@ snapshots:
       '@types/node': 26.1.1
       fsevents: 2.3.3
       jiti: 2.7.0
-      tsx: 4.23.1
+      tsx: 4.23.5
       yaml: 2.9.0
 
-  vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.1)(jiti@2.7.0)(postcss@8.5.25)(tsx@4.23.1)(typescript@6.0.3)(yaml@2.9.0):
+  vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.1)(jiti@2.7.0)(postcss@8.5.25)(tsx@4.23.5)(typescript@6.0.3)(yaml@2.9.0):
     dependencies:
       '@docsearch/css': 3.8.2
       '@docsearch/js': 3.8.2(@algolia/client-search@5.55.1)
@@ -8767,7 +8767,7 @@ snapshots:
       '@shikijs/transformers': 2.5.0
       '@shikijs/types': 2.5.0
       '@types/markdown-it': 14.1.2
-      '@vitejs/plugin-vue': 5.2.4(vite@6.4.3(@types/node@26.1.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))
+      '@vitejs/plugin-vue': 5.2.4(vite@6.4.3(@types/node@26.1.1)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))
       '@vue/devtools-api': 7.7.9
       '@vue/shared': 3.5.38
       '@vueuse/core': 12.8.2(typescript@6.0.3)
@@ -8776,7 +8776,7 @@ snapshots:
       mark.js: 8.11.1
       minisearch: 7.2.0
       shiki: 2.5.0
-      vite: 6.4.3(@types/node@26.1.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+      vite: 6.4.3(@types/node@26.1.1)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0)
       vue: 3.5.38(typescript@6.0.3)
     optionalDependencies:
       postcss: 8.5.25
@@ -8810,10 +8810,10 @@ snapshots:
       - universal-cookie
       - yaml
 
-  vitest@4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0):
+  vitest@4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0):
     dependencies:
       '@vitest/expect': 4.1.10
-      '@vitest/mocker': 4.1.10(vite@6.4.3(@types/node@26.1.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+      '@vitest/mocker': 4.1.10(vite@6.4.3(@types/node@26.1.1)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0))
       '@vitest/pretty-format': 4.1.10
       '@vitest/runner': 4.1.10
       '@vitest/snapshot': 4.1.10
@@ -8830,7 +8830,7 @@ snapshots:
       tinyexec: 1.2.4
       tinyglobby: 0.2.17
       tinyrainbow: 3.1.0
-      vite: 6.4.3(@types/node@26.1.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+      vite: 6.4.3(@types/node@26.1.1)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 26.1.1
