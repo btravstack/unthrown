@@ -41,8 +41,8 @@ catalog:
   knip: 6.29.0
   lefthook: 2.1.10
   neverthrow: 8.2.0
-  oxfmt: 0.60.0
-  oxlint: 1.75.0
+  oxfmt: 0.61.0
+  oxlint: 1.76.0
   pg: 8.22.0
   prisma: 7.9.0
   tsdown: 0.22.14
