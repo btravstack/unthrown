@@ -703,10 +703,22 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   arguments wherever they occur). Recognised on the callback's own matcher
   parameter via scope analysis — a matcher copied to another variable, or a
   callback passed by reference, is a documented miss; `prefer-async-result` (reports
-  `Promise<Result<T, E>>` in favour of `AsyncResult<T, E>`, but withholds the
-  autofix on an `async` function's return annotation **and in function-type
+  `Promise<Result<T, E>>` in favour of `AsyncResult<T, E>`; the autofix **adds
+  the `AsyncResult` specifier** to an existing `unthrown` import when the name
+  is not already in scope — otherwise the rule would go unfixed in its most
+  common case, a file that imports `Result` and so trips the rule without ever
+  having needed `AsyncResult` — anchoring the insertion on the **last
+  `ImportSpecifier`** so it is indifferent to spacing and to per-specifier
+  `type` qualifiers. It withholds the fix on an `async` function's return
+  annotation **and in function-type
   return positions** — either must stay a native `Promise` at the
-  implementation, so the fix would not compile); `no-unhandled-result` (in the
+  implementation, so the fix would not compile — and also when the name
+  `AsyncResult` is already bound to something else (adding a specifier would
+  collide) or when there is no specifier list to extend, which in practice
+  means a **namespace import**: `U.AsyncResult` is reachable, but rewriting to
+  a qualified name is a different edit. A file with no `unthrown` import at all
+  is not reachable here — a `Result` that is not unthrown's does not trip the
+  rule in the first place); `no-unhandled-result` (in the
   recommended preset — flags a bare `ExpressionStatement` dropping a `Result`:
   a call to an unthrown-imported producer or facade-companion member, or to a
   locally-declared function whose return annotation is unthrown's

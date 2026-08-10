@@ -31,10 +31,43 @@ ruleTester.run("prefer-async-result", preferAsyncResult, {
       errors: [{ messageId: "preferAsyncResult" }],
       output: `import type { Result, AsyncResult } from "unthrown";\ntype T = AsyncResult<number, MyError>;`,
     },
-    // `AsyncResult` is NOT imported → still reported, but no autofix (it would
-    // rewrite to an undefined name). `output: null` asserts the fix is withheld.
+    // `AsyncResult` is NOT imported, but an `unthrown` import exists → the fix
+    // adds the specifier as well as rewriting the annotation. This is the
+    // common case: a file that imports `Result` (and so trips the rule) but has
+    // never needed `AsyncResult`.
     {
       code: `import type { Result } from "unthrown";\ntype T = Promise<Result<number, MyError>>;`,
+      errors: [{ messageId: "preferAsyncResult" }],
+      output: `import type { Result, AsyncResult } from "unthrown";\ntype T = AsyncResult<number, MyError>;`,
+    },
+    // A VALUE import declaration with an inline `type` specifier: the inserted
+    // specifier must carry its own `type` qualifier. Under
+    // `verbatimModuleSyntax` a bare `AsyncResult` here would make the whole
+    // declaration value-bearing, emitting a runtime `import "unthrown"` the
+    // file never had.
+    {
+      code: `import { type Result } from "unthrown";\ntype T = Promise<Result<number, MyError>>;`,
+      errors: [{ messageId: "preferAsyncResult" }],
+      output: `import { type Result, type AsyncResult } from "unthrown";\ntype T = AsyncResult<number, MyError>;`,
+    },
+    // A mixed value/type import takes the specifier at the end, after the
+    // last one, whatever the existing spelling.
+    {
+      code: `import { Ok, type Result } from "unthrown";\ntype T = Promise<Result<number, MyError>>;\nexport { Ok };`,
+      errors: [{ messageId: "preferAsyncResult" }],
+      output: `import { Ok, type Result, type AsyncResult } from "unthrown";\ntype T = AsyncResult<number, MyError>;\nexport { Ok };`,
+    },
+    // A RENAMED `Result` still resolves (resolution goes through the imported
+    // name), and the added specifier is the plain `AsyncResult`.
+    {
+      code: `import type { Result as R } from "unthrown";\ntype T = Promise<R<number, MyError>>;`,
+      errors: [{ messageId: "preferAsyncResult" }],
+      output: `import type { Result as R, AsyncResult } from "unthrown";\ntype T = AsyncResult<number, MyError>;`,
+    },
+    // A local binding named `AsyncResult` shadows the import: adding a
+    // specifier would not help (and would collide), so keep withholding.
+    {
+      code: `import type { Result } from "unthrown";\ntype AsyncResult = never;\ntype T = Promise<Result<number, MyError>>;\nexport type { AsyncResult };`,
       errors: [{ messageId: "preferAsyncResult" }],
       output: null,
     },
@@ -45,11 +78,14 @@ ruleTester.run("prefer-async-result", preferAsyncResult, {
       errors: [{ messageId: "preferAsyncResult" }],
       output: `import type { Result, AsyncResult } from "unthrown";\nfunction f(): AsyncResult<number, MyError> { throw 0; }`,
     },
-    // Inner scope — a type alias inside a function body.
+    // Inner scope — a type alias inside a function body. The specifier is added
+    // to the top-level import even though the report is nested: an import
+    // declaration is only legal at the program body, which is where the fix
+    // looks for one.
     {
       code: `import type { Result } from "unthrown";\nfunction f() { type T = Promise<Result<number, MyError>>; return null as unknown as T; }`,
       errors: [{ messageId: "preferAsyncResult" }],
-      output: null,
+      output: `import type { Result, AsyncResult } from "unthrown";\nfunction f() { type T = AsyncResult<number, MyError>; return null as unknown as T; }`,
     },
     // An async function's return annotation is reported but NOT auto-fixed:
     // `async function` must return a native Promise, so rewriting the annotation

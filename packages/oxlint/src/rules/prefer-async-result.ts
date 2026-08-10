@@ -1,4 +1,4 @@
-import type { ESTree } from "@oxlint/plugins";
+import type { ESTree, Scope } from "@oxlint/plugins";
 import { defineRule } from "@oxlint/plugins";
 
 import { hasNamedImport } from "../helpers/has-named-import.js";
@@ -27,15 +27,70 @@ const isFunctionTypeReturn = (node: ESTree.TSTypeReference): boolean => {
 };
 
 /**
+ * The `unthrown` import declaration whose specifier list the fix can extend,
+ * or `undefined` when there is none to extend.
+ *
+ * Requires at least one `ImportSpecifier`: the insertion is anchored after the
+ * last one, so a bare `import "unthrown"` or a namespace/default-only import
+ * offers nothing to insert after. A namespace import is deliberately not
+ * handled — `U.AsyncResult` is reachable, but rewriting the annotation to a
+ * qualified name is a different edit from the one this rule makes.
+ *
+ * Only the *program body* is scanned: an import declaration is only legal at
+ * the top level, so there is nowhere else for one to be.
+ */
+const unthrownImport = (program: ESTree.Program): ESTree.ImportDeclaration | undefined =>
+  program.body.find(
+    (statement): statement is ESTree.ImportDeclaration =>
+      statement.type === "ImportDeclaration" &&
+      statement.source.value === MODULE &&
+      statement.specifiers.some((specifier) => specifier.type === "ImportSpecifier"),
+  );
+
+/**
+ * Whether the NAME `AsyncResult` already resolves to a declaration in scope —
+ * a type alias, an interface, a type parameter, or an import of something else
+ * under that local name.
+ *
+ * Distinct from {@link isLocallyBound}, which matches a specific identifier
+ * node by reference identity: here there is no node to match, because the name
+ * is one the fix would *introduce*. A hit means adding an `AsyncResult`
+ * specifier would collide with an existing binding rather than resolve it, so
+ * the fix must stay withheld.
+ */
+const nameIsTaken = (scope: Scope): boolean => {
+  for (let current: Scope | null = scope; current; current = current.upper) {
+    const variable = current.variables.find((v) => v.name === "AsyncResult");
+    if (variable) return variable.defs.length > 0;
+  }
+  return false;
+};
+
+/**
  * Prefer unthrown's `AsyncResult<T, E>` over `Promise<Result<T, E>>`. A raw
  * `Promise<Result>` can *reject*, reintroducing the throw channel `AsyncResult`
  * is designed to eliminate — so the wrapper is both shorter and stronger.
  *
- * Autofixable — but the fix is only offered when `AsyncResult` is already
- * imported from `unthrown` (so it can't rewrite to an undefined name) and the
- * annotation is not a position an `async` implementation must satisfy (an
- * `async` function's own return annotation, or the return type of a function
- * type — see {@link isFunctionTypeReturn}).
+ * Autofixable. When `AsyncResult` is not already in scope the fix **adds the
+ * specifier** to an existing `unthrown` import as well as rewriting the
+ * annotation — the common case, since a file that imports `Result` trips the
+ * rule without ever having needed `AsyncResult`. The added specifier carries a
+ * `type` qualifier unless the declaration is already `import type { … }`, so
+ * the fix never turns a types-only import into a value one (which under
+ * `verbatimModuleSyntax` would emit a runtime import the file never had).
+ *
+ * The fix is withheld in four situations, each because applying it would
+ * produce code that does not compile or does not mean what it says:
+ *
+ * - an `async` function's own return annotation, and the return type of a
+ *   function *type* (the implementer may be `async`) — both must stay a native
+ *   `Promise`; see {@link isFunctionTypeReturn};
+ * - the name `AsyncResult` is already bound to something else, so adding a
+ *   specifier would collide rather than resolve — see {@link nameIsTaken};
+ * - there is no `unthrown` import with a specifier list to extend, which in
+ *   practice means a namespace import (`import * as U from "unthrown"`) —
+ *   `U.AsyncResult` is reachable, but rewriting to a qualified name is a
+ *   different edit; see {@link unthrownImport}.
  */
 export const preferAsyncResult = defineRule({
   meta: {
@@ -90,15 +145,31 @@ export const preferAsyncResult = defineRule({
         if (resolveResultType(scope, inner) !== "Result") return;
 
         // Withhold the fix when this annotation is an `async` function's
-        // return type (see the `asyncReturnSpans` comment above), a function
+        // return type (see the `asyncReturnSpans` comment above) or a function
         // *type*'s return position (the implementer may be `async` — see
-        // `isFunctionTypeReturn`), or when `AsyncResult` isn't importable
-        // (the rewrite would reference an undefined name).
+        // `isFunctionTypeReturn`). Both must stay a native `Promise`.
         const inAsyncReturn = asyncReturnSpans.has(`${node.start}:${node.end}`);
-        const canFix =
-          !inAsyncReturn &&
-          !isFunctionTypeReturn(node) &&
-          hasNamedImport(scope, "AsyncResult", MODULE);
+        const positionAllowsFix = !inAsyncReturn && !isFunctionTypeReturn(node);
+
+        // `AsyncResult` already in scope under that name → rewrite alone.
+        const imported = hasNamedImport(scope, "AsyncResult", MODULE);
+        // Otherwise the fix can still apply, by ALSO adding the specifier to an
+        // existing `unthrown` import — the common case, since a file importing
+        // `Result` trips the rule without ever having needed `AsyncResult`.
+        //
+        // Two things must hold. `AsyncResult` must not be locally bound to
+        // something else: a shadowing declaration means adding a specifier
+        // would collide rather than help, so the fix stays withheld (the
+        // `hasNamedImport` check above is stricter than "is bound", so a
+        // *decoy* import like `Ok as AsyncResult` lands here too). And there
+        // must be a specifier list to extend — see `unthrownImport`.
+        //
+        // A file with NO `unthrown` import at all is deliberately out of scope:
+        // inserting a whole import statement raises placement and `import type`
+        // questions this rule should not answer.
+        const declaration =
+          imported || nameIsTaken(scope) ? undefined : unthrownImport(context.sourceCode.ast);
+        const canFix = positionAllowsFix && (imported || declaration !== undefined);
 
         context.report({
           node,
@@ -107,7 +178,32 @@ export const preferAsyncResult = defineRule({
             fix: (fixer) => {
               const value = context.sourceCode.getText(inner.typeArguments.params[0]);
               const error = context.sourceCode.getText(inner.typeArguments.params[1]);
-              return fixer.replaceText(node, `AsyncResult<${value}, ${error}>`);
+              const rewrite = fixer.replaceText(node, `AsyncResult<${value}, ${error}>`);
+              if (declaration === undefined) return rewrite;
+              // Anchor on the LAST specifier rather than the brace, so the
+              // insertion is indifferent to spacing and to whether the existing
+              // specifiers are `type`-qualified individually.
+              const specifiers = declaration.specifiers.filter(
+                (specifier) => specifier.type === "ImportSpecifier",
+              );
+              const last = specifiers[specifiers.length - 1];
+              // `unthrownImport` only returns a declaration with at least one
+              // ImportSpecifier, so `last` is present; the guard is here
+              // because `noUncheckedIndexedAccess` types the access as
+              // possibly-undefined.
+              if (last === undefined) return rewrite;
+              // Carry a `type` qualifier unless the declaration is already
+              // `import type { … }`, where every specifier is a type and
+              // repeating it is a syntax error.
+              //
+              // This matters under `verbatimModuleSyntax` (which this repo's
+              // shared tsconfig enables): adding a bare `AsyncResult` to a
+              // value declaration like `import { type Result } from "unthrown"`
+              // makes the declaration value-bearing, so TypeScript emits a
+              // runtime `import "unthrown"` the file never had — an autofix
+              // that silently adds a runtime dependency to a types-only module.
+              const qualifier = declaration.importKind === "type" ? "" : "type ";
+              return [rewrite, fixer.insertTextAfter(last, `, ${qualifier}AsyncResult`)];
             },
           }),
         });
