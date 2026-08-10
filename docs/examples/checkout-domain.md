@@ -29,9 +29,11 @@ arrives as a `Defect` — never as an `Err` a caller might mistake for a domain
 outcome. The test pins it:
 
 ```ts
-await expect(result).toBeDefect();
-expect(result.isDefect() ? result.cause : undefined).toBe(boom);
+await expect(result).toBeDefectWith(boom);
 ```
+
+The cause is the original throw, not a wrapper — `bind` is a plain combinator,
+so it mints a `Defect` carrying the thrown value as-is.
 
 The rule is "would you branch on it?" Nobody writes business logic for a severed
 connection; they log it and return 500. Modelling it would force an arm at every

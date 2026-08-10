@@ -93,9 +93,8 @@ test("a payment-provider outage becomes a Defect, not an Err", async () => {
     }),
     "cart_1",
   );
-  await expect(result).toBeDefect();
-  // Assert the cause too — it is the original throw, not a wrapper.
-  // (Once `toBeDefectWith` lands from #213 this collapses to
-  // `await expect(result).toBeDefectWith(boom)`.)
-  expect(result.isDefect() ? result.cause : undefined).toBe(boom);
+  // The cause is the original throw, not a wrapper: `bind` is a plain
+  // combinator, so it mints a Defect carrying the thrown value as-is. (The
+  // AggregateError wrapping is reserved for the failure *observers*.)
+  await expect(result).toBeDefectWith(boom);
 });
