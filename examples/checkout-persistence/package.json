@@ -1,0 +1,33 @@
+{
+  "name": "@unthrown/example-checkout-persistence",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Storing and reading a checkout with @unthrown/prisma",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "generate": "prisma generate",
+    "test": "prisma generate && vitest run",
+    "typecheck": "prisma generate && tsc --noEmit"
+  },
+  "dependencies": {
+    "@unthrown/example-checkout-domain": "workspace:*",
+    "@unthrown/prisma": "workspace:*",
+    "unthrown": "workspace:^"
+  },
+  "devDependencies": {
+    "@btravstack/tsconfig": "catalog:",
+    "@prisma/adapter-better-sqlite3": "catalog:",
+    "@prisma/client": "catalog:",
+    "@types/node": "catalog:",
+    "@unthrown/vitest": "workspace:*",
+    "better-sqlite3": "catalog:",
+    "prisma": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

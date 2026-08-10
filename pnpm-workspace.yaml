@@ -6,6 +6,7 @@ strictPeerDependencies: true
 
 packages:
   - packages/*
+  - examples/*
   - docs
 
 catalog:
@@ -53,6 +54,7 @@ catalog:
   typescript: 7.0.2
   vitepress: 1.6.4
   vitest: 4.1.10
+  zod: 4.4.3
 
 catalogs:
   # TypeDoc's own TypeScript: 7.x is the native port and ships no `typescript.js`,

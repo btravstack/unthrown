@@ -1,0 +1,25 @@
+{
+  "name": "@unthrown/example-checkout-domain",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Errors as values in a small checkout domain — the modelling half",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "unthrown": "workspace:^"
+  },
+  "devDependencies": {
+    "@btravstack/tsconfig": "catalog:",
+    "@unthrown/vitest": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

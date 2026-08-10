@@ -985,8 +985,27 @@ code: "NOT_FOUND" }, …))`); non-inferable →
   typedoc bases come from the catalog dependencies `@btravstack/tsconfig` and
   `@btravstack/typedoc` (alongside `@btravstack/oxlint`, `@btravstack/commitlint`,
   `@btravstack/lefthook` and the docs' `@btravstack/theme`). There is no
-  `tools/` directory — `pnpm-workspace.yaml` declares only `packages/*` and
-  `docs`.
+  `tools/` directory — `pnpm-workspace.yaml` declares `packages/*`, `examples/*`
+  and `docs`.
+- `examples/*` are **private, runnable examples**, not published packages —
+  `@unthrown/example-checkout-domain`, `@unthrown/example-checkout-persistence`,
+  `@unthrown/example-checkout-api`, modelling one checkout between them so each
+  package can show a different job the library does (the error union and `Do`
+  sequencing; `@unthrown/prisma`'s read/write error shapes; the oRPC edge with
+  no `try`/`catch`). Every guide snippet is hand-written prose, checked by
+  review and nothing else, so it drifts silently; these are workspace packages
+  instead — real imports of `unthrown` and its satellites through their
+  published entry points, typechecked and tested in CI, so a breaking change
+  turns one red rather than leaving a stale snippet uncaught. Each is
+  `private: true` with **no `build` script** — they are consumed as source,
+  never published, so there is nothing to build and no changeset to add.
+  `typecheck` runs on all three; `test` runs where no external infrastructure
+  is required (`checkout-domain` and `checkout-api` are pure; `checkout-persistence`
+  runs against Prisma's in-memory SQLite, the same pattern `@unthrown/prisma`'s
+  own suite uses). Each has an annotated walkthrough in `docs/examples/`, linked
+  from `examples/README.md`. They double as a **conformance fixture** for the
+  dogfooded oxlint preset — `no-catch-all-pattern` included, so none of the
+  three's error matches reaches for `P._`.
 - `docs` → `@unthrown/docs`, the VitePress site (guide + TypeDoc-generated API
   reference). **TypeDoc runs from here, not from the packages** — it needs its
   own TypeScript (see the toolchain section). One `typedoc.<name>.json` per
@@ -1187,8 +1206,16 @@ onRejected)`, so the fixture records the handler _and invokes it_, proving both
   spelling suggestion, which TypeScript 7 adds where a similar name exists);
   everything else fails, and a renamed export fails on the _preamble import_ as
   TS2305/TS2724, which is never ignored.
-  `@unthrown/prisma`'s 34 examples are the obvious next application.
-  `@unthrown/drizzle` takes the same idea from the other end:
+  This extractor stays **core-only** — rolling it out to the satellites is not
+  the direction taken (#191); the runnable `examples/` packages are the repo's
+  answer to prose rot outside core, and the satellites' `@example` blocks
+  remain unguarded. Beware the count that motivated that issue: a naive
+  `grep -c @example packages/prisma/src` reports **81**, but 47 of those are in
+  Prisma's own **generated** client and 30 more are in `index.spec.ts` /
+  `types.test-d.ts`, which the extractor skips by name. The public API surface
+  the extractor would actually see is `index.ts` alone — **4** blocks. The
+  earlier figures in this file (34) and on #191 (~80) were both artefacts of
+  counting generated and test files. `@unthrown/drizzle` takes the same idea from the other end:
   `src/docs-examples.test-d.ts` is a type-level file holding every sample its
   README, its guide page and its `@example` blocks ship, so a sample that stops
   compiling fails the gate. (It caught two live defects when it was written — a
