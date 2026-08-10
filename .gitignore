@@ -34,6 +34,7 @@ docs/api/*/
 # macOS
 .DS_Store
 
-# Local brainstorming specs (not tracked)
-docs/superpowers/
+# Ephemeral subagent-driven-development workspace (ledgers, briefs, review
+# diffs) — deleted when a plan finishes. The durable artifacts it works from,
+# `docs/superpowers/specs` and `docs/superpowers/plans`, ARE tracked.
 .superpowers/
