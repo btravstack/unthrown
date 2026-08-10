@@ -18,7 +18,7 @@
 - No new exports — `index.ts` is untouched; `discard` is a method on the existing surfaces.
 - Conventional commits (commitlint enforces); lefthook runs on commit.
 - Gate before finishing: `pnpm format --check`, `pnpm lint`, `pnpm typecheck`, `pnpm knip`, `pnpm test`, `pnpm build` all green from the repo root.
-- All commands below run from the repo root: `/Users/frx29150/Projects/unthrown`.
+- All commands below run from the repository root.
 
 ---
 

@@ -34,7 +34,7 @@
         "@unthrown/drizzle#build",
         "@unthrown/orpc#build"
       ],
-      "inputs": ["$TURBO_DEFAULT$", "../packages/*/src/**"],
+      "inputs": ["$TURBO_DEFAULT$", "../packages/*/src/**", "!superpowers/**"],
       "outputs": [".vitepress/dist/**", "api/*/**"],
       "env": ["DOCS_BASE", "DOCS_VERSIONS"]
     }

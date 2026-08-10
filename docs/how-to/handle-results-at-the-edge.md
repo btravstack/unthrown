@@ -127,9 +127,13 @@ result.getOrNull(); // Err → null;     Defect → throws
 result.getOrThrow(); // Err → throws the modeled error as-is; Defect → throws
 ```
 
-Use `getOrThrow` only as a deliberate escape hatch back into throw-land (it exists
-so a `no-throw` lint rule can ban raw `throw`). Prefer `match` / `recoverErrCases` /
-`flatMapErrCases` whenever the error can stay a value. Full family in the
+`getOrThrow` is a **test-and-script** tool — "this `Result` had better be `Ok`"
+_is_ the assertion there, and a throw is the right failure mode. At a
+production edge, fold the channel instead: `match` for per-channel branching,
+or `recoverErrCases` (empties `E`, so `get()` compiles) when there's no branching
+to do. The opt-in [`no-get-or-throw`](./lint-your-codebase#no-get-or-throw) rule
+enforces that boundary, exempting test files through an oxlint `overrides`
+entry. Full family in the
 [combinator reference](../reference/combinators#eliminating-a-result).
 
 ## Where to go next

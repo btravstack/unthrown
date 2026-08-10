@@ -762,10 +762,16 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   reversed ternary needs its condition negated and `ensure`'s boolean form
   requires a `boolean` predicate. Unlike every preset rule, the shape it flags
   violates no thesis — it is correct code with a better name available).
-  Purely syntactic AST rules that
-  resolve bindings via scope analysis keyed by the **imported** name (renamed
-  and namespace imports resolve; alias indirection like `type E = unknown` is a
-  documented limit) so they only fire on unthrown's `Result`. No TypeDoc API
+  Purely syntactic AST rules. Most resolve bindings via scope analysis keyed
+  by the **imported** name (renamed and namespace imports resolve; alias
+  indirection like `type E = unknown` is a documented limit), so they only
+  fire on unthrown's `Result`. A few are keyed on a **name or shape** instead,
+  unthrown's own coinage rather than an import: `no-throw` reports the bare
+  language statement itself, with no binding to resolve at all;
+  `no-get-or-throw` matches a zero-argument `.getOrThrow()` member call;
+  `no-unused-matcher` is keyed on the `…Cases` method names alone; and the
+  `returnType<R>()` pin (inside `no-ambiguous-error-type`) is anchored on that
+  call on a `mapErrCases` callback's own matcher parameter. No TypeDoc API
   page; documented in the Linting guide.
   Tested with oxlint's `RuleTester` from `oxlint/plugins-dev`.
   The **`oxlint` peer floor (`^1.69.0`) is deliberately decoupled from the

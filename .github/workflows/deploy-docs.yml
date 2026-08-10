@@ -37,6 +37,7 @@ on:
     branches: [main]
     paths:
       - "docs/**"
+      - "!docs/superpowers/**"
       - "pnpm-workspace.yaml"
       - ".github/workflows/deploy-docs.yml"
       - ".github/scripts/inject-docs-version-nav.ts"

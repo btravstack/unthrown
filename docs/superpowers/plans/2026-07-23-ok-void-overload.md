@@ -18,7 +18,7 @@
 - `Err`/`ErrAsync` get **no** overload (YAGNI). No `OkVoid`-style new exports; `index.ts` untouched.
 - Conventional commits (commitlint enforces); lefthook runs on commit.
 - Gate before finishing: `pnpm format --check`, `pnpm lint`, `pnpm typecheck`, `pnpm knip`, `pnpm test`, `pnpm build` all green from the repo root; `pnpm --filter unthrown build:docs` warning-free.
-- All commands run from the repo root: `/Users/frx29150/Projects/unthrown`.
+- All commands run from the repository root.
 
 ---
 

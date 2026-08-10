@@ -35,6 +35,6 @@ docs/api/*/
 .DS_Store
 
 # Ephemeral subagent-driven-development workspace (ledgers, briefs, review
-# diffs) — deleted when a plan finishes. The durable artifacts it works from,
-# `docs/superpowers/specs` and `docs/superpowers/plans`, ARE tracked.
+# diffs) — deleted when a plan finishes. Distinct from `docs/superpowers/`
+# (specs, plans, and other durable planning docs), which is tracked in full.
 .superpowers/

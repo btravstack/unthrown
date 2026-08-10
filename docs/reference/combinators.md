@@ -327,7 +327,10 @@ Reach for an eliminator once you're done chaining:
   assertion. In production, fold the channel instead — `recoverErrCases` empties
   `E`, so `get()` compiles — or use `match` / `flatMapErrCases`. The opt-in
   [`no-get-or-throw`](../how-to/lint-your-codebase#no-get-or-throw) rule enforces
-  that, exempting tests through an oxlint `overrides` entry.
+  that, exempting tests through an oxlint `overrides` entry. In a test,
+  [`@unthrown/vitest`](../how-to/test-with-vitest)'s matchers (`toBeOk`,
+  `toBeOkWith`, `toBeErrTagged`, `toBeDefect`, …) are usually the better tool —
+  reach for `getOrThrow()` when you just need the value.
 
 On an `AsyncResult` every eliminator returns a `Promise` — `await` it (an `Err` or
 `Defect` still throws/rejects, exactly as above).

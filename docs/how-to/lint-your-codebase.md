@@ -39,9 +39,9 @@ Register the plugin and turn its rules on in your `.oxlintrc.json`:
 The default export also exposes a `recommended` preset — an oxlint config that
 registers the plugin and enables `no-ambiguous-error-type`, `no-unhandled-result`,
 `no-unused-matcher`, `prefer-async-result`, and `no-catch-all-pattern`
-(`prefer-ensure`, `no-throw` and `no-get-or-throw` are the three explicit opt-ins) — for setups that
-build their config programmatically (`import unthrown from "@unthrown/oxlint"` →
-`unthrown.recommended`).
+(`prefer-ensure`, `no-throw` and `no-get-or-throw` are the three explicit
+opt-ins) — for setups that build their config programmatically
+(`import unthrown from "@unthrown/oxlint"` → `unthrown.recommended`).
 
 `oxlint` is a peer dependency; JS plugins require oxlint ≥ 1.69.
 
@@ -283,9 +283,12 @@ evasions, and the `oxlint-disable` comment is the sanctioned escape.
 #### Keeping it in tests
 
 `getOrThrow()` is the right tool in a test, where "this `Result` had better be
-`Ok`" _is_ the assertion and a throw is the correct failure mode. The rule has
-no `allow` option on purpose — oxlint's own `overrides` already does this, and
-works with whatever glob your tests use:
+`Ok`" _is_ the assertion and a throw is the correct failure mode — though
+[`@unthrown/vitest`](./test-with-vitest)'s matchers (`toBeOk`, `toBeOkWith`,
+`toBeErrTagged`, `toBeDefect`, …) are usually the better tool for the
+assertion itself; reach for `getOrThrow()` when you just need the value. The
+rule has no `allow` option on purpose — oxlint's own `overrides` already does
+this, and works with whatever glob your tests use:
 
 ```json
 {
@@ -303,10 +306,10 @@ works with whatever glob your tests use:
 
 The two rules close different doors, and enabling both closes the room:
 
-|                           | `no-throw` off  | `no-throw` on                                     |
-| ------------------------- | --------------- | ------------------------------------------------- |
-| **`no-get-or-throw` off** | escapes: both   | escape: `getOrThrow()`                            |
-| **`no-get-or-throw` on**  | escape: `throw` | **no escape — fold with `recoverErrCases`+`get`** |
+|                           | `no-throw` off  | `no-throw` on                                                |
+| ------------------------- | --------------- | ------------------------------------------------------------ |
+| **`no-get-or-throw` off** | escapes: both   | escape: `getOrThrow()`                                       |
+| **`no-get-or-throw` on**  | escape: `throw` | **no lint-clean escape — fold with `recoverErrCases`+`get`** |
 
 ### `unthrown/no-catch-all-pattern` {#no-catch-all-pattern}
 
