@@ -25,6 +25,12 @@ docs/api/*/
 # stray local run. Ignored so it cannot be swept into a commit again.
 packages/*/docs/
 
+# Generated Prisma clients, minted by the `generate` script. Ignored HERE, at
+# the root, rather than only in the owning package: a package-local .gitignore
+# disappears when you check out a branch that predates the package, leaving the
+# generated tree visible and sweepable into an unrelated commit.
+**/src/generated/prisma/
+
 # Logs
 *.log
 
