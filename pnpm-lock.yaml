@@ -221,6 +221,46 @@ importers:
         specifier: 'catalog:'
         version: 4.1.10(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0)
 
+  examples/checkout-persistence:
+    dependencies:
+      '@unthrown/example-checkout-domain':
+        specifier: workspace:*
+        version: link:../checkout-domain
+      '@unthrown/prisma':
+        specifier: workspace:*
+        version: link:../../packages/prisma
+      unthrown:
+        specifier: workspace:^
+        version: link:../../packages/core
+    devDependencies:
+      '@btravstack/tsconfig':
+        specifier: 'catalog:'
+        version: 0.2.0
+      '@prisma/adapter-better-sqlite3':
+        specifier: 'catalog:'
+        version: 7.9.1
+      '@prisma/client':
+        specifier: 'catalog:'
+        version: 7.9.1(prisma@7.9.1(@types/react@19.2.17)(better-sqlite3@13.0.2)(magicast@0.5.3)(typescript@7.0.2))(typescript@7.0.2)
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.1.2
+      '@unthrown/vitest':
+        specifier: workspace:*
+        version: link:../../packages/vitest
+      better-sqlite3:
+        specifier: 'catalog:'
+        version: 13.0.2
+      prisma:
+        specifier: 'catalog:'
+        version: 7.9.1(@types/react@19.2.17)(better-sqlite3@13.0.2)(magicast@0.5.3)(typescript@7.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.10(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0)
+
   packages/boxed:
     dependencies:
       unthrown:

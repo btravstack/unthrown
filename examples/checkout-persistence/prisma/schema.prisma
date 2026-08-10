@@ -1,0 +1,31 @@
+// Generated into src/generated (gitignored) by the test/typecheck scripts —
+// the same arrangement packages/prisma uses for its own test client.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Cart {
+  id    String     @id
+  lines CartLine[]
+}
+
+model CartLine {
+  id        Int    @id @default(autoincrement())
+  sku       String
+  quantity  Int
+  unitPrice Int
+  cart      Cart   @relation(fields: [cartId], references: [id])
+  cartId    String
+}
+
+model Order {
+  id     String @id
+  total  Int
+  cartId String @unique
+}
