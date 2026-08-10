@@ -20,7 +20,7 @@
 - **`getOrThrow` is not deprecated and its runtime is unchanged.** Core changes are TSDoc prose only.
 - **Gate (all must stay green at the end):** `pnpm format --check`, `pnpm lint`, `pnpm typecheck`, `pnpm knip`, `pnpm test`, `pnpm build`.
 - **Commits are conventional** (commitlint + lefthook run on commit).
-- **`docs/superpowers/` is gitignored** — this plan and its spec are not committed. Never `git add -f` them.
+- **`docs/superpowers/` is tracked** (as of commit `d44824b`) — this plan and its spec are committed. Because VitePress builds everything under `docs/`, the directory must be excluded from the site via `srcExclude` in `docs/.vitepress/config.ts`, or `pnpm build` fails on relative links inside a plan. The ephemeral `.superpowers/` SDD workspace stays gitignored.
 
 ### The replacement form (used verbatim in several messages and docs)
 
