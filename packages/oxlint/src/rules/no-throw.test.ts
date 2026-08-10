@@ -7,7 +7,8 @@ ruleTester.run("no-throw", noThrow, {
     {
       code: `import { Err, Ok } from "unthrown";\nfunction f(n) { return n > 0 ? Ok(n) : Err("negative"); }`,
     },
-    // The sanctioned extraction escape hatch is a call, not a `throw`.
+    // `getOrThrow()` is a call, not a `throw` statement, so this rule is
+    // silent on it — `no-get-or-throw` is what reports it.
     { code: `const value = result.getOrThrow();` },
     // A try/catch with no throw is fine — catching is not throwing.
     { code: `try { risky(); } catch (e) { report(e); }` },

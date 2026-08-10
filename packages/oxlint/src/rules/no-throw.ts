@@ -8,8 +8,9 @@ import { defineRule } from "@oxlint/plugins";
  * sanctioned forms stand out:
  *
  * - a modeled failure → `return Err(...)`;
- * - extraction that must throw the modeled error → `getOrThrow()` (the
- *   sanctioned, lint-clean escape hatch);
+ * - a failure that is genuinely unmodeled here → route it to the defect
+ *   channel in expression position:
+ *   `.recoverErrCases((matcher, defect) => matcher.with(P.tag("…"), (e) => defect(e))).get()`;
  * - a known-technical precondition throw → a plain helper wrapped once at its
  *   origin with `fromSafeThrowable`;
  * - a genuinely deliberate remaining `throw` site → a targeted
@@ -30,7 +31,7 @@ export const noThrow = defineRule({
     },
     messages: {
       noThrow:
-        "Unexpected `throw`. Return `Err(...)` for a modeled failure, or extract with `getOrThrow()` when the error must be thrown. A known-technical precondition throw belongs in a plain helper wrapped once with `fromSafeThrowable`; a genuinely deliberate `throw` carries a targeted `oxlint-disable` with a reason.",
+        'Unexpected `throw`. Return `Err(...)` for a modeled failure. When the failure is genuinely unmodeled here, route it to the defect channel in expression position — `.recoverErrCases((matcher, defect) => matcher.with(P.tag("…"), (e) => defect(e))).get()`. A known-technical precondition throw belongs in a plain helper wrapped once with `fromSafeThrowable`; a genuinely deliberate `throw` carries a targeted `oxlint-disable` with a reason.',
     },
   },
   createOnce: (context) => {
