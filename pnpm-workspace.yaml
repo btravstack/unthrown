@@ -31,7 +31,7 @@ catalog:
   "@types/node": 26.1.1
   # 8.20.1/8.20.2/8.20.3 are all within the minimumReleaseAge window as of
   # pinning; 8.20.0 is the newest release past it.
-  "@types/pg": 8.20.0
+  "@types/pg": 8.20.3
   "@vitest/coverage-v8": 4.1.10
   better-sqlite3: 13.0.1
   # Ranged peer, exact catalog pin: we subclass drizzle internals
