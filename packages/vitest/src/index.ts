@@ -495,9 +495,10 @@ export type UnthrownMatchers<R = unknown> = {
   /**
    * Assert a `Defect` whose `cause` is deeply equal to `expected`.
    *
-   * `expected` is `unknown` because a defect's cause is — nothing is thrown
-   * through a typed channel, so there is no tighter type to give it and no
-   * tag-aware variant to add. An asymmetric matcher works as elsewhere:
+   * `expected` is typed `unknown` because **a defect's cause is `unknown` by
+   * design**: nothing reaches that channel through a typed error, so there is
+   * no tighter type to give it and no tag-aware variant to add. An asymmetric
+   * matcher works as elsewhere:
    * `expect(result).toBeDefectWith(expect.any(TypeError))`.
    */
   toBeDefectWith: (expected: unknown) => R;

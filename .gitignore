@@ -19,6 +19,12 @@ docs/.vitepress/dist/
 # (the hand-written docs/api/index.md overview is kept)
 docs/api/*/
 
+# Stale per-package TypeDoc output. TypeDoc runs from `docs/` and writes
+# straight into `docs/api/<name>/` — there is no per-package `build:docs` and no
+# copy step — so anything here is a leftover from the older arrangement, or a
+# stray local run. Ignored so it cannot be swept into a commit again.
+packages/*/docs/
+
 # Logs
 *.log
 
