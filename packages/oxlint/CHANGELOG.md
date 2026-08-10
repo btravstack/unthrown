@@ -1,5 +1,89 @@
 # @unthrown/oxlint
 
+## 5.2.0
+
+### Minor Changes
+
+- 3eef964: Add the opt-in `no-get-or-throw` rule, and withdraw the circular `getOrThrow`
+  rationale.
+
+  `getOrThrow()` extracts `T` but throws the modeled error as-is, abandoning
+  errors-as-values at the last step — a caller of the enclosing function sees a
+  throw, not a channel. The new rule reports it, pointing at the fold that keeps
+  the error a value: `recoverErrCases` empties `E`, so `get()` compiles, and a
+  case routed to the injected `defect(...)` panics with its original cause.
+
+  It matches a **zero-argument** `.getOrThrow()` member call, so Effect's
+  one-argument `Option.getOrThrow(o)` / `Either.getOrThrow(e)` are untouched. A
+  computed access and a detached reference are documented misses.
+
+  The rule is **opt-in**, not in the `recommended` preset, and deliberately
+  option-free: `getOrThrow()` is the right tool in a test, and oxlint's own
+  `overrides` already exempts a test glob. It is also the one rule an existing
+  test suite fails until configured, which is no way to behave in a preset.
+
+  It stacks with `no-throw`: alone, each leaves the other spelling as an escape;
+  together there is none. That made `no-throw`'s own message — which recommended
+  `getOrThrow()` as the sanctioned escape — circular, so it now points at
+  `recoverErrCases` + `get` instead. `getOrThrow`'s TSDoc is reframed the same
+  way: a test-and-script tool, not the production escape. **`getOrThrow` itself
+  is unchanged and not deprecated** — the `unthrown` bump is documentation only.
+
+- 0ebb060: `prefer-async-result`: add the `AsyncResult` import as part of the autofix.
+
+  The rule withheld its fix whenever `AsyncResult` was not already imported, since
+  rewriting to a name that is not in scope produces code that does not compile.
+  The reasoning was right, but it made the autofix unavailable in the rule's most
+  common case: a file that imports `Result` — which is what trips the rule — and
+  has never needed `AsyncResult`. The diagnostic fired, `--fix` did nothing, and
+  the import had to be added by hand first.
+
+  The fix now emits both edits. The specifier is inserted after the **last
+  `ImportSpecifier`**, so it is indifferent to spacing and to whether the existing
+  specifiers carry per-specifier `type` qualifiers:
+
+  ```ts
+  // before
+  import type { Result } from "unthrown";
+  type T = Promise<Result<User, NotFound>>;
+
+  // after --fix
+  import type { Result, AsyncResult } from "unthrown";
+  type T = AsyncResult<User, NotFound>;
+  ```
+
+  Still withheld, each because the fix would not compile or would not mean what it
+  says: an `async` function's own return annotation and a function _type_'s return
+  position (both must stay a native `Promise`); a local binding already named
+  `AsyncResult` (adding a specifier would collide rather than resolve); and a
+  namespace import, which has no specifier list to extend — `U.AsyncResult` is
+  reachable, but rewriting to a qualified name is a different edit.
+
+### Patch Changes
+
+- 0ebb060: `prefer-async-result`: keep a types-only import types-only when the autofix adds
+  the `AsyncResult` specifier.
+
+  The fix inserted a bare `AsyncResult`, which is right for an
+  `import type { … }` declaration but wrong for a value declaration carrying an
+  inline `type` specifier. Adding a value specifier to
+  `import { type Result } from "unthrown"` makes the whole declaration
+  value-bearing, so under `verbatimModuleSyntax` TypeScript emits a runtime
+  `import "unthrown"` the file never had — an autofix quietly adding a runtime
+  dependency to a types-only module.
+
+  The inserted specifier now carries its own `type` qualifier unless the
+  declaration is already `import type { … }`, where repeating it would be a syntax
+  error:
+
+  ```ts
+  // import type { Result } from "unthrown";
+  import type { Result, AsyncResult } from "unthrown";
+
+  // import { type Result } from "unthrown";
+  import { type Result, type AsyncResult } from "unthrown";
+  ```
+
 ## 5.1.0
 
 ### Minor Changes

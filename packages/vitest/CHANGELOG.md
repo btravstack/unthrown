@@ -1,5 +1,51 @@
 # @unthrown/vitest
 
+## 5.2.0
+
+### Minor Changes
+
+- a4ca526: Point forgotten-`await` failures at the line that created the assertion.
+
+  The `afterEach` net named the pending matchers but not where they came from, so
+  a long spec with several `toBeOk` assertions — or a `test.concurrent` run, where
+  the mechanism already disambiguates by test name — left the missing `await` to a
+  manual scan.
+
+  `settle` now captures an `Error` when it creates the gate, so its stack runs
+  through the caller's `expect(...)`. The failure reports the first frame that is
+  neither this module nor `node_modules`:
+
+  ```
+  @unthrown/vitest: 1 async assertion(s) (toBeOk) were still pending when the
+  test ended — a forgotten `await`. … Created at: loadUser (src/user.spec.ts:42:18).
+  ```
+
+  The location goes in the **message**, since that is the part every reporter
+  shows; the full stack is on the error's `cause` for those that render it.
+
+  The capture happens only on the **async** path — the one that can be forgotten —
+  and V8 formats `.stack` lazily, so a correctly-awaited assertion pays for
+  constructing the `Error` and nothing else.
+
+- a4ca526: Add the `toBeDefectWith(cause)` matcher.
+
+  The `Defect` channel was the only one without a value assertion — `Ok` has
+  `toBeOkWith`, `Err` has `toBeErrWith` and `toBeErrTagged`, and a defect had only
+  `toBeDefect`. Asserting _what_ caused one meant a two-step that narrowed by hand,
+  and the narrowing only worked on a synchronous `Result`: on an `AsyncResult` the
+  value had to be awaited separately, which is exactly what these matchers exist to
+  avoid.
+
+  ```ts
+  await expect(asyncResult).toBeDefectWith(expect.any(TypeError));
+  expect(result).toBeDefectWith(theOriginalCause);
+  ```
+
+  `expected` is typed `unknown`, matching the channel — a defect's `cause` is
+  `unknown` by design, so there is no tighter type to give it and no tag-aware
+  variant to add. Like every other matcher it goes through `settle`, so it inherits
+  the thenable handling and the forgotten-`await` net.
+
 ## 5.1.0
 
 ### Minor Changes
