@@ -34,7 +34,9 @@ docs/api/*/
 # macOS
 .DS_Store
 
-# Ephemeral subagent-driven-development workspace (ledgers, briefs, review
-# diffs) — deleted when a plan finishes. Distinct from `docs/superpowers/`
-# (specs, plans, and other durable planning docs), which is tracked in full.
+# Local brainstorming specs and implementation plans (not tracked). They live
+# under `docs/`, so VitePress would otherwise build them as site pages — hence
+# the `srcExclude` in `docs/.vitepress/config.ts`, which is what keeps
+# `pnpm build` green whether or not these files are present.
+docs/superpowers/
 .superpowers/
