@@ -15,12 +15,12 @@ never pin core exactly (dual-copy hazard with `isResult`'s `instanceof`).
 Importing the package registers matchers via `expect.extend` (its one
 import-time side effect) and a module-level `afterEach`.
 
-| matcher                            | asserts                                                                                                                                             |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `toBeOk()` / `toBeOkWith(value)`   | Ok / Ok with deep-equal value                                                                                                                       |
-| `toBeErr()` / `toBeErrWith(error)` | Err / Err with deep-equal error                                                                                                                     |
-| `toBeErrTagged(tag, payload?)`     | Err carrying a TaggedError with `_tag === tag`; optional payload is deep-compared (exact for a plain object, partial for `expect.objectContaining`) |
-| `toBeDefect()`                     | Defect                                                                                                                                              |
+| matcher                                  | asserts                                                                                                                                             |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `toBeOk()` / `toBeOkWith(value)`         | Ok / Ok with deep-equal value                                                                                                                       |
+| `toBeErr()` / `toBeErrWith(error)`       | Err / Err with deep-equal error                                                                                                                     |
+| `toBeErrTagged(tag, payload?)`           | Err carrying a TaggedError with `_tag === tag`; optional payload is deep-compared (exact for a plain object, partial for `expect.objectContaining`) |
+| `toBeDefect()` / `toBeDefectWith(cause)` | Defect / Defect with deep-equal `cause` (`unknown` — asymmetric matchers work: `expect.any(TypeError)`)                                             |
 
 They detect a thenable `AsyncResult` and await internally:
 
@@ -29,8 +29,9 @@ await expect(asyncResult).toBeErrTagged("NotFound", { id: "42" });
 ```
 
 A forgotten `await` on an async assertion fails the test at its end
-(`failOnForgottenAwait`, auto-registered), naming the pending matchers. Manual
-wiring exports: the six raw matcher functions, `failOnForgottenAwait`, and the
+(`failOnForgottenAwait`, auto-registered), naming the pending matchers and the
+call site that created them (full stack on the error's `cause`). Manual
+wiring exports: the seven raw matcher functions, `failOnForgottenAwait`, and the
 `UnthrownMatchers` type.
 
 ## Linting: @unthrown/oxlint

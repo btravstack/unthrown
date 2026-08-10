@@ -33,6 +33,7 @@ test("matchers", () => {
   expect(Err("e")).toBeErr();
   expect(Err(new NotFound())).toBeErrTagged("NotFound");
   expect(aDefect).toBeDefect();
+  expect(aDefect).toBeDefectWith(expect.any(TypeError)); // assert the cause
 
   expect(Ok(1)).not.toBeErr(); // negations work too
 });
@@ -47,6 +48,7 @@ test("matchers", () => {
 | `toBeErrTagged(tag)`           | the result is `Err` whose error has `_tag === tag`                                                |
 | `toBeErrTagged(tag, expected)` | …and its payload matches `expected` (exact for a plain object, partial for an asymmetric matcher) |
 | `toBeDefect()`                 | the result is a `Defect`                                                                          |
+| `toBeDefectWith(cause)`        | the result is a `Defect` whose `cause` deep-equals `cause`                                        |
 
 ## Assert on a tagged error's payload
 
@@ -102,8 +104,15 @@ await expect(fromSafePromise(Promise.reject(boom))).toBeDefect();
 ::: danger Don't forget the await
 Always `await expect(asyncResult)…`. As a safety net, importing the package also
 registers an `afterEach` hook: a test that ends with async assertions still pending
-**fails** with an explicit message naming the un-awaited matchers, instead of
-passing silently.
+**fails** with an explicit message naming the un-awaited matchers **and the line
+that created them**, instead of passing silently.
+
+```
+@unthrown/vitest: 1 async assertion(s) (toBeOk) were still pending when the
+test ended — a forgotten `await`. … Created at: loadUser (src/user.spec.ts:42:18).
+```
+
+The full stack is on the error's `cause`, for reporters that render it.
 :::
 
 ## Where to go next

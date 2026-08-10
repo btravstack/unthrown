@@ -120,6 +120,20 @@ describe("toBeDefect", () => {
   });
 });
 
+describe("toBeDefectWith", () => {
+  it("compares the defect cause deeply", () => {
+    expect(aDefect).toBeDefectWith(boom);
+    expect(aDefect).not.toBeDefectWith(new Error("other"));
+    expect(Ok(1)).not.toBeDefectWith(boom);
+    expect(Err("e")).not.toBeDefectWith("e");
+  });
+
+  it("accepts an asymmetric matcher, since a cause is unknown by design", () => {
+    expect(aDefect).toBeDefectWith(expect.any(Error));
+    expect(aDefect).not.toBeDefectWith(expect.any(TypeError));
+  });
+});
+
 describe("AsyncResult matchers (await required)", () => {
   it("awaits the AsyncResult before asserting", async () => {
     await expect(fromSafePromise(Promise.resolve(1))).toBeOk();
@@ -140,6 +154,32 @@ describe("forgotten await detection", () => {
     // State is cleared by the failure: the next check starts clean, so one
     // forgotten await cannot cascade into the following tests.
     expect(() => failOnForgottenAwait()).not.toThrow();
+  });
+
+  it("names the call site of the forgotten assertion, not a library frame", () => {
+    void expect(fromSafePromise(new Promise<number>(() => {}))).toBeOk();
+    let message = "";
+    try {
+      failOnForgottenAwait();
+    } catch (e) {
+      message = (e as Error).message;
+    }
+    // The user's `expect(...)` line — this spec file, with a line number.
+    expect(message).toMatch(/index\.spec\.ts:\d+:\d+/);
+    // …and NOT the matcher machinery that created the gate.
+    expect(message).not.toMatch(/src[/\\]index\.ts:/);
+  });
+
+  it("attaches the assertion-time stack as the error's cause", () => {
+    void expect(fromSafePromise(new Promise<number>(() => {}))).toBeErr();
+    let cause: unknown;
+    try {
+      failOnForgottenAwait();
+    } catch (e) {
+      cause = (e as Error).cause;
+    }
+    expect(cause).toBeInstanceOf(Error);
+    expect((cause as Error).stack).toMatch(/index\.spec\.ts:\d+:\d+/);
   });
 
   it("names every pending matcher, negated assertions included", () => {
@@ -236,6 +276,9 @@ describe("failure messages", () => {
       expect(Err(new MyError({ code: 1 }))).toBeErrTagged("MyError", { code: 2 }),
     ).toThrowError(/to be Err tagged "MyError" matching/);
     expect(() => expect(Ok(1)).toBeDefect()).toThrowError(/to be a Defect, but got Ok\(1\)/);
+    expect(() => expect(Ok(1)).toBeDefectWith(boom)).toThrowError(
+      /to be a Defect caused by \[Error: boom\], but got Ok\(1\)/,
+    );
   });
 
   it("reports a clear message for a non-Result value", () => {
@@ -256,5 +299,8 @@ describe("failure messages", () => {
       /not to be Err tagged "MyError"/,
     );
     expect(() => expect(aDefect).not.toBeDefect()).toThrowError(/not to be a Defect/);
+    expect(() => expect(aDefect).not.toBeDefectWith(boom)).toThrowError(
+      /not to be a Defect caused by \[Error: boom\]/,
+    );
   });
 });

@@ -679,7 +679,7 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   exhaustiveness guarantee can never vary with a consumer-resolved third-party
   version, and nothing needs installing alongside `unthrown`)
 - `packages/vitest` → `@unthrown/vitest` (peerDep `vitest`; besides the
-  `expect.extend` registration it also exports the six raw matcher functions,
+  `expect.extend` registration it also exports the seven raw matcher functions,
   `failOnForgottenAwait`, and the `UnthrownMatchers` type — for manual
   `expect.extend` wiring)
 - `packages/effect` → `@unthrown/effect` (peerDep `effect`)
@@ -1054,15 +1054,25 @@ channel?**
    same list `TaggedErrorInstance` omits — because a subclass's documented
    `override message = "…"` lands as an own **enumerable** property and would
    otherwise leak into the exact form, breaking the very pattern Thesis #4
-   prescribes), `toBeDefect`, registered
+   prescribes), `toBeDefect`, `toBeDefectWith` (the defect-channel mirror of
+   `toBeErrWith` — a deep compare of the `cause`, typed `unknown` because that
+   is what a defect's cause is; there is no tag-aware variant, since nothing
+   reaches that channel through a typed error), registered
    via `expect.extend`
    and augmenting Vitest's `Matchers` interface. They detect a thenable
    `AsyncResult` and await internally, so a test reads
    `await expect(asyncResult).toBeOk()`. A forgotten `await` is **loud**: the
    matchers track in-flight assertions and a module-registered `afterEach`
    (`failOnForgottenAwait`) fails the test at its end, naming the pending
-   matchers — the abandoned assertion is reported exactly once, correctly
-   attributed, and can never late-fire as an unhandled rejection.
+   matchers **and the call site that created them** — the abandoned assertion is
+   reported exactly once, correctly attributed, and can never late-fire as an
+   unhandled rejection. The call site comes from an `Error` captured in `settle`
+   on the **async path only** (the one that can be forgotten), whose stack is
+   walked past `node_modules` and this module to the first user frame; it lands
+   in the **message**, since that is the part every reporter shows, with the
+   full stack on the error's `cause`. Deliberately not filtered on a `/vitest/`
+   path segment — this package's own sources live under `packages/vitest/`, so
+   that rule would discard the very frame being looked for.
 4. ✅ **The built-in matcher** — Done. `matcher.ts` powers the exhaustive error
    matchers (Thesis #5), exporting `match`/`P`/`NonExhaustiveError` — `P`
    carrying every pattern constructor, `P.tag(t)` (the `{ _tag: t }` pattern)

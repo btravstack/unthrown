@@ -73,8 +73,58 @@ function payloadOf(error: object): Record<string, unknown> {
 // survives a test is a forgotten `await`, which `failOnForgottenAwait` (the
 // `afterEach` hook registered below) turns into a loud, correctly-attributed
 // test failure.
-type InFlight = { matcherName: string; testName: string | undefined; abandon: () => void };
+type InFlight = {
+  matcherName: string;
+  testName: string | undefined;
+  abandon: () => void;
+  // Captured where the gate is created, so its stack runs through the user's
+  // `expect(...)` call. Only ever constructed on the ASYNC path — the one that
+  // can be forgotten — and V8 formats `.stack` lazily, so a correctly-awaited
+  // assertion pays for the capture and nothing more.
+  callSite: Error;
+};
 const inFlight = new Map<Promise<Outcome>, InFlight>();
+
+// The first stack frame that belongs to the user rather than to this matcher
+// module or to the test runner. `expect(...)` reaches `settle` through vitest's
+// chai wrappers, so the frame directly above us is machinery, not the call
+// site; skipping `node_modules` (which is where the runner and chai live) and
+// this module itself lands on the spec file.
+//
+// Deliberately NOT filtering on a `/vitest/` path segment: this package's own
+// sources sit under `packages/vitest/`, so such a rule would discard the very
+// frame we are looking for whenever the caller is a test in this repo.
+//
+// Returns undefined when nothing qualifies (a bundled runner, an exotic stack
+// format), in which case the caller omits the location rather than guessing.
+function callSiteFrame(error: Error): string | undefined {
+  // `?? ""` rather than an early return: `stack` is always populated on V8, so
+  // a guard clause would be an unreachable statement, and an empty string
+  // reaches the same answer (`find` over no frames yields undefined).
+  const stack = error.stack ?? "";
+  // `slice(1)` drops the message line; we construct the Error ourselves with a
+  // single-line message, so every remaining line is a frame.
+  //
+  // `find` rather than a loop with a fallback `return undefined`: in a normal
+  // V8 run the caller's own frame always qualifies, so an explicit fallback
+  // would be an unreachable statement. This way the undefined case falls out of
+  // `find`'s own contract, and an exotic stack format still degrades to
+  // omitting the location rather than naming a library frame as the call site.
+  const frame = stack
+    .split("\n")
+    .slice(1)
+    .map((raw) => raw.trim())
+    .find(
+      (line) =>
+        // The runner and chai live in node_modules; `node:` covers internals.
+        !/node_modules|node:/.test(line) &&
+        // This module — `src/index.ts` from source, `dist/index.[cm]js`
+        // published. `index.spec.ts` does not match: `\.` must be followed by
+        // the extension.
+        !/[/\\](?:src|dist)[/\\]index\.[cm]?[jt]s(?::|$)/.test(line),
+    );
+  return frame?.replace(/^at\s+/, "");
+}
 
 // The slice of vitest's `TestContext` the hook needs: enough of the task tree
 // to rebuild the full test name (`"outer suite > inner suite > test"` — the
@@ -126,6 +176,7 @@ function settle(
     // Which test created the assertion — lets the afterEach hook claim only
     // its own test's forgotten awaits under `test.concurrent`.
     testName: state.currentTestName,
+    callSite: new Error(`@unthrown/vitest: ${matcherName} assertion created here`),
     abandon: () =>
       deliver({
         pass: !state.isNot,
@@ -204,8 +255,29 @@ export function failOnForgottenAwait(context?: HookContext): void {
     entry.abandon();
   }
   const names = claimed.map(([, entry]) => entry.matcherName).join(", ");
+  // Report the call sites in the MESSAGE, not only via `cause`: the message is
+  // the one part every reporter shows, and "you forgot an await" is of little
+  // use without the line. `cause` carries the full stack for anything that
+  // renders it.
+  const sites = [
+    ...new Set(
+      claimed
+        .map(([, entry]) => callSiteFrame(entry.callSite))
+        .filter((site): site is string => site !== undefined),
+    ),
+  ];
+  // `sites` is empty only when no frame qualified — see `callSiteFrame`.
+  /* v8 ignore next */
+  const where = sites.length === 0 ? "" : ` Created at: ${sites.join("; ")}.`;
   throw new Error(
-    `@unthrown/vitest: ${claimed.length} async assertion(s) (${names}) were still pending when the test ended — a forgotten \`await\`. For an AsyncResult the matcher is asynchronous: write \`await expect(asyncResult).toBeOk()\`.`,
+    `@unthrown/vitest: ${claimed.length} async assertion(s) (${names}) were still pending when the test ended — a forgotten \`await\`. For an AsyncResult the matcher is asynchronous: write \`await expect(asyncResult).toBeOk()\`.${where}`,
+    // The first claimed assertion's capture: with several forgotten awaits the
+    // message lists every site, while `cause` gives one full stack to walk.
+    // The `?.` is unreachable — `claimed.length === 0` returned above — and is
+    // here only because `noUncheckedIndexedAccess` types the access as
+    // possibly-undefined.
+    /* v8 ignore next */
+    { cause: claimed[0]?.[1].callSite },
   );
 }
 
@@ -338,9 +410,32 @@ function toBeDefect(this: MatcherState, received: unknown): MatcherResult {
   });
 }
 
-expect.extend({ toBeDefect, toBeErr, toBeErrTagged, toBeErrWith, toBeOk, toBeOkWith });
+function toBeDefectWith(this: MatcherState, received: unknown, expected: unknown): MatcherResult {
+  const { stringify } = this.utils;
+  const { equals } = this;
+  return settle("toBeDefectWith", this, received, (result) => {
+    const pass = isDefect(result) && equals(result.cause, expected);
+    return {
+      pass,
+      message: () =>
+        pass
+          ? `expected result not to be a Defect caused by ${stringify(expected)}`
+          : `expected result to be a Defect caused by ${stringify(expected)}, but got ${render(result, stringify)}`,
+    };
+  });
+}
 
-export { toBeDefect, toBeErr, toBeErrTagged, toBeErrWith, toBeOk, toBeOkWith };
+expect.extend({
+  toBeDefect,
+  toBeDefectWith,
+  toBeErr,
+  toBeErrTagged,
+  toBeErrWith,
+  toBeOk,
+  toBeOkWith,
+});
+
+export { toBeDefect, toBeDefectWith, toBeErr, toBeErrTagged, toBeErrWith, toBeOk, toBeOkWith };
 
 /**
  * The matchers `@unthrown/vitest` contributes to Vitest's `expect`. For an
@@ -397,6 +492,16 @@ export type UnthrownMatchers<R = unknown> = {
   toBeErrWith: (expected: unknown) => R;
   /** `expect(result).toBeDefect()` asserts the result is a `Defect`. */
   toBeDefect: () => R;
+  /**
+   * Assert a `Defect` whose `cause` is deeply equal to `expected`.
+   *
+   * `expected` is typed `unknown` because **a defect's cause is `unknown` by
+   * design**: nothing reaches that channel through a typed error, so there is
+   * no tighter type to give it and no tag-aware variant to add. An asymmetric
+   * matcher works as elsewhere:
+   * `expect(result).toBeDefectWith(expect.any(TypeError))`.
+   */
+  toBeDefectWith: (expected: unknown) => R;
 };
 
 declare module "vitest" {
