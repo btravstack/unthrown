@@ -117,6 +117,9 @@ catalogs:
     vitest:
       specifier: 4.1.10
       version: 4.1.10
+    zod:
+      specifier: 4.4.3
+      version: 4.4.3
   typedoc:
     typescript:
       specifier: 6.0.3
@@ -198,6 +201,46 @@ importers:
       vitepress:
         specifier: 'catalog:'
         version: 1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.2)(jiti@2.7.0)(postcss@8.5.25)(tsx@4.23.5)(typescript@6.0.3)(yaml@2.9.0)
+
+  examples/checkout-api:
+    dependencies:
+      '@orpc/client':
+        specifier: 'catalog:'
+        version: 2.0.0-beta.23
+      '@orpc/server':
+        specifier: 'catalog:'
+        version: 2.0.0-beta.23
+      '@unthrown/example-checkout-domain':
+        specifier: workspace:*
+        version: link:../checkout-domain
+      '@unthrown/orpc':
+        specifier: workspace:*
+        version: link:../../packages/orpc
+      '@unthrown/standard-schema':
+        specifier: workspace:*
+        version: link:../../packages/standard-schema
+      unthrown:
+        specifier: workspace:^
+        version: link:../../packages/core
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
+    devDependencies:
+      '@btravstack/tsconfig':
+        specifier: 'catalog:'
+        version: 0.2.0
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.1.2
+      '@unthrown/vitest':
+        specifier: workspace:*
+        version: link:../../packages/vitest
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.10(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0)
 
   examples/checkout-domain:
     dependencies:
