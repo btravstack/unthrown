@@ -25,6 +25,7 @@ updates:
         patterns:
           - "oxlint"
           - "oxfmt"
+          - "@oxlint/*"
       typedoc:
         patterns:
           - "typedoc"
