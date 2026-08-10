@@ -162,6 +162,7 @@ export default defineConfig({
         ],
       },
       { text: "API", link: "/api/" },
+      { text: "Examples", link: "/examples/" },
       {
         text: "Changelog",
         link: "https://github.com/btravstack/unthrown/releases",
@@ -195,6 +196,17 @@ export default defineConfig({
             { text: "@unthrown/prisma", link: "/api/prisma/" },
             { text: "@unthrown/drizzle", link: "/api/drizzle/" },
             { text: "@unthrown/orpc", link: "/api/orpc/" },
+          ],
+        },
+      ],
+      "/examples/": [
+        {
+          text: "Examples",
+          items: [
+            { text: "Overview", link: "/examples/" },
+            { text: "Checkout domain", link: "/examples/checkout-domain" },
+            { text: "Checkout persistence", link: "/examples/checkout-persistence" },
+            { text: "Checkout API", link: "/examples/checkout-api" },
           ],
         },
       ],

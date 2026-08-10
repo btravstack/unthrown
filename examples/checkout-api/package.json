@@ -24,7 +24,6 @@
   "devDependencies": {
     "@btravstack/tsconfig": "catalog:",
     "@types/node": "catalog:",
-    "@unthrown/vitest": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

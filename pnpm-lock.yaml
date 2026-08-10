@@ -229,9 +229,6 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.2
-      '@unthrown/vitest':
-        specifier: workspace:*
-        version: link:../../packages/vitest
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
