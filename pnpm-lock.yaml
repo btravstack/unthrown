@@ -58,8 +58,8 @@ catalogs:
       specifier: 26.1.1
       version: 26.1.1
     '@types/pg':
-      specifier: 8.20.0
-      version: 8.20.0
+      specifier: 8.20.3
+      version: 8.20.3
     '@vitest/coverage-v8':
       specifier: 4.1.10
       version: 4.1.10
@@ -265,7 +265,7 @@ importers:
         version: 26.1.1
       '@types/pg':
         specifier: 'catalog:'
-        version: 8.20.0
+        version: 8.20.3
       '@unthrown/vitest':
         specifier: workspace:*
         version: link:../vitest
@@ -274,7 +274,7 @@ importers:
         version: 4.1.10(vitest@4.1.10)
       drizzle-orm:
         specifier: 'catalog:'
-        version: 1.0.0-rc.4(@electric-sql/pglite@0.4.3)(@types/pg@8.20.0)(better-sqlite3@13.0.1)(mysql2@3.15.3)(pg@8.22.0)(postgres@3.4.7)(valibot@1.4.2(typescript@7.0.2))(zod@4.4.3)
+        version: 1.0.0-rc.4(@electric-sql/pglite@0.4.3)(@types/pg@8.20.3)(better-sqlite3@13.0.1)(mysql2@3.15.3)(pg@8.22.0)(postgres@3.4.7)(valibot@1.4.2(typescript@7.0.2))(zod@4.4.3)
       pg:
         specifier: 'catalog:'
         version: 8.22.0
@@ -2337,8 +2337,8 @@ packages:
   '@types/node@26.1.1':
     resolution: {integrity: sha512-nxAkRSVkN1Y0JC1W8ky/fTfkGsMmcrRsbx+3XoZE+rMOX71kLYTV7fLXpqud1GpbpP5TuffXFqfX7fH2GgZREw==}
 
-  '@types/pg@8.20.0':
-    resolution: {integrity: sha512-bEPFOaMAHTEP1EzpvHTbmwR8UsFyHSKsRisLIHVMXnpNefSbGA1bD6CVy+qKjGSqmZqNqBDV2azOBo8TgkcVow==}
+  '@types/pg@8.20.3':
+    resolution: {integrity: sha512-4Tvg+HO6+oQaAkpT8GTYoSExzpGGZz532GXgbbCElWJQeQdMozBWxEKNBhJJpHFjWXsMxqPbyypvj/89FWNoSQ==}
 
   '@types/react@19.2.17':
     resolution: {integrity: sha512-MXfmqaVPEVgkBT/aY0aGCkRWWtByiYQXo3xdQ8r5RzuFrPiRn8Gar2tQdXSUQ2GKV3bkXckek89V8wQBY2Q/Aw==}
@@ -6422,7 +6422,7 @@ snapshots:
     dependencies:
       undici-types: 8.3.0
 
-  '@types/pg@8.20.0':
+  '@types/pg@8.20.3':
     dependencies:
       '@types/node': 26.1.1
       pg-protocol: 1.15.0
@@ -7239,10 +7239,10 @@ snapshots:
 
   dotenv@17.4.2: {}
 
-  drizzle-orm@1.0.0-rc.4(@electric-sql/pglite@0.4.3)(@types/pg@8.20.0)(better-sqlite3@13.0.1)(mysql2@3.15.3)(pg@8.22.0)(postgres@3.4.7)(valibot@1.4.2(typescript@7.0.2))(zod@4.4.3):
+  drizzle-orm@1.0.0-rc.4(@electric-sql/pglite@0.4.3)(@types/pg@8.20.3)(better-sqlite3@13.0.1)(mysql2@3.15.3)(pg@8.22.0)(postgres@3.4.7)(valibot@1.4.2(typescript@7.0.2))(zod@4.4.3):
     optionalDependencies:
       '@electric-sql/pglite': 0.4.3
-      '@types/pg': 8.20.0
+      '@types/pg': 8.20.3
       better-sqlite3: 13.0.1
       mysql2: 3.15.3
       pg: 8.22.0
