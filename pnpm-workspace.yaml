@@ -33,7 +33,7 @@ catalog:
   # pinning; 8.20.0 is the newest release past it.
   "@types/pg": 8.20.3
   "@vitest/coverage-v8": 4.1.10
-  better-sqlite3: 13.0.1
+  better-sqlite3: 13.0.2
   # Ranged peer, exact catalog pin: we subclass drizzle internals
   # (`_prepare`, the `entityKind` brand), so bumps are deliberate.
   drizzle-orm: 1.0.0-rc.4
