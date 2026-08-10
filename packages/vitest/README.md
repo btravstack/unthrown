@@ -34,7 +34,7 @@ expect(Err(new NotFound({ id: 1, msg: "x" }))).toBeErrTagged(
 await expect(fromPromise(load(), qualify)).toBeOk();
 ```
 
-Matchers: `toBeOk`, `toBeOkWith`, `toBeErr`, `toBeErrWith`, `toBeErrTagged(tag, expected?)`, `toBeDefect`.
+Matchers: `toBeOk`, `toBeOkWith`, `toBeErr`, `toBeErrWith`, `toBeErrTagged(tag, expected?)`, `toBeDefect`, `toBeDefectWith(cause)`.
 
 > [!WARNING]
 > For an `AsyncResult` the matcher is asynchronous — you **must** `await` the

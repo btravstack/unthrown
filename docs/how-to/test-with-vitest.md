@@ -33,6 +33,7 @@ test("matchers", () => {
   expect(Err("e")).toBeErr();
   expect(Err(new NotFound())).toBeErrTagged("NotFound");
   expect(aDefect).toBeDefect();
+  expect(aDefect).toBeDefectWith(expect.any(TypeError)); // assert the cause
 
   expect(Ok(1)).not.toBeErr(); // negations work too
 });
@@ -47,6 +48,7 @@ test("matchers", () => {
 | `toBeErrTagged(tag)`           | the result is `Err` whose error has `_tag === tag`                                                |
 | `toBeErrTagged(tag, expected)` | …and its payload matches `expected` (exact for a plain object, partial for an asymmetric matcher) |
 | `toBeDefect()`                 | the result is a `Defect`                                                                          |
+| `toBeDefectWith(cause)`        | the result is a `Defect` whose `cause` deep-equals `cause`                                        |
 
 ## Assert on a tagged error's payload
 

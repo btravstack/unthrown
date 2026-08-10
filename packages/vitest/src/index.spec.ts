@@ -120,6 +120,20 @@ describe("toBeDefect", () => {
   });
 });
 
+describe("toBeDefectWith", () => {
+  it("compares the defect cause deeply", () => {
+    expect(aDefect).toBeDefectWith(boom);
+    expect(aDefect).not.toBeDefectWith(new Error("other"));
+    expect(Ok(1)).not.toBeDefectWith(boom);
+    expect(Err("e")).not.toBeDefectWith("e");
+  });
+
+  it("accepts an asymmetric matcher, since a cause is unknown by design", () => {
+    expect(aDefect).toBeDefectWith(expect.any(Error));
+    expect(aDefect).not.toBeDefectWith(expect.any(TypeError));
+  });
+});
+
 describe("AsyncResult matchers (await required)", () => {
   it("awaits the AsyncResult before asserting", async () => {
     await expect(fromSafePromise(Promise.resolve(1))).toBeOk();
@@ -236,6 +250,9 @@ describe("failure messages", () => {
       expect(Err(new MyError({ code: 1 }))).toBeErrTagged("MyError", { code: 2 }),
     ).toThrowError(/to be Err tagged "MyError" matching/);
     expect(() => expect(Ok(1)).toBeDefect()).toThrowError(/to be a Defect, but got Ok\(1\)/);
+    expect(() => expect(Ok(1)).toBeDefectWith(boom)).toThrowError(
+      /to be a Defect caused by \[Error: boom\], but got Ok\(1\)/,
+    );
   });
 
   it("reports a clear message for a non-Result value", () => {
@@ -256,5 +273,8 @@ describe("failure messages", () => {
       /not to be Err tagged "MyError"/,
     );
     expect(() => expect(aDefect).not.toBeDefect()).toThrowError(/not to be a Defect/);
+    expect(() => expect(aDefect).not.toBeDefectWith(boom)).toThrowError(
+      /not to be a Defect caused by \[Error: boom\]/,
+    );
   });
 });

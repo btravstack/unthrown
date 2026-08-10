@@ -679,7 +679,7 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   exhaustiveness guarantee can never vary with a consumer-resolved third-party
   version, and nothing needs installing alongside `unthrown`)
 - `packages/vitest` → `@unthrown/vitest` (peerDep `vitest`; besides the
-  `expect.extend` registration it also exports the six raw matcher functions,
+  `expect.extend` registration it also exports the seven raw matcher functions,
   `failOnForgottenAwait`, and the `UnthrownMatchers` type — for manual
   `expect.extend` wiring)
 - `packages/effect` → `@unthrown/effect` (peerDep `effect`)
@@ -1054,7 +1054,10 @@ channel?**
    same list `TaggedErrorInstance` omits — because a subclass's documented
    `override message = "…"` lands as an own **enumerable** property and would
    otherwise leak into the exact form, breaking the very pattern Thesis #4
-   prescribes), `toBeDefect`, registered
+   prescribes), `toBeDefect`, `toBeDefectWith` (the defect-channel mirror of
+   `toBeErrWith` — a deep compare of the `cause`, typed `unknown` because that
+   is what a defect's cause is; there is no tag-aware variant, since nothing
+   reaches that channel through a typed error), registered
    via `expect.extend`
    and augmenting Vitest's `Matchers` interface. They detect a thenable
    `AsyncResult` and await internally, so a test reads

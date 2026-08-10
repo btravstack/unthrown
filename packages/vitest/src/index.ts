@@ -338,9 +338,32 @@ function toBeDefect(this: MatcherState, received: unknown): MatcherResult {
   });
 }
 
-expect.extend({ toBeDefect, toBeErr, toBeErrTagged, toBeErrWith, toBeOk, toBeOkWith });
+function toBeDefectWith(this: MatcherState, received: unknown, expected: unknown): MatcherResult {
+  const { stringify } = this.utils;
+  const { equals } = this;
+  return settle("toBeDefectWith", this, received, (result) => {
+    const pass = isDefect(result) && equals(result.cause, expected);
+    return {
+      pass,
+      message: () =>
+        pass
+          ? `expected result not to be a Defect caused by ${stringify(expected)}`
+          : `expected result to be a Defect caused by ${stringify(expected)}, but got ${render(result, stringify)}`,
+    };
+  });
+}
 
-export { toBeDefect, toBeErr, toBeErrTagged, toBeErrWith, toBeOk, toBeOkWith };
+expect.extend({
+  toBeDefect,
+  toBeDefectWith,
+  toBeErr,
+  toBeErrTagged,
+  toBeErrWith,
+  toBeOk,
+  toBeOkWith,
+});
+
+export { toBeDefect, toBeDefectWith, toBeErr, toBeErrTagged, toBeErrWith, toBeOk, toBeOkWith };
 
 /**
  * The matchers `@unthrown/vitest` contributes to Vitest's `expect`. For an
@@ -397,6 +420,15 @@ export type UnthrownMatchers<R = unknown> = {
   toBeErrWith: (expected: unknown) => R;
   /** `expect(result).toBeDefect()` asserts the result is a `Defect`. */
   toBeDefect: () => R;
+  /**
+   * Assert a `Defect` whose `cause` is deeply equal to `expected`.
+   *
+   * `expected` is `unknown` because a defect's cause is — nothing is thrown
+   * through a typed channel, so there is no tighter type to give it and no
+   * tag-aware variant to add. An asymmetric matcher works as elsewhere:
+   * `expect(result).toBeDefectWith(expect.any(TypeError))`.
+   */
+  toBeDefectWith: (expected: unknown) => R;
 };
 
 declare module "vitest" {
