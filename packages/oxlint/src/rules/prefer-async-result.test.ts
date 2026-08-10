@@ -40,19 +40,22 @@ ruleTester.run("prefer-async-result", preferAsyncResult, {
       errors: [{ messageId: "preferAsyncResult" }],
       output: `import type { Result, AsyncResult } from "unthrown";\ntype T = AsyncResult<number, MyError>;`,
     },
-    // A type-only import takes the specifier just the same — the rewrite only
-    // uses `AsyncResult` in type position.
+    // A VALUE import declaration with an inline `type` specifier: the inserted
+    // specifier must carry its own `type` qualifier. Under
+    // `verbatimModuleSyntax` a bare `AsyncResult` here would make the whole
+    // declaration value-bearing, emitting a runtime `import "unthrown"` the
+    // file never had.
     {
       code: `import { type Result } from "unthrown";\ntype T = Promise<Result<number, MyError>>;`,
       errors: [{ messageId: "preferAsyncResult" }],
-      output: `import { type Result, AsyncResult } from "unthrown";\ntype T = AsyncResult<number, MyError>;`,
+      output: `import { type Result, type AsyncResult } from "unthrown";\ntype T = AsyncResult<number, MyError>;`,
     },
     // A mixed value/type import takes the specifier at the end, after the
     // last one, whatever the existing spelling.
     {
       code: `import { Ok, type Result } from "unthrown";\ntype T = Promise<Result<number, MyError>>;\nexport { Ok };`,
       errors: [{ messageId: "preferAsyncResult" }],
-      output: `import { Ok, type Result, AsyncResult } from "unthrown";\ntype T = AsyncResult<number, MyError>;\nexport { Ok };`,
+      output: `import { Ok, type Result, type AsyncResult } from "unthrown";\ntype T = AsyncResult<number, MyError>;\nexport { Ok };`,
     },
     // A RENAMED `Result` still resolves (resolution goes through the imported
     // name), and the added specifier is the plain `AsyncResult`.

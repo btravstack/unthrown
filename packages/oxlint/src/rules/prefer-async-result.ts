@@ -74,7 +74,10 @@ const nameIsTaken = (scope: Scope): boolean => {
  * Autofixable. When `AsyncResult` is not already in scope the fix **adds the
  * specifier** to an existing `unthrown` import as well as rewriting the
  * annotation — the common case, since a file that imports `Result` trips the
- * rule without ever having needed `AsyncResult`.
+ * rule without ever having needed `AsyncResult`. The added specifier carries a
+ * `type` qualifier unless the declaration is already `import type { … }`, so
+ * the fix never turns a types-only import into a value one (which under
+ * `verbatimModuleSyntax` would emit a runtime import the file never had).
  *
  * The fix is withheld in four situations, each because applying it would
  * produce code that does not compile or does not mean what it says:
@@ -189,7 +192,18 @@ export const preferAsyncResult = defineRule({
               // because `noUncheckedIndexedAccess` types the access as
               // possibly-undefined.
               if (last === undefined) return rewrite;
-              return [rewrite, fixer.insertTextAfter(last, ", AsyncResult")];
+              // Carry a `type` qualifier unless the declaration is already
+              // `import type { … }`, where every specifier is a type and
+              // repeating it is a syntax error.
+              //
+              // This matters under `verbatimModuleSyntax` (which this repo's
+              // shared tsconfig enables): adding a bare `AsyncResult` to a
+              // value declaration like `import { type Result } from "unthrown"`
+              // makes the declaration value-bearing, so TypeScript emits a
+              // runtime `import "unthrown"` the file never had — an autofix
+              // that silently adds a runtime dependency to a types-only module.
+              const qualifier = declaration.importKind === "type" ? "" : "type ";
+              return [rewrite, fixer.insertTextAfter(last, `, ${qualifier}AsyncResult`)];
             },
           }),
         });

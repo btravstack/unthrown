@@ -133,6 +133,18 @@ import type { Result, AsyncResult } from "unthrown";
 That covers the common case: a file imports `Result`, which is what trips the
 rule, and has never needed `AsyncResult`.
 
+The added specifier is `type`-qualified unless the declaration is already
+`import type { … }`, so a types-only import stays types-only — under
+[`verbatimModuleSyntax`](https://www.typescriptlang.org/tsconfig/#verbatimModuleSyntax)
+a bare specifier would make the declaration value-bearing and emit a runtime
+import the file never had:
+
+```ts
+// before  ─ `--fix` ─▶  after
+import { type Result } from "unthrown";
+import { type Result, type AsyncResult } from "unthrown";
+```
+
 The fix is withheld where applying it would not compile or would not mean what it
 says — the rule still reports:
 
