@@ -6,9 +6,10 @@ description: Write and review TypeScript that uses the unthrown library — erro
 # unthrown
 
 Errors as values for TypeScript, with a separate **defect channel** for the
-unexpected. Ordinary errors are _unthrown_ — returned as values; only a true
-defect ever throws (at extraction — `getOrThrow` being the one deliberate
-escape hatch that throws a modeled error). Zero runtime dependencies; the
+unexpected. Ordinary errors are _unthrown_ — returned as values;
+only a true defect ever throws (at extraction). `getOrThrow` is the one
+deliberate escape that throws a _modeled_ error — a test-and-script tool, not a
+production one. Zero runtime dependencies; the
 exhaustive matcher (`match` / `P`) is built in.
 
 Full docs: https://btravstack.github.io/unthrown/
@@ -169,8 +170,9 @@ Extractors (when a fold is overkill): `get()` compiles **only** on
 channel first. `getOr(fallback)` / `getOrElse(f)` / `getOrNull()` /
 `getOrUndefined()` recover an `Err` to a fallback. **All of them panic
 (rethrow the cause) on a Defect** — a defect is a bug, not an absent value.
-`getOrThrow()` throws the modeled error as-is (the sanctioned escape hatch
-under a `no-throw` lint rule); it compiles only when `E` is non-empty. The
+`getOrThrow()` throws the modeled error as-is; it compiles only when `E` is
+non-empty. Use it in **tests**, not production — fold with `recoverErrCases` +
+`get` there (the opt-in `no-get-or-throw` rule enforces it). The
 removed v4 names `unwrap*` / `orElse` / `recover` / `matchTags` do not exist.
 
 ## AsyncResult: sync callbacks, boundaries for async work
@@ -221,20 +223,21 @@ tag is namespaced (`TaggedError("pkg/NotFound", { name: "NotFound" })`).
 
 ## Mistakes agents make (habits from neverthrow/Effect/fp-ts)
 
-| Habit                                                                          | In unthrown                                                                                         |
-| ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
-| `mapErr((e) => …)`, `orElse`, `andThen`                                        | Don't exist. `mapErrCases`/`flatMapErrCases` with the matcher; `flatMap`.                           |
-| `r.unwrap()` / `unwrapOr(x)`                                                   | Removed. `get()` (needs `E = never`) / `getOr(x)`.                                                  |
-| `Option` / `Some` / `None`                                                     | No Option. `T \| undefined`, `Result<T, NotFound>`, `fromNullable`.                                 |
-| `try { pipeline } catch`                                                       | Never needed — throws become Defects; `match`'s `defect` arm is the catch.                          |
-| `Result<T, unknown>` / `Result<T, Error>`                                      | Banned (lint: `no-ambiguous-error-type`). Model concrete cases.                                     |
-| `async (v) => …` inside `map`/`flatMap`/matcher branches                       | Compile error by design. Use `fromPromise` + `flatMap`.                                             |
-| `.with(P._, …)` as a default fallback                                          | Enumerate or group cases; `P._` only for generic-`E` helpers, with a lint-disable + reason.         |
-| Constructing a Defect (`Defect(x)`)                                            | No constructor. `throw` (the net catches it) or the injected `defect` helper at triage sites.       |
-| `message` in a TaggedError payload                                             | Reserved. `override message = …` on the class; context goes in typed fields.                        |
-| `tap((v) => auditLog.record(v))` where the effect returns a Result/AsyncResult | Effect outcome silently dropped/floats. Use `flatTap` on the matching surface.                      |
-| Serializing a Result (JSON, structuredClone)                                   | Unsupported by design. `match` at the boundary; re-enter via constructors on the other side.        |
-| `throw` in app code for known failures                                         | Return `Err(...)`. `throw` is for genuine defects only (the opt-in `no-throw` rule bans even that). |
+| Habit                                                                          | In unthrown                                                                                                                                                                                     |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mapErr((e) => …)`, `orElse`, `andThen`                                        | Don't exist. `mapErrCases`/`flatMapErrCases` with the matcher; `flatMap`.                                                                                                                       |
+| `r.unwrap()` / `unwrapOr(x)`                                                   | Removed. `get()` (needs `E = never`) / `getOr(x)`.                                                                                                                                              |
+| `Option` / `Some` / `None`                                                     | No Option. `T \| undefined`, `Result<T, NotFound>`, `fromNullable`.                                                                                                                             |
+| `try { pipeline } catch`                                                       | Never needed — throws become Defects; `match`'s `defect` arm is the catch.                                                                                                                      |
+| `Result<T, unknown>` / `Result<T, Error>`                                      | Banned (lint: `no-ambiguous-error-type`). Model concrete cases.                                                                                                                                 |
+| `async (v) => …` inside `map`/`flatMap`/matcher branches                       | Compile error by design. Use `fromPromise` + `flatMap`.                                                                                                                                         |
+| `.with(P._, …)` as a default fallback                                          | Enumerate or group cases; `P._` only for generic-`E` helpers, with a lint-disable + reason.                                                                                                     |
+| Constructing a Defect (`Defect(x)`)                                            | No constructor. `throw` (the net catches it) or the injected `defect` helper at triage sites.                                                                                                   |
+| `message` in a TaggedError payload                                             | Reserved. `override message = …` on the class; context goes in typed fields.                                                                                                                    |
+| `tap((v) => auditLog.record(v))` where the effect returns a Result/AsyncResult | Effect outcome silently dropped/floats. Use `flatTap` on the matching surface.                                                                                                                  |
+| Serializing a Result (JSON, structuredClone)                                   | Unsupported by design. `match` at the boundary; re-enter via constructors on the other side.                                                                                                    |
+| `throw` in app code for known failures                                         | Return `Err(...)`. `throw` is for genuine defects only (the opt-in `no-throw` rule bans even that).                                                                                             |
+| `getOrThrow()` in production code                                              | Throws the modeled error, ending errors-as-values at the last step. Fold with `recoverErrCases` + `get`. Fine in tests (the opt-in `no-get-or-throw` rule exempts them via oxlint `overrides`). |
 
 ## References
 

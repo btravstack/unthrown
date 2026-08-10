@@ -4,7 +4,7 @@
 > is an [oxlint](https://oxc.rs/docs/guide/usage/linter) plugin that turns
 > unthrown's theses into automated checks the type system can't enforce on its
 > own — a lazy `E`, a dropped `Result`, a blanket `P._`, an ignored matcher, a
-> raw `throw`.
+> raw `throw`, a thrown-away error channel.
 
 ```sh
 pnpm add -D @unthrown/oxlint oxlint
@@ -24,15 +24,22 @@ Register the plugin and turn its rules on in your `.oxlintrc.json`:
     "unthrown/prefer-async-result": "error",
     "unthrown/prefer-ensure": "error",
     "unthrown/no-throw": "error",
+    "unthrown/no-get-or-throw": "error",
     "unthrown/no-catch-all-pattern": "error"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.spec.ts"],
+      "rules": { "unthrown/no-get-or-throw": "off" }
+    }
+  ]
 }
 ```
 
 The default export also exposes a `recommended` preset — an oxlint config that
 registers the plugin and enables `no-ambiguous-error-type`, `no-unhandled-result`,
 `no-unused-matcher`, `prefer-async-result`, and `no-catch-all-pattern`
-(`prefer-ensure` and `no-throw` are the two explicit opt-ins) — for setups that
+(`prefer-ensure`, `no-throw` and `no-get-or-throw` are the three explicit opt-ins) — for setups that
 build their config programmatically (`import unthrown from "@unthrown/oxlint"` →
 `unthrown.recommended`).
 
@@ -230,13 +237,76 @@ function parse(input: string) {
 ```
 
 Every sanctioned form is a call, not a statement, so the rule stays clean on them: a
-modeled failure → `return Err(...)`; extraction that must surface the modeled error
-as a throw → [`getOrThrow()`](../reference/combinators#eliminating-a-result); a
+modeled failure → `return Err(...)`; a failure that is genuinely unmodeled here →
+fold it into the defect channel with
+[`recoverErrCases`](../reference/combinators#the-error-channel) +
+[`get`](../reference/combinators#eliminating-a-result); a
 known-technical precondition throw → keep it in a plain helper wrapped **once** with
 [`fromSafeThrowable`](./qualify-a-boundary); a genuinely deliberate remaining
 `throw` → a targeted `// oxlint-disable-next-line unthrown/no-throw -- <reason>`
 comment. The rule has no options and no autofix — the disable comment is the escape
 hatch.
+
+### `unthrown/no-get-or-throw` {#no-get-or-throw}
+
+**An opt-in rule** — the other half of `no-throw`. `getOrThrow()` extracts `T`
+but **throws the modeled error as-is** on `Err`, which abandons
+errors-as-values at the very last step: a caller of the enclosing function sees
+a throw, not a channel, and every guarantee the exhaustive matcher bought
+upstream is gone.
+
+```ts
+const user = findUser(id).getOrThrow(); // ✗ flagged
+```
+
+Fold the error channel instead. `recoverErrCases` empties `E`, so `get()`
+compiles, and a case routed to the injected `defect(...)` panics with its
+original cause — with every case still named:
+
+```ts
+const user = findUser(id)
+  .recoverErrCases(
+    (matcher, defect) =>
+      matcher
+        .with(P.tag("NotFound"), () => anonymousUser) // ✓ recovered to a value
+        .with(P.tag("Denied"), (e) => defect(e)), //    ✓ genuinely unmodeled here
+  )
+  .get();
+```
+
+The rule matches a **zero-argument** `.getOrThrow()` member call, so Effect's
+one-argument `Option.getOrThrow(o)` / `Either.getOrThrow(e)` are left alone. A
+computed access (`r["getOrThrow"]()`) and a detached reference
+(`const f = r.getOrThrow`) are documented misses — both are deliberate
+evasions, and the `oxlint-disable` comment is the sanctioned escape.
+
+#### Keeping it in tests
+
+`getOrThrow()` is the right tool in a test, where "this `Result` had better be
+`Ok`" _is_ the assertion and a throw is the correct failure mode. The rule has
+no `allow` option on purpose — oxlint's own `overrides` already does this, and
+works with whatever glob your tests use:
+
+```json
+{
+  "rules": { "unthrown/no-get-or-throw": "error" },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.spec.ts"],
+      "rules": { "unthrown/no-get-or-throw": "off" }
+    }
+  ]
+}
+```
+
+#### Stacking with `no-throw`
+
+The two rules close different doors, and enabling both closes the room:
+
+|                           | `no-throw` off  | `no-throw` on                                     |
+| ------------------------- | --------------- | ------------------------------------------------- |
+| **`no-get-or-throw` off** | escapes: both   | escape: `getOrThrow()`                            |
+| **`no-get-or-throw` on**  | escape: `throw` | **no escape — fold with `recoverErrCases`+`get`** |
 
 ### `unthrown/no-catch-all-pattern` {#no-catch-all-pattern}
 
