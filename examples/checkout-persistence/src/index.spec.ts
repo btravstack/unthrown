@@ -1,5 +1,5 @@
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import { beforeEach, expect, test } from "vitest";
+import { afterEach, beforeEach, expect, test } from "vitest";
 import "@unthrown/vitest";
 
 import { PrismaClient } from "./generated/prisma/client.js";
@@ -15,19 +15,49 @@ const DDL = [
   `CREATE UNIQUE INDEX "Order_cartId_key" ON "Order"("cartId")`,
 ];
 
-// An in-memory database per test: no file, no server, nothing to clean up.
+// An in-memory database per test: no file, no server, nothing to clean up
+// beyond the client itself — see the `afterEach` below. Copying this fixture
+// into a server-backed suite without that teardown would leak a connection
+// per test.
 const client = () => new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: ":memory:" }) });
 
+let db: PrismaClient;
 let repo: ReturnType<typeof createRepository>;
 
 beforeEach(async () => {
-  const db = client();
+  db = client();
   for (const stmt of DDL) await db.$executeRawUnsafe(stmt);
   repo = createRepository(db);
 });
 
+afterEach(async () => {
+  await db.$disconnect();
+});
+
 test("a missing cart is a modelled CartNotFound, not a defect", async () => {
   await expect(repo.findCart("nope")).toBeErrTagged("CartNotFound", { cartId: "nope" });
+});
+
+test("a found cart maps every line back, including unitPrice", async () => {
+  await db.cart.create({
+    data: {
+      id: "cart_1",
+      lines: {
+        create: [
+          { sku: "COFFEE-1KG", quantity: 2, unitPrice: 12_00 },
+          { sku: "MUG", quantity: 1, unitPrice: 5_00 },
+        ],
+      },
+    },
+  });
+
+  await expect(repo.findCart("cart_1")).toBeOkWith({
+    id: "cart_1",
+    lines: [
+      { sku: "COFFEE-1KG", quantity: 2, unitPrice: 12_00 },
+      { sku: "MUG", quantity: 1, unitPrice: 5_00 },
+    ],
+  });
 });
 
 test("saving the same cart's order twice is a modelled unique violation", async () => {

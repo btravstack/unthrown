@@ -19,7 +19,7 @@ const LINE = { sku: "COFFEE-1KG", quantity: 2, unitPrice: 12_00 };
  */
 const deps = (over: Partial<CheckoutDeps> = {}): CheckoutDeps => ({
   findCart: (id) => Ok({ id, lines: [LINE] } satisfies Cart).toAsync(),
-  reserve: () => Ok(undefined),
+  reserve: () => Ok(),
   charge: () => Ok({ reference: "pay_123" }).toAsync(),
   ...over,
 });

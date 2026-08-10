@@ -93,13 +93,34 @@ exception. `createCaller` deliberately routes every call through a real
 `RPCHandler`/`RPCLink` loop (in-memory, no socket) rather than oRPC's
 in-process shortcut, because that collapse only happens once a call crosses a
 genuine transport boundary — the same reason
-[`@unthrown/orpc`'s own suite](https://github.com/btravstack/unthrown/tree/main/packages/orpc/src/index.spec.ts)
+[`@unthrown/orpc`'s own suite](https://github.com/btravstack/unthrown/blob/main/packages/orpc/src/index.spec.ts)
 tests it that way. The payoff: an unmodelled failure still cannot escape as an
 unhandled rejection — it always arrives as a typed, catchable error, just not
 one you were meant to handle in `mapErrCases`.
 
 See [the oRPC guide](../how-to/use-with-orpc) for the full server/client
 bridge.
+
+## A fifth outcome, that is not a domain case at all
+
+`router.ts` also declares `input(z.object({ cartId: z.string().min(1) }))`.
+An empty `cartId` never reaches `placeOrder` — oRPC rejects it during its own
+input validation, before the handler runs at all. The rejection happens to
+carry the same `BAD_REQUEST` code as `CartEmpty` (both were declared in the
+same `.errors({...})` call), but it is not one of `E`'s four cases and no arm
+in `mapErrCases` produced it:
+
+```ts
+await expect(caller.placeOrder({ cartId: "" })).rejects.toMatchObject({
+  code: "BAD_REQUEST",
+  message: "Input validation failed",
+});
+```
+
+The message is the tell — `"Input validation failed"`, not `"cart … has no
+lines"`. A domain's `E` and a transport's input contract are two different
+things that can coincidentally share a status code; only `E` is the one
+`unthrown` makes exhaustive.
 
 ## Where to go next
 

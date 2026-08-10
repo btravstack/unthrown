@@ -245,9 +245,6 @@ importers:
       '@btravstack/tsconfig':
         specifier: 'catalog:'
         version: 0.2.0
-      '@types/node':
-        specifier: 'catalog:'
-        version: 26.1.2
       '@unthrown/vitest':
         specifier: workspace:*
         version: link:../../packages/vitest

@@ -49,21 +49,26 @@ const reserveAll = (
  * a bug in `totalOf` — is not in this type, and arrives as a `Defect`.
  *
  * `Do`/`bind` sequences the steps in an accumulating scope, so each step sees
- * the previous ones by name and any `Err` short-circuits the rest.
+ * the previous ones by name and any `Err` short-circuits the rest. `ensure`
+ * validates the cart in place — no separate step just to rename the same
+ * value — widening `E` from `CartNotFound` to `CartNotFound | CartEmpty`.
  */
 export const placeOrder = (
   deps: CheckoutDeps,
   cartId: string,
 ): AsyncResult<Order, CartNotFound | CartEmpty | OutOfStock | PaymentDeclined> =>
   DoAsync()
-    .bind("cart", () => deps.findCart(cartId))
-    .bind("nonEmpty", ({ cart }) =>
-      cart.lines.length === 0 ? Err(new CartEmpty({ cartId })) : Ok(cart.lines),
+    .bind("cart", () =>
+      deps.findCart(cartId).ensure(
+        (c) => c.lines.length > 0,
+        () => new CartEmpty({ cartId }),
+      ),
     )
-    .bind("lines", ({ nonEmpty }) => reserveAll(deps, nonEmpty))
-    .bind("payment", ({ lines }) => deps.charge(totalOf(lines)))
-    .map(({ lines, payment }) => ({
+    .bind("lines", ({ cart }) => reserveAll(deps, cart.lines))
+    .let("total", ({ lines }) => totalOf(lines))
+    .bind("payment", ({ total }) => deps.charge(total))
+    .map(({ lines, payment, total }) => ({
       id: `order_${payment.reference}`,
-      total: totalOf(lines),
+      total,
       lines,
     }));

@@ -14,9 +14,11 @@ model one small checkout between them, each showing a different job
 covered by tests.** There is no database and no server to start:
 
 ```sh
+git clone https://github.com/btravstack/unthrown.git
+cd unthrown
 pnpm install
-pnpm test
-pnpm typecheck
+pnpm --filter "@unthrown/example-*" test
+pnpm --filter "@unthrown/example-*" typecheck
 ```
 
 ## [Checkout domain](/examples/checkout-domain)
@@ -34,8 +36,9 @@ only the P-codes a caller would actually branch on.
 ## [Checkout API](/examples/checkout-api)
 
 The edge: `placeOrder` served over oRPC with `@unthrown/orpc` — one exhaustive
-`mapErrCases`, a handler with no `try`/`catch`, and a provider outage that
-collapses to `INTERNAL_SERVER_ERROR` instead of an unhandled rejection.
+`mapErrCases`, a handler with no `try`/`catch`, a provider outage that
+collapses to `INTERNAL_SERVER_ERROR` instead of an unhandled rejection, and
+why oRPC's own input validation is a separate concern from `E`.
 
 ## Why these exist as packages rather than snippets
 

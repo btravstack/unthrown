@@ -99,6 +99,13 @@ defect, so the edge of your program needs a single `match` and no `try`/`catch`.
 | [`@unthrown/standard-schema`](./packages/standard-schema) | `fromSchema` / `fromSchemaAsync`: any Standard Schema validator into a `Result`.                                                                                  |
 | [`@unthrown/oxlint`](./packages/oxlint)                   | oxlint plugin: `no-ambiguous-error-type`, `no-catch-all-pattern`, `no-unhandled-result`, `no-unused-matcher`, `prefer-async-result`, `no-throw`, `prefer-ensure`. |
 
+## Examples
+
+Three small runnable packages under [`./examples`](./examples) model one
+checkout end to end — the domain, `@unthrown/prisma` persistence, and an oRPC
+edge — each compiled and covered by tests, unlike the snippets above. See the
+[annotated walkthroughs](https://btravstack.github.io/unthrown/examples/).
+
 ## Contributing
 
 This is a pnpm + turbo monorepo. Common tasks:
