@@ -244,7 +244,7 @@ tag is namespaced (`TaggedError("pkg/NotFound", { name: "NotFound" })`).
   facade namespaces (`Result.*`/`AsyncResult.*`), and utility types. Read when
   choosing a combinator or writing anything beyond the basics above.
 - **[references/ecosystem.md](references/ecosystem.md)** — the `@unthrown/*`
-  satellite packages: vitest matchers (`toBeOk`/`toBeErrTagged`/…), the seven
+  satellite packages: vitest matchers (`toBeOk`/`toBeErrTagged`/…), the eight
   oxlint rules, Prisma extension (`try*` delegates), Drizzle database
   (replaces the stock one — no `try*`), oRPC bridge,
   standard-schema validation, and the effect/neverthrow/boxed interop bridges.
