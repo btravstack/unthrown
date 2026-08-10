@@ -13,7 +13,7 @@ catalog:
   "@btravstack/commitlint": 0.1.0
   "@btravstack/lefthook": 0.1.1
   "@btravstack/oxlint": 0.2.1
-  "@btravstack/theme": 1.7.0
+  "@btravstack/theme": 2.0.0
   "@btravstack/tsconfig": 0.2.0
   "@btravstack/typedoc": 0.1.0
   "@changesets/cli": 2.31.1
