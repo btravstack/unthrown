@@ -11,7 +11,7 @@ reading the cart from [Checkout domain](./checkout-domain) against a real
 (in-memory) database.
 
 ```sh
-pnpm --filter @unthrown/example-checkout-persistence test
+pnpm turbo run test --filter=@unthrown/example-checkout-persistence
 ```
 
 ## A read infers `E = never`

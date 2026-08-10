@@ -10,7 +10,7 @@ description: Errors as values in a small checkout domain — a TaggedError union
 pin both.
 
 ```sh
-pnpm --filter @unthrown/example-checkout-domain test
+pnpm turbo run test --filter=@unthrown/example-checkout-domain
 ```
 
 ## The signature is the documentation

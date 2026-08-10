@@ -16,6 +16,6 @@ tests**. There is no database and no server to start:
 
 ```sh
 pnpm install
-pnpm --filter "@unthrown/example-*" test
-pnpm --filter "@unthrown/example-*" typecheck
+pnpm turbo run test --filter="@unthrown/example-*"
+pnpm turbo run typecheck --filter="@unthrown/example-*"
 ```

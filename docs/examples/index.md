@@ -17,8 +17,8 @@ covered by tests.** There is no database and no server to start:
 git clone https://github.com/btravstack/unthrown.git
 cd unthrown
 pnpm install
-pnpm --filter "@unthrown/example-*" test
-pnpm --filter "@unthrown/example-*" typecheck
+pnpm turbo run test --filter="@unthrown/example-*"
+pnpm turbo run typecheck --filter="@unthrown/example-*"
 ```
 
 ## [Checkout domain](/examples/checkout-domain)

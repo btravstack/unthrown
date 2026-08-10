@@ -10,7 +10,7 @@ description: Serving placeOrder over oRPC with @unthrown/orpc — an exhaustive 
 over oRPC with `@unthrown/orpc`, tested through a real request/response cycle.
 
 ```sh
-pnpm --filter @unthrown/example-checkout-api test
+pnpm turbo run test --filter=@unthrown/example-checkout-api
 ```
 
 ## No `try`/`catch`
