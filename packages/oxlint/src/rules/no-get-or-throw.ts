@@ -23,20 +23,13 @@ import { defineRule } from "@oxlint/plugins";
  * `getOrThrow()` remains legitimate in **tests and scripts**, where "this
  * `Result` had better be `Ok`" is the assertion and a throw is the correct
  * failure mode. The rule is deliberately option-free: exempt those files with
- * oxlint's own `overrides`, which is the host's mechanism for exactly this and
- * works with any test-file convention.
- *
- * ```json
- * {
- *   "rules": { "unthrown/no-get-or-throw": "error" },
- *   "overrides": [
- *     {
- *       "files": ["**\/*.test.ts", "**\/*.spec.ts"],
- *       "rules": { "unthrown/no-get-or-throw": "off" }
- *     }
- *   ]
- * }
- * ```
+ * oxlint's own `overrides` — an entry whose `files` globs your test paths and
+ * turns this rule `"off"` — which is the host's mechanism for exactly this and
+ * works with any test-file convention. The package README and the "Lint your
+ * codebase" guide both carry a copy-pasteable config. (It is deliberately not
+ * inlined here: a recursive glob contains `*` followed by `/`, which would
+ * close this block comment, and escaping it would ship a sample that is wrong
+ * the moment anyone copies it.)
  *
  * Purely syntactic, like the rest of the plugin: a **zero-argument**
  * `.getOrThrow()` member call, with no receiver typing. The arity is the
