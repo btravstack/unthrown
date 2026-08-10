@@ -72,6 +72,25 @@ test("OutOfStock carries the structured detail, and the message is built from it
   expect(message).toBe("2 × COFFEE-1KG requested, 1 available");
 });
 
+// A `Result<void, OutOfStock>` can be in the DEFECT state at runtime — the
+// defect variant is never part of `E`. A reservation step that blows up on its
+// own account must therefore pass through as a Defect, not be mistaken for
+// success: `isErr()` is false for a Defect, so anything that branches only on
+// `isErr` silently swallows it.
+test("a reservation step that throws surfaces as a Defect, not a silent Ok", async () => {
+  const boom = new Error("stock service exploded");
+  const result = await placeOrder(
+    deps({
+      reserve: () =>
+        Ok().map(() => {
+          throw boom;
+        }),
+    }),
+    "cart_1",
+  );
+  await expect(result).toBeDefectWith(boom);
+});
+
 test("a declined payment keeps its code for the edge to branch on", async () => {
   const result = await placeOrder(
     deps({ charge: () => Err(new PaymentDeclined({ code: "card_expired" })).toAsync() }),

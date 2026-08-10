@@ -56,6 +56,48 @@ partial fulfilment — and the human string is defined once on the class rather
 than built at each throw site. See
 [Model errors](../how-to/model-errors).
 
+## The trap `reserveAll` avoids
+
+Reserving every line looks like a job for a loop:
+
+```ts
+// ✗ WRONG — silently destroys the defect channel
+for (const line of lines) {
+  const reserved = deps.reserve(line);
+  if (reserved.isErr()) return Err(reserved.error);
+}
+return Ok(lines);
+```
+
+`isErr()` is **false for a `Defect`**. A `Result<void, OutOfStock>` can be in the
+defect state at runtime — the defect variant is never part of `E` — so a
+reservation that blew up on its own account falls straight through this loop and
+gets reported as `Ok`. The failure vanishes.
+
+Folding with `flatMap` is both shorter and correct:
+
+```ts
+lines
+  .reduce<Result<void, OutOfStock>>(
+    (acc, line) => acc.flatMap(() => deps.reserve(line)),
+    Ok(),
+  )
+  .map(() => lines);
+```
+
+`flatMap` short-circuits on `Err` **and** passes a `Defect` through untouched,
+which is the whole reason to reach for the combinator instead of branching by
+hand. It stays lazy too: after a failure the callback is simply not invoked, so
+later lines are never reserved — which
+[`all`](../reference/combinators) could not do, since it takes an
+already-materialised array.
+
+A test pins it:
+
+```ts
+await expect(result).toBeDefectWith(boom);
+```
+
 ## Where to go next
 
 - Store and read it back: [Checkout persistence](./checkout-persistence).

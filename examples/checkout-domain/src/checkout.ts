@@ -1,4 +1,4 @@
-import { DoAsync, Err, Ok, type AsyncResult, type Result } from "unthrown";
+import { DoAsync, Ok, type AsyncResult, type Result } from "unthrown";
 
 import { CartEmpty, type CartNotFound, type OutOfStock, type PaymentDeclined } from "./errors.js";
 
@@ -27,19 +27,25 @@ const totalOf = (lines: readonly CartLine[]): number =>
 /**
  * Reserve every line, failing on the first that cannot be met.
  *
- * A plain loop, not an aggregate: `all` would evaluate every line and we want
- * the first failure to stop the walk.
+ * A `flatMap` fold, not an aggregate: `all` takes an already-materialised array,
+ * so every `reserve` would have run before it saw the first failure. Folding
+ * keeps the walk lazy — after a failure the callback is simply not invoked.
+ *
+ * And not a hand-rolled loop either. The obvious version —
+ * `for (…) { if (r.isErr()) return Err(r.error) }` — is **wrong**: `isErr()` is
+ * false for a `Defect`, so a reservation that blew up on its own account would
+ * fall through the loop and be reported as `Ok`, silently destroying the defect
+ * channel. `flatMap` short-circuits on `Err` *and* passes a `Defect` through
+ * untouched, which is the whole reason to reach for the combinator rather than
+ * branch by hand.
  */
 const reserveAll = (
   deps: CheckoutDeps,
   lines: readonly CartLine[],
-): Result<readonly CartLine[], OutOfStock> => {
-  for (const line of lines) {
-    const reserved = deps.reserve(line);
-    if (reserved.isErr()) return Err(reserved.error);
-  }
-  return Ok(lines);
-};
+): Result<readonly CartLine[], OutOfStock> =>
+  lines
+    .reduce<Result<void, OutOfStock>>((acc, line) => acc.flatMap(() => deps.reserve(line)), Ok())
+    .map(() => lines);
 
 /**
  * Place an order for a cart.
