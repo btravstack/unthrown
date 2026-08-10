@@ -6,6 +6,7 @@ strictPeerDependencies: true
 
 packages:
   - packages/*
+  - examples/*
   - docs
 
 catalog:
