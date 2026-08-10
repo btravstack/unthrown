@@ -390,12 +390,17 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
   family extracts from a still-fallible `Result` with a fallback, since
   `get`/`getErr` won't compile on it. `getOrThrow` completes the `getOr…`
   family with a **deliberate escape hatch** — it **throws the modeled `error`
-  as-is** on `Err` (and panics on a `Defect`, like the rest of the family). It
-  exists so a `no-throw` lint rule can ban raw `throw` while this one sanctioned
-  extraction remains — the faithful, lint-clean form of
-  `.flatMapErrCases((matcher) => matcher.with(P._, (e) => { throw e })).get()`; it is
-  **off the errors-as-values thesis** by design, so reach for `match` / `recoverErrCases`
-  / `flatMapErrCases` whenever the error can stay a value. It is type-gated as the
+  as-is** on `Err` (and panics on a `Defect`, like the rest of the family). Its
+  home is **tests and scripts**, where "this `Result` had better be `Ok`" is the
+  assertion and a throw is the correct failure mode; it is **off the
+  errors-as-values thesis** by design, so production code folds the channel
+  instead — `recoverErrCases` empties `E` so `get()` compiles, with `match` /
+  `flatMapErrCases` the other two ways to keep the error a value. The opt-in
+  `@unthrown/oxlint` rule `no-get-or-throw` enforces that split, exempting test
+  files through an oxlint `overrides` entry. (It earlier carried the opposite
+  rationale — that it existed so a `no-throw` rule could ban raw `throw` while
+  this one extraction remained. That was withdrawn when `no-get-or-throw`
+  shipped: with both rules on, the reasoning was circular.) It is type-gated as the
   **complement of `get`**: it compiles only when the error channel is **non-empty**
   (`E` is not `never`, spelled `this: [E] extends [never] ? never : Result<T,E>`) —
   on a `Result<T, never>` there is nothing to throw, so `getOrThrow` does not
@@ -686,7 +691,7 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   `Result` via `fromSchema` / `fromSchemaAsync`, with the validation issues as
   the modeled `E`)
 - `packages/oxlint` → `@unthrown/oxlint` (an oxlint **JS plugin**, peerDep
-  `oxlint`, dep `@oxlint/plugins`; ships **seven rules**: `no-ambiguous-error-type`
+  `oxlint`, dep `@oxlint/plugins`; ships **eight rules**: `no-ambiguous-error-type`
   — enforces Thesis #1 against `unknown`/`any`/`Error`/`{}` **and the primitive
   keywords** (`void` included) in `E`, both in a `Result`/`AsyncResult` type
   **annotation** and in the matcher's `returnType<R>()` **pin** — the latter only
@@ -732,8 +737,18 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   deliberately **no escape hatch**: a `…Cases` callback that does not use its
   matcher is never what you meant); and
   `no-throw` (**opt-in**, not in the preset — reports every `throw`
-  statement, pointing at `Err`/`getOrThrow`/`fromSafeThrowable`; this is the
-  `no-throw` rule the `getOrThrow` rationale references); and `prefer-ensure`
+  statement, pointing at `Err` for a modeled failure, `recoverErrCases` + `get`
+  for one that belongs to the defect channel, and `fromSafeThrowable` for a
+  known-technical precondition); `no-get-or-throw` (**also opt-in** — reports
+  `getOrThrow()`, matched as a **zero-argument** member call so Effect's
+  one-argument `Option.getOrThrow(o)` is untouched; a computed access and a
+  detached reference are documented misses. It throws the modeled error,
+  ending errors-as-values at the last step; the replacement is
+  `recoverErrCases` + `get`. Deliberately **option-free**: `getOrThrow()` is
+  right in a test, and oxlint's own `overrides` already exempts a test glob —
+  which is also why it stays out of the preset, being the one rule an existing
+  suite fails until configured. It stacks with `no-throw`: with both on there
+  is no escape left); and `prefer-ensure`
   (**the other opt-in**, report-only with **no autofix** — flags a `flatMap`
   whose success branch returns its own parameter untouched
   (`flatMap((x) => c ? Ok(x) : Err(e))`), a predicate wearing a bind costume:
@@ -747,10 +762,16 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   reversed ternary needs its condition negated and `ensure`'s boolean form
   requires a `boolean` predicate. Unlike every preset rule, the shape it flags
   violates no thesis — it is correct code with a better name available).
-  Purely syntactic AST rules that
-  resolve bindings via scope analysis keyed by the **imported** name (renamed
-  and namespace imports resolve; alias indirection like `type E = unknown` is a
-  documented limit) so they only fire on unthrown's `Result`. No TypeDoc API
+  Purely syntactic AST rules. Most resolve bindings via scope analysis keyed
+  by the **imported** name (renamed and namespace imports resolve; alias
+  indirection like `type E = unknown` is a documented limit), so they only
+  fire on unthrown's `Result`. A few are keyed on a **name or shape** instead,
+  unthrown's own coinage rather than an import: `no-throw` reports the bare
+  language statement itself, with no binding to resolve at all;
+  `no-get-or-throw` matches a zero-argument `.getOrThrow()` member call;
+  `no-unused-matcher` is keyed on the `…Cases` method names alone; and the
+  `returnType<R>()` pin (inside `no-ambiguous-error-type`) is anchored on that
+  call on a `mapErrCases` callback's own matcher parameter. No TypeDoc API
   page; documented in the Linting guide.
   Tested with oxlint's `RuleTester` from `oxlint/plugins-dev`.
   The **`oxlint` peer floor (`^1.69.0`) is deliberately decoupled from the

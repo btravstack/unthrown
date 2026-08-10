@@ -89,8 +89,14 @@ grows. That is the whole reason the handler changed shape. `@unthrown/oxlint`'s
 recommended preset, will point at every arm still waiting to be converted.
 
 If your old `err` handler was `(error) => { throw error }`, prefer
-[`getOrThrow()`](../reference/combinators) — the sanctioned single-throw
-extractor — over re-throwing inside a match arm.
+[`getOrThrow()`](../reference/combinators) over re-throwing inside a match
+arm as a mechanical stopgap during the port — it throws the modeled error
+as-is, matching the old behavior with one call. Treat it the same way as the
+`P._` arm above: a way station, not the destination. Once the site is
+converted for real, fold the channel instead (`match` / `recoverErrCases` +
+`get`) — the opt-in
+[`no-get-or-throw`](./lint-your-codebase#no-get-or-throw) rule flags any
+`getOrThrow()` left outside a test file.
 
 ## 4. Replace the removed aliases
 

@@ -34,6 +34,9 @@ docs/api/*/
 # macOS
 .DS_Store
 
-# Local brainstorming specs (not tracked)
+# Local brainstorming specs and implementation plans (not tracked). They live
+# under `docs/`, so VitePress would otherwise build them as site pages — hence
+# the `srcExclude` in `docs/.vitepress/config.ts`, which is what keeps
+# `pnpm build` green whether or not these files are present.
 docs/superpowers/
 .superpowers/

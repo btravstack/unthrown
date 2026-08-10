@@ -9,11 +9,12 @@ const manifest: { peerDependencies: Record<string, string> } = JSON.parse(
 );
 
 describe("@unthrown/oxlint plugin", () => {
-  it("exposes all seven rules under the `unthrown` plugin name", () => {
+  it("exposes all eight rules under the `unthrown` plugin name", () => {
     expect(plugin.meta?.name).toBe("unthrown");
     expect(Object.keys(plugin.rules).sort()).toEqual([
       "no-ambiguous-error-type",
       "no-catch-all-pattern",
+      "no-get-or-throw",
       "no-throw",
       "no-unhandled-result",
       "no-unused-matcher",
@@ -51,6 +52,15 @@ describe("@unthrown/oxlint plugin", () => {
   it("keeps `no-throw` out of the `recommended` preset — it bans a language statement", () => {
     expect(plugin.recommended.rules).not.toHaveProperty("unthrown/no-throw");
     expect(plugin.rules["no-throw"]?.meta?.docs?.recommended).toBe(false);
+  });
+
+  // `getOrThrow()` stays in unthrown's public surface — it is the right tool in
+  // a test, where "this Result had better be Ok" is the assertion. Banning it
+  // is a production-code stance, and unlike every preset rule an existing test
+  // suite does not pass until an `overrides` entry exempts it.
+  it("keeps `no-get-or-throw` out of the `recommended` preset — tests need an overrides entry first", () => {
+    expect(plugin.recommended.rules).not.toHaveProperty("unthrown/no-get-or-throw");
+    expect(plugin.rules["no-get-or-throw"]?.meta?.docs?.recommended).toBe(false);
   });
 
   // Every preset rule flags a spelling unthrown considers *wrong*. A `flatMap`

@@ -35,7 +35,7 @@ wiring exports: the six raw matcher functions, `failOnForgottenAwait`, and the
 
 ## Linting: @unthrown/oxlint
 
-An oxlint JS plugin (peer `oxlint`). Seven rules; scope-analysis keyed to
+An oxlint JS plugin (peer `oxlint`). Eight rules; scope-analysis keyed to
 unthrown imports, so they only fire on unthrown's `Result`.
 
 **Recommended preset:**
@@ -57,8 +57,14 @@ unthrown imports, so they only fire on unthrown's `Result`.
 
 **Opt-in (not in the preset):**
 
-- `no-throw` — reports every `throw`, pointing at
-  `Err`/`getOrThrow`/`fromSafeThrowable`.
+- `no-throw` — reports every `throw`, pointing at `Err(...)` for a modeled
+  failure, `recoverErrCases` + `get` for one that belongs to the defect
+  channel, and `fromSafeThrowable` for a known-technical precondition.
+- `no-get-or-throw` — reports `getOrThrow()` (a zero-argument member call, so
+  Effect's one-argument `Option.getOrThrow(o)` is untouched). It throws the
+  modeled error, abandoning errors-as-values at the last step; fold with
+  `recoverErrCases` + `get`. Legitimate in tests — exempt them with an oxlint
+  `overrides` entry, not a rule option.
 - `prefer-ensure` — flags `flatMap((x) => c ? Ok(x) : Err(e))` (a predicate
   wearing a bind costume); report-only, no autofix.
 

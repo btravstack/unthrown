@@ -322,10 +322,15 @@ Reach for an eliminator once you're done chaining:
 - `getOr` / `getOrElse` / `getOrNull` / `getOrUndefined` — recover an `Err` to a
   fallback, but **re-throw a defect** (it's a bug, not an absent value).
 - `getOrThrow` — extract `T`, but **throw the modeled error as-is** on `Err`
-  (panicking on a defect). A deliberate escape hatch off errors-as-values: its
-  point is to move a literal `throw` behind a method so a `no-throw` lint rule can
-  ban raw throws. Prefer `match` / `recoverErrCases` / `flatMapErrCases` when the error can stay a
-  value.
+  (panicking on a defect). A deliberate escape hatch off errors-as-values, at
+  home in **tests and scripts** where "this `Result` had better be `Ok`" is the
+  assertion. In production, fold the channel instead — `recoverErrCases` empties
+  `E`, so `get()` compiles — or use `match` / `flatMapErrCases`. The opt-in
+  [`no-get-or-throw`](../how-to/lint-your-codebase#no-get-or-throw) rule enforces
+  that, exempting tests through an oxlint `overrides` entry. In a test,
+  [`@unthrown/vitest`](../how-to/test-with-vitest)'s matchers (`toBeOk`,
+  `toBeOkWith`, `toBeErrTagged`, `toBeDefect`, …) are usually the better tool —
+  reach for `getOrThrow()` when you just need the value.
 
 On an `AsyncResult` every eliminator returns a `Promise` — `await` it (an `Err` or
 `Defect` still throws/rejects, exactly as above).

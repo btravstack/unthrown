@@ -80,8 +80,8 @@ family in full.)
 ## You don't have to convert the whole codebase
 
 `Result` composes at whatever boundary you choose to draw it — no requirement that
-every function up and down the stack returns one. `getOrThrow()` exists precisely so
-you can re-enter throw-land at the edges you haven't converted yet, on purpose — it
+every function up and down the stack returns one. `getOrThrow()` lets you
+re-enter throw-land at the edges you haven't converted yet, on purpose — it
 throws the modeled error **as-is** (unlike `get()`, which only compiles once the
 error channel is `never`):
 
@@ -93,9 +93,13 @@ function loadConfig(text: string): Config {
 }
 ```
 
-Convert the parts where an untyped failure actually costs you something — a boundary
-you keep getting wrong, a `catch` block that silently swallows a bug. Leave the rest
-throwing until it earns the conversion.
+This is a mid-migration seam, not the final shape: `getOrThrow()`'s lasting
+home is **tests and scripts**, and a call like the one above is exactly what the
+opt-in [`no-get-or-throw`](./lint-your-codebase#no-get-or-throw) rule flags once
+you turn it on — so revisit `loadConfig` once its callers are ready to hold a
+`Result` instead. Convert the parts where an untyped failure actually costs you
+something — a boundary you keep getting wrong, a `catch` block that silently
+swallows a bug. Leave the rest throwing until it earns the conversion.
 
 ## `try`/`catch` idioms → combinators
 

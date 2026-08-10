@@ -544,12 +544,20 @@ export type ResultMethods<out T, out E> = {
    *
    * @remarks
    * A deliberate escape hatch off the errors-as-values model — it **throws the
-   * `Err` value as-is** at the call site. Its purpose is to move a literal
-   * `throw` behind a method, so a `no-throw` lint rule can ban raw throws while
-   * this one sanctioned extraction remains — _not_ to replace principled
-   * handling. When you can keep the error a value, prefer
-   * {@link ResultMethods.match | match} / {@link ResultMethods.recoverErrCases | recoverErrCases} /
-   * {@link ResultMethods.flatMapErrCases | flatMapErrCases}.
+   * `Err` value as-is** at the call site, so a caller of the enclosing function
+   * sees a throw rather than a channel. Its home is **tests and scripts**,
+   * where "this `Result` had better be `Ok`" is the assertion and a throw is
+   * the correct failure mode.
+   *
+   * In production code, fold the error channel instead:
+   * {@link ResultMethods.recoverErrCases | recoverErrCases} empties `E`, so
+   * {@link ResultMethods.get | get} compiles and a case routed to the injected
+   * `defect(...)` panics with its original cause — with every case still named.
+   * {@link ResultMethods.match | match} and
+   * {@link ResultMethods.flatMapErrCases | flatMapErrCases} are the other two
+   * ways to keep the error a value. `@unthrown/oxlint`'s opt-in
+   * `no-get-or-throw` rule enforces this, exempting test files through an
+   * oxlint `overrides` entry.
    *
    * Type-gated as the **complement** of {@link ResultMethods.get | get}: it
    * compiles only when the error channel is **non-empty** (`E` is not `never`) —

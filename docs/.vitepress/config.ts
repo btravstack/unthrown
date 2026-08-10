@@ -99,6 +99,10 @@ export default defineConfig({
   // time; its cross-references use relative links TypeDoc resolves itself.
   ignoreDeadLinks: [/^\/api\//, /^\.\/index$/, /^\.\/[a-z-]+$/, /^\.\.\//],
 
+  // Internal planning artifacts (design specs, implementation plans), not
+  // documentation pages — excluded from the build and never deployed.
+  srcExclude: ["superpowers/**"],
+
   sitemap: {
     hostname: SITE_URL,
   },
