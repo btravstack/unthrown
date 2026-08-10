@@ -43,7 +43,8 @@ unthrown imports, so they only fire on unthrown's `Result`.
 - `no-ambiguous-error-type` — bans `unknown`/`any`/`Error`/`{}`/primitive
   keywords in `E` (annotations and `returnType<R>()` pins inside `mapErrCases`).
 - `prefer-async-result` — reports `Promise<Result<T, E>>` in favour of
-  `AsyncResult<T, E>` (no autofix on `async` function return annotations or
+  `AsyncResult<T, E>`; the autofix adds the `AsyncResult` specifier to an
+  existing `unthrown` import when needed (no autofix on `async` function return annotations or
   function-type return positions — those must stay `Promise`).
 - `no-unhandled-result` — flags a bare expression statement dropping a
   `Result` (syntactic; a dropped method chain is out of scope).

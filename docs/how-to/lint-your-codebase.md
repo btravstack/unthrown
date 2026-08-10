@@ -120,10 +120,28 @@ to eliminate.
 type Slow = Promise<Result<User, NotFound>>; // ✗ → AsyncResult<User, NotFound>
 ```
 
-Autofixable — except in two positions where it reports **without** a fix, because
-the rewrite would not compile: an `async` function's own return-type annotation
-(an `async` function must return a native `Promise`), and the return position of a
-function **type** (the implementer may be an `async` function the rule can't see).
+Autofixable. When `AsyncResult` is not already in scope, the fix **adds the
+specifier** to your existing `unthrown` import rather than leaving you to do it
+by hand:
+
+```ts
+// before  ─ `--fix` ─▶  after
+import type { Result } from "unthrown";
+import type { Result, AsyncResult } from "unthrown";
+```
+
+That covers the common case: a file imports `Result`, which is what trips the
+rule, and has never needed `AsyncResult`.
+
+The fix is withheld where applying it would not compile or would not mean what it
+says — the rule still reports:
+
+| Situation                                            | Why no fix                                                       |
+| ---------------------------------------------------- | ---------------------------------------------------------------- |
+| An `async` function's own return-type annotation     | An `async` function must return a native `Promise`               |
+| The return position of a function **type**           | The implementer may be an `async` function                       |
+| `AsyncResult` already names something else in scope  | Adding the specifier would collide, not resolve                  |
+| A namespace import (`import * as U from "unthrown"`) | No specifier list to extend; `U.AsyncResult` is a different edit |
 
 ### `unthrown/no-unhandled-result` {#no-unhandled-result}
 
