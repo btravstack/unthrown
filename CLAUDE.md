@@ -451,6 +451,12 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
   combinator callback that returns one is a compile error instead of a silently
   unqualified rejection. `FailureView<E, T>` — the exported `ErrView | DefectView`
   union a `tapFailure` callback receives (error-type-first, like `ErrView`).
+  `Settle<T, E>` — the settler a `fromExecutor` executor receives, exported for
+  the same reason `ErrMatcher` and `@unthrown/prisma`'s `TransactionClient<C>`
+  are: a helper factored out of the callback has to be able to name its
+  parameter, and deriving it from the function (`Parameters<typeof
+fromExecutor<T, E>>[0]`) is the grotesque spelling that invites a hand-copied
+  drifting duplicate instead.
   `ErrMatcher<E>` — the built-in match builder over the error
   (`ReturnType<typeof match<E>>`, i.e. `Matcher<E, E, never>`).
   `OkOf<R>` / `ErrOf<R>` / `AsyncOkOf<R>` / `AsyncErrOf<R>` — public

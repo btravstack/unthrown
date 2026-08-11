@@ -282,6 +282,8 @@ export function fromSafePromise<T>(
  *
  * @typeParam T - the success type.
  * @typeParam E - the modeled error type.
+ *
+ * @category Types
  */
 export type Settle<T, E> = (result: Result<T, E> | Defect) => void;
 
