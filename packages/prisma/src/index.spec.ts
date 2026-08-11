@@ -353,8 +353,7 @@ describe("$tryTransaction (batch form)", () => {
         db.user.create({ data: { email: "dup@example.com" } }),
       ]),
     ).toBeErrTagged("UniqueConstraintViolation");
-    // The rollback is asserted against the DATABASE, not inferred from the Err:
-    // the first two creates succeeded before the third one failed.
+    // The rollback is asserted against the DATABASE, not inferred from the Err.
     await expect(db.user.tryCount()).toBeOkWith(0);
   });
 

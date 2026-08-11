@@ -428,26 +428,6 @@ type TryTransaction = {
   ): AsyncResult<UnwrapPrismaTuple<P>, PrismaQueryError>;
 };
 
-/**
- * The Prisma Client extension. Apply it with `$extends` to add the `try*`
- * methods to every model delegate, and `$tryTransaction` to the client.
- *
- * @remarks
- * Typing follows Prisma's documented `$allModels` pattern: `this: T` binds the
- * concrete delegate, `Prisma.Exact` checks args, and `Prisma.Result` computes
- * the payload — so `select` / `include` inference survives the wrap.
- *
- * @example
- * ```ts
- * import { PrismaClient } from "./generated/prisma/client.ts";
- * import { unthrownPrisma } from "@unthrown/prisma";
- *
- * const db = new PrismaClient({ adapter }).$extends(unthrownPrisma);
- *
- * const users = db.user.tryFindMany({ select: { id: true } });
- * //    ^? AsyncResult<{ id: number }[], never>  — a read has no modeled failure
- * ```
- */
 // Declared as a const rather than an object-literal method because it is
 // OVERLOADED (Prisma's `$transaction` has two forms and the `try*` prefix maps
 // one-to-one onto it). The implementation side is untyped, as it is for the
@@ -507,6 +487,26 @@ const $tryTransaction = function <T, E>(this: unknown, arg: unknown, options?: u
   );
 } as TryTransaction;
 
+/**
+ * The Prisma Client extension. Apply it with `$extends` to add the `try*`
+ * methods to every model delegate, and `$tryTransaction` to the client.
+ *
+ * @remarks
+ * Typing follows Prisma's documented `$allModels` pattern: `this: T` binds the
+ * concrete delegate, `Prisma.Exact` checks args, and `Prisma.Result` computes
+ * the payload — so `select` / `include` inference survives the wrap.
+ *
+ * @example
+ * ```ts
+ * import { PrismaClient } from "./generated/prisma/client.ts";
+ * import { unthrownPrisma } from "@unthrown/prisma";
+ *
+ * const db = new PrismaClient({ adapter }).$extends(unthrownPrisma);
+ *
+ * const users = db.user.tryFindMany({ select: { id: true } });
+ * //    ^? AsyncResult<{ id: number }[], never>  — a read has no modeled failure
+ * ```
+ */
 export const unthrownPrisma = Prisma.defineExtension({
   name: "@unthrown/prisma",
   model: {
