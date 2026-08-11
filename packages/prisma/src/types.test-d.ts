@@ -141,6 +141,11 @@ namedTx.$transaction;
 // @ts-expect-error — and the connection/extension methods.
 namedTx.$extends;
 
+// The round trip: the `tx` the callback actually receives is assignable to the
+// exported alias — the whole point of naming a helper's parameter with it.
+const chargeFees = (t: TransactionClient<typeof db>) => t.user.tryFindMany();
+db.$tryTransaction((txc) => chargeFees(txc));
+
 // --- $tryTransaction: the batch form ------------------------------------------
 
 const batch = db.$tryTransaction([

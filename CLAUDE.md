@@ -843,7 +843,7 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   raw `PrismaPromise` carries no error-type information. A fixed tuple keeps
   positional types, a dynamic array collapses to a list — core's `all` duality.
   Being overloaded is why `$tryTransaction` is a `const` carrying an overloaded
-  function type rather than an object-literal method and
+  function type rather than an object-literal method. Also
   `tryPaginate(...).withCursor(...)` (the
   `prisma-extension-pagination` cursor API with its unmerged #35 fix folded
   in; `after`/`before` are mutually exclusive in the type — passing both used to

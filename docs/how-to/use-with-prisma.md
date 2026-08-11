@@ -195,8 +195,11 @@ import type { TransactionClient } from "@unthrown/prisma";
 
 type Tx = TransactionClient<typeof db>;
 
-const chargeFees = (tx: Tx, id: number) =>
-  tx.invoice.tryUpdate({ where: { id }, data: { charged: true } });
+const chargeFees = (tx: Tx, id: number, fee: number) =>
+  tx.account.tryUpdate({
+    where: { id },
+    data: { balance: { decrement: fee } },
+  });
 ```
 
 ### Batch transactions

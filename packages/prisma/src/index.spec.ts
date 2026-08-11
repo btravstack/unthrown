@@ -360,6 +360,12 @@ describe("$tryTransaction (batch form)", () => {
   it("an empty batch is Ok([])", async ({ db }) => {
     await expect(db.$tryTransaction([])).toBeOkWith([]);
   });
+
+  it("threads options through on the batch path", async ({ db }) => {
+    await expect(
+      db.$tryTransaction([db.user.count()], { isolationLevel: "Serializable" }),
+    ).toBeOkWith([0]);
+  });
 });
 
 describe("tryPaginate / withCursor", () => {

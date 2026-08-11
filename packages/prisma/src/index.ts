@@ -142,8 +142,7 @@ const constraintFields = (meta: unknown): readonly string[] => {
 
 /**
  * Qualify a Prisma rejection — the runtime half of the bridge, and a ready-made
- * `qualify` for any boundary you build yourself (raw SQL, a batch
- * `$transaction([...])`).
+ * `qualify` for any boundary you build yourself (raw SQL).
  *
  * @remarks
  * The three P-codes that describe a **domain** outcome map to their tagged
@@ -321,6 +320,9 @@ type TxDenyList =
  * alias, so the two cannot drift. Restating it by hand does drift silently —
  * `Omit` of a key that does not exist is not an error, so a hand-copied list
  * keeps compiling after the library's own list changes.
+ *
+ * Not to be confused with Prisma's own generated `Prisma.TransactionClient` —
+ * that one is non-generic and, notably, does not remove `$tryTransaction`.
  *
  * @typeParam C - the extended client, usually `typeof db`.
  *

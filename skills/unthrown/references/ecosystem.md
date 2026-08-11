@@ -99,8 +99,8 @@ db.user.tryFindMany();
   own `defect` arm.
 - `$tryTransaction(cb)` — interactive transaction whose callback speaks
   `AsyncResult`: an `Err` rolls back and re-surfaces typed; a defect (throwing
-  callback included) rolls back and stays a defect. `TransactionClient<typeof
-db>` names the callback's `tx` for a helper factored out of it.
+  callback included) rolls back and stays a defect. `TransactionClient<C>`
+  names the callback's `tx` for a helper factored out of it.
 - `$tryTransaction([...])` — the batch form, one round trip, all or nothing. It
   takes the **raw** delegate methods (Prisma's batch needs unexecuted
   `PrismaPromise`s), so `E` is the whole `PrismaQueryError` union rather than
