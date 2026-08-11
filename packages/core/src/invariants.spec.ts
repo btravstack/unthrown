@@ -330,6 +330,11 @@ describe("Invariant 6: a DISCARDED thenable is adopted, so its rejection never f
     ["flatTap", (t: PromiseLike<never>) => Ok(1).flatTap((() => t) as never)],
     ["bind", (t: PromiseLike<never>) => Do().bind("a", (() => t) as never)],
     ["fromExecutor", (t: PromiseLike<never>) => fromExecutor<number, never>(() => t)],
+    [
+      "fromExecutor settle",
+      (t: PromiseLike<never>) =>
+        fromExecutor<number, never>((s) => (s as unknown as (v: unknown) => void)(t)),
+    ],
   ])("%s adopts a smuggled thenable rather than dropping it", async (_label, run) => {
     await expectAdopted(run);
   });

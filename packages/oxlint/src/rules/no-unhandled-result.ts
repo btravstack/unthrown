@@ -20,6 +20,7 @@ const FREE_PRODUCERS: ReadonlySet<string> = new Set([
   "fromSafeThrowable",
   "fromPromise",
   "fromSafePromise",
+  "fromExecutor",
   "all",
   "allAsync",
   "allFromDict",
@@ -40,7 +41,16 @@ const COMPANION_PRODUCERS: Readonly<Record<string, ReadonlySet<string>>> = {
     "all",
     "allFromDict",
   ]),
-  AsyncResult: new Set(["Ok", "Err", "Do", "fromPromise", "fromSafePromise", "all", "allFromDict"]),
+  AsyncResult: new Set([
+    "Ok",
+    "Err",
+    "Do",
+    "fromExecutor",
+    "fromPromise",
+    "fromSafePromise",
+    "all",
+    "allFromDict",
+  ]),
 };
 
 /**

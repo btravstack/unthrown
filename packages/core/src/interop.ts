@@ -298,7 +298,10 @@ export type Settle<T, E> = (result: Result<T, E> | Defect) => void;
  * its own turn, long after the executor body returned).
  *
  * `T` and `E` cannot be inferred from the body, since `settle` is a parameter.
- * Supply them explicitly, or let them flow from an annotated target.
+ * Supply them explicitly, or let them flow from an annotated target. Absent
+ * either, both default to `never` (Thesis #3: no path may produce `unknown` in
+ * `E`) — so an unannotated call is a compile error at the `settle(...)` call
+ * site, not a silently-`unknown` channel.
  *
  * An executor that never settles yields an `AsyncResult` that never resolves —
  * the one hazard {@link fromPromise} does not have, and identical to
@@ -323,7 +326,7 @@ export type Settle<T, E> = (result: Result<T, E> | Defect) => void;
  *   });
  * ```
  */
-export function fromExecutor<T, E>(
+export function fromExecutor<T = never, E = never>(
   executor: (settle: Settle<T, E>, defect: (cause: unknown) => Defect) => void,
 ): AsyncResult<T, E> {
   let resolve!: (result: Result<T, E>) => void;
@@ -337,6 +340,11 @@ export function fromExecutor<T, E>(
       return;
     }
     if (!isResult(result)) {
+      // A smuggled thenable (a raw-JS/cast caller passing a Promise instead of
+      // a Result) would otherwise be dropped mid-flight; adopt-and-silence so
+      // its later rejection can't float — the sibling of qualifyToResult's and
+      // thenableReturnDefect's nets.
+      if (isThenable(result)) void Promise.resolve(result).then(undefined, () => undefined);
       resolve(
         defectRes<T, E>(
           new TypeError("unthrown: fromExecutor's settle received a non-Result value"),

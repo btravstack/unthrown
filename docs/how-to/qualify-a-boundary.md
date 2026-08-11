@@ -14,6 +14,7 @@ that matches the shape of the edge.
 | a throwing function, every throw a bug       | `fromSafeThrowable` | `never`                    |
 | a rejecting promise, some rejections modeled | `fromPromise`       | `Exclude<qualify, Defect>` |
 | a rejecting promise, every rejection a bug   | `fromSafePromise`   | `never`                    |
+| a callback-style API (events, listeners)     | `fromExecutor`      | your modeled `E`           |
 
 ## `fromNullable` — absence as a modeled error
 

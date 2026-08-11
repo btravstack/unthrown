@@ -15,6 +15,7 @@ const FREE_PRODUCERS = [
   "fromSafeThrowable",
   "fromPromise",
   "fromSafePromise",
+  "fromExecutor",
   "all",
   "allAsync",
   "allFromDict",

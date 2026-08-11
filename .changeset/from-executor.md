@@ -26,5 +26,5 @@ route to the defect channel from inside an asynchronous callback, where a
 `throw` runs in its own turn and would escape the boundary entirely.
 
 An `async` executor is caught at runtime rather than by the types: its rejection
-settles a `Defect` instead of floating, which is what `new Promise` does with the
-same mistake.
+settles a `Defect` instead of floating unhandled — `new Promise` lets the same
+mistake float.

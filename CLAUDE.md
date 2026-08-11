@@ -29,8 +29,9 @@ was planned).
 3. **Qualification is enforced at every boundary.** `fromPromise` / `fromThrowable`
    take a mandatory `qualify: (cause: unknown, defect) => E | Defect`, where
    `defect` is a helper the boundary **injects** as the second argument (domain
-   code never imports it — the qualify-time marker is not a public value).
-   `qualify` is **synchronous**: its return intersects `NotThenable`, so an
+   code never imports it — the qualify-time marker is not a public value);
+   `fromExecutor` injects the same helper as its executor's second argument,
+   with no `qualify` to write. `qualify` is **synchronous**: its return intersects `NotThenable`, so an
    `async` qualify does not compile (its `Promise` would land in `E`
    un-triaged); a thenable slipped past the types at runtime becomes a `Defect`
    (never `Err(Promise)`), and the orphaned thenable is adopted-and-silenced so
@@ -479,8 +480,9 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
   companion aliases them as `AsyncResult.Ok` / `AsyncResult.Err` (suffix dropped,
   same rule as `AsyncResult.all`). A **deliberate** defect needs no constructor
   either — the `defect` helper is **injected wherever a triage decision is
-  made, and nowhere else**: `qualify` at a boundary (Thesis #3) and the
-  error-match branches (Thesis #5). Elsewhere the syntax
+  made, and nowhere else**: `qualify` at a boundary (Thesis #3), an executor
+  passed to `fromExecutor` (the same sanctioned injection, `qualify`-free), and
+  the error-match branches (Thesis #5). Elsewhere the syntax
   is `throw` (the throw → defect invariant is the safety net; a
   known-technical precondition throws in a plain helper wrapped once at its
   origin with `fromSafeThrowable`). A public minting helper was weighed and
@@ -498,7 +500,9 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
   injected alongside it, the triage-site rule of Thesis #3, and is the only route
   to the defect channel from inside an asynchronous callback. `T`/`E` come from
   explicit type arguments or an annotated target — a settler is a parameter, so
-  nothing infers them. An executor that never settles never resolves, the one
+  nothing infers them; both default to `never`, so supplying neither is a
+  compile error at the `settle(...)` call rather than an `unknown` channel. An
+  executor that never settles never resolves, the one
   hazard `fromPromise` does not have.)
 - aggregate: `all` / `allAsync` take a **tuple/array** (a fixed tuple keeps
   positional types; a dynamic `Result<T, E>[]` / `AsyncResult<T, E>[]` collapses

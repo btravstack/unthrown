@@ -1216,3 +1216,11 @@ void fromExecutor<number, "boom">((settle) => {
   // @ts-expect-error - "other" is not in the error channel
   settle(Err("other"));
 });
+
+// No explicit type arguments and no annotated target: T/E default to `never`,
+// so settling anything but a Defect is a compile error at the call — never a
+// silent `unknown` channel (Thesis #3).
+void fromExecutor((settle) => {
+  // @ts-expect-error - T/E default to never with no explicit args or contextual target
+  settle(Ok(1));
+});
