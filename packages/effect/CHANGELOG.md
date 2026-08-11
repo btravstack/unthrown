@@ -1,5 +1,12 @@
 # @unthrown/effect
 
+## 5.3.0
+
+### Patch Changes
+
+- Updated dependencies [de9486c]
+  - unthrown@5.3.0
+
 ## 5.2.0
 
 ### Patch Changes
