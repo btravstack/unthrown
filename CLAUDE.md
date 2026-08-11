@@ -1015,6 +1015,14 @@ code: "NOT_FOUND" }, …))`); non-inferable →
   turns one red rather than leaving a stale snippet uncaught. Each is
   `private: true` with **no `build` script** — they are consumed as source,
   never published, so there is nothing to build and no changeset to add.
+  `private: true` already keeps them off npm, but changesets **versions** a
+  private package by default, so bumping a satellite they depend on bumped
+  their version, wrote them a `CHANGELOG.md`, and listed
+  `@unthrown/example-checkout-persistence@0.0.1` under **Releases** in the
+  release PR — a package name that does not and must not exist on the registry
+  (#220). `.changeset/config.json` therefore sets
+  `privatePackages: { version: false, tag: false }`, which pins every example
+  (and `docs`) at `0.0.0` with no changelog.
   `typecheck` runs on all three; `test` runs where no external infrastructure
   is required (`checkout-domain` and `checkout-api` are pure; `checkout-persistence`
   runs against Prisma's in-memory SQLite, the same pattern `@unthrown/prisma`'s
