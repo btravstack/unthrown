@@ -857,8 +857,8 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   `qualifyPrismaError`, which **is** a `qualify` — `(cause, defect)`, generic in
   the marker type so core's non-exported `Defect` need not be named — and so
   drops straight into a `fromPromise` at a boundary of your own; the raw methods
-  stay as the escape hatch for batch
-  `$transaction([...])` and raw SQL. Tested against a
+  stay as the escape hatch for raw SQL, and are what a batch
+  `$tryTransaction([...])` is composed from. Tested against a
   real in-memory SQLite client (`@prisma/adapter-better-sqlite3`) with a
   generated, gitignored test client; **deliberately outside the fixed version
   group** — its majors track `@prisma/client`'s cadence, not the family's.
