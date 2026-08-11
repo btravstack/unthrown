@@ -162,13 +162,14 @@ const [a, b] = (
 
 ## Interop constructors
 
-| Function            | Produces                  | Purpose                                    |
-| ------------------- | ------------------------- | ------------------------------------------ |
-| `fromNullable`      | `Result<T, E>`            | `null`/`undefined` → modeled `Err`         |
-| `fromThrowable`     | `(…) => Result<T, E>`     | wrap a throwing fn; mandatory `qualify`    |
-| `fromSafeThrowable` | `(…) => Result<T, never>` | wrap a throwing fn; every throw a `Defect` |
-| `fromPromise`       | `AsyncResult<T, E>`       | wrap a promise; mandatory `qualify`        |
-| `fromSafePromise`   | `AsyncResult<T, never>`   | wrap a promise; every rejection a `Defect` |
+| Function            | Produces                  | Purpose                                        |
+| ------------------- | ------------------------- | ---------------------------------------------- |
+| `fromNullable`      | `Result<T, E>`            | `null`/`undefined` → modeled `Err`             |
+| `fromThrowable`     | `(…) => Result<T, E>`     | wrap a throwing fn; mandatory `qualify`        |
+| `fromSafeThrowable` | `(…) => Result<T, never>` | wrap a throwing fn; every throw a `Defect`     |
+| `fromPromise`       | `AsyncResult<T, E>`       | wrap a promise; mandatory `qualify`            |
+| `fromSafePromise`   | `AsyncResult<T, never>`   | wrap a promise; every rejection a `Defect`     |
+| `fromExecutor`      | `AsyncResult<T, E>`       | wrap a callback API; settler names the variant |
 
 Their tasks and signatures are covered in
 [Qualify a boundary](../how-to/qualify-a-boundary).

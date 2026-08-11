@@ -76,6 +76,7 @@ import {
   fromThrowable,
   fromSafeThrowable,
   fromSafePromise,
+  fromExecutor,
   fromNullable,
 } from "unthrown";
 
@@ -95,6 +96,12 @@ parse("nope"); // => Err("invalid_json")
 // "every throw here is a bug" → E = never, no qualify
 const decode = fromSafeThrowable((row: Row) => schema.parse(row));
 const cfg = fromSafePromise(loadConfig()); // async twin
+
+// callback/event APIs: the settler takes a Result, so there is no qualify
+const ready = fromExecutor<Server, PortInUse>((settle, defect) => {
+  server.once("error", (c) => settle(defect(c)));
+  server.listen(port, () => settle(Ok(server)));
+});
 
 // nullable APIs (the Option replacement)
 fromNullable(map.get(key), () => "absent" as const); // Result<V, "absent">

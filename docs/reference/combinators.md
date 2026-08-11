@@ -208,8 +208,8 @@ where enumeration is impossible — see
 
 Every combinator above exists on **both** `Result` and `AsyncResult` — same names,
 same channel behavior. `AsyncResult` (what you get from `fromPromise` /
-`fromSafePromise`, or by lifting a sync `Result` with `.toAsync()`) differs in
-exactly three ways:
+`fromSafePromise` / `fromExecutor`, or by lifting a sync `Result` with
+`.toAsync()`) differs in exactly three ways:
 
 - **Callbacks stay synchronous.** A raw `Promise` may never enter a combinator —
   that would skip qualification and silently become a defect. Do async work by

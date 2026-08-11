@@ -25,6 +25,7 @@ import {
   ErrAsync,
   type ErrView,
   type FailureView,
+  fromExecutor,
   fromPromise,
   fromSafeThrowable,
   fromThrowable,
@@ -1185,3 +1186,41 @@ declare function sometimesWork(): Promise<number>;
   const locked = lock(r);
   type _Locked = Expect<Equal<typeof locked, Result<number, ApiError>>>;
 }
+
+// --- fromExecutor: two type arguments, no third generic for NotThenable -----
+
+// fromExecutor: the two-type-argument call compiles. A third generic (for a
+// `R & NotThenable<R>` executor return) would make this `TS2558: Expected 3
+// type arguments, but got 2` — see CLAUDE.md's runtime-not-types invariant.
+const fromExecutorExplicit = fromExecutor<number, "boom">((settle) => {
+  settle(Ok(1));
+});
+type _FromExecutorExplicit = Expect<
+  Equal<typeof fromExecutorExplicit, AsyncResult<number, "boom">>
+>;
+
+// T/E flow from an annotated target, so a call site with a typed home needs no
+// explicit type arguments.
+type ExecutorClock = { readonly sleep: (ms: number) => AsyncResult<void, never> };
+const executorClock: ExecutorClock = {
+  sleep: (ms) =>
+    fromExecutor((settle) => {
+      void ms;
+      settle(Ok());
+    }),
+};
+void executorClock;
+
+// settle rejects a Result outside the declared channels.
+void fromExecutor<number, "boom">((settle) => {
+  // @ts-expect-error - "other" is not in the error channel
+  settle(Err("other"));
+});
+
+// No explicit type arguments and no annotated target: T/E default to `never`,
+// so settling anything but a Defect is a compile error at the call — never a
+// silent `unknown` channel (Thesis #3).
+void fromExecutor((settle) => {
+  // @ts-expect-error - T/E default to never with no explicit args or contextual target
+  settle(Ok(1));
+});

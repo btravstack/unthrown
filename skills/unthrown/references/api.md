@@ -176,8 +176,8 @@ group them **by what they return**:
 - `Result.*`: `Ok`, `Err`, `Do`, `fromNullable`, `fromThrowable`,
   `fromSafeThrowable`, `all`, `allFromDict`, `isOk`/`isErr`/`isDefect`/`isResult`.
 - `AsyncResult.*`: `Ok` (= `OkAsync`), `Err` (= `ErrAsync`), `Do`
-  (= `DoAsync`), `fromPromise`, `fromSafePromise`, `all` (= `allAsync`),
-  `allFromDict` (= `allFromDictAsync`).
+  (= `DoAsync`), `fromExecutor`, `fromPromise`, `fromSafePromise`, `all`
+  (= `allAsync`), `allFromDict` (= `allFromDictAsync`).
 
 Both are value + type companions — `Result<T, E>` / `AsyncResult<T, E>` are the
 same names as types.

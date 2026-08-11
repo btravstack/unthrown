@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   type AsyncResult,
+  Err,
+  fromExecutor,
   fromNullable,
   fromPromise,
   fromSafePromise,
@@ -298,5 +300,90 @@ describe("the SYNC boundaries reject an async fn", () => {
       expect(r.value.then).toBe(1);
       expect(r.value.ok).toBe(true);
     }
+  });
+});
+
+describe("fromExecutor", () => {
+  it("settles Ok from an asynchronous callback", async () => {
+    const r = await fromExecutor<number, never>((settle) => {
+      setTimeout(() => settle(Ok(1)), 0);
+    });
+    expectOk(r, 1);
+  });
+
+  it("settles Err from an asynchronous callback", async () => {
+    const r = await fromExecutor<number, "nope">((settle) => {
+      setTimeout(() => settle(Err("nope")), 0);
+    });
+    expectErr(r, "nope");
+  });
+
+  it("settles synchronously when the executor settles synchronously", async () => {
+    const r = await fromExecutor<number, never>((settle) => {
+      settle(Ok(7));
+    });
+    expectOk(r, 7);
+  });
+
+  it("ignores a second settle — the first wins", async () => {
+    const r = await fromExecutor<number, "late">((settle) => {
+      settle(Ok(1));
+      settle(Err("late"));
+    });
+    expectOk(r, 1);
+  });
+
+  it("settles a Defect through the injected helper", async () => {
+    const r = await fromExecutor<number, never>((settle, defect) => {
+      settle(defect(boom));
+    });
+    expectDefect(r);
+  });
+
+  it("routes an asynchronous callback's failure to the defect channel", async () => {
+    const r = await fromExecutor<number, never>((settle, defect) => {
+      setTimeout(() => settle(defect(boom)), 0);
+    });
+    expectDefect(r);
+  });
+
+  it("turns a synchronous throw in the executor body into a Defect", async () => {
+    const r = await fromExecutor<number, never>(() => {
+      throw boom;
+    });
+    expectDefect(r);
+  });
+
+  it("turns a non-Result handed to settle into a Defect", async () => {
+    const r = await fromExecutor<number, never>((settle) => {
+      (settle as unknown as (value: unknown) => void)(42);
+    });
+    expect(r.tag).toBe("Defect");
+    if (r.tag === "Defect") expect(r.cause).toBeInstanceOf(TypeError);
+  });
+
+  it("keeps the first settle when the body throws afterwards", async () => {
+    const r = await fromExecutor<number, never>((settle) => {
+      settle(Ok(1));
+      throw boom;
+    });
+    expectOk(r, 1);
+  });
+
+  it("routes an async executor's rejection to the defect channel", async () => {
+    // An `async` executor type-checks — see the runtime-not-types note in
+    // CLAUDE.md. `new Promise` would drop this throw as a floating rejection.
+    const r = await fromExecutor<number, never>(async () => {
+      throw boom;
+    });
+    expectDefect(r);
+  });
+
+  it("keeps a settled value when an async executor rejects afterwards", async () => {
+    const r = await fromExecutor<number, never>(async (settle) => {
+      settle(Ok(1));
+      throw boom;
+    });
+    expectOk(r, 1);
   });
 });

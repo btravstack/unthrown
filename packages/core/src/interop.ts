@@ -275,6 +275,100 @@ export function fromSafePromise<T>(
   return new AsyncRes<T, never>(settled);
 }
 
+/**
+ * The settler a {@link fromExecutor} executor receives. Settles the pending
+ * `AsyncResult` **once** — later calls are no-ops, exactly as `resolve` is on a
+ * `Promise`.
+ *
+ * @typeParam T - the success type.
+ * @typeParam E - the modeled error type.
+ *
+ * @category Types
+ */
+export type Settle<T, E> = (result: Result<T, E> | Defect) => void;
+
+/**
+ * Build an {@link AsyncResult} from a callback-style API — this library's
+ * answer to `new Promise((resolve, reject) => …)`.
+ *
+ * @remarks
+ * The settler takes a **`Result`**, not a value-or-reason pair: the caller names
+ * the variant, so no `unknown` can enter `E` and there is no `qualify` to pass.
+ * For a failure that is *not* modeled, settle the injected `defect` helper's
+ * marker — the same injection `qualify` receives, and the only way to reach the
+ * defect channel from inside an asynchronous callback (a `throw` there runs in
+ * its own turn, long after the executor body returned).
+ *
+ * `T` and `E` cannot be inferred from the body, since `settle` is a parameter.
+ * Supply them explicitly, or let them flow from an annotated target. Absent
+ * either, both default to `never` (Thesis #3: no path may produce `unknown` in
+ * `E`) — so an unannotated call is a compile error at the `settle(...)` call
+ * site, not a silently-`unknown` channel.
+ *
+ * An executor that never settles yields an `AsyncResult` that never resolves —
+ * the one hazard {@link fromPromise} does not have, and identical to
+ * `new Promise`.
+ *
+ * @typeParam T - the success type.
+ * @typeParam E - the modeled error type.
+ * @param executor - runs immediately; receives the settler and the `defect` helper.
+ *
+ * @category Interop
+ *
+ * @example
+ * ```ts
+ * import { fromExecutor, Err, Ok } from "unthrown";
+ *
+ * const listen = (port: number) =>
+ *   fromExecutor<Server, PortInUse>((settle, defect) => {
+ *     server.once("error", (cause) =>
+ *       isAddrInUse(cause) ? settle(Err(new PortInUse(port))) : settle(defect(cause)),
+ *     );
+ *     server.listen(port, () => settle(Ok(server)));
+ *   });
+ * ```
+ */
+export function fromExecutor<T = never, E = never>(
+  executor: (settle: Settle<T, E>, defect: (cause: unknown) => Defect) => void,
+): AsyncResult<T, E> {
+  let resolve!: (result: Result<T, E>) => void;
+  const promise = new Promise<Result<T, E>>((r) => {
+    resolve = r;
+  });
+
+  const settle: Settle<T, E> = (result) => {
+    if (isDefectMarker(result)) {
+      resolve(defectRes<T, E>(result.cause));
+      return;
+    }
+    if (!isResult(result)) {
+      // A smuggled thenable (a raw-JS/cast caller passing a Promise instead of
+      // a Result) would otherwise be dropped mid-flight; adopt-and-silence so
+      // its later rejection can't float — the sibling of qualifyToResult's and
+      // thenableReturnDefect's nets.
+      if (isThenable(result)) void Promise.resolve(result).then(undefined, () => undefined);
+      resolve(
+        defectRes<T, E>(
+          new TypeError("unthrown: fromExecutor's settle received a non-Result value"),
+        ),
+      );
+      return;
+    }
+    resolve(result);
+  };
+
+  try {
+    const returned: unknown = executor(settle, defect);
+    if (isThenable(returned)) {
+      void Promise.resolve(returned).then(undefined, (cause: unknown) => settle(defect(cause)));
+    }
+  } catch (cause) {
+    settle(defect(cause));
+  }
+
+  return new AsyncRes<T, E>(promise);
+}
+
 function qualifyToResult<T, E>(
   cause: unknown,
   qualify: (cause: unknown, defect: (cause: unknown) => Defect) => E | Defect,

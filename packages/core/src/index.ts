@@ -17,6 +17,7 @@ export {
   allAsync,
   allFromDict,
   allFromDictAsync,
+  fromExecutor,
   fromNullable,
   fromPromise,
   fromSafePromise,
@@ -25,6 +26,7 @@ export {
 } from "./interop.js";
 export { TaggedError } from "./tagged.js";
 
+export type { Settle } from "./interop.js";
 export type { TaggedErrorConstructor, TaggedErrorInstance } from "./tagged.js";
 export type {
   AsyncErrOf,

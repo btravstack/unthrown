@@ -12,6 +12,7 @@ import {
   allAsync,
   allFromDict,
   allFromDictAsync,
+  fromExecutor,
   fromNullable,
   fromPromise,
   fromSafePromise,
@@ -83,14 +84,15 @@ export type Result<T, E> = ResultType<T, E>;
 /**
  * Companion object grouping the **`AsyncResult`-producing** entry points under
  * the matching namespace: {@link AsyncResult.Ok}, {@link AsyncResult.Err},
- * {@link AsyncResult.Do}, {@link AsyncResult.fromPromise},
- * {@link AsyncResult.fromSafePromise}, {@link AsyncResult.all},
- * {@link AsyncResult.allFromDict}.
+ * {@link AsyncResult.Do}, {@link AsyncResult.fromExecutor},
+ * {@link AsyncResult.fromPromise}, {@link AsyncResult.fromSafePromise},
+ * {@link AsyncResult.all}, {@link AsyncResult.allFromDict}.
  *
  * @remarks
  * The async sibling of {@link Result}. Statics are grouped by what they
- * **return**, so the pre-lifted constructors, `fromPromise`/`fromSafePromise`,
- * and the async aggregates sit here rather than on {@link Result}; the namespace
+ * **return**, so the pre-lifted constructors, `fromExecutor`,
+ * `fromPromise`/`fromSafePromise`, and the async aggregates sit here rather
+ * than on {@link Result}; the namespace
  * already conveys "async", so the members drop the `Async` suffix their free
  * functions carry (`AsyncResult.Ok` is `OkAsync`; `AsyncResult.Err` is
  * `ErrAsync`; `AsyncResult.Do` is `DoAsync`; `AsyncResult.all` is `allAsync`;
@@ -115,6 +117,7 @@ export const AsyncResult = {
   Ok: OkAsync,
   Err: ErrAsync,
   Do: DoAsync,
+  fromExecutor,
   fromPromise,
   fromSafePromise,
   all: allAsync,

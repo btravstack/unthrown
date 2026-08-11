@@ -14,6 +14,7 @@ that matches the shape of the edge.
 | a throwing function, every throw a bug       | `fromSafeThrowable` | `never`                    |
 | a rejecting promise, some rejections modeled | `fromPromise`       | `Exclude<qualify, Defect>` |
 | a rejecting promise, every rejection a bug   | `fromSafePromise`   | `never`                    |
+| a callback-style API (events, listeners)     | `fromExecutor`      | your modeled `E`           |
 
 ## `fromNullable` — absence as a modeled error
 
@@ -146,6 +147,37 @@ const status = await user.match({
   },
 });
 ```
+
+## Bridging a callback API
+
+`fromPromise` needs a promise. When the API you are bridging is callback- or
+event-based, `fromExecutor` is the boundary — the `new Promise` of this library,
+except that the settler takes a `Result`:
+
+```ts
+import { fromExecutor, Err, Ok } from "unthrown";
+
+const startServer = (port: number) =>
+  fromExecutor<Server, PortInUse>((settle, defect) => {
+    server.once("error", (cause) =>
+      isAddrInUse(cause)
+        ? settle(Err(new PortInUse(port)))
+        : settle(defect(cause)),
+    );
+    server.listen(port, () => settle(Ok(server)));
+  });
+```
+
+Because the settler names the variant, there is no `qualify` to write and no
+`unknown` can reach `E`. The injected `defect` helper is how an unmodeled
+failure reaches the defect channel — and it is the _only_ way from inside an
+asynchronous callback, since a `throw` there runs in its own turn, long after
+the executor body returned.
+
+Two things to know. `T` and `E` cannot be inferred from the body, so supply them
+explicitly or let them flow from an annotated target. And an executor that never
+settles yields an `AsyncResult` that never resolves — the one hazard
+`fromPromise` does not have, and exactly `new Promise`'s.
 
 ## Where to go next
 
