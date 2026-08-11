@@ -99,13 +99,19 @@ db.user.tryFindMany();
   own `defect` arm.
 - `$tryTransaction(cb)` — interactive transaction whose callback speaks
   `AsyncResult`: an `Err` rolls back and re-surfaces typed; a defect (throwing
-  callback included) rolls back and stays a defect.
+  callback included) rolls back and stays a defect. `TransactionClient<typeof
+db>` names the callback's `tx` for a helper factored out of it.
+- `$tryTransaction([...])` — the batch form, one round trip, all or nothing. It
+  takes the **raw** delegate methods (Prisma's batch needs unexecuted
+  `PrismaPromise`s), so `E` is the whole `PrismaQueryError` union rather than
+  the per-operation narrowing. A tuple keeps positional types; a dynamic array
+  collapses to a list.
 - `tryPaginate(...).withCursor(...)` — cursor pagination; its `E` is
   `InvalidCursor` (the cursor is the only part of the query that came from
   outside). `after` and `before` are mutually exclusive.
 - `qualifyPrismaError` — the exported qualify, for hand-rolled boundaries.
-- Raw methods remain the escape hatch for batch `$transaction([...])` and raw
-  SQL.
+- Raw methods remain the escape hatch for raw SQL, and are what a batch
+  `$tryTransaction([...])` is composed from.
 
 ## Drizzle: @unthrown/drizzle
 

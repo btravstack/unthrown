@@ -30,8 +30,10 @@
 // So a read has NO modeled failure: `tryFindMany` is `AsyncResult<User[], never>`
 // (absence is `null`, not an error).
 //
-// The raw promise methods stay available on purpose: they are the escape hatch
-// for batch `$transaction([...])`, which needs unexecuted `PrismaPromise`s.
+// The raw promise methods stay available on purpose: raw SQL goes through them,
+// and a batch `$tryTransaction([...])` is composed FROM them — Prisma's batch
+// form needs unexecuted `PrismaPromise`s, which a `try*` method (already
+// executed, already an `AsyncResult`) cannot supply.
 
 import { Prisma } from "@prisma/client/extension";
 import { type AsyncResult, fromPromise, isResult, type Result, TaggedError } from "unthrown";

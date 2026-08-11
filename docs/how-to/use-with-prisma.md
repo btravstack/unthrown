@@ -184,9 +184,48 @@ const moved = db.$tryTransaction((tx) =>
 - A [`Defect`](../explanation/the-defect-channel) also rolls back and **stays a
   defect** — including a callback that _throws_ instead of returning an
   `AsyncResult`. A bug is never quietly downgraded into your error channel.
-- Nesting is a compile error: `tx` has no `$tryTransaction`. For a batch of
-  independent writes, use the raw `$transaction([...])` with the raw promise
-  methods.
+- Nesting is a compile error: `tx` has no `$tryTransaction`.
+- Naming the `tx` parameter of a helper factored out of the callback is
+  `TransactionClient<typeof db>` — use it rather than restating the deny list by
+  hand, which drifts silently (`Omit` of a key that does not exist is not an
+  error):
+
+```ts
+import type { TransactionClient } from "@unthrown/prisma";
+
+type Tx = TransactionClient<typeof db>;
+
+const chargeFees = (tx: Tx, id: number) =>
+  tx.invoice.tryUpdate({ where: { id }, data: { charged: true } });
+```
+
+### Batch transactions
+
+For independent writes with no application logic between them, `$tryTransaction`
+also takes an **array** — Prisma's batch form, one round trip, all or nothing:
+
+```ts
+const rows = db.$tryTransaction(inputs.map((data) => db.user.create({ data })));
+//    ^? AsyncResult<User[], PrismaQueryError>
+```
+
+A fixed tuple keeps positional types
+(`[db.user.create(…), db.user.count()]` → `AsyncResult<[User, number], …>`); a
+dynamic array collapses to a list, the same duality as core's `all`.
+
+Two consequences of Prisma's batch form needing **unexecuted** `PrismaPromise`s,
+both deliberate:
+
+- The array holds the **raw** delegate methods — `db.user.create(...)`, not
+  `tryCreate`. A `try*` method has already run and returns an `AsyncResult`, so
+  passing one is a compile error.
+- `E` is the whole `PrismaQueryError` union rather than the per-operation
+  narrowing you get from `try*`: a raw `PrismaPromise` carries no error-type
+  information. Infrastructure failures are still defects, exactly as everywhere
+  else.
+
+`maxWait` and `timeout` are not accepted — they govern an interactive
+transaction's open window, which a batch does not have. `isolationLevel` is.
 
 ## Cursor pagination
 
@@ -228,9 +267,9 @@ defect.
 ## Raw methods and raw SQL
 
 The bridge is additive: `db.user.findMany(...)` (the raw promise) is still there,
-for exactly two things — batch `$transaction([...])` (which needs unexecuted
-`PrismaPromise`s) and raw SQL. Qualify those yourself at the boundary, reusing the
-exported `qualifyPrismaError`:
+for exactly two things — composing the array a batch `$tryTransaction([...])`
+runs, and raw SQL. Qualify raw SQL yourself at the boundary, reusing the exported
+`qualifyPrismaError`:
 
 ```ts
 import { fromPromise } from "unthrown";
