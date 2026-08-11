@@ -346,4 +346,27 @@ describe("fromExecutor", () => {
     });
     expectDefect(r);
   });
+
+  it("turns a synchronous throw in the executor body into a Defect", async () => {
+    const r = await fromExecutor<number, never>(() => {
+      throw boom;
+    });
+    expectDefect(r);
+  });
+
+  it("turns a non-Result handed to settle into a Defect", async () => {
+    const r = await fromExecutor<number, never>((settle) => {
+      (settle as unknown as (value: unknown) => void)(42);
+    });
+    expect(r.tag).toBe("Defect");
+    if (r.tag === "Defect") expect(r.cause).toBeInstanceOf(TypeError);
+  });
+
+  it("keeps the first settle when the body throws afterwards", async () => {
+    const r = await fromExecutor<number, never>((settle) => {
+      settle(Ok(1));
+      throw boom;
+    });
+    expectOk(r, 1);
+  });
 });
