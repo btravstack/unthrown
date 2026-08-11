@@ -263,6 +263,18 @@ was planned).
   The type therefore over-states the success channel — `Result<Promise<T>, E>` is
   spellable but never inhabited — the mirror of `recoverErrCases`'s `never`
   under-stating the error channel. Guarded in `interop.spec.ts`.
+- **`fromExecutor`'s executor is sync too — enforced at RUNTIME, the sibling of
+  the `fromThrowable` rule above.** An `async` executor **compiles**: TypeScript's
+  void-return special case accepts a `Promise<void>` against a `=> void`
+  annotation. Neither escape works — `<T, E, R>` with `R & NotThenable<R>` makes
+  the primary call form `TS2558: Expected 3 type arguments, but got 2` (there is
+  no partial type-argument inference), and defaulting `R = void` to fix that
+  pins `R` to the default instead of inferring `Promise<void>`, so the ban never
+  fires. So the returned thenable is adopted and its rejection **settles a
+  `Defect`** unless the executor already settled — strictly better than
+  `new Promise`, which drops the same throw as a floating rejection. Guarded in
+  `interop.spec.ts` and `invariants.spec.ts`; the `TS2558` regression is guarded
+  in `types.test-d.ts`.
 - **A DISCARDED thenable is adopted, so its rejection never floats.** The
   observers (`tap`, `tapErrCases`, `tapDefect`, `tapFailure`) throw their
   callback's return away, and the `Result`-returning combinators reject a
@@ -479,7 +491,15 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
 - interop: `fromNullable`, `fromThrowable`, `fromSafeThrowable` (the sync
   mirror of `fromSafePromise` — every throw a `Defect`, `E = never`, no
   `qualify`; the named form of the `(c, d) => d(c)` boilerplate, an explicit
-  "everything here is a defect" decision), `fromPromise`, `fromSafePromise`
+  "everything here is a defect" decision), `fromPromise`,
+  `fromSafePromise`, `fromExecutor` (the callback-API boundary — this library's
+  `new Promise`, whose settler takes a **`Result`** so the caller names the
+  variant: no `qualify`, and no `unknown` can reach `E`. The `defect` helper is
+  injected alongside it, the triage-site rule of Thesis #3, and is the only route
+  to the defect channel from inside an asynchronous callback. `T`/`E` come from
+  explicit type arguments or an annotated target — a settler is a parameter, so
+  nothing infers them. An executor that never settles never resolves, the one
+  hazard `fromPromise` does not have.)
 - aggregate: `all` / `allAsync` take a **tuple/array** (a fixed tuple keeps
   positional types; a dynamic `Result<T, E>[]` / `AsyncResult<T, E>[]` collapses
   to `Result<T[], E>` / `AsyncResult<T[], E>`), while `allFromDict` /

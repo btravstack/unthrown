@@ -90,8 +90,9 @@ export type Result<T, E> = ResultType<T, E>;
  *
  * @remarks
  * The async sibling of {@link Result}. Statics are grouped by what they
- * **return**, so the pre-lifted constructors, `fromPromise`/`fromSafePromise`,
- * and the async aggregates sit here rather than on {@link Result}; the namespace
+ * **return**, so the pre-lifted constructors, `fromExecutor`,
+ * `fromPromise`/`fromSafePromise`, and the async aggregates sit here rather
+ * than on {@link Result}; the namespace
  * already conveys "async", so the members drop the `Async` suffix their free
  * functions carry (`AsyncResult.Ok` is `OkAsync`; `AsyncResult.Err` is
  * `ErrAsync`; `AsyncResult.Do` is `DoAsync`; `AsyncResult.all` is `allAsync`;
