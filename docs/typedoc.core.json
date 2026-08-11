@@ -27,6 +27,7 @@
     "AsyncResultRecord",
     "ExhaustiveMatch",
     "MatchOut",
+    "Settle",
     "NonExhaustive",
     "MatchedOf",
     "Unset",

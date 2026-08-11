@@ -17,6 +17,7 @@ export {
   allAsync,
   allFromDict,
   allFromDictAsync,
+  fromExecutor,
   fromNullable,
   fromPromise,
   fromSafePromise,

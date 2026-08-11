@@ -12,6 +12,7 @@ import {
   allAsync,
   allFromDict,
   allFromDictAsync,
+  fromExecutor,
   fromNullable,
   fromPromise,
   fromSafePromise,
@@ -83,9 +84,9 @@ export type Result<T, E> = ResultType<T, E>;
 /**
  * Companion object grouping the **`AsyncResult`-producing** entry points under
  * the matching namespace: {@link AsyncResult.Ok}, {@link AsyncResult.Err},
- * {@link AsyncResult.Do}, {@link AsyncResult.fromPromise},
- * {@link AsyncResult.fromSafePromise}, {@link AsyncResult.all},
- * {@link AsyncResult.allFromDict}.
+ * {@link AsyncResult.Do}, {@link AsyncResult.fromExecutor},
+ * {@link AsyncResult.fromPromise}, {@link AsyncResult.fromSafePromise},
+ * {@link AsyncResult.all}, {@link AsyncResult.allFromDict}.
  *
  * @remarks
  * The async sibling of {@link Result}. Statics are grouped by what they
@@ -115,6 +116,7 @@ export const AsyncResult = {
   Ok: OkAsync,
   Err: ErrAsync,
   Do: DoAsync,
+  fromExecutor,
   fromPromise,
   fromSafePromise,
   all: allAsync,
