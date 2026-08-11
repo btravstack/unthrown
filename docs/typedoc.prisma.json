@@ -11,6 +11,7 @@
     "DeleteError",
     "UpsertError",
     "UpdateManyError",
-    "TxDenyList"
+    "TxDenyList",
+    "TryTransaction"
   ]
 }

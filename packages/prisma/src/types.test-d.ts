@@ -16,6 +16,7 @@ import type {
   ForeignKeyViolation,
   PrismaQueryError,
   RecordNotFound,
+  TransactionClient,
   UniqueConstraintViolation,
 } from "./index.js";
 import { qualifyPrismaError, unthrownPrisma } from "./index.js";
@@ -126,6 +127,44 @@ db.$tryTransaction((txc) => {
   return txc.user.tryFindMany();
 });
 
+// --- TransactionClient: the tx parameter has a nameable type -------------------
+
+declare const namedTx: TransactionClient<typeof db>;
+
+// The delegates and their try* methods survive the Omit.
+namedTx.user.tryFindMany();
+
+// @ts-expect-error — the deny list removes $tryTransaction (no nesting).
+namedTx.$tryTransaction;
+// @ts-expect-error — and the raw $transaction with it.
+namedTx.$transaction;
+// @ts-expect-error — and the connection/extension methods.
+namedTx.$extends;
+
+// The round trip: the `tx` the callback actually receives is assignable to the
+// exported alias — the whole point of naming a helper's parameter with it.
+const chargeFees = (t: TransactionClient<typeof db>) => t.user.tryFindMany();
+db.$tryTransaction((txc) => chargeFees(txc));
+
+// --- $tryTransaction: the batch form ------------------------------------------
+
+const batch = db.$tryTransaction([
+  db.user.create({ data: { email: "a@example.com" } }),
+  db.user.count(),
+]);
+
+declare const inputs: readonly { email: string }[];
+const batchDynamic = db.$tryTransaction(inputs.map((data) => db.user.create({ data })));
+
+// @ts-expect-error — a batch takes UNEXECUTED PrismaPromises; `try*` has already run.
+db.$tryTransaction([db.user.tryCreate({ data: { email: "a@example.com" } })]);
+// @ts-expect-error — not a Prisma isolation level.
+db.$tryTransaction([db.user.count()], { isolationLevel: "Chaotic" });
+// @ts-expect-error — `timeout` governs an interactive transaction, not a batch.
+db.$tryTransaction([db.user.count()], { timeout: 10 });
+
+db.$tryTransaction([db.user.count()], { isolationLevel: "Serializable" });
+
 export type _Assertions = [
   // full read: default payload flows through
   Expect<Equal<AsyncOkOf<typeof all>[number]["email"], string>>,
@@ -194,4 +233,13 @@ export type _Assertions = [
     Equal<AsyncErrOf<typeof tx>, UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound>
   >,
   Expect<Equal<AsyncOkOf<typeof tx>["email"], string>>,
+  // the batch form: a fixed tuple keeps positional types...
+  Expect<Equal<AsyncOkOf<typeof batch>["length"], 2>>,
+  Expect<Equal<AsyncOkOf<typeof batch>[0]["email"], string>>,
+  Expect<Equal<AsyncOkOf<typeof batch>[1], number>>,
+  // ...a dynamic array collapses to a list, as core's `all` does
+  Expect<Equal<AsyncOkOf<typeof batchDynamic>[number]["email"], string>>,
+  // and E is the whole union — a raw PrismaPromise carries no error type
+  Expect<Equal<AsyncErrOf<typeof batch>, PrismaQueryError>>,
+  Expect<Equal<AsyncErrOf<typeof batchDynamic>, PrismaQueryError>>,
 ];

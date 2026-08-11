@@ -94,6 +94,22 @@ const moved = db.$tryTransaction((tx) =>
 // Err anywhere → both updates rolled back, and the Err is in `moved`.
 ```
 
+- **`$tryTransaction([...])`** — the same method's **batch** form: the operations
+  run in one round trip, all or nothing. It takes the **raw** delegate methods,
+  because Prisma's batch form needs unexecuted `PrismaPromise`s — and for the
+  same reason `E` is the whole `PrismaQueryError` union rather than the
+  per-operation narrowing `try*` gives.
+
+```ts
+const rows = db.$tryTransaction(inputs.map((data) => db.user.create({ data })));
+//    ^? AsyncResult<User[], PrismaQueryError>
+// Any constraint violation → nothing is written, and the Err is modeled.
+```
+
+- **`TransactionClient<C>`** — the type of an interactive callback's `tx`, for
+  naming the parameter of a helper factored out of one:
+  `type Tx = TransactionClient<typeof db>`.
+
 - **`tryPaginate`** — cursor pagination in the style of
   [`prisma-extension-pagination`](https://github.com/deptyped/prisma-extension-pagination)
   (same option names, same `[results, meta]` shape), with one fix folded in: a
@@ -126,8 +142,8 @@ const liked = await db.like
   });
 ```
 
-The raw promise methods stay available on purpose: they are the escape hatch for
-batch `$transaction([...])`, which needs unexecuted `PrismaPromise`s.
+The raw promise methods stay available on purpose: raw SQL goes through them, and
+a batch `$tryTransaction([...])` is composed from them.
 
 `@prisma/client` (v7+) is a peer dependency.
 

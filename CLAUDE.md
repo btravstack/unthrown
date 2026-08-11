@@ -825,9 +825,25 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   (an unsound omission until 2026-08: the runtime produced a `RecordNotFound`
   the type excluded, so a type-exhaustive `mapErrCases` threw
   `NonExhaustiveError` and the modeled error silently became a `Defect`). Also
-  `$tryTransaction` (an interactive transaction whose callback
-  speaks `AsyncResult` — an `Err` rolls back and re-surfaces typed; a defect
-  rolls back and stays a defect, a throwing callback included) and
+  `$tryTransaction`, **overloaded exactly as Prisma's own
+  `$transaction` is** — one method, two forms, so the `try*` prefix keeps
+  mapping one-to-one onto a Prisma method (a separate `$tryBatchTransaction`
+  was rejected for inventing a concept Prisma does not have). The
+  **interactive** form takes a callback speaking `AsyncResult` — an `Err` rolls
+  back and re-surfaces typed; a defect rolls back and stays a defect, a
+  throwing callback included — and its `tx` is nameable from outside as the
+  exported `TransactionClient<C>` (`Omit<C, TxDenyList>`; the deny list itself
+  stays internal, because a hand-copied `Omit` drifts silently — `Omit` of a
+  key that does not exist is not an error). The **batch** form takes an array
+  of unexecuted `Prisma.PrismaPromise`s, one round trip, all or nothing,
+  qualified through the same `qualifyPrismaError`; two limits follow from
+  Prisma's form and are documented rather than papered over: the array holds
+  the **raw** delegate methods (a `try*` has already executed, so passing one
+  is a compile error) and `E` is the whole `PrismaQueryError` union, since a
+  raw `PrismaPromise` carries no error-type information. A fixed tuple keeps
+  positional types, a dynamic array collapses to a list — core's `all` duality.
+  Being overloaded is why `$tryTransaction` is a `const` carrying an overloaded
+  function type rather than an object-literal method. Also
   `tryPaginate(...).withCursor(...)` (the
   `prisma-extension-pagination` cursor API with its unmerged #35 fix folded
   in; `after`/`before` are mutually exclusive in the type — passing both used to
@@ -841,8 +857,8 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   `qualifyPrismaError`, which **is** a `qualify` — `(cause, defect)`, generic in
   the marker type so core's non-exported `Defect` need not be named — and so
   drops straight into a `fromPromise` at a boundary of your own; the raw methods
-  stay as the escape hatch for batch
-  `$transaction([...])` and raw SQL. Tested against a
+  stay as the escape hatch for raw SQL, and are what a batch
+  `$tryTransaction([...])` is composed from. Tested against a
   real in-memory SQLite client (`@prisma/adapter-better-sqlite3`) with a
   generated, gitignored test client; **deliberately outside the fixed version
   group** — its majors track `@prisma/client`'s cadence, not the family's.

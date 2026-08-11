@@ -30,8 +30,10 @@
 // So a read has NO modeled failure: `tryFindMany` is `AsyncResult<User[], never>`
 // (absence is `null`, not an error).
 //
-// The raw promise methods stay available on purpose: they are the escape hatch
-// for batch `$transaction([...])`, which needs unexecuted `PrismaPromise`s.
+// The raw promise methods stay available on purpose: raw SQL goes through them,
+// and a batch `$tryTransaction([...])` is composed FROM them — Prisma's batch
+// form needs unexecuted `PrismaPromise`s, which a `try*` method (already
+// executed, already an `AsyncResult`) cannot supply.
 
 import { Prisma } from "@prisma/client/extension";
 import { type AsyncResult, fromPromise, isResult, type Result, TaggedError } from "unthrown";
@@ -140,8 +142,7 @@ const constraintFields = (meta: unknown): readonly string[] => {
 
 /**
  * Qualify a Prisma rejection — the runtime half of the bridge, and a ready-made
- * `qualify` for any boundary you build yourself (raw SQL, a batch
- * `$transaction([...])`).
+ * `qualify` for any boundary you build yourself (raw SQL).
  *
  * @remarks
  * The three P-codes that describe a **domain** outcome map to their tagged
@@ -308,6 +309,187 @@ type TxDenyList =
   | "$use"
   | "$extends"
   | "$tryTransaction";
+
+/**
+ * The client an interactive `$tryTransaction` callback receives — the extended
+ * client minus what a transaction cannot do.
+ *
+ * @remarks
+ * Name the `tx` parameter of a helper factored out of a callback with this,
+ * rather than restating the deny list: `$tryTransaction` uses the very same
+ * alias, so the two cannot drift. Restating it by hand does drift silently —
+ * `Omit` of a key that does not exist is not an error, so a hand-copied list
+ * keeps compiling after the library's own list changes.
+ *
+ * Not to be confused with Prisma's own generated `Prisma.TransactionClient` —
+ * that one is non-generic and, notably, does not remove `$tryTransaction`.
+ *
+ * @typeParam C - the extended client, usually `typeof db`.
+ *
+ * @example
+ * ```ts
+ * type Tx = TransactionClient<typeof db>;
+ *
+ * const chargeFees = (tx: Tx, id: number) =>
+ *   tx.invoice.tryUpdate({ where: { id }, data: { charged: true } });
+ *
+ * db.$tryTransaction((tx) => chargeFees(tx, 1));
+ * ```
+ */
+export type TransactionClient<C> = Omit<C, TxDenyList>;
+
+// Prisma's own `UnwrapTuple` lives at `runtime.Types.Utils.UnwrapTuple`, behind a
+// runtime entry path this package deliberately never imports (it moved between
+// Prisma 6 and 7), so the mapping is written here. A fixed tuple keeps positional
+// types; a dynamic `PrismaPromise<T>[]` collapses to `T[]` — the same duality as
+// core's `all`.
+type UnwrapPrismaTuple<P extends readonly unknown[]> = {
+  -readonly [K in keyof P]: P[K] extends Prisma.PrismaPromise<infer X> ? X : never;
+};
+
+type TryTransaction = {
+  /**
+   * An interactive transaction whose callback speaks `AsyncResult`: an `Err`
+   * triggers a ROLLBACK and comes out as the same typed `Err`.
+   *
+   * @remarks
+   * The callback's `Err` is thrown internally as a sentinel so Prisma aborts the
+   * transaction, then unwrapped back into the typed error channel —
+   * `AsyncResult<T, E | PrismaQueryError>`. A defect inside the callback also
+   * rolls back and stays a defect — including a callback that *throws* instead
+   * of returning an `AsyncResult` (a bug, never downgraded to a modeled error).
+   * The `try*` methods are available on `tx` (extensions propagate into the
+   * interactive transaction); the deny list additionally removes
+   * `$tryTransaction` itself — no nesting. Name a helper's `tx` parameter with
+   * {@link TransactionClient}.
+   *
+   * The `| PrismaQueryError` is not merely defensive: a deferred constraint
+   * surfaces its violation at COMMIT rather than at the statement, so the
+   * transaction boundary itself can produce one. Prisma's own machinery failing
+   * any other way (a `maxWait` / `timeout` expiry, a lost connection) is
+   * infrastructure, and so a defect like everywhere else.
+   *
+   * @example
+   * ```ts
+   * const moved = db.$tryTransaction((tx) =>
+   *   tx.account
+   *     .tryUpdate({ where: { id: from }, data: { balance: { decrement: amount } } })
+   *     .flatMap(() =>
+   *       tx.account.tryUpdate({
+   *         where: { id: to },
+   *         data: { balance: { increment: amount } },
+   *       }),
+   *     ),
+   * );
+   * // Err anywhere → both updates rolled back, and the Err is in `moved`.
+   * ```
+   */
+  <C, T, E>(
+    this: C,
+    fn: (tx: TransactionClient<C>) => AsyncResult<T, E>,
+    options?: {
+      maxWait?: number;
+      timeout?: number;
+      isolationLevel?: TransactionIsolationLevel;
+    },
+  ): AsyncResult<T, E | PrismaQueryError>;
+
+  /**
+   * A batch transaction: the operations run in one round trip, all or nothing,
+   * with no application code held open in between.
+   *
+   * @remarks
+   * Two things follow from Prisma's batch form taking **unexecuted**
+   * `PrismaPromise`s, and both are deliberate:
+   *
+   * - The array holds the **raw** delegate methods — `db.user.create(...)`, not
+   *   `tryCreate`. A `try*` method has already executed and returns an
+   *   `AsyncResult`, so passing one is a compile error.
+   * - `E` is the whole {@link PrismaQueryError} union rather than the
+   *   per-operation narrowing the `try*` methods give: a raw `PrismaPromise`
+   *   carries no error-type information. Every infrastructure failure is still
+   *   a defect, exactly as everywhere else.
+   *
+   * A fixed tuple keeps positional types; a dynamic array (a `.map(...)`)
+   * collapses to `AsyncResult<T[], PrismaQueryError>`.
+   *
+   * `maxWait` and `timeout` are absent by design — they govern an interactive
+   * transaction's open window, which a single-round-trip batch does not have.
+   *
+   * @example
+   * ```ts
+   * const rows = db.$tryTransaction(
+   *   inputs.map((data) => db.user.create({ data })),
+   * );
+   * //    ^? AsyncResult<User[], PrismaQueryError>
+   * // Any constraint violation → nothing is written, and the Err is modeled.
+   * ```
+   */
+  <C, P extends readonly Prisma.PrismaPromise<unknown>[]>(
+    this: C,
+    operations: readonly [...P],
+    options?: { isolationLevel?: TransactionIsolationLevel },
+  ): AsyncResult<UnwrapPrismaTuple<P>, PrismaQueryError>;
+};
+
+// Declared as a const rather than an object-literal method because it is
+// OVERLOADED (Prisma's `$transaction` has two forms and the `try*` prefix maps
+// one-to-one onto it). The implementation side is untyped, as it is for the
+// `$allModels` methods: the declared signatures carry the safety.
+const $tryTransaction = function <T, E>(this: unknown, arg: unknown, options?: unknown) {
+  const client = Prisma.getExtensionContext(this) as unknown as {
+    $transaction: (arg: unknown, opts?: unknown) => Promise<unknown>;
+  };
+  // The batch form needs none of the sentinel machinery below: there is no
+  // callback whose `Err` has to travel out through a throw. Prisma runs the
+  // array in one transaction and rejects with the first failure, which is
+  // qualified exactly like any other query.
+  if (Array.isArray(arg)) {
+    return fromPromise(() => client.$transaction(arg, options), qualifyPrismaError);
+  }
+  const fn = arg as (tx: unknown) => AsyncResult<T, E>;
+  // Passed as a THUNK so even a synchronous throw out of `$transaction` itself
+  // (e.g. invalid options from untyped code) stays inside the boundary instead
+  // of escaping as a raw throw.
+  //
+  // The triage runs with the concrete `PrismaQueryError` union — `qualify`'s
+  // `NotThenable` return constraint cannot be proven over the unresolved `E`
+  // parameter (the generic-`E` concession, as guards-over-match) — and the
+  // callback's modeled `E` is re-attached by the declared signature.
+  return fromPromise(
+    () =>
+      client.$transaction(async (tx: unknown) => {
+        let result: Result<T, E>;
+        try {
+          const returned: unknown = await fn(tx);
+          // A callback that resolves to a NON-Result (out of contract — e.g. a
+          // raw value from untyped code) is a bug, exactly like a throwing
+          // callback: the TypeError is caught below, so it rolls back as a
+          // DEFECT — never downgraded to a modeled error.
+          if (!isResult(returned)) {
+            throw new TypeError(
+              "@unthrown/prisma: the $tryTransaction callback did not return a Result.",
+            );
+          }
+          result = returned as Result<T, E>;
+        } catch (cause) {
+          // A callback that throws (instead of returning an AsyncResult) is a
+          // bug — roll back and keep it a DEFECT. Only rejections outside this
+          // catch (Prisma's own BEGIN/COMMIT/timeout machinery) qualify as
+          // query failures below.
+          throw new Rollback(cause, true);
+        }
+        if (result.isOk()) return result.value;
+        throw result.isErr() ? new Rollback(result.error, false) : new Rollback(result.cause, true);
+      }, options),
+    (cause, defect) =>
+      cause instanceof Rollback
+        ? cause.wasDefect
+          ? defect(cause.carried)
+          : (cause.carried as PrismaQueryError)
+        : qualifyPrismaError(cause, defect),
+  );
+} as TryTransaction;
 
 /**
  * The Prisma Client extension. Apply it with `$extends` to add the `try*`
@@ -594,102 +776,5 @@ export const unthrownPrisma = Prisma.defineExtension({
       },
     },
   },
-  client: {
-    /**
-     * An interactive transaction whose callback speaks `AsyncResult`: an `Err`
-     * triggers a ROLLBACK and comes out as the same typed `Err`.
-     *
-     * @remarks
-     * The callback's `Err` is thrown internally as a sentinel so Prisma aborts
-     * the transaction, then unwrapped back into the typed error channel —
-     * `AsyncResult<T, E | PrismaQueryError>`. A defect inside the callback also
-     * rolls back and stays a defect — including a callback that *throws*
-     * instead of returning an `AsyncResult` (a bug, never downgraded to a
-     * modeled error). The `try*` methods are available on `tx`
-     * (extensions propagate into the interactive transaction); the deny list
-     * additionally removes `$tryTransaction` itself — no nesting.
-     *
-     * The `| PrismaQueryError` is not merely defensive: a deferred constraint
-     * surfaces its violation at COMMIT rather than at the statement, so the
-     * transaction boundary itself can produce one. Prisma's own machinery
-     * failing any other way (a `maxWait` / `timeout` expiry, a lost connection)
-     * is infrastructure, and so a defect like everywhere else.
-     *
-     * @example
-     * ```ts
-     * const moved = db.$tryTransaction((tx) =>
-     *   tx.account
-     *     .tryUpdate({ where: { id: from }, data: { balance: { decrement: amount } } })
-     *     .flatMap(() =>
-     *       tx.account.tryUpdate({
-     *         where: { id: to },
-     *         data: { balance: { increment: amount } },
-     *       }),
-     *     ),
-     * );
-     * // Err anywhere → both updates rolled back, and the Err is in `moved`.
-     * ```
-     */
-    $tryTransaction<C, T, E>(
-      this: C,
-      fn: (tx: Omit<C, TxDenyList>) => AsyncResult<T, E>,
-      options?: {
-        maxWait?: number;
-        timeout?: number;
-        isolationLevel?: TransactionIsolationLevel;
-      },
-    ): AsyncResult<T, E | PrismaQueryError> {
-      const client = Prisma.getExtensionContext(this) as unknown as {
-        $transaction: <R>(f: (tx: unknown) => Promise<R>, opts?: unknown) => Promise<R>;
-      };
-      // Passed as a THUNK so even a synchronous throw out of `$transaction`
-      // itself (e.g. invalid options from untyped code) stays inside the
-      // boundary instead of escaping as a raw throw.
-      //
-      // The triage runs with the concrete `PrismaQueryError` union — `qualify`'s
-      // `NotThenable` return constraint cannot be proven over the unresolved `E`
-      // parameter (the generic-`E` concession, as guards-over-match) — and the
-      // callback's modeled `E` is re-attached once, on the way out.
-      const lifted: AsyncResult<T, PrismaQueryError> = fromPromise(
-        () =>
-          client.$transaction(async (tx) => {
-            let result: Result<T, E>;
-            try {
-              const returned: unknown = await fn(tx as Omit<C, TxDenyList>);
-              // A callback that resolves to a NON-Result (out of contract —
-              // e.g. a raw value from untyped code) is a bug, exactly like a
-              // throwing callback: the TypeError is caught below, so it rolls
-              // back as a DEFECT — never downgraded to a modeled error
-              // (which is what dispatching `returned.isOk()` outside this
-              // try/catch used to do).
-              if (!isResult(returned)) {
-                throw new TypeError(
-                  "@unthrown/prisma: the $tryTransaction callback did not return a Result.",
-                );
-              }
-              result = returned as Result<T, E>;
-            } catch (cause) {
-              // A callback that throws (instead of returning an AsyncResult) is a
-              // bug — roll back and keep it a DEFECT. Only rejections outside
-              // this catch (Prisma's own BEGIN/COMMIT/timeout machinery) qualify
-              // as query failures below.
-              throw new Rollback(cause, true);
-            }
-            if (result.isOk()) return result.value;
-            throw result.isErr()
-              ? new Rollback(result.error, false)
-              : new Rollback(result.cause, true);
-          }, options),
-        (cause, defect) =>
-          cause instanceof Rollback
-            ? cause.wasDefect
-              ? defect(cause.carried)
-              : (cause.carried as PrismaQueryError)
-            : qualifyPrismaError(cause, defect),
-      );
-      // A non-defect `Rollback` carries the callback's own `Err` value, so the
-      // channel is really `E | PrismaQueryError` — re-attached here.
-      return lifted as AsyncResult<T, E | PrismaQueryError>;
-    },
-  },
+  client: { $tryTransaction },
 });

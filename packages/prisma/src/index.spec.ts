@@ -331,6 +331,43 @@ describe("$tryTransaction", () => {
   });
 });
 
+describe("$tryTransaction (batch form)", () => {
+  it("commits every operation in one transaction", async ({ db }) => {
+    await expect(
+      db.$tryTransaction([
+        db.user.create({ data: { email: "a@example.com" } }),
+        db.user.create({ data: { email: "b@example.com" } }),
+      ]),
+    ).toBeOkWith([
+      expect.objectContaining({ email: "a@example.com" }),
+      expect.objectContaining({ email: "b@example.com" }),
+    ]);
+    await expect(db.user.tryCount()).toBeOkWith(2);
+  });
+
+  it("models a constraint violation and rolls the whole batch back", async ({ db }) => {
+    await expect(
+      db.$tryTransaction([
+        db.user.create({ data: { email: "first@example.com" } }),
+        db.user.create({ data: { email: "dup@example.com" } }),
+        db.user.create({ data: { email: "dup@example.com" } }),
+      ]),
+    ).toBeErrTagged("UniqueConstraintViolation");
+    // The rollback is asserted against the DATABASE, not inferred from the Err.
+    await expect(db.user.tryCount()).toBeOkWith(0);
+  });
+
+  it("an empty batch is Ok([])", async ({ db }) => {
+    await expect(db.$tryTransaction([])).toBeOkWith([]);
+  });
+
+  it("threads options through on the batch path", async ({ db }) => {
+    await expect(
+      db.$tryTransaction([db.user.count()], { isolationLevel: "Serializable" }),
+    ).toBeOkWith([0]);
+  });
+});
+
 describe("tryPaginate / withCursor", () => {
   const ids = (rows: ReadonlyArray<{ id: number }>) => rows.map((r) => r.id);
 
