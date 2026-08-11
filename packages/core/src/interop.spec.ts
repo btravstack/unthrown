@@ -332,4 +332,18 @@ describe("fromExecutor", () => {
     });
     expectOk(r, 1);
   });
+
+  it("settles a Defect through the injected helper", async () => {
+    const r = await fromExecutor<number, never>((settle, defect) => {
+      settle(defect(boom));
+    });
+    expectDefect(r);
+  });
+
+  it("routes an asynchronous callback's failure to the defect channel", async () => {
+    const r = await fromExecutor<number, never>((settle, defect) => {
+      setTimeout(() => settle(defect(boom)), 0);
+    });
+    expectDefect(r);
+  });
 });
