@@ -310,6 +310,31 @@ type TxDenyList =
   | "$tryTransaction";
 
 /**
+ * The client an interactive `$tryTransaction` callback receives — the extended
+ * client minus what a transaction cannot do.
+ *
+ * @remarks
+ * Name the `tx` parameter of a helper factored out of a callback with this,
+ * rather than restating the deny list: `$tryTransaction` uses the very same
+ * alias, so the two cannot drift. Restating it by hand does drift silently —
+ * `Omit` of a key that does not exist is not an error, so a hand-copied list
+ * keeps compiling after the library's own list changes.
+ *
+ * @typeParam C - the extended client, usually `typeof db`.
+ *
+ * @example
+ * ```ts
+ * type Tx = TransactionClient<typeof db>;
+ *
+ * const chargeFees = (tx: Tx, id: number) =>
+ *   tx.invoice.tryUpdate({ where: { id }, data: { charged: true } });
+ *
+ * db.$tryTransaction((tx) => chargeFees(tx, 1));
+ * ```
+ */
+export type TransactionClient<C> = Omit<C, TxDenyList>;
+
+/**
  * The Prisma Client extension. Apply it with `$extends` to add the `try*`
  * methods to every model delegate, and `$tryTransaction` to the client.
  *
@@ -632,7 +657,7 @@ export const unthrownPrisma = Prisma.defineExtension({
      */
     $tryTransaction<C, T, E>(
       this: C,
-      fn: (tx: Omit<C, TxDenyList>) => AsyncResult<T, E>,
+      fn: (tx: TransactionClient<C>) => AsyncResult<T, E>,
       options?: {
         maxWait?: number;
         timeout?: number;
@@ -655,7 +680,7 @@ export const unthrownPrisma = Prisma.defineExtension({
           client.$transaction(async (tx) => {
             let result: Result<T, E>;
             try {
-              const returned: unknown = await fn(tx as Omit<C, TxDenyList>);
+              const returned: unknown = await fn(tx as TransactionClient<C>);
               // A callback that resolves to a NON-Result (out of contract —
               // e.g. a raw value from untyped code) is a bug, exactly like a
               // throwing callback: the TypeError is caught below, so it rolls

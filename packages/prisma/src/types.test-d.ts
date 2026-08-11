@@ -16,6 +16,7 @@ import type {
   ForeignKeyViolation,
   PrismaQueryError,
   RecordNotFound,
+  TransactionClient,
   UniqueConstraintViolation,
 } from "./index.js";
 import { qualifyPrismaError, unthrownPrisma } from "./index.js";
@@ -125,6 +126,20 @@ db.$tryTransaction((txc) => {
   txc.$transaction;
   return txc.user.tryFindMany();
 });
+
+// --- TransactionClient: the tx parameter has a nameable type -------------------
+
+declare const namedTx: TransactionClient<typeof db>;
+
+// The delegates and their try* methods survive the Omit.
+namedTx.user.tryFindMany();
+
+// @ts-expect-error — the deny list removes $tryTransaction (no nesting).
+namedTx.$tryTransaction;
+// @ts-expect-error — and the raw $transaction with it.
+namedTx.$transaction;
+// @ts-expect-error — and the connection/extension methods.
+namedTx.$extends;
 
 export type _Assertions = [
   // full read: default payload flows through
