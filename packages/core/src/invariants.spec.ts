@@ -5,7 +5,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { Do, Err, fromSafePromise, Ok, P, type Result, GetError } from "./index.js";
+import { Do, Err, fromExecutor, fromSafePromise, Ok, P, type Result, GetError } from "./index.js";
 import { adoptionProbe, boom, defectOf, flushMicrotasks } from "./test-helpers.js";
 
 describe("Invariant 1: throw inside any combinator becomes a Defect", () => {
@@ -276,6 +276,15 @@ describe("Invariant 5: an AsyncResult's internal promise never rejects", () => {
     const defectR = await fromSafePromise(Promise.reject(boom));
     expect(okR.get()).toBe(1);
     expect(defectR.isDefect()).toBe(true);
+    await expect(
+      fromExecutor<number, never>(() => {
+        throw boom;
+      }),
+    ).resolves.toMatchObject({});
+    const executorR = await fromExecutor<number, never>(async () => {
+      throw boom;
+    });
+    expect(executorR.isDefect()).toBe(true);
   });
 });
 
@@ -320,6 +329,7 @@ describe("Invariant 6: a DISCARDED thenable is adopted, so its rejection never f
     ["flatMap", (t: PromiseLike<never>) => Ok(1).flatMap((() => t) as never)],
     ["flatTap", (t: PromiseLike<never>) => Ok(1).flatTap((() => t) as never)],
     ["bind", (t: PromiseLike<never>) => Do().bind("a", (() => t) as never)],
+    ["fromExecutor", (t: PromiseLike<never>) => fromExecutor<number, never>(() => t)],
   ])("%s adopts a smuggled thenable rather than dropping it", async (_label, run) => {
     await expectAdopted(run);
   });

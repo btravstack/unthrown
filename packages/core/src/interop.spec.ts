@@ -369,4 +369,21 @@ describe("fromExecutor", () => {
     });
     expectOk(r, 1);
   });
+
+  it("routes an async executor's rejection to the defect channel", async () => {
+    // An `async` executor type-checks — see the runtime-not-types note in
+    // CLAUDE.md. `new Promise` would drop this throw as a floating rejection.
+    const r = await fromExecutor<number, never>(async () => {
+      throw boom;
+    });
+    expectDefect(r);
+  });
+
+  it("keeps a settled value when an async executor rejects afterwards", async () => {
+    const r = await fromExecutor<number, never>(async (settle) => {
+      settle(Ok(1));
+      throw boom;
+    });
+    expectOk(r, 1);
+  });
 });
