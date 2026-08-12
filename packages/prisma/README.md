@@ -72,6 +72,15 @@ await db.user.tryCreate({ data }).match({
   only force every call site to carry an arm duplicating its own `defect` arm.
   (A defect is not a crash — it flows through the pipeline untouched and is
   folded at the edge like any other unmodeled failure.)
+
+  Those four codes are the **whole** modeled set: every other P-code — `P2007`,
+  `P2023`, `P2000`, `P2011`, `P2015`, … — is a defect. That matters where a
+  defect is _retried_ rather than surfaced (a Temporal activity rethrows it, and
+  a malformed id can never succeed on a retry). Replacing a hand-rolled
+  qualifier? Diff it against these four and re-qualify the rest with
+  `recoverDefect` — see
+  [Migrating a hand-rolled qualifier](https://btravstack.github.io/unthrown/how-to/use-with-prisma#migrating-a-hand-rolled-qualifier).
+
 - **`$tryTransaction`** — an interactive transaction whose callback speaks
   `AsyncResult`: an `Err` triggers a ROLLBACK and comes out as the same typed
   `Err`; a defect also rolls back and stays a defect. The `try*` methods are

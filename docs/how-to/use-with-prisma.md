@@ -51,6 +51,24 @@ that can't happen:
 `P2025` — plus `P2018`, which says the same thing from the to-many side of a
 nested write (a 404).
 
+::: danger Those four codes are the whole modeled set
+`P2002`, `P2003`, `P2018`, `P2025` — and nothing else. **Every other P-code
+becomes a [`Defect`](../explanation/the-defect-channel)**, including ones that
+read like domain outcomes: `P2007` (malformed value / inconsistent column
+data), `P2023` (inconsistent column data), `P2000` (value too long), `P2011`
+(null constraint), `P2015` (related record not found). The table above is a
+**boundary**, not a menu.
+
+That matters wherever a defect is retried rather than surfaced. Folded at an
+HTTP edge, a defect is a 500 and the request is over. Inside a **Temporal
+activity** — or any supervisor that retries on a thrown error — an `Err` you
+convert to a non-retryable failure fails fast, while a defect is rethrown and
+**retried**. A `P2007` from a malformed id can never succeed on a retry, so a
+path that carries that id (an `onError` handler, a dead-letter reprocessor)
+retries forever. Re-qualify such a code explicitly — see
+[below](#migrating-a-hand-rolled-qualifier).
+:::
+
 A **read has no modeled failure at all**. Absence is `null`, and a database that
 will not answer is a defect — so `tryFindMany` is `AsyncResult<User[], never>`.
 
@@ -112,6 +130,52 @@ Deadlocks (`P2034`) and pool timeouts (`P2024`) are defects too, so a retry
 wrapper reaches for `recoverDefect` and inspects the cause, rather than matching a
 tag. That is one place in a codebase — versus an arm at every call site.
 :::
+
+### Migrating a hand-rolled qualifier {#migrating-a-hand-rolled-qualifier}
+
+Replacing your own `try`/`catch` qualifier with `try*` is not a like-for-like
+swap: **diff your old qualifier against the four modeled codes**, because
+anything else it used to turn into an `Err` now lands on the defect channel.
+
+The migration is silent by every signal you would normally trust — the type
+check passes (the `Err` channel legitimately shrank), and a repository unit
+test asserting the `Ok` path passes too. What changes is the behaviour of the
+_failure_ path, one layer up.
+
+Re-qualify the codes you were modelling with `recoverDefect`, right where the
+query is issued:
+
+```ts
+import { RecordNotFound } from "@unthrown/prisma";
+import { Err, type AsyncResult } from "unthrown";
+
+// Recognized by `name` + a string `code`, not `instanceof`: Prisma's runtime
+// module path moves between majors, and an `instanceof` against the wrong copy
+// silently fails. This is the same check the extension itself uses.
+const hasCode = (cause: unknown, code: string): boolean =>
+  cause instanceof Error &&
+  cause.name === "PrismaClientKnownRequestError" &&
+  (cause as { code?: unknown }).code === code;
+
+const findUser = (id: string): AsyncResult<User, RecordNotFound> =>
+  db.user.tryFindUniqueOrThrow({ where: { id } }).recoverDefect((cause) => {
+    // A malformed id is the same domain outcome as a missing row — and it can
+    // never succeed on a retry, so it must not stay a defect.
+    if (hasCode(cause, "P2007")) return Err(new RecordNotFound({ cause }));
+    // oxlint-disable-next-line unthrown/no-throw -- rethrow keeps the defect intact
+    throw cause;
+  });
+```
+
+The `throw cause` is caught by the pipeline's own throw-to-defect net, so
+everything you did not name stays a defect with its original cause — no
+`try`/`catch`, and nothing untriaged leaks into `E`. Keep the comment: without
+it, the next reader "simplifies" the branch away.
+
+Re-qualifying into the error the operation _already_ models — `RecordNotFound`
+here — keeps `E` unchanged, so no call site has to grow an arm. A code that is
+genuinely a different outcome gets your own tagged error, and every exhaustive
+match on that channel stops compiling until it is handled, which is the point.
 
 ## Handle the errors
 

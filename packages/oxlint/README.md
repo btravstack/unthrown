@@ -21,7 +21,8 @@ library's theses into automated checks.
 | `unthrown/no-unhandled-result`     | A `Result` / `AsyncResult` returned by a bare call (awaited or not) must not be dropped on the floor — it carries the error channel; dropping it silently discards failures. Bind it, return it, or eliminate it with `match` / a `get*` extractor.                                                                                                                                                                                                                                                                                                                |
 | `unthrown/no-catch-all-pattern`    | No `P._` catch-all in a matcher (nor ts-pattern's `P.any` alias) — enumerate every error case by name (`.with(P.tag("A"), P.tag("B"), …, handler)`, grouping cases that share a handler), so a new error can't be silently absorbed. This is unthrown's default position; `P._` is an escape hatch — a helper generic in `E`, or an `E` that is a single type rather than a union — and carries a targeted `oxlint-disable`. See [below](#the-catch-all-escape-hatch).                                                                                             |
 | `unthrown/no-unused-matcher`       | A `…Cases` callback (the five error combinators, and `match`'s `errCases` handler) must use the matcher it was handed. The injected matcher is the only builder bound to the actual error — a builder sourced elsewhere satisfies the structural `ExhaustiveMatch` constraint but picks its branch from whatever value _it_ closed over: the wrong case is recovered silently, or nothing matches and the modeled error becomes a Defect. Also flags a second `match(...)` built inside the callback's own body (branch handlers are free to match their payload). |
-| `unthrown/no-get-or-throw`         | **Opt-in** (not in `recommended`): no `getOrThrow()` — it throws the modeled error, abandoning errors-as-values at the last step. Fold the error channel instead: `recoverErrCases((matcher, defect) => …)` empties `E`, so `.get()` compiles. Matched as a **zero-argument** member call, so Effect's one-argument `Option.getOrThrow(o)` is left alone. `getOrThrow()` is right in a **test** — exempt those files with an oxlint `overrides` entry rather than a rule option.                                                                                   |
+| `unthrown/no-throw`                | **Opt-in** (not in `recommended`): no raw `throw` statements — errors are returned (`Err(...)`), only a true defect ever throws. A modeled failure → `return Err(...)`; a failure genuinely unmodeled here → `recoverErrCases` + `get` (routing the case to the injected `defect(...)`); a known-technical precondition throw → a plain helper wrapped once with `fromSafeThrowable`; a deliberate throw site carries a targeted `oxlint-disable`. oxlint ships no `no-restricted-syntax`, so this rule is the only way to enforce the ban.                        |
+| `unthrown/no-get-or-throw`         | **Opt-in** (not in `recommended`): no `getOrThrow()` — it throws the modeled error, abandoning errors-as-values at the last step. Fold the error channel instead: `recoverErrCases((matcher, defect) => …)` empties `E`, so `.get()` compiles. Matched as a **zero-argument** member call, so Effect's one-argument `Option.getOrThrow(o)` is left alone. `getOrThrow()` is right in a **test** — exempt those files with an oxlint `overrides` entry rather than a rule option. Pairs with `no-throw`: with both on, there is no escape left.                     |
 
 Most rules resolve import bindings via scope analysis (through the _imported_
 name, so renamed imports resolve too), and only fire on unthrown's own
@@ -30,7 +31,8 @@ are keyed on a **name or shape** instead — unthrown's own vocabulary, needing
 no `Result` binding to resolve: `no-get-or-throw` (a zero-argument
 `.getOrThrow()` member call), `no-unused-matcher` (the `…Cases` method names),
 and the `returnType<R>()` pin on a `mapErrCases` callback's own matcher
-parameter.
+parameter. `no-throw` is keyed on the language statement itself — it reports
+every `throw`, with nothing to resolve at all.
 
 ## Usage
 
@@ -44,6 +46,7 @@ Register the plugin and enable its rules in your `.oxlintrc.json`:
     "unthrown/no-catch-all-pattern": "error",
     "unthrown/no-get-or-throw": "error",
     "unthrown/no-unhandled-result": "error",
+    "unthrown/no-throw": "error",
     "unthrown/no-unused-matcher": "error",
     "unthrown/prefer-async-result": "error"
   },
@@ -58,8 +61,8 @@ Register the plugin and enable its rules in your `.oxlintrc.json`:
 
 The package's default export also exposes a `recommended` preset (an oxlint
 config that registers the plugin and turns the recommended rules on —
-`no-get-or-throw` is the one explicit opt-in) for setups that build their config
-programmatically:
+`no-throw` and `no-get-or-throw` are the two explicit opt-ins) for setups that
+build their config programmatically:
 
 ```ts
 import unthrown from "@unthrown/oxlint";
