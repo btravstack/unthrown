@@ -1,6 +1,6 @@
 // Generate the per-package API reference into `api/<name>/`, one TypeDoc run
-// per `typedoc.<name>.json`, concurrently. TypeDoc lives here rather than in
-// each package because it needs its own TypeScript — see CLAUDE.md.
+// per package, concurrently. TypeDoc lives here rather than in each package
+// because it needs its own TypeScript — see CLAUDE.md.
 import { execFile } from "node:child_process";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
@@ -21,8 +21,15 @@ const TYPEDOC = join(
   "typedoc",
 );
 
-// Keep in sync with the `typedoc.<name>.json` files beside this script and with
-// the `/api/` sidebar in `.vitepress/config.ts`.
+// Every documented package. `core`, `drizzle` and `orpc` keep an options file of
+// their own because they carry settings nothing else needs (a `categoryOrder`,
+// `intentionallyNotExported`, or several entry points — `orpc` has no root
+// export at all); the rest differ only in the four values derived below, so they
+// share `typedoc.base.json` and get those four on the command line — CLI
+// arguments take precedence over the options file.
+//
+// Keep in sync with the `/api/` sidebar in `.vitepress/config.ts` and with
+// `@unthrown/docs#build`'s `dependsOn` in `turbo.json`.
 const packages: readonly string[] = [
   "core",
   "vitest",
@@ -35,11 +42,31 @@ const packages: readonly string[] = [
   "orpc",
 ];
 
+// Packages whose settings do not fit the shared base.
+const OWN_OPTIONS: ReadonlySet<string> = new Set(["core", "drizzle", "orpc"]);
+
+// `unthrown` is published unscoped; every satellite is `@unthrown/<dir>`.
+const displayName = (name: string): string => (name === "core" ? "unthrown" : `@unthrown/${name}`);
+
+const argsFor = (name: string): string[] =>
+  OWN_OPTIONS.has(name)
+    ? ["--options", `typedoc.${name}.json`]
+    : [
+        "--options",
+        "typedoc.base.json",
+        "--name",
+        displayName(name),
+        "--entryPoints",
+        `../packages/${name}/src/index.ts`,
+        "--tsconfig",
+        `../packages/${name}/tsconfig.json`,
+        "--out",
+        `api/${name}`,
+      ];
+
 const results = await Promise.allSettled(
   packages.map(async (name) => {
-    await run(process.execPath, [TYPEDOC, "--options", `typedoc.${name}.json`], {
-      cwd: docsDir,
-    });
+    await run(process.execPath, [TYPEDOC, ...argsFor(name)], { cwd: docsDir });
     return name;
   }),
 );

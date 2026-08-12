@@ -123,8 +123,11 @@ was planned).
    matcher is built-in** (`matcher.ts` — it replaced the former `ts-pattern`
    peer, keeping its call-site shape): a purpose-built, shallow matcher whose
    exhaustiveness is plain `Exclude` over a tracked `Remaining` parameter, with
-   `match`, `P` (`_`/`any`, `tag`, `instanceOf`, `when`, `union`, `string`,
-   `number`), `returnType<R>()` (declare the output type once — every branch is checked
+   `match`, `P` (`_`, `tag`, `instanceOf`, `when` — a primitive-type wildcard is
+   `P.when` with a `typeof` guard, and grouping patterns under one handler is
+   what a `.with(a, b, handler)` arm already does, so there is no `P.string` /
+   `P.number` / `P.union`, and no `P.any` alias for `P._`),
+   `returnType<R>()` (declare the output type once — every branch is checked
    against it, and the match evaluates to `R` instead of the union of the branch
    returns; callable before any arm has produced an output and only once — in
    practice directly after `match(…)`, though an arm returning `never` closes
@@ -410,10 +413,7 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
   instead — `recoverErrCases` empties `E` so `get()` compiles, with `match` /
   `flatMapErrCases` the other two ways to keep the error a value. The opt-in
   `@unthrown/oxlint` rule `no-get-or-throw` enforces that split, exempting test
-  files through an oxlint `overrides` entry. (It earlier carried the opposite
-  rationale — that it existed so a `no-throw` rule could ban raw `throw` while
-  this one extraction remained. That was withdrawn when `no-get-or-throw`
-  shipped: with both rules on, the reasoning was circular.) It is type-gated as the
+  files through an oxlint `overrides` entry. It is type-gated as the
   **complement of `get`**: it compiles only when the error channel is **non-empty**
   (`E` is not `never`, spelled `this: [E] extends [never] ? never : Result<T,E>`) —
   on a `Result<T, never>` there is nothing to throw, so `getOrThrow` does not
@@ -494,8 +494,8 @@ fromExecutor<T, E>>[0]`) is the grotesque spelling that invites a hand-copied
   origin with `fromSafeThrowable`). A public minting helper was weighed and
   **rejected** in #77 — frictionless minting would let unmodeled-by-laziness
   failures erode the defect channel's meaning; scoping the injection to triage
-  sites keeps that friction (the exhaustiveness IS the friction) while staying
-  lint-clean under a `no-throw` rule. Documented in the defect-channel guide.
+  sites keeps that friction (the exhaustiveness IS the friction). Documented in
+  the defect-channel guide.
 - interop: `fromNullable`, `fromThrowable`, `fromSafeThrowable` (the sync
   mirror of `fromSafePromise` — every throw a `Defect`, `E = never`, no
   `qualify`; the named form of the `(c, d) => d(c)` boilerplate, an explicit
@@ -668,6 +668,19 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   type-checks on the `Ok` variant. `AsyncRes` operates purely on the public
   `Result` union (wraps a `Promise<Result>`, branches on `r.tag`), never on `Res`
   internals.
+- **`AsyncRes` delegates every non-awaiting combinator to its sync twin**, via
+  one private `#lift(f)` = `new AsyncRes(this.#promise.then(f))`. `map`, `tap`,
+  `let`, `as`, `discard`, `ensure`, `mapErrCases`, `recoverErrCases`,
+  `tapErrCases`, `tapDefect` and `tapFailure` are exactly their `Res`
+  counterparts applied to the settled `Result` — same tag check, same
+  throw→defect net, same observer aggregation — so restating them was two copies
+  of one behaviour that could drift apart. A fix to the sync combinator is now
+  the fix to the async one. The **six that genuinely differ** stay written out in
+  full: `flatMap`, `flatTap`, `bind`, `flatMapErrCases`, `flatTapErrCases` and
+  `recoverDefect` each `await` a callback result that may be an `AsyncResult`,
+  which the sync surface has no way to express. Loose-typed methods keep their
+  documented cast at the delegation site (`ensure` and the matcher four — see the
+  `implements`-boundary note above).
 - **`isResult` is `instanceof` first, `Symbol.for` prototype-brand fallback
   second.** The core's own dual CJS/ESM build (or a duplicated install, or
   another realm) can put two copies of `Res` in one process; since the
@@ -721,7 +734,7 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   `Result` via `fromSchema` / `fromSchemaAsync`, with the validation issues as
   the modeled `E`)
 - `packages/oxlint` → `@unthrown/oxlint` (an oxlint **JS plugin**, peerDep
-  `oxlint`, dep `@oxlint/plugins`; ships **eight rules**: `no-ambiguous-error-type`
+  `oxlint`, dep `@oxlint/plugins`; ships **six rules**: `no-ambiguous-error-type`
   — enforces Thesis #1 against `unknown`/`any`/`Error`/`{}` **and the primitive
   keywords** (`void` included) in `E`, both in a `Result`/`AsyncResult` type
   **annotation** and in the matcher's `returnType<R>()` **pin** — the latter only
@@ -755,7 +768,8 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   `Result`/`AsyncResult`, awaited or not; deliberately syntactic — a dropped
   method _chain_ like `r.map(f);` is type-dependent and out of scope); and
   `no-catch-all-pattern` (**in the recommended preset** — reports the catch-all
-  `P._` / its alias `P.any` where `P` is imported from `unthrown` or
+  `P._` — plus ts-pattern's `P.any` alias, kept because the rule also covers a
+  `P` imported straight from there — where `P` is imported from `unthrown` or
   `ts-pattern`, so every error case must be enumerated by name; this **states
   the library's own default** (Thesis #5: `P._` is an escape hatch, not the
   sanctioned catch-all), and the sites that must keep the wildcard — a helper
@@ -778,10 +792,7 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   typing), a callback passed by reference is a documented miss, and there is
   deliberately **no escape hatch**: a `…Cases` callback that does not use its
   matcher is never what you meant); and
-  `no-throw` (**opt-in**, not in the preset — reports every `throw`
-  statement, pointing at `Err` for a modeled failure, `recoverErrCases` + `get`
-  for one that belongs to the defect channel, and `fromSafeThrowable` for a
-  known-technical precondition); `no-get-or-throw` (**also opt-in** — reports
+  `no-get-or-throw` (**the one opt-in** — reports
   `getOrThrow()`, matched as a **zero-argument** member call so Effect's
   one-argument `Option.getOrThrow(o)` is untouched; a computed access and a
   detached reference are documented misses. It throws the modeled error,
@@ -789,27 +800,12 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   `recoverErrCases` + `get`. Deliberately **option-free**: `getOrThrow()` is
   right in a test, and oxlint's own `overrides` already exempts a test glob —
   which is also why it stays out of the preset, being the one rule an existing
-  suite fails until configured. It stacks with `no-throw`: with both on there
-  is no escape left); and `prefer-ensure`
-  (**the other opt-in**, report-only with **no autofix** — flags a `flatMap`
-  whose success branch returns its own parameter untouched
-  (`flatMap((x) => c ? Ok(x) : Err(e))`), a predicate wearing a bind costume:
-  `ensure` names that intent and passes the _same_ `Ok` through where the
-  `flatMap` form allocates a fresh one. Anchored on the constructors rather
-  than the method name — the `Ok(...)` / `Err(...)` calls must resolve to
-  `unthrown` imports (`OkAsync` / `ErrAsync` and the facade members included) —
-  and it requires **every** return position of the callback to be a constructor
-  call, so a wrapped branch or a fall-through is left alone; a **reassigned**
-  parameter is the one false positive the shape admits. No autofix because a
-  reversed ternary needs its condition negated and `ensure`'s boolean form
-  requires a `boolean` predicate. Unlike every preset rule, the shape it flags
-  violates no thesis — it is correct code with a better name available).
+  suite fails until configured).
   Purely syntactic AST rules. Most resolve bindings via scope analysis keyed
   by the **imported** name (renamed and namespace imports resolve; alias
   indirection like `type E = unknown` is a documented limit), so they only
   fire on unthrown's `Result`. A few are keyed on a **name or shape** instead,
-  unthrown's own coinage rather than an import: `no-throw` reports the bare
-  language statement itself, with no binding to resolve at all;
+  unthrown's own coinage rather than an import:
   `no-get-or-throw` matches a zero-argument `.getOrThrow()` member call;
   `no-unused-matcher` is keyed on the `…Cases` method names alone; and the
   `returnType<R>()` pin (inside `no-ambiguous-error-type`) is anchored on that
@@ -1066,8 +1062,14 @@ code: "NOT_FOUND" }, …))`); non-inferable →
   documented package points its `entryPoints`/`tsconfig` back at that package's
   sources and writes straight into `api/<name>/`; `scripts/build-api.ts` runs
   the nine concurrently. There is no per-package `build:docs` and no copy step.
-  The package list is repeated in four places that must stay in sync: the
-  configs, `build-api.ts`, `@unthrown/docs#build`'s `dependsOn` in `turbo.json`
+  Only `core`, `drizzle` and `orpc` keep a `typedoc.<name>.json` of their own —
+  they carry a `categoryOrder`, an `intentionallyNotExported`, or several entry
+  points (`orpc` has no root export at all). The other six differ solely in
+  name/entryPoints/tsconfig/out, so they share `typedoc.base.json` and take
+  those four on the command line from `build-api.ts`, which derives them from
+  the directory name (CLI arguments beat the options file).
+  The package list is repeated in three places that must stay in sync:
+  `build-api.ts`, `@unthrown/docs#build`'s `dependsOn` in `turbo.json`
   (explicit `<pkg>#build` edges — `docs` no longer _depends_ on the packages, so
   `^build` would resolve to nothing, but it still needs them built for a
   cross-package import inside a documented source to resolve), and the `/api/`
@@ -1076,9 +1078,7 @@ code: "NOT_FOUND" }, …))`); non-inferable →
   while a prerelease is in progress (`.changeset/pre.json` on main) the site is
   built twice, the latest stable tag's docs at the root (the default) and main's
   under `/beta/`, linked by a nav version dropdown (`DOCS_BASE` /
-  `DOCS_VERSIONS` env in the VitePress config; a legacy tag without native
-  support gets the dropdown injected by
-  `.github/scripts/inject-docs-version-nav.ts`). With no prerelease, main
+  `DOCS_VERSIONS` env in the VitePress config). With no prerelease, main
   deploys alone to the root as before
 
 Core has **no runtime dependencies** (the error matcher is built-in). Never

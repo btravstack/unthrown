@@ -225,13 +225,9 @@ const viaAsyncFacade = [
 
 const patterns = [
   P._,
-  P.any,
   P.tag("RecordNotFound"),
   P.instanceOf(NotFoundError),
   P.when((x: unknown): x is string => typeof x === "string"),
-  P.union("a", "b"),
-  P.string,
-  P.number,
 ] as const;
 
 // `match` over a whole Result, since Result is a discriminated union.

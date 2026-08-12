@@ -41,8 +41,7 @@ import { defineRule } from "@oxlint/plugins";
  *
  * Opt-in (not part of the `recommended` preset): it is a whole-codebase
  * commitment, and — uniquely among the plugin's rules — an existing test suite
- * does not pass until an `overrides` entry is added. It pairs with `no-throw`;
- * with both on there is no escape left, which is the point.
+ * does not pass until an `overrides` entry is added.
  *
  * No autofix — the replacement requires enumerating every error case by hand.
  */

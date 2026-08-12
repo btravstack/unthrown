@@ -1,0 +1,3 @@
+{
+  "extends": "@btravstack/typedoc/base.json"
+}

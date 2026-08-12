@@ -1,8 +1,0 @@
-{
-  "extends": "@btravstack/typedoc/base.json",
-  "name": "@unthrown/vitest",
-  "entryPoints": ["../packages/vitest/src/index.ts"],
-  "tsconfig": "../packages/vitest/tsconfig.json",
-  "out": "api/vitest",
-  "intentionallyNotExported": ["HookContext"]
-}

@@ -56,7 +56,7 @@ combinator runs `.exhaustive()`, so a missing case does not compile. See
 [Exhaustive error matching](../explanation/exhaustive-error-matching).
 
 **`P` / `P.tag(t)`**
-: `P` is unthrown's pattern namespace (`P._`, `P.tag`, `P.instanceOf`, `P.when`, `P.union`, `P.string`, `P.number`).
+: `P` is unthrown's pattern namespace (`P._`, `P.tag`, `P.instanceOf`, `P.when`).
 `P.tag(t)` is sugar for the `{ _tag: t }` pattern, narrowing to a tagged variant
 and its payload — the everyday way to write an arm. `P._` is the universal
 catch-all; it makes any match exhaustive, so it is reserved for the two cases

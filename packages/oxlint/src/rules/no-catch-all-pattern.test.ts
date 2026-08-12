@@ -9,10 +9,10 @@ ruleTester.run("no-catch-all-pattern", noCatchAllPattern, {
     },
     // Specific `P.*` matchers are fine — only the catch-alls are banned.
     {
-      code: `import { P } from "unthrown";\nm.with(P.string, (s) => s);`,
+      code: `import { P } from "unthrown";\nm.with(P.tag("A"), (a) => a);`,
     },
     {
-      code: `import { P } from "unthrown";\nm.with(P.union(P.string, P.number), (v) => v);`,
+      code: `import { P } from "unthrown";\nm.with(P.instanceOf(Boom), (b) => b);`,
     },
     // `P` from an unrelated module is not unthrown's / ts-pattern's `P`.
     {
@@ -37,9 +37,9 @@ ruleTester.run("no-catch-all-pattern", noCatchAllPattern, {
       code: `import { P } from "unthrown";\nresult.mapErrCases((m) => m.with(P._, (e) => e));`,
       errors: [{ messageId: "noCatchAll" }],
     },
-    // `P.any` is the same catch-all under a different name.
+    // ts-pattern's `P.any` is the same catch-all under a different name.
     {
-      code: `import { P } from "unthrown";\nm.with(P.any, (e) => e);`,
+      code: `import { P } from "ts-pattern";\nm.with(P.any, (e) => e);`,
       errors: [{ messageId: "noCatchAll" }],
     },
     // `P._` imported straight from ts-pattern counts too.

@@ -39,6 +39,6 @@ This reference is generated from the source with
 
 `@unthrown/oxlint` (the recommended rules `no-ambiguous-error-type`,
 `no-catch-all-pattern`, `no-unhandled-result`, `no-unused-matcher`,
-`prefer-async-result`, and the opt-in `no-throw` / `prefer-ensure`) has no
+`prefer-async-result`, and the opt-in `no-get-or-throw`) has no
 generated API page — it is documented in the
 [Linting guide](../how-to/lint-your-codebase).

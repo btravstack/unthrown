@@ -13,7 +13,10 @@ describe("the built-in matcher engine", () => {
     expect(
       match(Number.NaN as number)
         .with(Number.NaN, () => "nan")
-        .with(P.number, () => "num")
+        .with(
+          P.when((v): v is number => typeof v === "number"),
+          () => "num",
+        )
         .run(),
     ).toBe("nan");
   });
@@ -61,7 +64,10 @@ describe("the built-in matcher engine", () => {
   it("first matching arm wins; later arms are not evaluated", () => {
     let later = 0;
     const out = match("x" as string)
-      .with(P.string, () => "first")
+      .with(
+        P.when((v): v is string => typeof v === "string"),
+        () => "first",
+      )
       .with(P._, () => {
         later += 1;
         return "second";
@@ -71,7 +77,7 @@ describe("the built-in matcher engine", () => {
     expect(later).toBe(0);
   });
 
-  it("P._ and P.any match anything", () => {
+  it("P._ matches anything", () => {
     expect(
       match(123 as unknown)
         .with(P._, (v) => v)
@@ -79,26 +85,28 @@ describe("the built-in matcher engine", () => {
     ).toBe(123);
     expect(
       match(undefined as unknown)
-        .with(P.any, () => "caught")
+        .with(P._, () => "caught")
         .run(),
     ).toBe("caught");
   });
 
-  it("P.instanceOf narrows by class, P.when by guard, P.string/P.number by typeof", () => {
+  it("P.instanceOf narrows by class, P.when by guard", () => {
     class Boom extends Error {}
+    const isString = (v: unknown): v is string => typeof v === "string";
+    const isNumber = (v: unknown): v is number => typeof v === "number";
     const e: Boom | string | number = new Boom("x");
     expect(
       match(e)
         .with(P.instanceOf(Boom), (b) => b.message)
-        .with(P.string, (s) => s)
-        .with(P.number, (n) => String(n))
+        .with(P.when(isString), (s) => s)
+        .with(P.when(isNumber), (n) => String(n))
         .run(),
     ).toBe("x");
     expect(
       match(7 as Boom | string | number)
         .with(P.instanceOf(Boom), (b) => b.message)
-        .with(P.string, (s) => s)
-        .with(P.number, (n) => `n:${n}`)
+        .with(P.when(isString), (s) => s)
+        .with(P.when(isNumber), (n) => `n:${n}`)
         .run(),
     ).toBe("n:7");
     const isEven = (v: unknown): v is number => typeof v === "number" && v % 2 === 0;
@@ -110,11 +118,11 @@ describe("the built-in matcher engine", () => {
     ).toBe("even");
   });
 
-  it("P.union matches when any sub-pattern matches", () => {
+  it("a grouped arm matches when any of its patterns matches", () => {
     type E = { _tag: "A" } | { _tag: "B" } | { _tag: "C" };
     const run = (e: E) =>
       match(e)
-        .with(P.union(P.tag("A"), P.tag("B")), (ab) => `ab:${ab._tag}`)
+        .with(P.tag("A"), P.tag("B"), (ab) => `ab:${ab._tag}`)
         .with(P.tag("C"), () => "c")
         .run();
     expect(run({ _tag: "A" })).toBe("ab:A");
@@ -237,11 +245,11 @@ describe("the built-in matcher engine", () => {
     // site would silently change what "exhaustive" means at runtime.
     expect(Object.isFrozen(P)).toBe(true);
     expect(Object.isFrozen(P._)).toBe(true);
-    expect(Object.isFrozen(P.string)).toBe(true);
+    const original = P._;
     expect(() => {
-      (P as unknown as { string: unknown }).string = P.number;
+      (P as unknown as { _: unknown })._ = P.tag("decoy");
     }).toThrow(TypeError);
-    expect(P.string).not.toBe(P.number);
+    expect(P._).toBe(original);
   });
 
   it("still throws NonExhaustiveError under a pin when no arm matches", () => {

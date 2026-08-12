@@ -43,21 +43,6 @@ export type ResultThen<T, E = PgQueryError> = <TResult1 = Result<T, E>, TResult2
 ) => PromiseLike<TResult1 | TResult2>;
 
 /**
- * Collapse an `AsyncResult` into a native promise of its `Result`.
- *
- * `Awaitable.then` deliberately models no rejection channel and so takes only
- * `onFulfilled`, while a builder's `then` is called by `await` with both
- * handlers. Awaiting the `AsyncResult` inside a real promise gives back a `then`
- * that accepts the pair — the same `settle` shape the interop packages use for
- * the same reason.
- */
-// oxlint-disable unthrown/prefer-async-result -- producing the native Promise IS this helper's job: only a real promise has the two-handler `then` an awaiting caller drives. An AsyncResult here would be circular.
-function settle<T, E>(asyncResult: AsyncResult<T, E>): Promise<Result<T, E>> {
-  return (async () => await asyncResult)();
-}
-// oxlint-enable unthrown/prefer-async-result
-
-/**
  * Build the {@link ResultThen} a builder installs as its `then`.
  *
  * @remarks
@@ -65,12 +50,17 @@ function settle<T, E>(asyncResult: AsyncResult<T, E>): Promise<Result<T, E>> {
  * builder is awaited: `execute()` is called inside the returned closure, on each
  * `await`, exactly as `QueryPromise.then` calls it.
  *
+ * `Promise.resolve` is what bridges the two `then` shapes. `Awaitable.then`
+ * deliberately models no rejection channel and so takes only `onFulfilled`,
+ * while a builder's `then` is called by `await` with both handlers; adopting the
+ * `AsyncResult` into a real promise gives back a `then` that accepts the pair.
+ *
  * @internal
  */
 export const resultThen =
   <T, E>(builder: { execute: () => AsyncResult<T, E> }): ResultThen<T, E> =>
   (onFulfilled, onRejected) =>
-    settle(builder.execute()).then(onFulfilled, onRejected);
+    Promise.resolve(builder.execute()).then(onFulfilled, onRejected);
 
 /**
  * Compile and run a query, with **compilation inside the failure boundary**.
