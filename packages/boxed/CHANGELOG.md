@@ -1,5 +1,11 @@
 # @unthrown/boxed
 
+## 5.5.0
+
+### Patch Changes
+
+- unthrown@5.5.0
+
 ## 5.4.0
 
 ### Patch Changes
