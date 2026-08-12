@@ -36,8 +36,14 @@ wiring exports: the seven raw matcher functions, `failOnForgottenAwait`, and the
 
 ## Linting: @unthrown/oxlint
 
-An oxlint JS plugin (peer `oxlint`). Seven rules; scope-analysis keyed to
-unthrown imports, so they only fire on unthrown's `Result`.
+An oxlint JS plugin (peer `oxlint`). Seven rules. The type-shaped ones
+(`no-ambiguous-error-type`, `prefer-async-result`, `no-unhandled-result`,
+`no-catch-all-pattern`) resolve bindings by scope analysis, so they only fire
+on unthrown's own `Result` — another library's is left alone. Three are keyed
+on a name or shape instead, and need no import to resolve:
+`no-unused-matcher` (the `…Cases` method names), `no-get-or-throw` (a
+zero-argument `.getOrThrow()` member call), and `no-throw` (the language
+statement itself — it reports every `throw`, in any file).
 
 **Recommended preset:**
 
