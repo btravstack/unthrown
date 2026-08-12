@@ -734,10 +734,10 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   `Result` via `fromSchema` / `fromSchemaAsync`, with the validation issues as
   the modeled `E`)
 - `packages/oxlint` → `@unthrown/oxlint` (an oxlint **JS plugin**, peerDep
-  `oxlint`, dep `@oxlint/plugins`; ships **six rules** — five in the
+  `oxlint`, dep `@oxlint/plugins`; ships **seven rules** — five in the
   `recommended` preset (`no-ambiguous-error-type`, `no-catch-all-pattern`,
   `no-unhandled-result`, `no-unused-matcher`, `prefer-async-result`) plus the
-  opt-in `no-get-or-throw`. Purely syntactic AST rules. No TypeDoc API page;
+  opt-ins `no-get-or-throw` and `no-throw`. Purely syntactic AST rules. No TypeDoc API page;
   documented in the Linting guide. Full spec: `packages/oxlint/CLAUDE.md`.)
 - `packages/prisma` → `@unthrown/prisma` (peerDep `@prisma/client` ^7; a Prisma
   Client **extension** — `$extends(unthrownPrisma)` adds `try*` `AsyncResult`

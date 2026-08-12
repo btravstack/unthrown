@@ -6,7 +6,7 @@ internal design — live in the root [`CLAUDE.md`](../../CLAUDE.md) and apply
 here too.
 
 An oxlint **JS plugin**, peerDep
-`oxlint`, dep `@oxlint/plugins`; ships **six rules**: `no-ambiguous-error-type`
+`oxlint`, dep `@oxlint/plugins`; ships **seven rules**: `no-ambiguous-error-type`
 — enforces Thesis #1 against `unknown`/`any`/`Error`/`{}` **and the primitive
 keywords** (`void` included) in `E`, both in a `Result`/`AsyncResult` type
 **annotation** and in the matcher's `returnType<R>()` **pin** — the latter only
@@ -64,7 +64,16 @@ the `…Cases` method names alone (unthrown's own coinage — no receiver
 typing), a callback passed by reference is a documented miss, and there is
 deliberately **no escape hatch**: a `…Cases` callback that does not use its
 matcher is never what you meant); and
-`no-get-or-throw` (**the one opt-in** — reports
+`no-throw` (**an opt-in** — reports every `throw` statement, keyed on the
+language statement itself with nothing to resolve. Removed in 5.4.0 as "a
+`no-restricted-syntax` entry rather than a rule" and **restored in 5.5.0**
+(#227): oxlint implements no `no-restricted-syntax`, so the removal left a
+codebase that bans `throw` with no replacement, and — because oxlint refuses
+to parse a config naming an unknown rule — it hard-failed the consumer's whole
+lint run, not just this rule. Opt-in because it bans a core language statement;
+the escape hatch is a targeted `oxlint-disable` with a reason, and `index.test.ts`
+guards both its presence and its absence from the preset); and
+`no-get-or-throw` (**the other opt-in** — reports
 `getOrThrow()`, matched as a **zero-argument** member call so Effect's
 one-argument `Option.getOrThrow(o)` is untouched; a computed access and a
 detached reference are documented misses. It throws the modeled error,

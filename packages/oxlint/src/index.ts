@@ -1,5 +1,5 @@
 // @unthrown/oxlint — an oxlint (JS) plugin that enforces unthrown's conventions
-// at lint time. Six rules:
+// at lint time. Seven rules:
 //
 //   unthrown/no-ambiguous-error-type  — keep `E` a concrete domain error
 //                                        (no unknown/any/Error/{}), i.e. Thesis #1;
@@ -14,6 +14,9 @@
 //   unthrown/no-unused-matcher        — a `…Cases` callback must use the matcher it
 //                                        was handed; a foreign builder matches the
 //                                        wrong value.
+//   unthrown/no-throw                 — ban the `throw` statement; return `Err(...)`
+//                                        and let the boundaries own the defect
+//                                        channel (opt-in; not in `recommended`).
 //
 // Enable the bundled `recommended` preset, or wire the rules by hand. See the
 // package README.
@@ -25,6 +28,7 @@ import type { OxlintConfig } from "oxlint";
 import { noAmbiguousErrorType } from "./rules/no-ambiguous-error-type.js";
 import { noCatchAllPattern } from "./rules/no-catch-all-pattern.js";
 import { noGetOrThrow } from "./rules/no-get-or-throw.js";
+import { noThrow } from "./rules/no-throw.js";
 import { noUnhandledResult } from "./rules/no-unhandled-result.js";
 import { noUnusedMatcher } from "./rules/no-unused-matcher.js";
 import { preferAsyncResult } from "./rules/prefer-async-result.js";
@@ -37,13 +41,23 @@ const plugin = eslintCompatPlugin({
     "no-ambiguous-error-type": noAmbiguousErrorType,
     "no-catch-all-pattern": noCatchAllPattern,
     "no-get-or-throw": noGetOrThrow,
+    "no-throw": noThrow,
     "no-unhandled-result": noUnhandledResult,
     "no-unused-matcher": noUnusedMatcher,
     "prefer-async-result": preferAsyncResult,
   },
 }) as UnthrownPlugin;
 
-// One deliberate opt-out from the preset.
+// Two deliberate opt-outs from the preset.
+//
+// `no-throw` bans a core language statement, so it only suits a codebase that
+// has committed to the convention end to end — every sanctioned `throw` (a
+// framework that reads a thrown value, a deliberate rethrow onto the defect
+// channel) carries a targeted `oxlint-disable` with a reason. It is opt-in for
+// that reason, not because the ban is optional where it applies: there is no
+// other way to enforce it, oxlint having no `no-restricted-syntax` of its own
+// (#227 — which is why removing this rule in 5.4.0 left downstream bans with
+// no replacement, and why it is back).
 //
 // `no-get-or-throw` is a whole-codebase commitment, and it has a property no
 // preset rule has: `getOrThrow()` is the right tool in a test, so an existing

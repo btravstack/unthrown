@@ -36,7 +36,7 @@ wiring exports: the seven raw matcher functions, `failOnForgottenAwait`, and the
 
 ## Linting: @unthrown/oxlint
 
-An oxlint JS plugin (peer `oxlint`). Six rules; scope-analysis keyed to
+An oxlint JS plugin (peer `oxlint`). Seven rules; scope-analysis keyed to
 unthrown imports, so they only fire on unthrown's `Result`.
 
 **Recommended preset:**
@@ -64,6 +64,13 @@ unthrown imports, so they only fire on unthrown's `Result`.
   modeled error, abandoning errors-as-values at the last step; fold with
   `recoverErrCases` + `get`. Legitimate in tests — exempt them with an oxlint
   `overrides` entry, not a rule option.
+- `no-throw` — reports every `throw` statement. For a codebase that has
+  committed to errors-as-values end to end: a modeled failure is `Err(...)`,
+  an unmodeled one reaches the defect channel through a boundary or the
+  injected `defect(cause)`, and a genuinely deliberate `throw` (a framework
+  that reads the thrown value) carries a targeted `oxlint-disable` with a
+  reason. Opt-in because it bans a core language statement — but the only way
+  to enforce the ban, oxlint having no `no-restricted-syntax`.
 
 ## Prisma: @unthrown/prisma
 

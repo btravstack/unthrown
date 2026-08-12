@@ -9,12 +9,13 @@ const manifest: { peerDependencies: Record<string, string> } = JSON.parse(
 );
 
 describe("@unthrown/oxlint plugin", () => {
-  it("exposes all six rules under the `unthrown` plugin name", () => {
+  it("exposes all seven rules under the `unthrown` plugin name", () => {
     expect(plugin.meta?.name).toBe("unthrown");
     expect(Object.keys(plugin.rules).sort()).toEqual([
       "no-ambiguous-error-type",
       "no-catch-all-pattern",
       "no-get-or-throw",
+      "no-throw",
       "no-unhandled-result",
       "no-unused-matcher",
       "prefer-async-result",
@@ -54,6 +55,17 @@ describe("@unthrown/oxlint plugin", () => {
   it("keeps `no-get-or-throw` out of the `recommended` preset — tests need an overrides entry first", () => {
     expect(plugin.recommended.rules).not.toHaveProperty("unthrown/no-get-or-throw");
     expect(plugin.rules["no-get-or-throw"]?.meta?.docs?.recommended).toBe(false);
+  });
+
+  // Regression guard for #227. Removing this rule broke every downstream config
+  // that named it — oxlint fails to parse a config referencing an unknown rule,
+  // which kills the whole lint run — and nothing replaces it: oxlint ships no
+  // `no-restricted-syntax`. It stays out of the preset (it bans a core language
+  // statement), but it stays.
+  it("ships `no-throw`, outside the `recommended` preset", () => {
+    expect(plugin.rules).toHaveProperty("no-throw");
+    expect(plugin.recommended.rules).not.toHaveProperty("unthrown/no-throw");
+    expect(plugin.rules["no-throw"]?.meta?.docs?.recommended).toBe(false);
   });
 
   it("keeps every preset rule pointing at a rule the plugin actually defines", () => {
