@@ -1,5 +1,14 @@
 # @unthrown/standard-schema
 
+## 5.4.0
+
+### Patch Changes
+
+- Updated dependencies [d892c07]
+- Updated dependencies [d892c07]
+- Updated dependencies [d892c07]
+  - unthrown@5.4.0
+
 ## 5.3.0
 
 ### Patch Changes

@@ -1,5 +1,83 @@
 # unthrown
 
+## 5.4.0
+
+### Minor Changes
+
+- d892c07: **Breaking, released as a minor.** Remove four matcher patterns from `P`:
+  `P.any`, `P.string`, `P.number` and `P.union`. Code using any of them stops
+  compiling; the rewrites are mechanical and listed below.
+
+  `P.any` was a bare alias for `P._` — two names for one concept, the same
+  duplication the `unwrap*` / `orElse` aliases were removed for in v5. The other
+  three had no use the remaining surface does not already cover: a primitive-type
+  wildcard is `P.when` with a `typeof` guard, and grouping patterns under one
+  handler is what a `.with(a, b, handler)` arm does. None of the four appeared
+  anywhere in the library, its satellites, or the runnable `examples/` packages
+  outside their own tests.
+
+  `P` now carries `_`, `tag`, `instanceOf` and `when`.
+
+  **Migrating:**
+
+  ```ts
+  // P.any → P._
+  matcher.with(P._, handler);
+
+  // P.string / P.number → P.when with a typeof guard
+  matcher.with(
+    P.when((v): v is string => typeof v === "string"),
+    handler,
+  );
+
+  // P.union(a, b) → a grouped arm, which is the same thing
+  matcher.with(P.tag("A"), P.tag("B"), handler);
+  ```
+
+  `@unthrown/oxlint`'s `no-catch-all-pattern` still reports `P.any`: the rule also
+  covers a `P` imported straight from `ts-pattern`, where the alias remains.
+
+### Patch Changes
+
+- d892c07: Fix a `fromExecutor` hang: a non-`Result` whose `then` getter throws, handed to
+  `settle` from asynchronous code, left the `AsyncResult` unsettled forever.
+
+  `settle` runs in the caller's own turn, outside the `try` that guards the
+  executor body, so the thenable probe on the value about to be discarded was the
+  one unguarded `isThenable` call in the library. A hostile `then` getter — a
+  Proxy `get` trap, or a throwing accessor — escaped into that turn as an
+  unhandled error _before_ `resolve` was reached, so the promise behind the
+  `AsyncResult` never settled and every `await` on it hung.
+
+  The probe now goes through the internal `silenceIfThenable` helper, which is
+  total: the value is dropped without adopting it and the `TypeError` Defect the
+  boundary already documents is always reached. Reachable only from a cast or a
+  raw-JS caller, since `settle` is typed to take a `Result`.
+
+- d892c07: Internal cleanup, no behaviour or API change.
+
+  `unthrown`: `AsyncRes` now delegates each of its eleven non-awaiting combinators
+  (`map`, `tap`, `let`, `as`, `discard`, `ensure`, `mapErrCases`,
+  `recoverErrCases`, `tapErrCases`, `tapDefect`, `tapFailure`) to the sync `Res`
+  method through one private `#lift` helper, instead of restating the same tag
+  check, try/catch and throw→defect net inside a `.then`. The six that genuinely
+  differ — `flatMap`, `flatTap`, `bind`, `flatMapErrCases`, `flatTapErrCases`,
+  `recoverDefect`, each awaiting a callback result that may be an `AsyncResult` —
+  are unchanged. `allFromDict` / `allFromDictAsync` fold through the positional
+  `foldArray` and pair keys back on with `Object.fromEntries`, whose
+  CreateDataProperty semantics give the same `"__proto__"` guarantee the explicit
+  `Object.defineProperty` loop bought by hand.
+
+  `@unthrown/vitest`: the seven matchers are built from one shared definition
+  rather than seven copies of the same twelve lines; assertion messages are
+  byte-identical. `render`'s unreachable fallthrough is gone — after the `Ok` and
+  `Err` returns the remaining variant is the `Defect`, so the third guard could
+  never be false.
+
+  `@unthrown/effect`, `@unthrown/neverthrow`, `@unthrown/boxed`: each package's
+  local `settle` helper is replaced by `Promise.resolve`, which performs the same
+  thenable adoption.
+
 ## 5.3.0
 
 ### Minor Changes
