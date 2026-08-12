@@ -1,9 +1,12 @@
 ---
-"@unthrown/oxlint": major
+"@unthrown/oxlint": minor
 ---
 
-Remove the `no-throw` and `prefer-ensure` rules. The plugin now ships six rules:
-five in `recommended`, plus `no-get-or-throw` as the one opt-in.
+**Breaking, released as a minor.** Remove the `no-throw` and `prefer-ensure`
+rules. The plugin now ships six rules: five in `recommended`, plus
+`no-get-or-throw` as the one opt-in. A config naming either removed rule fails
+to resolve it — see the migration note below. Configs that use the
+`recommended` preset alone are unaffected, since neither rule was in it.
 
 `prefer-ensure` flagged a shape that violates no thesis — a `flatMap` gating its
 own parameter is correct code with a better name available. Every other rule

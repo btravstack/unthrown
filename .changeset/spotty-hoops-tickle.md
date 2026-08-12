@@ -1,9 +1,10 @@
 ---
-"unthrown": major
+"unthrown": minor
 ---
 
-Remove four matcher patterns from `P`: `P.any`, `P.string`, `P.number` and
-`P.union`.
+**Breaking, released as a minor.** Remove four matcher patterns from `P`:
+`P.any`, `P.string`, `P.number` and `P.union`. Code using any of them stops
+compiling; the rewrites are mechanical and listed below.
 
 `P.any` was a bare alias for `P._` — two names for one concept, the same
 duplication the `unwrap*` / `orElse` aliases were removed for in v5. The other

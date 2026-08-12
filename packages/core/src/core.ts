@@ -529,8 +529,22 @@ function passThrough<T, E>(self: Result<unknown, unknown>): Result<T, E> {
 
 /**
  * Runtime thenable probe, shared by the combinator-side net below and the
- * boundary nets in `interop.ts`. Always called inside the caller's `try`, so
- * even a hostile `.then` getter lands on that caller's Defect path.
+ * boundary nets in `interop.ts`.
+ *
+ * @remarks
+ * Reading `.then` can itself **throw** — a hostile getter, or a Proxy `get`
+ * trap — so this is deliberately not a total function, and every caller must
+ * account for that. Two shapes are sanctioned, and there is no third:
+ *
+ * - inside a `try` that routes the throw to a `Defect` (the boundaries in
+ *   `interop.ts`, where a hostile value arriving at a triage point *is* an
+ *   unmodeled failure and should surface as one); or
+ * - through {@link silenceIfThenable}, for a value being **discarded**, where
+ *   there is no Defect channel to route to and the only correct answer is to
+ *   drop it without throwing.
+ *
+ * Calling it bare, outside both, is a bug: the throw escapes into whatever
+ * context invoked it.
  *
  * @internal
  */
@@ -561,7 +575,7 @@ export function isThenable(x: unknown): boolean {
  *
  * @internal
  */
-function silenceIfThenable(value: unknown): void {
+export function silenceIfThenable(value: unknown): void {
   try {
     if (isThenable(value)) void Promise.resolve(value).then(undefined, () => undefined);
   } catch {

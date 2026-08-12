@@ -3,7 +3,15 @@
 // there is no path that yields `unknown` in `E`.
 
 import { Err, Ok } from "./constructors.js";
-import { AsyncRes, defectRes, errRes, isResult, isThenable, okRes } from "./core.js";
+import {
+  AsyncRes,
+  defectRes,
+  errRes,
+  isResult,
+  isThenable,
+  okRes,
+  silenceIfThenable,
+} from "./core.js";
 import { type Defect, defect, isDefectMarker } from "./defect.js";
 import type {
   AsyncErrOf,
@@ -346,7 +354,14 @@ export function fromExecutor<T = never, E = never>(
       // a Result) would otherwise be dropped mid-flight; adopt-and-silence so
       // its later rejection can't float — the sibling of qualifyToResult's and
       // thenableReturnDefect's nets.
-      if (isThenable(result)) void Promise.resolve(result).then(undefined, () => undefined);
+      //
+      // Via `silenceIfThenable`, NOT a bare `isThenable`: `settle` is called
+      // from the caller's own asynchronous code, outside the `try` around the
+      // executor below, so a hostile `.then` getter throwing here would escape
+      // into that turn AND leave `resolve` uncalled — an AsyncResult that never
+      // settles, the one hazard this boundary is meant to bound. Silencing is
+      // total, so the Defect below is always reached.
+      silenceIfThenable(result);
       resolve(
         defectRes<T, E>(
           new TypeError("unthrown: fromExecutor's settle received a non-Result value"),

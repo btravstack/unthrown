@@ -386,4 +386,25 @@ describe("fromExecutor", () => {
     });
     expectOk(r, 1);
   });
+
+  it("still settles when a non-Result with a hostile `then` getter reaches settle asynchronously", async () => {
+    // `settle` runs in the CALLER's turn, outside the `try` around the executor
+    // body, so the thenable probe on the discarded value must not be able to
+    // throw: it would escape into that turn with `resolve` never called, and
+    // this `await` would hang forever. Awaiting at all is the assertion.
+    const hostile = new Proxy(
+      {},
+      {
+        get: (_target, key) => {
+          if (key === "then") throw new Error("hostile then getter");
+          return undefined;
+        },
+      },
+    );
+    const r = await fromExecutor<number, never>((settle) => {
+      void Promise.resolve().then(() => (settle as unknown as (v: unknown) => void)(hostile));
+    });
+    expect(r.tag).toBe("Defect");
+    if (r.tag === "Defect") expect(r.cause).toBeInstanceOf(TypeError);
+  });
 });
