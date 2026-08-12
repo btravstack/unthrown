@@ -36,7 +36,7 @@ wiring exports: the seven raw matcher functions, `failOnForgottenAwait`, and the
 
 ## Linting: @unthrown/oxlint
 
-An oxlint JS plugin (peer `oxlint`). Eight rules; scope-analysis keyed to
+An oxlint JS plugin (peer `oxlint`). Six rules; scope-analysis keyed to
 unthrown imports, so they only fire on unthrown's `Result`.
 
 **Recommended preset:**
@@ -49,7 +49,7 @@ unthrown imports, so they only fire on unthrown's `Result`.
   function-type return positions — those must stay `Promise`).
 - `no-unhandled-result` — flags a bare expression statement dropping a
   `Result` (syntactic; a dropped method chain is out of scope).
-- `no-catch-all-pattern` — reports `P._` / `P.any`; keep-the-wildcard sites
+- `no-catch-all-pattern` — reports `P._` (and ts-pattern's `P.any`); keep-the-wildcard sites
   (generic-`E` helpers, single-type `E`) carry a targeted `oxlint-disable`
   with a reason.
 - `no-unused-matcher` — reports a `…Cases` callback (or `match`'s `errCases`
@@ -59,16 +59,11 @@ unthrown imports, so they only fire on unthrown's `Result`.
 
 **Opt-in (not in the preset):**
 
-- `no-throw` — reports every `throw`, pointing at `Err(...)` for a modeled
-  failure, `recoverErrCases` + `get` for one that belongs to the defect
-  channel, and `fromSafeThrowable` for a known-technical precondition.
 - `no-get-or-throw` — reports `getOrThrow()` (a zero-argument member call, so
   Effect's one-argument `Option.getOrThrow(o)` is untouched). It throws the
   modeled error, abandoning errors-as-values at the last step; fold with
   `recoverErrCases` + `get`. Legitimate in tests — exempt them with an oxlint
   `overrides` entry, not a rule option.
-- `prefer-ensure` — flags `flatMap((x) => c ? Ok(x) : Err(e))` (a predicate
-  wearing a bind costume); report-only, no autofix.
 
 ## Prisma: @unthrown/prisma
 

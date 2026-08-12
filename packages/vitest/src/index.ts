@@ -32,12 +32,11 @@ function isThenable(x: unknown): x is PromiseLike<unknown> {
 function render(result: SomeResult, stringify: Stringify): string {
   if (isOk(result)) return `Ok(${stringify(result.value)})`;
   if (isErr(result)) return `Err(${stringify(result.error)})`;
-  if (isDefect(result)) return `Defect(${stringify(result.cause)})`;
-  // Unreachable: `settle` only calls `render` on a canonical Result, which is
-  // always Ok/Err/Defect; kept for return-exhaustiveness.
-  /* v8 ignore start */
-  return stringify(result);
-  /* v8 ignore stop */
+  // No third guard and no fallthrough: `settle` only renders a canonical
+  // Result, whose three variants the two returns above have narrowed down to
+  // the Defect. The `isDefect(result)` check that used to stand here could
+  // never be false, so it was an untestable branch guarding unreachable code.
+  return `Defect(${stringify(result.cause)})`;
 }
 
 // The keys `TaggedError` RESERVES — never payload, so never part of what
@@ -61,11 +60,9 @@ const RESERVED_KEYS: ReadonlySet<string> = new Set(["_tag", "name", "message", "
 // it exactly, and an asymmetric matcher (e.g. `expect.objectContaining(...)`)
 // asserts it partially.
 function payloadOf(error: object): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const key of Object.keys(error)) {
-    if (!RESERVED_KEYS.has(key)) out[key] = (error as Record<string, unknown>)[key];
-  }
-  return out;
+  return Object.fromEntries(
+    Object.entries(error).filter(([key]) => !RESERVED_KEYS.has(key)),
+  ) as Record<string, unknown>;
 }
 
 // Async assertions in flight: every matcher that adopts a thenable registers
@@ -296,64 +293,70 @@ try {
   // forgotten-`await` safety net is unavailable.
 }
 
-function toBeOk(this: MatcherState, received: unknown): MatcherResult {
-  const { stringify } = this.utils;
-  return settle("toBeOk", this, received, (result) => {
-    const pass = isOk(result);
-    return {
-      pass,
-      message: () =>
-        pass
-          ? `expected result not to be Ok, but it was ${render(result, stringify)}`
-          : `expected result to be Ok, but got ${render(result, stringify)}`,
-    };
-  });
+/**
+ * Build a matcher from the only two things that vary between them: how the
+ * expectation is worded, and how it is tested.
+ *
+ * `showActual` picks between the two message families. A no-argument matcher
+ * (`toBeOk`) names what it actually found on the negated path — "not to be Ok,
+ * but it was `Err("e")`" — because "not to be Ok" alone would not say why it
+ * failed. An argument-taking one (`toBeOkWith`) has already spelled the
+ * expectation in its label, so the negated message stops there.
+ */
+function define(
+  matcherName: string,
+  showActual: boolean,
+  label: (stringify: Stringify, expected: unknown) => string,
+  test: (result: SomeResult, equals: MatcherState["equals"], expected: unknown) => boolean,
+) {
+  return function (this: MatcherState, received: unknown, expected?: unknown): MatcherResult {
+    const { stringify } = this.utils;
+    const { equals } = this;
+    const worded = label(stringify, expected);
+    return settle(matcherName, this, received, (result) => {
+      const pass = test(result, equals, expected);
+      return {
+        pass,
+        message: () =>
+          pass
+            ? `expected result not to be ${worded}${showActual ? `, but it was ${render(result, stringify)}` : ""}`
+            : `expected result to be ${worded}, but got ${render(result, stringify)}`,
+      };
+    });
+  };
 }
 
-function toBeOkWith(this: MatcherState, received: unknown, expected: unknown): MatcherResult {
-  const { stringify } = this.utils;
-  const { equals } = this;
-  return settle("toBeOkWith", this, received, (result) => {
-    const pass = isOk(result) && equals(result.value, expected);
-    return {
-      pass,
-      message: () =>
-        pass
-          ? `expected result not to be Ok(${stringify(expected)})`
-          : `expected result to be Ok(${stringify(expected)}), but got ${render(result, stringify)}`,
-    };
-  });
-}
+const toBeOk = define(
+  "toBeOk",
+  true,
+  () => "Ok",
+  (result) => isOk(result),
+);
 
-function toBeErr(this: MatcherState, received: unknown): MatcherResult {
-  const { stringify } = this.utils;
-  return settle("toBeErr", this, received, (result) => {
-    const pass = isErr(result);
-    return {
-      pass,
-      message: () =>
-        pass
-          ? `expected result not to be Err, but it was ${render(result, stringify)}`
-          : `expected result to be Err, but got ${render(result, stringify)}`,
-    };
-  });
-}
+const toBeOkWith = define(
+  "toBeOkWith",
+  false,
+  (stringify, expected) => `Ok(${stringify(expected)})`,
+  (result, equals, expected) => isOk(result) && equals(result.value, expected),
+);
 
-function toBeErrWith(this: MatcherState, received: unknown, expected: unknown): MatcherResult {
-  const { stringify } = this.utils;
-  const { equals } = this;
-  return settle("toBeErrWith", this, received, (result) => {
-    const pass = isErr(result) && equals(result.error, expected);
-    return {
-      pass,
-      message: () =>
-        pass
-          ? `expected result not to be Err(${stringify(expected)})`
-          : `expected result to be Err(${stringify(expected)}), but got ${render(result, stringify)}`,
-    };
-  });
-}
+const toBeErr = define(
+  "toBeErr",
+  true,
+  () => "Err",
+  (result) => isErr(result),
+);
 
+const toBeErrWith = define(
+  "toBeErrWith",
+  false,
+  (stringify, expected) => `Err(${stringify(expected)})`,
+  (result, equals, expected) => isErr(result) && equals(result.error, expected),
+);
+
+// Hand-written rather than built by `define`: it is the one matcher taking TWO
+// arguments, and it reads `arguments.length` to tell an omitted payload from an
+// explicitly-passed `undefined` — neither of which survives a shared wrapper.
 function toBeErrTagged(
   this: MatcherState,
   received: unknown,
@@ -396,34 +399,19 @@ function toBeErrTagged(
   });
 }
 
-function toBeDefect(this: MatcherState, received: unknown): MatcherResult {
-  const { stringify } = this.utils;
-  return settle("toBeDefect", this, received, (result) => {
-    const pass = isDefect(result);
-    return {
-      pass,
-      message: () =>
-        pass
-          ? `expected result not to be a Defect, but it was ${render(result, stringify)}`
-          : `expected result to be a Defect, but got ${render(result, stringify)}`,
-    };
-  });
-}
+const toBeDefect = define(
+  "toBeDefect",
+  true,
+  () => "a Defect",
+  (result) => isDefect(result),
+);
 
-function toBeDefectWith(this: MatcherState, received: unknown, expected: unknown): MatcherResult {
-  const { stringify } = this.utils;
-  const { equals } = this;
-  return settle("toBeDefectWith", this, received, (result) => {
-    const pass = isDefect(result) && equals(result.cause, expected);
-    return {
-      pass,
-      message: () =>
-        pass
-          ? `expected result not to be a Defect caused by ${stringify(expected)}`
-          : `expected result to be a Defect caused by ${stringify(expected)}, but got ${render(result, stringify)}`,
-    };
-  });
-}
+const toBeDefectWith = define(
+  "toBeDefectWith",
+  false,
+  (stringify, expected) => `a Defect caused by ${stringify(expected)}`,
+  (result, equals, expected) => isDefect(result) && equals(result.cause, expected),
+);
 
 expect.extend({
   toBeDefect,

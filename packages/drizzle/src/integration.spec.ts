@@ -429,7 +429,7 @@ describe("defect routing against a real PostgreSQL", () => {
     expect(
       folded.match({
         ok: (value) => value,
-        errCases: (matcher) => matcher.with(P.union("modeled"), (value) => value),
+        errCases: (matcher) => matcher.with("modeled", (value) => value),
         defect: (cause) => `defect:${sqlstateOf(cause) ?? "?"}`,
       }),
     ).toBe("defect:42601");

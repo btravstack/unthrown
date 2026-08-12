@@ -182,7 +182,7 @@ export function toEffect<T, E>(source: AsyncResult<T, E>): Effect.Effect<T, E>;
 export function toEffect<T, E>(source: Result<T, E> | AsyncResult<T, E>): Effect.Effect<T, E> {
   if (isAsyncResult(source)) {
     return Effect.flatMap(
-      Effect.promise(() => settle(source)),
+      Effect.promise(() => Promise.resolve(source)),
       (result) => resultToEffect(result),
     );
   }
@@ -234,11 +234,6 @@ function dieToResult<T, E>(cause: unknown): Result<T, E> {
     },
     (c, defect) => defect(c),
   )() as Result<T, E>;
-}
-
-// oxlint-disable-next-line unthrown/prefer-async-result -- the bridge INTO Effect: a native Promise is what `Effect.promise` consumes, so an AsyncResult here would be circular
-function settle<T, E>(asyncResult: AsyncResult<T, E>): Promise<Result<T, E>> {
-  return (async () => await asyncResult)();
 }
 
 function isAsyncResult<T, E>(

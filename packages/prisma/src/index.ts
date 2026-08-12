@@ -219,14 +219,23 @@ type DeleteManyError = ForeignKeyViolation;
 // side is untyped by design; the declared signatures carry the safety).
 type UntypedDelegate = Record<string, (args?: unknown) => Promise<unknown>>;
 
-const query = (self: unknown, op: string, args?: unknown): AsyncResult<unknown, PrismaQueryError> =>
+// Generic in the channels it hands back, so each `try*` below is a one-line
+// delegation whose own declared return type supplies `R` and `E`. The narrowing
+// from `unknown` / `PrismaQueryError` to that operation's payload and error set
+// is an assertion either way — this is the single place it lives, rather than a
+// repeated `as AsyncResult<…>` at all seventeen call sites (core's `passThrough`
+// keeps its one sound cast in one place for the same reason). The declared
+// signatures remain the contract; `qualifyPrismaError` is what makes the `E`
+// side true at runtime, by minting exactly those tagged errors and defecting
+// everything else.
+const query = <R, E>(self: unknown, op: string, args?: unknown): AsyncResult<R, E> =>
   // Passed as a THUNK: a delegate that throws synchronously (e.g. a validation
   // error out of untyped args) is absorbed by the boundary instead of escaping
   // the AsyncResult as a raw throw.
   fromPromise(
     () => (Prisma.getExtensionContext(self) as unknown as UntypedDelegate)[op]!(args),
     qualifyPrismaError,
-  );
+  ) as unknown as AsyncResult<R, E>;
 
 // Pagination's own triage — the one place a Prisma VALIDATION error is a value
 // rather than a defect. A cursor is an OPAQUE STRING from the outside world (a
@@ -520,7 +529,7 @@ export const unthrownPrisma = Prisma.defineExtension({
         this: T,
         args?: Prisma.Exact<A, Prisma.Args<T, "findMany">>,
       ): AsyncResult<Prisma.Result<T, A, "findMany">, never> {
-        return query(this, "findMany", args) as AsyncResult<Prisma.Result<T, A, "findMany">, never>;
+        return query(this, "findMany", args);
       },
 
       /** `findUnique`, qualified: the row or `null` — absence is not an error. */
@@ -528,10 +537,7 @@ export const unthrownPrisma = Prisma.defineExtension({
         this: T,
         args: Prisma.Exact<A, Prisma.Args<T, "findUnique">>,
       ): AsyncResult<Prisma.Result<T, A, "findUnique">, never> {
-        return query(this, "findUnique", args) as AsyncResult<
-          Prisma.Result<T, A, "findUnique">,
-          never
-        >;
+        return query(this, "findUnique", args);
       },
 
       /**
@@ -542,10 +548,7 @@ export const unthrownPrisma = Prisma.defineExtension({
         this: T,
         args: Prisma.Exact<A, Prisma.Args<T, "findUniqueOrThrow">>,
       ): AsyncResult<Prisma.Result<T, A, "findUniqueOrThrow">, RecordNotFound> {
-        return query(this, "findUniqueOrThrow", args) as AsyncResult<
-          Prisma.Result<T, A, "findUniqueOrThrow">,
-          RecordNotFound
-        >;
+        return query(this, "findUniqueOrThrow", args);
       },
 
       /** `findFirst`, qualified: the first match or `null`. */
@@ -553,10 +556,7 @@ export const unthrownPrisma = Prisma.defineExtension({
         this: T,
         args?: Prisma.Exact<A, Prisma.Args<T, "findFirst">>,
       ): AsyncResult<Prisma.Result<T, A, "findFirst">, never> {
-        return query(this, "findFirst", args) as AsyncResult<
-          Prisma.Result<T, A, "findFirst">,
-          never
-        >;
+        return query(this, "findFirst", args);
       },
 
       /**
@@ -567,10 +567,7 @@ export const unthrownPrisma = Prisma.defineExtension({
         this: T,
         args?: Prisma.Exact<A, Prisma.Args<T, "findFirstOrThrow">>,
       ): AsyncResult<Prisma.Result<T, A, "findFirstOrThrow">, RecordNotFound> {
-        return query(this, "findFirstOrThrow", args) as AsyncResult<
-          Prisma.Result<T, A, "findFirstOrThrow">,
-          RecordNotFound
-        >;
+        return query(this, "findFirstOrThrow", args);
       },
 
       /** `count`, qualified. */
@@ -578,7 +575,7 @@ export const unthrownPrisma = Prisma.defineExtension({
         this: T,
         args?: Prisma.Exact<A, Prisma.Args<T, "count">>,
       ): AsyncResult<Prisma.Result<T, A, "count">, never> {
-        return query(this, "count", args) as AsyncResult<Prisma.Result<T, A, "count">, never>;
+        return query(this, "count", args);
       },
 
       /** `aggregate`, qualified. */
@@ -586,10 +583,7 @@ export const unthrownPrisma = Prisma.defineExtension({
         this: T,
         args: Prisma.Exact<A, Prisma.Args<T, "aggregate">>,
       ): AsyncResult<Prisma.Result<T, A, "aggregate">, never> {
-        return query(this, "aggregate", args) as AsyncResult<
-          Prisma.Result<T, A, "aggregate">,
-          never
-        >;
+        return query(this, "aggregate", args);
       },
 
       /** `groupBy`, qualified. */
@@ -597,7 +591,7 @@ export const unthrownPrisma = Prisma.defineExtension({
         this: T,
         args: Prisma.Exact<A, Prisma.Args<T, "groupBy">>,
       ): AsyncResult<Prisma.Result<T, A, "groupBy">, never> {
-        return query(this, "groupBy", args) as AsyncResult<Prisma.Result<T, A, "groupBy">, never>;
+        return query(this, "groupBy", args);
       },
 
       /**
@@ -610,10 +604,7 @@ export const unthrownPrisma = Prisma.defineExtension({
         this: T,
         args: Prisma.Exact<A, Prisma.Args<T, "create">>,
       ): AsyncResult<Prisma.Result<T, A, "create">, CreateError> {
-        return query(this, "create", args) as AsyncResult<
-          Prisma.Result<T, A, "create">,
-          CreateError
-        >;
+        return query(this, "create", args);
       },
 
       /**
@@ -625,10 +616,7 @@ export const unthrownPrisma = Prisma.defineExtension({
         this: T,
         args: Prisma.Exact<A, Prisma.Args<T, "createMany">>,
       ): AsyncResult<Prisma.Result<T, A, "createMany">, CreateManyError> {
-        return query(this, "createMany", args) as AsyncResult<
-          Prisma.Result<T, A, "createMany">,
-          CreateManyError
-        >;
+        return query(this, "createMany", args);
       },
 
       /** `createManyAndReturn`, qualified: the created rows instead of a count. */
@@ -636,10 +624,7 @@ export const unthrownPrisma = Prisma.defineExtension({
         this: T,
         args: Prisma.Exact<A, Prisma.Args<T, "createManyAndReturn">>,
       ): AsyncResult<Prisma.Result<T, A, "createManyAndReturn">, CreateManyError> {
-        return query(this, "createManyAndReturn", args) as AsyncResult<
-          Prisma.Result<T, A, "createManyAndReturn">,
-          CreateManyError
-        >;
+        return query(this, "createManyAndReturn", args);
       },
 
       /**
@@ -650,10 +635,7 @@ export const unthrownPrisma = Prisma.defineExtension({
         this: T,
         args: Prisma.Exact<A, Prisma.Args<T, "update">>,
       ): AsyncResult<Prisma.Result<T, A, "update">, UpdateError> {
-        return query(this, "update", args) as AsyncResult<
-          Prisma.Result<T, A, "update">,
-          UpdateError
-        >;
+        return query(this, "update", args);
       },
 
       /**
@@ -666,10 +648,7 @@ export const unthrownPrisma = Prisma.defineExtension({
         this: T,
         args: Prisma.Exact<A, Prisma.Args<T, "upsert">>,
       ): AsyncResult<Prisma.Result<T, A, "upsert">, UpsertError> {
-        return query(this, "upsert", args) as AsyncResult<
-          Prisma.Result<T, A, "upsert">,
-          UpsertError
-        >;
+        return query(this, "upsert", args);
       },
 
       /**
@@ -681,10 +660,7 @@ export const unthrownPrisma = Prisma.defineExtension({
         this: T,
         args: Prisma.Exact<A, Prisma.Args<T, "updateMany">>,
       ): AsyncResult<Prisma.Result<T, A, "updateMany">, UpdateManyError> {
-        return query(this, "updateMany", args) as AsyncResult<
-          Prisma.Result<T, A, "updateMany">,
-          UpdateManyError
-        >;
+        return query(this, "updateMany", args);
       },
 
       /** `updateManyAndReturn`, qualified: the updated rows instead of a count. */
@@ -692,10 +668,7 @@ export const unthrownPrisma = Prisma.defineExtension({
         this: T,
         args: Prisma.Exact<A, Prisma.Args<T, "updateManyAndReturn">>,
       ): AsyncResult<Prisma.Result<T, A, "updateManyAndReturn">, UpdateManyError> {
-        return query(this, "updateManyAndReturn", args) as AsyncResult<
-          Prisma.Result<T, A, "updateManyAndReturn">,
-          UpdateManyError
-        >;
+        return query(this, "updateManyAndReturn", args);
       },
 
       /**
@@ -706,10 +679,7 @@ export const unthrownPrisma = Prisma.defineExtension({
         this: T,
         args: Prisma.Exact<A, Prisma.Args<T, "delete">>,
       ): AsyncResult<Prisma.Result<T, A, "delete">, DeleteError> {
-        return query(this, "delete", args) as AsyncResult<
-          Prisma.Result<T, A, "delete">,
-          DeleteError
-        >;
+        return query(this, "delete", args);
       },
 
       /**
@@ -721,10 +691,7 @@ export const unthrownPrisma = Prisma.defineExtension({
         this: T,
         args?: Prisma.Exact<A, Prisma.Args<T, "deleteMany">>,
       ): AsyncResult<Prisma.Result<T, A, "deleteMany">, DeleteManyError> {
-        return query(this, "deleteMany", args) as AsyncResult<
-          Prisma.Result<T, A, "deleteMany">,
-          DeleteManyError
-        >;
+        return query(this, "deleteMany", args);
       },
 
       /**

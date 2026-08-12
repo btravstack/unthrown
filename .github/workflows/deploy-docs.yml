@@ -39,7 +39,6 @@ on:
       - "docs/**"
       - "pnpm-workspace.yaml"
       - ".github/workflows/deploy-docs.yml"
-      - ".github/scripts/inject-docs-version-nav.ts"
   workflow_dispatch:
 
 permissions:
@@ -151,11 +150,6 @@ jobs:
           DOCS_VERSIONS: ${{ steps.meta.outputs.versions_stable }}
         run: |
           git worktree add /tmp/stable-docs "${{ steps.meta.outputs.stable_tag }}"
-          # A tag that predates native DOCS_VERSIONS support in the config gets the
-          # version dropdown injected; a no-op once the stable tag carries it natively.
-          # (Runs with the main checkout's docs toolchain — tsx lives there.)
-          pnpm --filter ./docs exec tsx "$GITHUB_WORKSPACE/.github/scripts/inject-docs-version-nav.ts" \
-            /tmp/stable-docs/docs/.vitepress
           cd /tmp/stable-docs
           pnpm install --frozen-lockfile
           pnpm --filter ./docs exec turbo build

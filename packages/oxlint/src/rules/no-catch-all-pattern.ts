@@ -6,14 +6,17 @@ import { getImportBinding } from "../helpers/get-import-binding.js";
 // ts-pattern — a `P._` from either is the same catch-all, so both count.
 const SOURCES: ReadonlySet<string> = new Set(["unthrown", "ts-pattern"]);
 
-// The two universal patterns ts-pattern exposes on `P`: `P._` and its alias
-// `P.any`. Both match anything, so both defeat exhaustive enumeration. Every
-// other `P.*` (`P.string`, `P.number`, `P.union(...)`, …) is a *specific*
-// matcher and is left alone.
+// The universal patterns: unthrown's `P._`, plus ts-pattern's `P.any` alias.
+// Both match anything, so both defeat exhaustive enumeration. Every other `P.*`
+// is a *specific* matcher and is left alone.
+//
+// `any` is kept even though unthrown's own `P` no longer carries it: this rule
+// also covers a `P` imported straight from ts-pattern, where the alias is very
+// much alive, and dropping it would let that catch-all through unreported.
 const CATCH_ALL_PROPS: ReadonlySet<string> = new Set(["_", "any"]);
 
 /**
- * Disallow the matcher catch-all `P._` (and its alias `P.any`) in an
+ * Disallow the matcher catch-all `P._` (and ts-pattern's `P.any` alias) in an
  * unthrown matcher. The exhaustive error matcher exists so every failure is
  * *accounted for by name* — a catch-all re-opens the blanket-handling hole it
  * closes, silently absorbing any error the union grows later.
@@ -48,7 +51,7 @@ export const noCatchAllPattern = defineRule({
     type: "suggestion",
     docs: {
       description:
-        "Disallow the `P._` / `P.any` catch-all in an unthrown matcher — enumerate every error case by name; the catch-all is an escape hatch (a helper generic in `E`, or an `E` that is a single type rather than a union), carried by a targeted `oxlint-disable`",
+        "Disallow the `P._` catch-all (and ts-pattern's `P.any` alias) in an unthrown matcher — enumerate every error case by name; the catch-all is an escape hatch (a helper generic in `E`, or an `E` that is a single type rather than a union), carried by a targeted `oxlint-disable`",
       recommended: true,
     },
     messages: {
@@ -62,8 +65,8 @@ export const noCatchAllPattern = defineRule({
         if (node.object.type !== "Identifier") return;
 
         // The catch-all is written `P._` / `P.any` (dot access) or `P["_"]` /
-        // `P["any"]` (computed access with a string literal) — both are the same
-        // pattern, so both are flagged. A computed access with a dynamic key
+        // `P["any"]` (computed access with a string literal) — the same pattern
+        // either way, so every spelling is flagged. A computed access with a dynamic key
         // (`P[k]`) is left alone: it can't be resolved statically.
         const prop =
           !node.computed && node.property.type === "Identifier"

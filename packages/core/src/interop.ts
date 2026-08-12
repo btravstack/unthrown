@@ -3,7 +3,15 @@
 // there is no path that yields `unknown` in `E`.
 
 import { Err, Ok } from "./constructors.js";
-import { AsyncRes, defectRes, errRes, isResult, okRes } from "./core.js";
+import {
+  AsyncRes,
+  defectRes,
+  errRes,
+  isResult,
+  isThenable,
+  okRes,
+  silenceIfThenable,
+} from "./core.js";
 import { type Defect, defect, isDefectMarker } from "./defect.js";
 import type {
   AsyncErrOf,
@@ -346,7 +354,14 @@ export function fromExecutor<T = never, E = never>(
       // a Result) would otherwise be dropped mid-flight; adopt-and-silence so
       // its later rejection can't float — the sibling of qualifyToResult's and
       // thenableReturnDefect's nets.
-      if (isThenable(result)) void Promise.resolve(result).then(undefined, () => undefined);
+      //
+      // Via `silenceIfThenable`, NOT a bare `isThenable`: `settle` is called
+      // from the caller's own asynchronous code, outside the `try` around the
+      // executor below, so a hostile `.then` getter throwing here would escape
+      // into that turn AND leave `resolve` uncalled — an AsyncResult that never
+      // settles, the one hazard this boundary is meant to bound. Silencing is
+      // total, so the Defect below is always reached.
+      silenceIfThenable(result);
       resolve(
         defectRes<T, E>(
           new TypeError("unthrown: fromExecutor's settle received a non-Result value"),
@@ -428,20 +443,6 @@ function thenableReturnDefect<T, E>(value: unknown): Result<T, E> {
 }
 
 /**
- * Runtime thenable probe for the belt-and-braces guards above. Called inside the
- * caller's `try`, so even a hostile `.then` getter lands on the Defect path.
- *
- * @internal
- */
-function isThenable(x: unknown): boolean {
-  return (
-    (typeof x === "object" || typeof x === "function") &&
-    x !== null &&
-    typeof (x as { then?: unknown }).then === "function"
-  );
-}
-
-/**
  * The success channel of {@link all} / {@link allAsync}: a **positional tuple**
  * for a fixed-length input (including the empty tuple), or a homogeneous
  * **array** for a dynamic one.
@@ -503,33 +504,25 @@ function foldArray(results: readonly Result<unknown, unknown>[]): Result<unknown
 
 /**
  * Fold a record of settled `Result`s with the same rules, else `Ok` of the
- * record of values. Keys are written with `Object.defineProperty` so a
- * caller-supplied `"__proto__"` key cannot pollute the prototype.
+ * record of values.
+ *
+ * @remarks
+ * The positional fold already implements every rule (first `Err` wins, any
+ * `Defect` dominates, a non-`Result` element becomes a `Defect`), so this pairs
+ * the keys back onto its success value rather than restating them.
+ *
+ * `Object.fromEntries` is what makes a caller-supplied `"__proto__"` key safe:
+ * it builds each key with CreateDataProperty, which defines an own property
+ * instead of invoking the `__proto__` setter — the same guarantee the previous
+ * explicit `Object.defineProperty` loop bought by hand.
  *
  * @internal
  */
 function foldRecord(results: ResultRecord): Result<unknown, unknown> {
-  let firstErr: Result<unknown, unknown> | undefined;
-  let firstDefect: Result<unknown, unknown> | undefined;
-  const values: Record<string, unknown> = {};
-  for (const [key, r] of Object.entries(results)) {
-    if (!isResult(r)) {
-      firstDefect ??= nonResultDefect(); // out-of-contract element → Defect (see foldArray)
-      break;
-    }
-    if (r.tag === "Defect") {
-      firstDefect ??= r;
-      break; // any Defect dominates — nothing later can change the outcome
-    } else if (r.tag === "Err") firstErr ??= r;
-    else
-      Object.defineProperty(values, key, {
-        value: r.value,
-        enumerable: true,
-        writable: true,
-        configurable: true,
-      });
-  }
-  return firstDefect ?? firstErr ?? Ok(values);
+  const keys = Object.keys(results);
+  return foldArray(Object.values(results)).map((values) =>
+    Object.fromEntries(keys.map((key, i) => [key, (values as unknown[])[i]])),
+  );
 }
 
 /**
@@ -661,24 +654,24 @@ export function allAsync<Rs extends readonly AsyncResult<unknown, unknown>[]>(
 export function allFromDictAsync<R extends AsyncResultRecord>(
   results: R,
 ): AsyncResult<{ [K in keyof R]: AsyncOkOf<R[K]> }, AsyncErrOf<R[keyof R]>> {
-  const entries = Object.entries(results);
+  const keys = Object.keys(results);
   const settled = Promise.all(
     // Adopt each input defensively (see `allAsync`): a rejecting thenable
     // becomes a `Defect`, so the internal promise never rejects.
-    entries.map(([, ar]) =>
+    Object.values(results).map((ar) =>
       Promise.resolve(ar).then(
         (x) => x,
         (cause) => defectRes(cause),
       ),
     ),
-  ).then((resolved) => {
-    // Null-proto accumulator: pairing resolved values back to keys can't pollute.
-    const byKey: ResultRecord = Object.create(null) as ResultRecord;
-    entries.forEach(([key], i) => {
-      byKey[key] = resolved[i]!;
-    });
-    return foldRecord(byKey);
-  });
+  ).then((resolved) =>
+    // The positional fold applies the `all` rules; the keys are paired back on
+    // afterwards, with the same `Object.fromEntries` prototype guarantee
+    // `foldRecord` relies on.
+    foldArray(resolved as readonly Result<unknown, unknown>[]).map((values) =>
+      Object.fromEntries(keys.map((key, i) => [key, (values as unknown[])[i]])),
+    ),
+  );
   return new AsyncRes(settled) as unknown as AsyncResult<
     { [K in keyof R]: AsyncOkOf<R[K]> },
     AsyncErrOf<R[keyof R]>

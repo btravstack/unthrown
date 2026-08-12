@@ -934,7 +934,7 @@ declare function sometimesWork(): Promise<number>;
     .exhaustive();
   type _PinnedDefect = Expect<Equal<typeof pinnedDefect, string>>;
 
-  // grouped patterns under a pin: the variadic form and P.union
+  // grouped patterns under a pin: the variadic form
   const grouped = match(e)
     .returnType<string>()
     .with(P.tag("NotFound"), P.tag("Conflict"), (both) => {
@@ -943,15 +943,6 @@ declare function sometimesWork(): Promise<number>;
     })
     .exhaustive();
   type _Grouped = Expect<Equal<typeof grouped, string>>;
-
-  const unioned = match(e)
-    .returnType<string>()
-    .with(P.union(P.tag("NotFound"), P.tag("Conflict")), (both) => {
-      type _UnionNarrowed = Expect<Equal<typeof both, NotFound | Conflict>>;
-      return both._tag;
-    })
-    .exhaustive();
-  type _Unioned = Expect<Equal<typeof unioned, string>>;
 }
 
 // --- returnType<R>() reaches every combinator that hands out a matcher -------

@@ -1,7 +1,0 @@
-{
-  "extends": "@btravstack/typedoc/base.json",
-  "name": "@unthrown/boxed",
-  "entryPoints": ["../packages/boxed/src/index.ts"],
-  "tsconfig": "../packages/boxed/tsconfig.json",
-  "out": "api/boxed"
-}

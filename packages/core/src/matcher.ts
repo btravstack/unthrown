@@ -8,7 +8,7 @@
 //   - Exhaustiveness is computed with plain `Exclude` over the tracked
 //     `Remaining` parameter — shallow, fast, and stable (no third-party minor
 //     release can change what "exhaustive" means).
-//   - The universal pattern (`P._` / `P.any`) carries phantom type `unknown`,
+//   - The universal pattern (`P._`) carries phantom type `unknown`,
 //     and `Exclude<Remaining, unknown>` reduces to `never` even when the input
 //     is an UNRESOLVED generic — so a catch-all-terminated builder is provably
 //     exhaustive inside code generic in `E` (fixes #145 by construction).
@@ -18,10 +18,11 @@
 // Supported patterns (the vocabulary the error channel actually uses):
 // primitive literals, shallow(-ly nested) object literals (`{ _tag: "X" }`,
 // `{ code: "X" }` — `P.tag(t)` produces the former), and the `P.*` matchers
-// (`_`/`any`, `tag`, `instanceOf`, `when`, `union`, `string`, `number`).
-// Deliberately NOT supported: deep structural inversion, selections,
-// array/variadic patterns — that is the complexity (and instability) being
-// left behind.
+// (`_`, `tag`, `instanceOf`, `when`). Deliberately NOT supported: deep
+// structural inversion, selections, array/variadic patterns — that is the
+// complexity (and instability) being left behind. Primitive-type wildcards and
+// pattern unions are not carried either: `P.when` spells the first, and a
+// `.with(a, b, handler)` arm already groups patterns under one handler.
 
 import type { Defect } from "./defect.js";
 
@@ -52,7 +53,7 @@ export type PatternMatcher<M> = {
 };
 
 /**
- * The statically-known universal pattern — the type of `P._` / `P.any` only.
+ * The statically-known universal pattern — the type of `P._` only.
  * The phantom `UNIVERSAL` marker is *required*, so no other
  * `PatternMatcher<unknown>` (e.g. a `P.when` guard that happens to be
  * universal) is assignable: the catch-all `.with` overload must only fire for
@@ -148,7 +149,7 @@ type PinTooLate = {
  */
 export type Matcher<E, Remaining, O, Declared = Unset> = {
   /**
-   * The catch-all arm: `.with(P._, handler)` / `.with(P.any, handler)` — the
+   * The catch-all arm: `.with(P._, handler)` — the
    * wildcard **escape hatch**, not the way to handle a concrete error union
    * (name those cases; `@unthrown/oxlint`'s `no-catch-all-pattern`, in its
    * `recommended` preset, flags the wildcard).
@@ -377,13 +378,13 @@ function pattern<M>(predicate: (value: unknown) => boolean): PatternMatcher<M> {
 
 // The `UNIVERSAL` marker is phantom (declaration-only): the cast brands the
 // runtime object with the statically-known-universal type so the catch-all
-// `.with` overload fires for `P._` / `P.any` and for nothing else.
+// `.with` overload fires for `P._` and for nothing else.
 const universal = pattern<unknown>(() => true) as UniversalPattern;
 
 /**
  * The pattern namespace (unthrown's own; the former ts-pattern `P`):
  *
- * - `P._` / `P.any` — the universal catch-all, and an **escape hatch** rather
+ * - `P._` — the universal catch-all, and an **escape hatch** rather
  *   than the default: matching the error channel means naming its cases, so
  *   reach for this only where they cannot be named. Matches anything, and
  *   (because its phantom type is `unknown`) makes the builder provably
@@ -401,28 +402,22 @@ const universal = pattern<unknown>(() => true) as UniversalPattern;
  *   branch's parameter to that variant, payload included. The workhorse of the
  *   error channel: `matcher.with(P.tag("NotFound"), (e) => …)`. It composes like
  *   any other pattern — in a grouped arm
- *   (`.with(P.tag("A"), P.tag("B"), handler)`) and inside `P.union`.
+ *   (`.with(P.tag("A"), P.tag("B"), handler)`).
  * - `P.instanceOf(Cls)` — an `instanceof` check, narrowing to the class
  *   instance type (for union members that are not tagged, e.g. a third-party
  *   error class).
- * - `P.when(guard)` — an arbitrary type-guard predicate.
- * - `P.union(…patterns)` — matches when any sub-pattern matches.
- * - `P.string` / `P.number` — primitive-type wildcards.
+ * - `P.when(guard)` — an arbitrary type-guard predicate. Also the way to match
+ *   a primitive shape (`P.when((v): v is string => typeof v === "string")`),
+ *   and grouping patterns under one handler is what a `.with(a, b, handler)`
+ *   arm already does.
  *
  * @category Constructors
  */
 export const P = Object.freeze({
   _: universal,
-  any: universal,
   tag: <const Tag extends string>(value: Tag): { _tag: Tag } => ({ _tag: value }),
   instanceOf: <C extends abstract new (...args: never[]) => unknown>(
     cls: C,
   ): PatternMatcher<InstanceType<C>> => pattern((value) => value instanceof cls),
   when: <G>(guard: (value: unknown) => value is G): PatternMatcher<G> => pattern(guard),
-  union: <const Pts extends readonly [unknown, ...unknown[]]>(
-    ...patterns: Pts
-  ): PatternMatcher<MatchedOf<Pts[number]>> =>
-    pattern((value) => patterns.some((sub) => matches(sub, value))),
-  string: pattern<string>((value) => typeof value === "string"),
-  number: pattern<number>((value) => typeof value === "number"),
 });

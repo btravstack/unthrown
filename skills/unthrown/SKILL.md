@@ -243,7 +243,7 @@ tag is namespaced (`TaggedError("pkg/NotFound", { name: "NotFound" })`).
 | `message` in a TaggedError payload                                             | Reserved. `override message = …` on the class; context goes in typed fields.                                                                                                                    |
 | `tap((v) => auditLog.record(v))` where the effect returns a Result/AsyncResult | Effect outcome silently dropped/floats. Use `flatTap` on the matching surface.                                                                                                                  |
 | Serializing a Result (JSON, structuredClone)                                   | Unsupported by design. `match` at the boundary; re-enter via constructors on the other side.                                                                                                    |
-| `throw` in app code for known failures                                         | Return `Err(...)`. `throw` is for genuine defects only (the opt-in `no-throw` rule bans even that).                                                                                             |
+| `throw` in app code for known failures                                         | Return `Err(...)`. `throw` is for genuine defects only.                                                                                                                                         |
 | `getOrThrow()` in production code                                              | Throws the modeled error, ending errors-as-values at the last step. Fold with `recoverErrCases` + `get`. Fine in tests (the opt-in `no-get-or-throw` rule exempts them via oxlint `overrides`). |
 
 ## References
@@ -254,7 +254,7 @@ tag is namespaced (`TaggedError("pkg/NotFound", { name: "NotFound" })`).
   facade namespaces (`Result.*`/`AsyncResult.*`), and utility types. Read when
   choosing a combinator or writing anything beyond the basics above.
 - **[references/ecosystem.md](references/ecosystem.md)** — the `@unthrown/*`
-  satellite packages: vitest matchers (`toBeOk`/`toBeErrTagged`/…), the eight
+  satellite packages: vitest matchers (`toBeOk`/`toBeErrTagged`/…), the six
   oxlint rules, Prisma extension (`try*` delegates), Drizzle database
   (replaces the stock one — no `try*`), oRPC bridge,
   standard-schema validation, and the effect/neverthrow/boxed interop bridges.

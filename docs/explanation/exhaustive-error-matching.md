@@ -184,7 +184,7 @@ function toPromise<T, E>(result: Result<T, E>): T {
 ```
 
 The exemption is narrow by construction: the `UniversalPattern` type that
-unlocks the catch-all overload is carried by `P._` / `P.any` alone. Even a
+unlocks the catch-all overload is carried by `P._` alone. Even a
 `P.when` guard that happens to accept everything is _not_ assignable to it — the
 overload fires only for a pattern the type system **knows** covers the whole
 input. There is no way to widen this hole from user code.

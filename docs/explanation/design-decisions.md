@@ -69,8 +69,7 @@ never exported.
 The reasoning is friction as a forcing function: once minting a defect is one
 frictionless call, "I don't feel like modeling this error" starts flowing into
 the defect channel, and the discipline that makes `E` trustworthy erodes. Scoping
-the injection to triage sites keeps that friction while staying lint-clean under
-a [`no-throw`](../how-to/lint-your-codebase#no-throw) rule. Weighed and
+the injection to triage sites keeps that friction. Weighed and
 decided in [#77](https://github.com/btravstack/unthrown/issues/77).
 
 ## No serialization

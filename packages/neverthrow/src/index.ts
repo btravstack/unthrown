@@ -117,7 +117,7 @@ export function toNeverthrowAsync<T, E>(
   asyncResult: AsyncResult<T, E>,
   onDefect: (cause: unknown) => E,
 ): NeverthrowResultAsync<T, E> {
-  return NeverthrowResultAsync.fromSafePromise(settle(asyncResult)).andThen((result) =>
+  return NeverthrowResultAsync.fromSafePromise(Promise.resolve(asyncResult)).andThen((result) =>
     toNeverthrow(result, onDefect),
   );
 }
@@ -147,9 +147,4 @@ export function fromNeverthrowAsync<T, E>(
   resultAsync: NeverthrowResultAsync<T, E>,
 ): AsyncResult<T, E> {
   return fromSafePromise(Promise.resolve(resultAsync)).flatMap((result) => fromNeverthrow(result));
-}
-
-// oxlint-disable-next-line unthrown/prefer-async-result -- the bridge INTO neverthrow: a native Promise is what `ResultAsync.fromSafePromise` consumes, so an AsyncResult here would be circular
-function settle<T, E>(asyncResult: AsyncResult<T, E>): Promise<Result<T, E>> {
-  return (async () => await asyncResult)();
 }

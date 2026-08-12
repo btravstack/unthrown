@@ -528,6 +528,35 @@ function passThrough<T, E>(self: Result<unknown, unknown>): Result<T, E> {
 }
 
 /**
+ * Runtime thenable probe, shared by the combinator-side net below and the
+ * boundary nets in `interop.ts`.
+ *
+ * @remarks
+ * Reading `.then` can itself **throw** — a hostile getter, or a Proxy `get`
+ * trap — so this is deliberately not a total function, and every caller must
+ * account for that. Two shapes are sanctioned, and there is no third:
+ *
+ * - inside a `try` that routes the throw to a `Defect` (the boundaries in
+ *   `interop.ts`, where a hostile value arriving at a triage point *is* an
+ *   unmodeled failure and should surface as one); or
+ * - through {@link silenceIfThenable}, for a value being **discarded**, where
+ *   there is no Defect channel to route to and the only correct answer is to
+ *   drop it without throwing.
+ *
+ * Calling it bare, outside both, is a bug: the throw escapes into whatever
+ * context invoked it.
+ *
+ * @internal
+ */
+export function isThenable(x: unknown): boolean {
+  return (
+    (typeof x === "object" || typeof x === "function") &&
+    x !== null &&
+    typeof (x as { then?: unknown }).then === "function"
+  );
+}
+
+/**
  * Adopt-and-silence a thenable a combinator is about to **discard**.
  *
  * @remarks
@@ -546,15 +575,9 @@ function passThrough<T, E>(self: Result<unknown, unknown>): Result<T, E> {
  *
  * @internal
  */
-function silenceIfThenable(value: unknown): void {
+export function silenceIfThenable(value: unknown): void {
   try {
-    if (
-      (typeof value === "object" || typeof value === "function") &&
-      value !== null &&
-      typeof (value as { then?: unknown }).then === "function"
-    ) {
-      void Promise.resolve(value).then(undefined, () => undefined);
-    }
+    if (isThenable(value)) void Promise.resolve(value).then(undefined, () => undefined);
   } catch {
     // A hostile `then` getter threw — there is nothing adoptable here.
   }
@@ -658,6 +681,25 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     this.#promise = promise;
   }
 
+  /**
+   * Lift a **synchronous** `Result` combinator over the wrapped promise.
+   *
+   * @remarks
+   * Every method below that does no `await` of its own is exactly its `Res`
+   * twin applied to the settled `Result` — same tag check, same try/catch, same
+   * throw→defect net. Delegating instead of restating it keeps the two surfaces
+   * from drifting: a fix to the sync combinator is the fix to the async one.
+   * The methods that DO await a callback's result (`flatMap`, `flatTap`,
+   * `bind`, `flatMapErrCases`, `flatTapErrCases`, `recoverDefect` — the ones
+   * whose callback may hand back an `AsyncResult`) genuinely differ and are
+   * still written out in full.
+   *
+   * @internal
+   */
+  #lift<U, E2>(f: (r: Result<T, E>) => Result<U, E2>): AsyncResult<U, E2> {
+    return new AsyncRes<U, E2>(this.#promise.then(f));
+  }
+
   // oxlint-disable-next-line no-thenable -- AsyncResult is an intentional (success-only) thenable so `await` collapses it to a Result; see the Awaitable type. onrejected is still forwarded so a hypothetical internal rejection settles the await instead of hanging — though the internal promise never rejects.
   then<R1 = Result<T, E>, R2 = never>(
     onfulfilled?: ((value: Result<T, E>) => R1 | PromiseLike<R1>) | null,
@@ -667,16 +709,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   }
 
   map<U>(f: (value: T) => U & NotThenable<U>): AsyncResult<U, E> {
-    return new AsyncRes<U, E>(
-      this.#promise.then((r) => {
-        if (r.tag !== "Ok") return passThrough(r);
-        try {
-          return okRes(f(r.value));
-        } catch (cause) {
-          return defectRes(cause);
-        }
-      }),
-    );
+    return this.#lift((r) => r.map(f));
   }
 
   flatMap<U, E2>(f: (value: T) => Result<U, E2> | AsyncResult<U, E2>): AsyncResult<U, E | E2> {
@@ -694,17 +727,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   }
 
   tap<R>(f: (value: T) => R & NotThenable<R>): AsyncResult<T, E> {
-    return new AsyncRes<T, E>(
-      this.#promise.then((r) => {
-        if (r.tag !== "Ok") return r;
-        try {
-          silenceIfThenable(f(r.value));
-          return r;
-        } catch (cause) {
-          return defectRes<T, E>(cause);
-        }
-      }),
-    );
+    return this.#lift((r) => r.tap(f));
   }
 
   flatTap<E2>(
@@ -751,31 +774,15 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     name: K,
     f: (scope: T) => U & NotThenable<U>,
   ): AsyncResult<Bound<T, K, U>, E> {
-    return new AsyncRes<Bound<T, K, U>, E>(
-      this.#promise.then((r) => {
-        if (r.tag !== "Ok") return passThrough(r);
-        try {
-          return okRes({ ...scopeOf(r.value), [name]: f(r.value) }) as unknown as Result<
-            Bound<T, K, U>,
-            E
-          >;
-        } catch (cause) {
-          return defectRes(cause);
-        }
-      }),
-    );
+    return this.#lift((r) => r.let(name, f));
   }
 
   as<U>(value: U): AsyncResult<U, E> {
-    return new AsyncRes<U, E>(
-      this.#promise.then((r) => (r.tag === "Ok" ? okRes<U, E>(value) : passThrough(r))),
-    );
+    return this.#lift((r) => r.as(value));
   }
 
   discard(): AsyncResult<void, E> {
-    return new AsyncRes<void, E>(
-      this.#promise.then((r) => (r.tag === "Ok" ? okRes<void, E>(undefined) : passThrough(r))),
-    );
+    return this.#lift((r) => r.discard());
   }
 
   // Like the matcher methods below, `ensure` is typed loosely here (`never`
@@ -786,17 +793,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     predicate: (value: T) => boolean,
     onFail: (value: T) => unknown,
   ): AsyncResult<never, never> {
-    return new AsyncRes<never, never>(
-      this.#promise.then((r) => {
-        if (r.tag !== "Ok") return passThrough(r);
-        try {
-          // A passing value flows through as the same Ok (see the sync `ensure`).
-          return (predicate(r.value) ? r : errRes(onFail(r.value))) as Result<never, never>;
-        } catch (cause) {
-          return defectRes(cause);
-        }
-      }),
-    );
+    return this.#lift((r) => r.ensure(predicate, onFail) as Result<never, never>);
   }
 
   // The precise generic-M matcher signatures live on the public surface
@@ -809,18 +806,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   mapErrCases(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
   ): AsyncResult<T, never> {
-    return new AsyncRes<T, never>(
-      this.#promise.then((r) => {
-        if (r.tag !== "Err") return passThrough(r);
-        try {
-          const out = runMatch(f, r.error);
-          if (isDefectMarker(out)) return defectRes<T, never>(out.cause);
-          return errRes<T, never>(out as never);
-        } catch (cause) {
-          return defectRes(cause);
-        }
-      }),
-    );
+    return this.#lift((r) => r.mapErrCases(f) as Result<T, never>);
   }
 
   flatMapErrCases(
@@ -848,39 +834,13 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   recoverErrCases(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
   ): AsyncResult<T, never> {
-    return new AsyncRes<T, never>(
-      this.#promise.then((r) => {
-        if (r.tag !== "Err") return passThrough(r);
-        try {
-          const out = runMatch(f, r.error);
-          if (isDefectMarker(out)) return defectRes<T, never>(out.cause);
-          return okRes<T, never>(out as T);
-        } catch (cause) {
-          return defectRes(cause);
-        }
-      }),
-    );
+    return this.#lift((r) => r.recoverErrCases(f) as Result<T, never>);
   }
 
   tapErrCases(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
   ): AsyncResult<T, E> {
-    return new AsyncRes<T, E>(
-      this.#promise.then((r) => {
-        if (r.tag !== "Err") return r;
-        try {
-          const out = runMatch(f, r.error);
-          // Same observer treatment as the sync surface — a deliberate
-          // `defect(…)` is the expression-position form of a `throw`, not a
-          // discarded branch value.
-          if (isDefectMarker(out)) return observerThrowToDefect<T, E>(out.cause, r.error);
-          silenceIfThenable(out);
-          return r;
-        } catch (cause) {
-          return observerThrowToDefect<T, E>(cause, r.error);
-        }
-      }),
-    );
+    return this.#lift((r) => r.tapErrCases(f));
   }
 
   flatTapErrCases(
@@ -927,31 +887,11 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   }
 
   tapDefect<R>(f: (cause: unknown) => R & NotThenable<R>): AsyncResult<T, E> {
-    return new AsyncRes<T, E>(
-      this.#promise.then((r) => {
-        if (r.tag !== "Defect") return r;
-        try {
-          silenceIfThenable(f(r.cause));
-          return r;
-        } catch (cause) {
-          return observerThrowToDefect<T, E>(cause, r.cause);
-        }
-      }),
-    );
+    return this.#lift((r) => r.tapDefect(f));
   }
 
   tapFailure<R>(f: (failure: FailureView<E, T>) => R & NotThenable<R>): AsyncResult<T, E> {
-    return new AsyncRes<T, E>(
-      this.#promise.then((r) => {
-        if (r.tag === "Ok") return r;
-        try {
-          silenceIfThenable(f(r));
-          return r;
-        } catch (cause) {
-          return observerThrowToDefect<T, E>(cause, r.tag === "Err" ? r.error : r.cause);
-        }
-      }),
-    );
+    return this.#lift((r) => r.tapFailure(f));
   }
 
   match<ROk, RDefect, M extends ExhaustiveMatch<unknown>>(cases: {
