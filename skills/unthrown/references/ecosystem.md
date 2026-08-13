@@ -55,9 +55,10 @@ statement itself — it reports every `throw`, in any file).
   function-type return positions — those must stay `Promise`).
 - `no-unhandled-result` — flags a bare expression statement dropping a
   `Result` (syntactic; a dropped method chain is out of scope).
-- `no-catch-all-pattern` — reports `P._` (and ts-pattern's `P.any`); keep-the-wildcard sites
-  (generic-`E` helpers, single-type `E`) carry a targeted `oxlint-disable`
-  with a reason.
+- `no-catch-all-pattern` — reports `P._` (and ts-pattern's `P.any`); self-exempts
+  when an in-file `Result` annotation proves `E` is a single non-union type or
+  an unresolved generic; unprovable keep-the-wildcard sites carry a targeted
+  `oxlint-disable` with a reason.
 - `no-unused-matcher` — reports a `…Cases` callback (or `match`'s `errCases`
   handler) whose matcher parameter is absent or never read, and a second
   `match(...)` built in the callback's own body — a borrowed builder matches

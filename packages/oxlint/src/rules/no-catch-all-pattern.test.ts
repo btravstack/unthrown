@@ -30,6 +30,33 @@ ruleTester.run("no-catch-all-pattern", noCatchAllPattern, {
     {
       code: `import { P } from "unthrown";\nconst k = "_";\nm.with(P[k], (e) => e);`,
     },
+    // ---- Provable single non-union `E` (issue #230): the catch-all is the
+    // ---- legitimate single arm, no disable needed.
+    // Annotated variable, `E` a single imported type reference.
+    {
+      code: `import { P, type Result } from "unthrown";\nimport type { SchemaIssues } from "@unthrown/standard-schema";\ndeclare const r: Result<number, SchemaIssues>;\nr.mapErrCases((m) => m.with(P._, (e) => e));`,
+    },
+    // Helper generic in `E` — the docstring's own example shape.
+    {
+      code: `import { P, type Result } from "unthrown";\nconst toApiError = <T, E>(result: Result<T, E>) =>\n  result.mapErrCases((m) => m.with(P._, (e) => e));`,
+    },
+    // Receiver is a call to an in-file function with an annotated return type;
+    // `E` is an in-file alias resolving to a non-union (an array type).
+    {
+      code: `import { P, type Result } from "unthrown";\ntype Issues = readonly { message: string }[];\ndeclare function readEnv(): Result<number, Issues>;\nreadEnv().match({ ok: (v) => v, errCases: (m) => m.with(P._, (e) => e), defect: (c) => c });`,
+    },
+    // AsyncResult annotation, and a chain with a `returnType` pin before the arm.
+    {
+      code: `import { P, type AsyncResult } from "unthrown";\nimport type { Issues } from "./issues.js";\ndeclare const r: AsyncResult<number, Issues>;\nr.recoverErrCases((m) => m.returnType<number>().with(P._, () => 0));`,
+    },
+    // The string-literal key spelling of `errCases` proves the same way.
+    {
+      code: `import { P, type Result } from "unthrown";\ntype Issues = readonly { message: string }[];\ndeclare function readEnv(): Result<number, Issues>;\nreadEnv().match({ ok: (v) => v, "errCases": (m) => m.with(P._, (e) => e), defect: (c) => c });`,
+    },
+    // An awaited AsyncResult receiver traces through the `await`.
+    {
+      code: `import { P, type AsyncResult } from "unthrown";\nimport type { Issues } from "./issues.js";\ndeclare const r: AsyncResult<number, Issues>;\nasync () => (await r).mapErrCases((m) => m.with(P._, (e) => e));`,
+    },
   ],
   invalid: [
     // `P._` from unthrown — the catch-all.
@@ -69,6 +96,21 @@ ruleTester.run("no-catch-all-pattern", noCatchAllPattern, {
     },
     {
       code: `import { P } from "unthrown";\nm.with(P["any"], (e) => e);`,
+      errors: [{ messageId: "noCatchAll" }],
+    },
+    // A union `E` in the annotation is enumerable — the catch-all still hides cases.
+    {
+      code: `import { P, type Result } from "unthrown";\ndeclare const r: Result<number, "a" | "b">;\nr.mapErrCases((m) => m.with(P._, (e) => e));`,
+      errors: [{ messageId: "noCatchAll" }],
+    },
+    // An in-file alias that resolves to a union is seen through.
+    {
+      code: `import { P, type Result } from "unthrown";\ntype E = "a" | "b";\ndeclare const r: Result<number, E>;\nr.mapErrCases((m) => m.with(P._, () => 0));`,
+      errors: [{ messageId: "noCatchAll" }],
+    },
+    // An unannotated receiver proves nothing — flagged, keep the targeted disable.
+    {
+      code: `import { P, type Result } from "unthrown";\nimport { readEnv } from "./env.js";\nreadEnv().match({ ok: (v) => v, errCases: (m) => m.with(P._, (e) => e), defect: (c) => c });`,
       errors: [{ messageId: "noCatchAll" }],
     },
   ],

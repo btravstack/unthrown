@@ -300,19 +300,24 @@ Because a matched builder must still be exhaustive, removing `P._` makes the
 compiler point at each unhandled case until every one is named — the rule and the
 type checker push the same way.
 
-`P._` remains a legitimate **escape hatch**, and the rule expects you to say so
-in place. Two cases are legitimate: a helper still **generic in `E`**, where no
-list of tag arms can prove coverage and the catch-all is the only form that
-compiles; and an **`E` that is a single type** rather than a union, where one
-arm _is_ the enumeration. The first looks like this:
+`P._` remains a legitimate **escape hatch** in exactly two cases, and the rule
+**exempts them itself when the file proves them**: a helper still **generic in
+`E`**, where no list of tag arms can prove coverage and the catch-all is the
+only form that compiles; and an **`E` that is a single non-union type**, where
+one arm _is_ the enumeration. The proof is syntactic — the matcher is traced to
+its receiver, and the receiver to an in-file `Result` / `AsyncResult`
+annotation (a variable or parameter annotation, or the return annotation of a
+function declared in the same file). When the annotated `E` is not a union
+(in-file aliases are seen through; an _imported_ named type counts as the
+single abstraction it names), nothing is reported:
 
 ```ts
 function toPromise<T, E>(result: Result<T, E>): T {
   return result.match({
     ok: (value) => value,
     errCases: (matcher) =>
-      // oxlint-disable-next-line unthrown/no-catch-all-pattern -- generic in E: no tag arm can prove coverage
       matcher.with(P._, (error) => {
+        // exempt: `result` is annotated `Result<T, E>` and `E` is a type parameter
         throw error;
       }),
     defect: (cause) => {
@@ -322,11 +327,21 @@ function toPromise<T, E>(result: Result<T, E>): T {
 }
 ```
 
-The same targeted disable comment covers the other honest case: an `E` that is a
-single type rather than a union, where one arm _is_ the enumeration. The rule has no options and no
-autofix — the disable comment is the escape hatch. (Where the helper needs no
-matcher at all, the `isOk` / `isErr` / `isDefect` guards carry no exhaustiveness
-obligation and need no disable comment.)
+Where no annotation is in reach — most commonly a receiver returned by a
+function **imported from another module**, which per-file analysis cannot see —
+the rule still reports, and the targeted disable comment remains the honest
+escape hatch:
+
+```ts
+// oxlint-disable-next-line unthrown/no-catch-all-pattern -- E is SchemaIssues: one type, nothing to enumerate
+errCases: (matcher) => matcher.with(P._, (issues) => abort(describe(issues))),
+```
+
+(Annotating the receiver in-file — `const parsed: Result<Env, SchemaIssues> =
+readEnv()` — also lifts the proof into view and drops the comment.) The rule
+has no options and no autofix. Where the helper needs no matcher at all, the
+`isOk` / `isErr` / `isDefect` guards carry no exhaustiveness obligation and
+need no disable comment.
 
 ### `unthrown/no-unused-matcher` {#no-unused-matcher}
 
