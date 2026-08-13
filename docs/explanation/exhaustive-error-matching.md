@@ -104,7 +104,10 @@ you do:
 `@unthrown/oxlint`'s
 [`no-catch-all-pattern`](../how-to/lint-your-codebase#no-catch-all-pattern) —
 part of its recommended preset — encodes this: `P._` is reported, and the two
-sanctioned uses carry a targeted `oxlint-disable` comment saying which one it is.
+sanctioned uses are exempted automatically when an in-file `Result` annotation
+proves them; where the proof is out of reach (a receiver imported from another
+module), the site carries a targeted `oxlint-disable` comment saying which
+case it is.
 
 ## Why the `*Cases` suffix?
 
@@ -172,7 +175,8 @@ function toPromise<T, E>(result: Result<T, E>): T {
   return result.match({
     ok: (value) => value,
     errCases: (matcher) =>
-      // oxlint-disable-next-line unthrown/no-catch-all-pattern -- generic in E: no tag arm can prove coverage
+      // The lint rule exempts this arm itself: `result` is annotated
+      // `Result<T, E>` in this file, and `E` is an unresolved type parameter.
       matcher.with(P._, (error) => {
         throw error;
       }),
@@ -236,7 +240,8 @@ of failing.
 // Generic in E again — so the catch-all is the only arm that can compile here.
 const toApiError = <T, E>(result: Result<T, E>): Result<T, ApiError> =>
   result.mapErrCases((matcher) =>
-    // oxlint-disable-next-line unthrown/no-catch-all-pattern -- generic in E
+    // No disable needed: the rule sees `result: Result<T, E>` and exempts
+    // the catch-all over an unresolved `E` itself.
     matcher
       .returnType<ApiError>()
       .with(P._, (error) => new ApiError({ status: 500, error })),

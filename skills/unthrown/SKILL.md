@@ -145,8 +145,11 @@ result.mapErrCases(
   (`.with(P.tag("A"), P.tag("B"), handler)`), never wildcarded.
 - **`P._` is an escape hatch, not the default.** It absorbs every future case —
   the exact hole the matcher closes. Legitimate only in a helper generic in `E`
-  (nothing enumerable) or when `E` is a single non-union type; such sites carry
-  an `oxlint-disable … unthrown/no-catch-all-pattern` comment with a reason.
+  (nothing enumerable) or when `E` is a single non-union type. The lint rule
+  exempts those itself when an in-file `Result` annotation on the receiver
+  proves them; where the proof is out of reach (receiver imported from another
+  module), the site carries an
+  `oxlint-disable … unthrown/no-catch-all-pattern` comment with a reason.
 - Never call `.exhaustive()` / `.otherwise()` yourself in these callbacks — you
   return the builder. `matcher.returnType<R>()` (called first) pins the output
   type when a signature decides it.
@@ -238,7 +241,7 @@ tag is namespaced (`TaggedError("pkg/NotFound", { name: "NotFound" })`).
 | `try { pipeline } catch`                                                       | Never needed — throws become Defects; `match`'s `defect` arm is the catch.                                                                                                                      |
 | `Result<T, unknown>` / `Result<T, Error>`                                      | Banned (lint: `no-ambiguous-error-type`). Model concrete cases.                                                                                                                                 |
 | `async (v) => …` inside `map`/`flatMap`/matcher branches                       | Compile error by design. Use `fromPromise` + `flatMap`.                                                                                                                                         |
-| `.with(P._, …)` as a default fallback                                          | Enumerate or group cases; `P._` only for generic-`E` helpers, with a lint-disable + reason.                                                                                                     |
+| `.with(P._, …)` as a default fallback                                          | Enumerate or group cases; `P._` only for generic-`E` helpers or single-type `E` (the lint rule self-exempts when an in-file annotation proves it; otherwise lint-disable + reason).             |
 | Constructing a Defect (`Defect(x)`)                                            | No constructor. `throw` (the net catches it) or the injected `defect` helper at triage sites.                                                                                                   |
 | `message` in a TaggedError payload                                             | Reserved. `override message = …` on the class; context goes in typed fields.                                                                                                                    |
 | `tap((v) => auditLog.record(v))` where the effect returns a Result/AsyncResult | Effect outcome silently dropped/floats. Use `flatTap` on the matching surface.                                                                                                                  |

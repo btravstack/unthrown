@@ -1,6 +1,7 @@
 import { defineRule } from "@oxlint/plugins";
 import type { ESTree, Scope } from "@oxlint/plugins";
 
+import { declaredReturnType } from "../helpers/declared-return-type.js";
 import { getImportBinding } from "../helpers/get-import-binding.js";
 import { resolveResultType } from "../helpers/resolve-result-type.js";
 
@@ -51,25 +52,6 @@ const COMPANION_PRODUCERS: Readonly<Record<string, ReadonlySet<string>>> = {
     "all",
     "allFromDict",
   ]),
-};
-
-/**
- * The declared return-type annotation of a locally-defined function binding,
- * for the two syntactic forms the rule recognises: a (possibly `declare`d)
- * `function` declaration, and a `const f = () => …` / `const f = function …`
- * initialiser carrying its own return annotation.
- */
-const declaredReturnType = (node: ESTree.Node): ESTree.TSType | undefined => {
-  if (node.type === "FunctionDeclaration" || node.type === "TSDeclareFunction") {
-    return node.returnType?.typeAnnotation;
-  }
-  if (node.type === "VariableDeclarator" && node.init) {
-    const { init } = node;
-    if (init.type === "ArrowFunctionExpression" || init.type === "FunctionExpression") {
-      return init.returnType?.typeAnnotation;
-    }
-  }
-  return undefined;
 };
 
 /**
