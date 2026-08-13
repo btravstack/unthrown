@@ -174,7 +174,20 @@ function isProvenSingleTypeArm(
   const errorType = annotatedErrorType(context, receiver);
   if (errorType === undefined) return false;
 
-  return !resolvesToUnion(errorType, topLevelTypeAliases(context.sourceCode.ast), new Set());
+  return !resolvesToUnion(errorType, typeAliasesOf(context.sourceCode.ast), new Set());
+}
+
+// One alias scan per file, however many catch-alls it carries: the map is
+// keyed by the Program node, which is stable for the lint run of a file.
+const ALIAS_CACHE = new WeakMap<ESTree.Program, ReadonlyMap<string, ESTree.TSType>>();
+
+function typeAliasesOf(ast: ESTree.Program): ReadonlyMap<string, ESTree.TSType> {
+  let aliases = ALIAS_CACHE.get(ast);
+  if (aliases === undefined) {
+    aliases = topLevelTypeAliases(ast);
+    ALIAS_CACHE.set(ast, aliases);
+  }
+  return aliases;
 }
 
 /**
@@ -200,14 +213,15 @@ function matcherReceiver(fn: ESTree.Node): ESTree.Node | undefined {
   }
 
   // Several node kinds share `type: "Property"`; `kind` narrows to the object
-  // literal's own `ObjectProperty` (`{ errCases: (m) => … }`).
+  // literal's own `ObjectProperty` (`{ errCases: (m) => … }`). Both key
+  // spellings count, as in `no-unused-matcher`: `errCases:` and `"errCases":`.
   if (
     parent.type === "Property" &&
     "kind" in parent &&
     parent.value === fn &&
     !parent.computed &&
-    parent.key.type === "Identifier" &&
-    parent.key.name === "errCases" &&
+    ((parent.key.type === "Identifier" && parent.key.name === "errCases") ||
+      (parent.key.type === "Literal" && parent.key.value === "errCases")) &&
     parent.parent?.type === "ObjectExpression"
   ) {
     const handlers = parent.parent;

@@ -49,6 +49,10 @@ ruleTester.run("no-catch-all-pattern", noCatchAllPattern, {
     {
       code: `import { P, type AsyncResult } from "unthrown";\nimport type { Issues } from "./issues.js";\ndeclare const r: AsyncResult<number, Issues>;\nr.recoverErrCases((m) => m.returnType<number>().with(P._, () => 0));`,
     },
+    // The string-literal key spelling of `errCases` proves the same way.
+    {
+      code: `import { P, type Result } from "unthrown";\ntype Issues = readonly { message: string }[];\ndeclare function readEnv(): Result<number, Issues>;\nreadEnv().match({ ok: (v) => v, "errCases": (m) => m.with(P._, (e) => e), defect: (c) => c });`,
+    },
     // An awaited AsyncResult receiver traces through the `await`.
     {
       code: `import { P, type AsyncResult } from "unthrown";\nimport type { Issues } from "./issues.js";\ndeclare const r: AsyncResult<number, Issues>;\nasync () => (await r).mapErrCases((m) => m.with(P._, (e) => e));`,
