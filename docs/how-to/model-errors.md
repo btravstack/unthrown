@@ -1,10 +1,16 @@
-# Model errors with `TaggedError`
+# Model errors
 
 > **How-to.** Define matchable domain errors and fold a `Result` on them. Core
-> `Result<T, E>` is generic in `E` — a plain string union works — but for real
-> domains a **tagged error** is the recommended convention.
+> `Result<T, E>` is generic in `E` and **unconstrained** — the only thing the
+> matcher needs is an `E` TypeScript can discriminate. `TaggedError` is
+> unthrown's convenience for getting one, **not** a requirement: if you already
+> have an error convention, [keep it](#use-the-errors-you-already-have).
 
 ## Define a tagged error
+
+`TaggedError` is the shape unthrown proposes when you have no convention yet: a
+discriminant, a typed payload, and `Error` semantics, without writing the class
+boilerplate three times.
 
 `TaggedError(tag)` builds a base class you extend. Supply a payload with an
 instantiation expression; omit it for a payload-less error:
@@ -113,31 +119,6 @@ Miss a tag and it **won't compile** — exhaustiveness is enforced by the type, 
 no `.exhaustive()` to forget. For an `AsyncResult`, `match` resolves to a
 `Promise<R>`.
 
-## Match on more than `_tag`
-
-Because the matcher matches by structure, you can also branch on a `code`, on a
-`P.*` matcher, or on **grouped patterns** — several cases sharing one strategy,
-each still named:
-
-```ts
-// E = { code: "EXPIRED" } | { code: "REVOKED" } | { code: "THROTTLED"; retryAfter: number }
-const status = authorize(id).match({
-  ok: () => 200,
-  defect: () => 500,
-  errCases: (matcher) =>
-    matcher
-      // grouped: one handler, two named cases — not a wildcard
-      .with({ code: "EXPIRED" }, { code: "REVOKED" }, () => 401)
-      .with({ code: "THROTTLED" }, () => 429),
-});
-```
-
-Grouping is the answer when several errors deserve the same response: the union
-stays written out, so adding a fourth code still stops the build here. `P._`
-exists for what enumeration cannot express — a helper generic in `E`, or an `E`
-that is a single type rather than a union — and is covered in
-[Exhaustive error matching](../explanation/exhaustive-error-matching#generic-boundary-helpers-the-catch-all-is-the-only-form-that-compiles).
-
 Unlike the error _combinators_ (`mapErrCases`, `flatMapErrCases`, …), `match`'s `errCases`
 handler receives **no `defect` helper** — `match` is total elimination to a value,
 and a `Result` that already carries a defect is handled by the `defect:` case. To
@@ -145,9 +126,126 @@ keep matching _inside_ the pipeline (transforming or recovering the error rather
 than eliminating it), reach for those combinators — see the
 [combinator reference](../reference/combinators#the-error-channel).
 
+## Use the errors you already have
+
+`TaggedError` is a **convention, not a requirement**. Nothing in core constrains
+`E` — there is no `E extends { _tag: string }` anywhere — and `P.tag("X")` is
+just sugar for the object pattern `{ _tag: "X" }`, one pattern among several.
+The matcher matches by **structure**, so an error convention you already have
+works unchanged.
+
+Every shape below is a module of the runnable
+[existing error types example](../examples/existing-errors) — it typechecks and
+its specs run in CI, so these are not snippets that can quietly rot.
+
+### Your own error classes
+
+Any discriminant field does the job — here a `kind` on a shared base class:
+
+```ts
+abstract class DomainError extends Error {
+  abstract readonly kind: string;
+}
+
+class TicketNotFound extends DomainError {
+  readonly kind = "TicketNotFound" as const;
+  constructor(readonly ticketId: string) {
+    super(`ticket ${ticketId} not found`);
+  }
+}
+
+class TicketLocked extends DomainError {
+  readonly kind = "TicketLocked" as const;
+  constructor(readonly lockedBy: string) {
+    super("ticket locked");
+  }
+}
+
+type TicketError = TicketNotFound | TicketLocked;
+```
+
+`mapErrCases` takes the same matcher the `match` handler does — one branch per
+case, each narrowed to its own variant, and the un-terminated builder returned:
+
+```ts
+const withStatus = loadTicket(id).mapErrCases((matcher) =>
+  matcher
+    .with({ kind: "TicketNotFound" }, (e) => ({ status: 404, id: e.ticketId }))
+    .with({ kind: "TicketLocked" }, (e) => ({ status: 423, by: e.lockedBy })),
+);
+//    ^? AsyncResult<Ticket, { status: number; id: string } | { status: number; by: string }>
+```
+
+Drop the `TicketLocked` branch and it stops compiling — exhaustiveness comes
+from the union's shape, not from `TaggedError`.
+
+### A plain union type, no classes at all
+
+`E` doesn't have to be an `Error` subclass either. A union of plain objects
+discriminated by a `code` behaves identically, and **grouped patterns** let
+several cases share one handler without a wildcard:
+
+```ts
+type PaymentError =
+  | { code: "CARD_DECLINED"; declineCode: string }
+  | { code: "INSUFFICIENT_FUNDS" }
+  | { code: "RATE_LIMITED"; retryAfter: number };
+
+const status = charge(order).match({
+  ok: () => 200,
+  defect: () => 500,
+  errCases: (matcher) =>
+    matcher
+      // grouped: one handler, two named cases — not a wildcard
+      .with(
+        { code: "CARD_DECLINED" },
+        { code: "INSUFFICIENT_FUNDS" },
+        () => 402,
+      )
+      .with({ code: "RATE_LIMITED" }, () => 429),
+});
+```
+
+Grouping is the answer when several errors deserve the same response: the union
+stays written out, so adding a fourth code still stops the build here.
+
+### Classes with no discriminant field
+
+For third-party or legacy classes carrying no tag at all, `P.instanceOf` is the
+pattern — the branch is narrowed to the class instance:
+
+```ts
+declare const parsed: Result<Config, ParseError | TimeoutError>;
+
+const described = parsed.mapErrCases((matcher) =>
+  matcher
+    .with(P.instanceOf(ParseError), (e) => `bad syntax at ${e.at}`)
+    .with(P.instanceOf(TimeoutError), (e) => `gave up after ${e.afterMs}ms`),
+);
+```
+
+`P.when(guard)` covers whatever the other two can't express — an arbitrary type
+guard, including one over a primitive.
+
+### What `E` _does_ have to be
+
+Exhaustiveness is `Exclude` over the union, so the one real requirement is that
+`E` is a union TypeScript can **discriminate**: a `_tag` / `kind` / `code`
+field, structurally distinct class shapes, or a guard. What does not work is a
+set of structurally identical classes (they collapse into one union member) or a
+widened `E` like `Error`, `string` or `unknown` — with nothing to enumerate, the
+only arm that terminates the match is the `P._` escape hatch, which gives back
+the blanket `catch` the matcher exists to remove.
+[`no-ambiguous-error-type`](./lint-your-codebase#no-ambiguous-error-type) flags those `E`s for exactly
+that reason; a named union of your own types passes.
+
+`P._` remains for what enumeration genuinely cannot express — a helper generic
+in `E`, or an `E` that is a single type rather than a union — and is covered in
+[Exhaustive error matching](../explanation/exhaustive-error-matching#generic-boundary-helpers-the-catch-all-is-the-only-form-that-compiles).
+
 ## Where to go next
 
 - Match inside a pipeline: [Combinator reference](../reference/combinators#the-error-channel).
 - Why the matcher, not a callback:
   [Exhaustive error matching](../explanation/exhaustive-error-matching).
-- Test tagged errors: [Test with Vitest](./test-with-vitest).
+- Test the errors you defined: [Test with Vitest](./test-with-vitest).
