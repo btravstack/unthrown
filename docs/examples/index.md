@@ -1,14 +1,14 @@
 ---
 title: Examples
-description: Three small packages modelling one checkout — code that compiles and is covered by tests, unlike the snippets in the guide.
+description: Small runnable packages — code that compiles and is covered by tests, unlike the snippets in the guide.
 ---
 
 # Examples
 
 Annotated tours of the runnable packages under
-[`examples/`](https://github.com/btravstack/unthrown/tree/main/examples). They
-model one small checkout between them, each showing a different job
-`unthrown` does.
+[`examples/`](https://github.com/btravstack/unthrown/tree/main/examples). Three
+of them model one small checkout between them, each showing a different job
+`unthrown` does; the fourth stands alone.
 
 **Unlike the snippets elsewhere in this guide, this code compiles and is
 covered by tests.** There is no database and no server to start:
@@ -40,13 +40,20 @@ The edge: `placeOrder` served over oRPC with `@unthrown/orpc` — one exhaustive
 collapses to `INTERNAL_SERVER_ERROR` instead of an unhandled rejection, and
 why oRPC's own input validation is a separate concern from `E`.
 
+## [Existing error types](/examples/existing-errors)
+
+The adoption case, with **no `TaggedError` anywhere**: a codebase that already
+has an error convention — a `kind`-discriminated class hierarchy, a plain
+`code` union from a generated client, and untagged third-party classes — wired
+to `Result` without rewriting any of it.
+
 ## Why these exist as packages rather than snippets
 
 Every fenced block in the rest of this guide is written by hand. It is
 checked by review and nothing else, so it can drift from the library without
 any build noticing.
 
-These three cannot. They are workspace packages: they typecheck, their specs
-run in CI, and they consume `unthrown` and its satellites through their real
-published entry points rather than a path alias. If the library changes
-underneath them, something goes red.
+These cannot. They are workspace packages: they typecheck, their specs run in
+CI, and they consume `unthrown` and its satellites through their real published
+entry points rather than a path alias. If the library changes underneath them,
+something goes red.

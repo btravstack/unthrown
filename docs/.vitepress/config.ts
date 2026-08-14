@@ -114,6 +114,7 @@ const EXAMPLES_SIDEBAR = [
       { text: "Checkout domain", link: "/examples/checkout-domain" },
       { text: "Checkout persistence", link: "/examples/checkout-persistence" },
       { text: "Checkout API", link: "/examples/checkout-api" },
+      { text: "Existing error types", link: "/examples/existing-errors" },
     ],
   },
 ];

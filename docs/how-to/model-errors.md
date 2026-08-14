@@ -134,6 +134,10 @@ just sugar for the object pattern `{ _tag: "X" }`, one pattern among several.
 The matcher matches by **structure**, so an error convention you already have
 works unchanged.
 
+Every shape below is a module of the runnable
+[existing error types example](../examples/existing-errors) — it typechecks and
+its specs run in CI, so these are not snippets that can quietly rot.
+
 ### Your own error classes
 
 Any discriminant field does the job — here a `kind` on a shared base class:
