@@ -236,7 +236,8 @@ anywhere — and `P.tag("X")` is only sugar for the object pattern `{ _tag: "X" 
 A codebase with its own error convention keeps it: match a `kind` / `code` field
 with an object pattern, an untagged class with `P.instanceOf`, anything else
 with `P.when`. The requirement is a **discriminable** `E`, not a tagged one; a
-widened `Error` / `string` / `unknown` is what breaks exhaustiveness (rule 1).
+widened `Error` / `string` / `unknown` is what breaks exhaustiveness, which is
+what `no-ambiguous-error-type` flags.
 
 ## Mistakes agents make (habits from neverthrow/Effect/fp-ts)
 
