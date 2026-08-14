@@ -18,6 +18,7 @@
     "typedoc": "catalog:",
     "typedoc-plugin-markdown": "catalog:",
     "typescript": "catalog:typedoc",
-    "vitepress": "catalog:"
+    "vitepress": "catalog:",
+    "vitepress-plugin-llms": "catalog:"
   }
 }

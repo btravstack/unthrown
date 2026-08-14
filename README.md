@@ -14,6 +14,8 @@
 
 [**Documentation**](https://btravstack.github.io/unthrown/) · [**Get Started**](https://btravstack.github.io/unthrown/tutorial/getting-started) · [**Why unthrown?**](https://btravstack.github.io/unthrown/explanation/why-unthrown)
 
+[**LLM documentation index**](https://btravstack.github.io/unthrown/llms.txt) · [**Agent skill**](https://github.com/btravstack/unthrown/tree/main/skills/unthrown)
+
 </div>
 
 Ordinary errors are _unthrown_ — returned as values, not flung up the stack.
@@ -122,6 +124,20 @@ pnpm format       # oxfmt
 `@unthrown/drizzle`'s suite runs against a real PostgreSQL started by
 [testcontainers](https://testcontainers.com), so **`pnpm test` needs a running
 Docker daemon**. Every other package's tests are self-contained.
+
+### Using the agent skill
+
+The repository publishes an agent skill with the same error-modeling and
+boundary rules as the documentation. Install it into a supported coding agent
+with:
+
+```sh
+npx skills add btravstack/unthrown --skill unthrown
+```
+
+The documentation build also publishes [`llms.txt`](https://btravstack.github.io/unthrown/llms.txt)
+and [`llms-full.txt`](https://btravstack.github.io/unthrown/llms-full.txt) for
+agents that prefer a curated index or a complete Markdown context.
 
 ## License
 

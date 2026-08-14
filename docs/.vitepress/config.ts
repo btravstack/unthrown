@@ -1,4 +1,5 @@
 import { defineConfig } from "vitepress";
+import llmstxt from "vitepress-plugin-llms";
 
 const SITE_DESCRIPTION =
   "Explicit errors as values for TypeScript, with a separate defect channel for the unexpected and qualification enforced at every boundary.";
@@ -86,6 +87,41 @@ const GUIDE_SIDEBAR = [
     ],
   },
 ];
+
+const API_SIDEBAR = [
+  {
+    text: "API Reference",
+    items: [
+      { text: "Overview", link: "/api/" },
+      { text: "unthrown", link: "/api/core/" },
+      { text: "@unthrown/vitest", link: "/api/vitest/" },
+      { text: "@unthrown/effect", link: "/api/effect/" },
+      { text: "@unthrown/neverthrow", link: "/api/neverthrow/" },
+      { text: "@unthrown/boxed", link: "/api/boxed/" },
+      { text: "@unthrown/standard-schema", link: "/api/standard-schema/" },
+      { text: "@unthrown/prisma", link: "/api/prisma/" },
+      { text: "@unthrown/drizzle", link: "/api/drizzle/" },
+      { text: "@unthrown/orpc", link: "/api/orpc/" },
+    ],
+  },
+];
+
+const EXAMPLES_SIDEBAR = [
+  {
+    text: "Examples",
+    items: [
+      { text: "Overview", link: "/examples/" },
+      { text: "Checkout domain", link: "/examples/checkout-domain" },
+      { text: "Checkout persistence", link: "/examples/checkout-persistence" },
+      { text: "Checkout API", link: "/examples/checkout-api" },
+    ],
+  },
+];
+
+// Pass one flattened sidebar to vitepress-plugin-llms. The human site uses
+// path-scoped sidebars, but flattening those four shared entries would repeat
+// every guide section in llms.txt.
+const LLM_SIDEBAR = [...GUIDE_SIDEBAR, ...API_SIDEBAR, ...EXAMPLES_SIDEBAR];
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
@@ -182,34 +218,8 @@ export default defineConfig({
           GUIDE_SIDEBAR,
         ]),
       ),
-      "/api/": [
-        {
-          text: "API Reference",
-          items: [
-            { text: "Overview", link: "/api/" },
-            { text: "unthrown", link: "/api/core/" },
-            { text: "@unthrown/vitest", link: "/api/vitest/" },
-            { text: "@unthrown/effect", link: "/api/effect/" },
-            { text: "@unthrown/neverthrow", link: "/api/neverthrow/" },
-            { text: "@unthrown/boxed", link: "/api/boxed/" },
-            { text: "@unthrown/standard-schema", link: "/api/standard-schema/" },
-            { text: "@unthrown/prisma", link: "/api/prisma/" },
-            { text: "@unthrown/drizzle", link: "/api/drizzle/" },
-            { text: "@unthrown/orpc", link: "/api/orpc/" },
-          ],
-        },
-      ],
-      "/examples/": [
-        {
-          text: "Examples",
-          items: [
-            { text: "Overview", link: "/examples/" },
-            { text: "Checkout domain", link: "/examples/checkout-domain" },
-            { text: "Checkout persistence", link: "/examples/checkout-persistence" },
-            { text: "Checkout API", link: "/examples/checkout-api" },
-          ],
-        },
-      ],
+      "/api/": API_SIDEBAR,
+      "/examples/": EXAMPLES_SIDEBAR,
     },
 
     socialLinks: [
@@ -237,6 +247,7 @@ export default defineConfig({
   },
 
   vite: {
+    plugins: [llmstxt({ sidebar: LLM_SIDEBAR })],
     // @btravstack/theme's entry imports `vitepress/theme` (which pulls in `.css`)
     // and its own `style.css`. VitePress externalizes node_modules deps in the SSR
     // build, so Node's ESM loader would hit those `.css` files and throw
