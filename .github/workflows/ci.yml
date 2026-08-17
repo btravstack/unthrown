@@ -16,4 +16,4 @@ jobs:
   ci:
     uses: btravstack/tools/.github/workflows/ci-reusable.yml@workflows-v1
     with:
-      node-versions: '["", "22.19"]'
+      node-versions: '["", "22.23.2"]'

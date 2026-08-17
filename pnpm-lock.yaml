@@ -52,8 +52,8 @@ catalogs:
       specifier: ^1.1.0
       version: 1.1.0
     '@testcontainers/postgresql':
-      specifier: 12.0.4
-      version: 12.0.4
+      specifier: 12.1.0
+      version: 12.1.0
     '@types/node':
       specifier: 26.2.0
       version: 26.2.0
@@ -381,7 +381,7 @@ importers:
         version: 0.2.0
       '@testcontainers/postgresql':
         specifier: 'catalog:'
-        version: 12.0.4
+        version: 12.1.0
       '@types/node':
         specifier: 'catalog:'
         version: 26.2.0
@@ -2366,8 +2366,8 @@ packages:
   '@standardserver/shared@0.7.1':
     resolution: {integrity: sha512-tBDheI3Me1gQEKPU+XhcCZ6/njmkKgJhA5rhi1/m6GauGhHq87UuVslDNc8qB+T/xsxVch/qETFhssEWO9c6BA==}
 
-  '@testcontainers/postgresql@12.0.4':
-    resolution: {integrity: sha512-a/pLU6j5lpKKAlUTPwqweqMGhOSjgTSb6HBX69TOrXn32ifU37nnQDmNFTj8ddOAw+BQL9oTRkeOxVbZkqhgZA==}
+  '@testcontainers/postgresql@12.1.0':
+    resolution: {integrity: sha512-Pjf2VSVNirEPfz36nidyrVAnZvc2YhajOznY4VgyEsvfTd5qiMNOuPq96drREvxAUtXl5SFLX7vXj7sSq4aTcA==}
 
   '@turbo/darwin-64@2.10.9':
     resolution: {integrity: sha512-Jh+pTGXLNz8+1tkUU13TI/f+ZOI+OvC4YbHi1H+57iSpLt5DR3xgptd+4sA07RdjdRR/RX/01uQQu2OkbzIefA==}
@@ -4836,8 +4836,9 @@ packages:
     resolution: {integrity: sha512-wK0Ri4fOGjv/XPy8SBHZChl8CM7uMc5VML7SqiQ0zG7+J5Vr+RMQDoHa2CNT6KHUnTGIXH34UDMkPzAUyapBZg==}
     engines: {node: '>=8'}
 
-  testcontainers@12.0.4:
-    resolution: {integrity: sha512-QIR/8xF1+F/26cIM+9B4yyxNTbKJxAv3hygZyhPRgZ8Q2AhlPZjDdpXRuk16V37X4bgJRI3hXFhoEICMBA7Adg==}
+  testcontainers@12.1.0:
+    resolution: {integrity: sha512-YjDLqIITuhGLMnM10yhg3oV6lIG5IMpz1R1DPBZoOOks83q7i7IVpeSWRTiyl7roozjiyLmwIoLK/KY8OnZmIA==}
+    engines: {node: '>= 22.22'}
 
   text-decoder@1.2.7:
     resolution: {integrity: sha512-vlLytXkeP4xvEq2otHeJfSQIRyWxo/oZGEbXrtEEF9Hnmrdly59sUbzZ/QgyWuLYHctCHxFF4tRQZNQ9k60ExQ==}
@@ -6647,9 +6648,9 @@ snapshots:
 
   '@standardserver/shared@0.7.1': {}
 
-  '@testcontainers/postgresql@12.0.4':
+  '@testcontainers/postgresql@12.1.0':
     dependencies:
-      testcontainers: 12.0.4
+      testcontainers: 12.1.0
     transitivePeerDependencies:
       - bare-abort-controller
       - bare-buffer
@@ -6722,13 +6723,13 @@ snapshots:
 
   '@types/docker-modem@3.0.6':
     dependencies:
-      '@types/node': 26.1.2
+      '@types/node': 26.2.0
       '@types/ssh2': 1.15.5
 
   '@types/dockerode@4.0.1':
     dependencies:
       '@types/docker-modem': 3.0.6
-      '@types/node': 26.1.2
+      '@types/node': 26.2.0
       '@types/ssh2': 1.15.5
 
   '@types/estree@1.0.9': {}
@@ -6782,11 +6783,11 @@ snapshots:
 
   '@types/ssh2-streams@0.1.13':
     dependencies:
-      '@types/node': 26.1.2
+      '@types/node': 26.2.0
 
   '@types/ssh2@0.5.52':
     dependencies:
-      '@types/node': 26.1.2
+      '@types/node': 26.2.0
       '@types/ssh2-streams': 0.1.13
 
   '@types/ssh2@1.15.5':
@@ -8733,7 +8734,7 @@ snapshots:
       '@protobufjs/path': 1.1.2
       '@protobufjs/pool': 1.1.0
       '@protobufjs/utf8': 1.1.2
-      '@types/node': 26.1.2
+      '@types/node': 26.2.0
       long: 5.3.2
 
   pump@3.0.4:
@@ -9145,7 +9146,7 @@ snapshots:
 
   term-size@2.2.1: {}
 
-  testcontainers@12.0.4:
+  testcontainers@12.1.0:
     dependencies:
       '@balena/dockerignore': 1.0.2
       '@types/dockerode': 4.0.1
