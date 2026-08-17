@@ -29,7 +29,7 @@ catalog:
   # consumer's own copy of the (types-only) spec package.
   "@standard-schema/spec": ^1.1.0
   "@testcontainers/postgresql": 12.0.4
-  "@types/node": 26.1.2
+  "@types/node": 26.2.0
   # 8.20.1/8.20.2/8.20.3 are all within the minimumReleaseAge window as of
   # pinning; 8.20.0 is the newest release past it.
   "@types/pg": 8.21.0
