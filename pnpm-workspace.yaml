@@ -47,7 +47,7 @@ catalog:
   pg: 8.22.0
   prisma: 7.9.1
   tsdown: 0.22.14
-  tsx: 4.23.5
+  tsx: 4.23.12
   turbo: 2.10.9
   typedoc: 0.28.20
   typedoc-plugin-markdown: 4.12.0
@@ -113,6 +113,9 @@ overrides:
   # GHSA-5qjj-4xww-7phc: valibot inherited property path crash in flatten()
   # (<=1.4.1), also via @prisma/dev. Lift to the first fixed release.
   "valibot@<1.4.2": "1.4.2"
+  # GHSA-ggr8-5vv4-36mx: deepmerge-ts stack exhaustion when merging recursive
+  # object graphs (<8.0.0), via @prisma/config. Lift to the first fixed release.
+  "deepmerge-ts@<8.0.0": "8.0.1"
 
 peerDependencyRules:
   ignoreMissing:
@@ -168,3 +171,7 @@ minimumReleaseAgeExclude:
   # Temporary: nanoid 3.3.18 (GHSA-2v37-7h3g-55p8, widened) published
   # 2026-08-07. Remove once it is 7 days old (i.e. after 2026-08-14).
   - nanoid
+  # Temporary security-patch exception: deepmerge-ts 8.0.1 (the
+  # GHSA-ggr8-5vv4-36mx fix forced by the override above) published
+  # 2026-08-16. Remove once it is 7 days old (i.e. after 2026-08-23).
+  - deepmerge-ts
