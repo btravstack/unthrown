@@ -1,5 +1,11 @@
 # @unthrown/neverthrow
 
+## 5.6.0
+
+### Patch Changes
+
+- unthrown@5.6.0
+
 ## 5.5.0
 
 ### Patch Changes
