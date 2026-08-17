@@ -173,7 +173,7 @@ importers:
         specifier: 'catalog:'
         version: 0.63.0
       oxlint:
-        specifier: 1.78.0
+        specifier: 'catalog:'
         version: 1.78.0
       turbo:
         specifier: 'catalog:'
