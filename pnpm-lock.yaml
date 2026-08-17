@@ -34,14 +34,14 @@ catalogs:
       specifier: 21.2.1
       version: 21.2.1
     '@orpc/client':
-      specifier: 2.0.0-beta.23
-      version: 2.0.0-beta.23
+      specifier: 2.0.0-beta.26
+      version: 2.0.0-beta.26
     '@orpc/contract':
-      specifier: 2.0.0-beta.23
-      version: 2.0.0-beta.23
+      specifier: 2.0.0-beta.26
+      version: 2.0.0-beta.26
     '@orpc/server':
-      specifier: 2.0.0-beta.23
-      version: 2.0.0-beta.23
+      specifier: 2.0.0-beta.26
+      version: 2.0.0-beta.26
     '@prisma/adapter-better-sqlite3':
       specifier: 7.9.1
       version: 7.9.1
@@ -182,7 +182,7 @@ importers:
     devDependencies:
       '@btravstack/theme':
         specifier: 'catalog:'
-        version: 2.0.0(vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.2)(jiti@2.7.0)(postcss@8.5.25)(tsx@4.23.5)(typescript@6.0.3)(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))
+        version: 2.0.0(vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.2)(jiti@2.7.0)(postcss@8.5.26)(tsx@4.23.5)(typescript@6.0.3)(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))
       '@btravstack/typedoc':
         specifier: 'catalog:'
         version: 0.1.0(typedoc-plugin-markdown@4.12.0(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3))
@@ -203,7 +203,7 @@ importers:
         version: 6.0.3
       vitepress:
         specifier: 'catalog:'
-        version: 1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.2)(jiti@2.7.0)(postcss@8.5.25)(tsx@4.23.5)(typescript@6.0.3)(yaml@2.9.0)
+        version: 1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.2)(jiti@2.7.0)(postcss@8.5.26)(tsx@4.23.5)(typescript@6.0.3)(yaml@2.9.0)
       vitepress-plugin-llms:
         specifier: 'catalog:'
         version: 1.13.4
@@ -212,10 +212,10 @@ importers:
     dependencies:
       '@orpc/client':
         specifier: 'catalog:'
-        version: 2.0.0-beta.23
+        version: 2.0.0-beta.26
       '@orpc/server':
         specifier: 'catalog:'
-        version: 2.0.0-beta.23
+        version: 2.0.0-beta.26
       '@unthrown/example-checkout-domain':
         specifier: workspace:*
         version: link:../checkout-domain
@@ -476,13 +476,13 @@ importers:
         version: 0.2.0
       '@orpc/client':
         specifier: 'catalog:'
-        version: 2.0.0-beta.23
+        version: 2.0.0-beta.26
       '@orpc/contract':
         specifier: 'catalog:'
-        version: 2.0.0-beta.23
+        version: 2.0.0-beta.26
       '@orpc/server':
         specifier: 'catalog:'
-        version: 2.0.0-beta.23
+        version: 2.0.0-beta.26
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.2
@@ -1370,22 +1370,25 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
-  '@orpc/client@2.0.0-beta.23':
-    resolution: {integrity: sha512-w9czJs6yWPNlyoDPRFvRJeQOBRHylGT3oCHa9kh0KbFXiHRE+qZNicUj4925lfX+sEI2Gktsew/62/R7hG1yPA==}
+  '@orpc/client@2.0.0-beta.26':
+    resolution: {integrity: sha512-TT2+S4TP/EzU19mXqzqnd938tuaOss7prtXqlowY1MZh1wxsEW6t5b+RI310yHtgLM5u/ovku26BvOpl5Fb49Q==}
 
-  '@orpc/contract@2.0.0-beta.23':
-    resolution: {integrity: sha512-xbTWVfwlhBtGp/1gKm0KfU94mFRWqER4RnBDNuX3lrnJ0HPqLAkcGJTA8sPT1RvEooxrQ5zKtnRVZQx7FwiMaQ==}
+  '@orpc/contract@2.0.0-beta.26':
+    resolution: {integrity: sha512-tTeJBN0s+weE67t6Xyjt7pCnSaytWrUase4VdyajjjtWba2wxqIwMHITyvSKohmLVwym6LYAoGLqXF4ORgwHYQ==}
 
-  '@orpc/server@2.0.0-beta.23':
-    resolution: {integrity: sha512-BLHEM86bi+9Ly51QaUXJbidE94+CZBnbH2BTFqDqGusA2lV8016W7dnPz618L5dqQ4BwoJ/GnARB0YapGb658A==}
+  '@orpc/server@2.0.0-beta.26':
+    resolution: {integrity: sha512-IBvwkJkCkPMxOLd2A2Js2baTXc4FE//W+wnXrMXkdNXarwjId9AJ+NJngxHitjepQKqc2fnqvWlMDvypS3WdQg==}
     peerDependencies:
       crossws: '>=0.3.4'
+      fastify: '>=5.6.1'
     peerDependenciesMeta:
       crossws:
         optional: true
+      fastify:
+        optional: true
 
-  '@orpc/shared@2.0.0-beta.23':
-    resolution: {integrity: sha512-eRLhcu8y+mYV8cdmMN1f48nfaTphRyaQWBPhyosRgi0TbkagJ2zbenyXWuS2i0uV8Ueq3JfL0IlSL4O4rzjjmA==}
+  '@orpc/shared@2.0.0-beta.26':
+    resolution: {integrity: sha512-rbzPz6fSE+5WWn1uesSnekBIy4aJFx0ocGI3EcWVAu8l0ILLjdufof6A2E9RwvRSZeEefIE9D7iadW044YCBSw==}
     peerDependencies:
       '@opentelemetry/api': '>=1.9.0'
     peerDependenciesMeta:
@@ -2336,20 +2339,31 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@standardserver/core@0.6.0':
-    resolution: {integrity: sha512-Cb41o407LOpERtHwMqSDd0zeR6T78njHYNGzyrtyNFOWGnUG1+HGJI1PS12a1w3o3ZYn7OvZlKseiDUdcUkLqA==}
+  '@standardserver/aws-lambda@0.7.1':
+    resolution: {integrity: sha512-fuwAx2M2O5Bnjk2JdFrtEQALmBwVtnn4jKApzFVmlIivWA7EGMj5kOzCNaJizxCQXlhPmC+doDHqf/H7FKMaNA==}
 
-  '@standardserver/fetch@0.6.0':
-    resolution: {integrity: sha512-zs43GbR8ntzv6ZaNPiiERa1EBfnplPnPyJPLPsxiihC1NRKexw5JOnWuXk2nhbP1rtoWJ2g16s+WNdxvA/N/iA==}
+  '@standardserver/core@0.7.1':
+    resolution: {integrity: sha512-ZMoFDR92p9HnaI6vXK1iNFKXyLK8/6r3D4EJUM+SqeyReUH3OEJO4CZKU8BfXyzAV1A6Nsa7y2dGqDOYqH5LlQ==}
 
-  '@standardserver/node@0.6.0':
-    resolution: {integrity: sha512-jx59Ig+vHDDtFxUa+ppRa5dDk2z78XBcMFsCbzAoSqjezimzn6aQQEwwF1L7E4xnAq6ijhJ5apv6zuM0p6K1pw==}
+  '@standardserver/fastify@0.7.1':
+    resolution: {integrity: sha512-Oa+ttR0CyNkFjNczs2dO/WFFeZ4sAszVBKIOhKb1FFcDtD9VdqDgMBhbQ4sFR885fwpYckoYjFU6xXWWTueBlw==}
+    peerDependencies:
+      fastify: '>=5.6.1'
+    peerDependenciesMeta:
+      fastify:
+        optional: true
 
-  '@standardserver/peer@0.6.0':
-    resolution: {integrity: sha512-FeyteqxAJRQR+v1RtFuDdYkgwpvQS583VdsH8kOSbRQjbIslfPjpXTZmC280H//Mv2EejOhWeS5Oy5nRuvQtxQ==}
+  '@standardserver/fetch@0.7.1':
+    resolution: {integrity: sha512-BeiAWESedv0woYpoBHCnq2Y3xLZZ3voFahdzpFd+HqLyenXIL4XX3z7/WgWNQnf+WsSQrK6HzBkDWCicCXVoKQ==}
 
-  '@standardserver/shared@0.6.0':
-    resolution: {integrity: sha512-pPn3XL6bUOHhT85zN20uFeoZjFdmdTabNvhOCXKRiW2zvzbuWDYyBqjcptjHXI4muamEFqOXiSLoqvh8Gjy+Ag==}
+  '@standardserver/node@0.7.1':
+    resolution: {integrity: sha512-Ikc07cGBTJ8tJgPd1OanNKVNpijcbixB1iKk0GdL/b1vkYbriGgNW3oHvbApM7+XqeCeNHj5XawHk6q90mwEEA==}
+
+  '@standardserver/peer@0.7.1':
+    resolution: {integrity: sha512-ggqPbwz4X4GIziQgoyCTDHFw9nM9YuEvlSpO21pfoXLYF80ijtpN/iq4P0zKpb4kcXnBoSVDRUSnBJSZi0SJDg==}
+
+  '@standardserver/shared@0.7.1':
+    resolution: {integrity: sha512-tBDheI3Me1gQEKPU+XhcCZ6/njmkKgJhA5rhi1/m6GauGhHq87UuVslDNc8qB+T/xsxVch/qETFhssEWO9c6BA==}
 
   '@testcontainers/postgresql@12.0.4':
     resolution: {integrity: sha512-a/pLU6j5lpKKAlUTPwqweqMGhOSjgTSb6HBX69TOrXn32ifU37nnQDmNFTj8ddOAw+BQL9oTRkeOxVbZkqhgZA==}
@@ -4408,8 +4422,8 @@ packages:
   pkg-types@2.3.1:
     resolution: {integrity: sha512-y+ichcgc2LrADuhLNAx8DFjVfgz91pRxfZdI3UDhxHvcVEZsenLO+7XaU5vOp0u/7V/wZ+plyuQxtrDlZJ+yeg==}
 
-  postcss@8.5.25:
-    resolution: {integrity: sha512-DTPx3RWSSnWyzLxQnlH0rJP+EW5ekl16ZU4/psbIhA0e53kJfdgaN5vKM+xP7yJtXVu+nfdVFmlgFDEKAe4Pyw==}
+  postcss@8.5.26:
+    resolution: {integrity: sha512-u82N74LFzG8ca+dD8puPnplTXoGH4fTPpVGuIbt36G3qvNlkvfD0lEAZSxaly3KX8TS/L1A1gsCEmvKmBcVbkQ==}
     engines: {node: ^10 || ^12 || >=14}
 
   postgres-array@2.0.0:
@@ -5347,9 +5361,9 @@ snapshots:
     dependencies:
       oxlint: 1.76.0
 
-  '@btravstack/theme@2.0.0(vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.2)(jiti@2.7.0)(postcss@8.5.25)(tsx@4.23.5)(typescript@6.0.3)(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))':
+  '@btravstack/theme@2.0.0(vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.2)(jiti@2.7.0)(postcss@8.5.26)(tsx@4.23.5)(typescript@6.0.3)(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))':
     dependencies:
-      vitepress: 1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.2)(jiti@2.7.0)(postcss@8.5.25)(tsx@4.23.5)(typescript@6.0.3)(yaml@2.9.0)
+      vitepress: 1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.2)(jiti@2.7.0)(postcss@8.5.26)(tsx@4.23.5)(typescript@6.0.3)(yaml@2.9.0)
     optionalDependencies:
       vue: 3.5.38(typescript@6.0.3)
 
@@ -5937,39 +5951,41 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
 
-  '@orpc/client@2.0.0-beta.23':
+  '@orpc/client@2.0.0-beta.26':
     dependencies:
-      '@orpc/shared': 2.0.0-beta.23
-      '@standardserver/core': 0.6.0
-      '@standardserver/fetch': 0.6.0
-      '@standardserver/peer': 0.6.0
+      '@orpc/shared': 2.0.0-beta.26
+      '@standardserver/core': 0.7.1
+      '@standardserver/fetch': 0.7.1
+      '@standardserver/peer': 0.7.1
     transitivePeerDependencies:
       - '@opentelemetry/api'
 
-  '@orpc/contract@2.0.0-beta.23':
+  '@orpc/contract@2.0.0-beta.26':
     dependencies:
-      '@orpc/client': 2.0.0-beta.23
-      '@orpc/shared': 2.0.0-beta.23
+      '@orpc/client': 2.0.0-beta.26
+      '@orpc/shared': 2.0.0-beta.26
       '@standard-schema/spec': 1.1.0
     transitivePeerDependencies:
       - '@opentelemetry/api'
 
-  '@orpc/server@2.0.0-beta.23':
+  '@orpc/server@2.0.0-beta.26':
     dependencies:
-      '@orpc/client': 2.0.0-beta.23
-      '@orpc/contract': 2.0.0-beta.23
-      '@orpc/shared': 2.0.0-beta.23
-      '@standardserver/core': 0.6.0
-      '@standardserver/fetch': 0.6.0
-      '@standardserver/node': 0.6.0
-      '@standardserver/peer': 0.6.0
+      '@orpc/client': 2.0.0-beta.26
+      '@orpc/contract': 2.0.0-beta.26
+      '@orpc/shared': 2.0.0-beta.26
+      '@standardserver/aws-lambda': 0.7.1
+      '@standardserver/core': 0.7.1
+      '@standardserver/fastify': 0.7.1
+      '@standardserver/fetch': 0.7.1
+      '@standardserver/node': 0.7.1
+      '@standardserver/peer': 0.7.1
       cookie: 2.0.1
     transitivePeerDependencies:
       - '@opentelemetry/api'
 
-  '@orpc/shared@2.0.0-beta.23':
+  '@orpc/shared@2.0.0-beta.26':
     dependencies:
-      '@standardserver/shared': 0.6.0
+      '@standardserver/shared': 0.7.1
       radash: 12.1.1
       type-fest: 5.7.0
 
@@ -6583,27 +6599,39 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@standardserver/core@0.6.0':
+  '@standardserver/aws-lambda@0.7.1':
     dependencies:
-      '@standardserver/shared': 0.6.0
+      '@standardserver/core': 0.7.1
+      '@standardserver/fetch': 0.7.1
+      '@standardserver/node': 0.7.1
+      '@standardserver/shared': 0.7.1
 
-  '@standardserver/fetch@0.6.0':
+  '@standardserver/core@0.7.1':
     dependencies:
-      '@standardserver/core': 0.6.0
-      '@standardserver/shared': 0.6.0
+      '@standardserver/shared': 0.7.1
 
-  '@standardserver/node@0.6.0':
+  '@standardserver/fastify@0.7.1':
     dependencies:
-      '@standardserver/core': 0.6.0
-      '@standardserver/fetch': 0.6.0
-      '@standardserver/shared': 0.6.0
+      '@standardserver/core': 0.7.1
+      '@standardserver/node': 0.7.1
 
-  '@standardserver/peer@0.6.0':
+  '@standardserver/fetch@0.7.1':
     dependencies:
-      '@standardserver/core': 0.6.0
-      '@standardserver/shared': 0.6.0
+      '@standardserver/core': 0.7.1
+      '@standardserver/shared': 0.7.1
 
-  '@standardserver/shared@0.6.0': {}
+  '@standardserver/node@0.7.1':
+    dependencies:
+      '@standardserver/core': 0.7.1
+      '@standardserver/fetch': 0.7.1
+      '@standardserver/shared': 0.7.1
+
+  '@standardserver/peer@0.7.1':
+    dependencies:
+      '@standardserver/core': 0.7.1
+      '@standardserver/shared': 0.7.1
+
+  '@standardserver/shared@0.7.1': {}
 
   '@testcontainers/postgresql@12.0.4':
     dependencies:
@@ -6968,7 +6996,7 @@ snapshots:
       '@vue/shared': 3.5.38
       estree-walker: 2.0.2
       magic-string: 0.30.21
-      postcss: 8.5.25
+      postcss: 8.5.26
       source-map-js: 1.2.1
 
   '@vue/compiler-ssr@3.5.38':
@@ -8598,7 +8626,7 @@ snapshots:
       exsolve: 1.1.0
       pathe: 2.0.3
 
-  postcss@8.5.25:
+  postcss@8.5.26:
     dependencies:
       nanoid: 3.3.18
       picocolors: 1.1.1
@@ -9322,7 +9350,7 @@ snapshots:
       esbuild: 0.25.12
       fdir: 6.5.0(picomatch@4.0.5)
       picomatch: 4.0.5
-      postcss: 8.5.25
+      postcss: 8.5.26
       rollup: 4.62.4
       tinyglobby: 0.2.17
     optionalDependencies:
@@ -9351,7 +9379,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.2)(jiti@2.7.0)(postcss@8.5.25)(tsx@4.23.5)(typescript@6.0.3)(yaml@2.9.0):
+  vitepress@1.6.4(@algolia/client-search@5.55.1)(@types/node@26.1.2)(jiti@2.7.0)(postcss@8.5.26)(tsx@4.23.5)(typescript@6.0.3)(yaml@2.9.0):
     dependencies:
       '@docsearch/css': 3.8.2
       '@docsearch/js': 3.8.2(@algolia/client-search@5.55.1)
@@ -9372,7 +9400,7 @@ snapshots:
       vite: 6.4.3(@types/node@26.1.2)(jiti@2.7.0)(tsx@4.23.5)(yaml@2.9.0)
       vue: 3.5.38(typescript@6.0.3)
     optionalDependencies:
-      postcss: 8.5.25
+      postcss: 8.5.26
     transitivePeerDependencies:
       - '@algolia/client-search'
       - '@types/node'
