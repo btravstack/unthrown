@@ -115,8 +115,8 @@ catalogs:
       specifier: 1.6.4
       version: 1.6.4
     vitepress-plugin-llms:
-      specifier: 1.13.4
-      version: 1.13.4
+      specifier: 1.13.5
+      version: 1.13.5
     vitest:
       specifier: 4.1.10
       version: 4.1.10
@@ -207,7 +207,7 @@ importers:
         version: 1.6.4(@algolia/client-search@5.55.1)(@types/node@26.2.0)(jiti@2.7.0)(postcss@8.5.26)(tsx@4.23.12)(typescript@6.0.3)(yaml@2.9.0)
       vitepress-plugin-llms:
         specifier: 'catalog:'
-        version: 1.13.4
+        version: 1.13.5
 
   examples/checkout-api:
     dependencies:
@@ -5072,8 +5072,8 @@ packages:
       yaml:
         optional: true
 
-  vitepress-plugin-llms@1.13.4:
-    resolution: {integrity: sha512-3/L1ceexjpJirWWGlfvqx2hmaDTFGSkSHrn3y2C7RZm6lNa/vmvU49Ayr4GxLYQfOFfo9CP6rsWdD+6rEbnIxA==}
+  vitepress-plugin-llms@1.13.5:
+    resolution: {integrity: sha512-CTiDkKRs0h64J5rdiICdHmXH4pM1gBu2S/MJ+OxSAm+vM72srBkHr86ZubzfMJbGJh4AMVKff4R3oCu8etI1ww==}
     engines: {node: '>=18'}
 
   vitepress@1.6.4:
@@ -9400,7 +9400,7 @@ snapshots:
       tsx: 4.23.12
       yaml: 2.9.0
 
-  vitepress-plugin-llms@1.13.4:
+  vitepress-plugin-llms@1.13.5:
     dependencies:
       '@11ty/gray-matter': 2.1.0
       markdown-it: 14.3.0
