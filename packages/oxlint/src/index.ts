@@ -1,11 +1,14 @@
 // @unthrown/oxlint — an oxlint (JS) plugin that enforces unthrown's conventions
-// at lint time. Seven rules:
+// at lint time. Eight rules:
 //
 //   unthrown/no-ambiguous-error-type  — keep `E` a concrete domain error
 //                                        (no unknown/any/Error/{}), i.e. Thesis #1;
 //                                        also covers mapErrCases' returnType<R>() pin.
 //   unthrown/prefer-async-result      — use AsyncResult<T,E> over Promise<Result<T,E>>.
 //   unthrown/no-unhandled-result      — don't drop a Result returned by a bare call.
+//   unthrown/no-async-result-race     — don't start a sibling AsyncResult while
+//                                        an earlier one is unconsumed; eager
+//                                        construction makes the sequence a race.
 //   unthrown/no-catch-all-pattern     — ban the `P._` matcher catch-all;
 //                                        enumerate every error case by name.
 //   unthrown/no-get-or-throw          — ban `getOrThrow()`; fold the error channel
@@ -26,6 +29,7 @@ import type { Plugin } from "@oxlint/plugins";
 import type { OxlintConfig } from "oxlint";
 
 import { noAmbiguousErrorType } from "./rules/no-ambiguous-error-type.js";
+import { noAsyncResultRace } from "./rules/no-async-result-race.js";
 import { noCatchAllPattern } from "./rules/no-catch-all-pattern.js";
 import { noGetOrThrow } from "./rules/no-get-or-throw.js";
 import { noThrow } from "./rules/no-throw.js";
@@ -39,6 +43,7 @@ const plugin = eslintCompatPlugin({
   meta: { name: "unthrown" },
   rules: {
     "no-ambiguous-error-type": noAmbiguousErrorType,
+    "no-async-result-race": noAsyncResultRace,
     "no-catch-all-pattern": noCatchAllPattern,
     "no-get-or-throw": noGetOrThrow,
     "no-throw": noThrow,
@@ -89,6 +94,7 @@ plugin.recommended = {
   jsPlugins: [{ name: "unthrown", specifier: "@unthrown/oxlint" }],
   rules: {
     "unthrown/no-ambiguous-error-type": "error",
+    "unthrown/no-async-result-race": "error",
     "unthrown/no-catch-all-pattern": "error",
     "unthrown/no-unhandled-result": "error",
     "unthrown/no-unused-matcher": "error",

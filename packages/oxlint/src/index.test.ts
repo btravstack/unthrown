@@ -9,10 +9,11 @@ const manifest: { peerDependencies: Record<string, string> } = JSON.parse(
 );
 
 describe("@unthrown/oxlint plugin", () => {
-  it("exposes all seven rules under the `unthrown` plugin name", () => {
+  it("exposes all eight rules under the `unthrown` plugin name", () => {
     expect(plugin.meta?.name).toBe("unthrown");
     expect(Object.keys(plugin.rules).sort()).toEqual([
       "no-ambiguous-error-type",
+      "no-async-result-race",
       "no-catch-all-pattern",
       "no-get-or-throw",
       "no-throw",
@@ -27,6 +28,7 @@ describe("@unthrown/oxlint plugin", () => {
     // a rule silently added to (or dropped from) it must fail this test.
     expect(plugin.recommended.rules).toEqual({
       "unthrown/no-ambiguous-error-type": "error",
+      "unthrown/no-async-result-race": "error",
       "unthrown/no-catch-all-pattern": "error",
       "unthrown/no-unhandled-result": "error",
       "unthrown/no-unused-matcher": "error",

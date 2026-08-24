@@ -36,8 +36,9 @@ Register the plugin and turn its rules on in your `.oxlintrc.json`:
 ```
 
 The default export also exposes a `recommended` preset — an oxlint config that
-registers the plugin and enables `no-ambiguous-error-type`, `no-unhandled-result`,
-`no-unused-matcher`, `prefer-async-result`, and `no-catch-all-pattern`
+registers the plugin and enables `no-ambiguous-error-type`, `no-async-result-race`,
+`no-unhandled-result`, `no-unused-matcher`, `prefer-async-result`, and
+`no-catch-all-pattern`
 (`no-throw` and `no-get-or-throw` are the two explicit opt-ins) — for setups
 that build their config programmatically
 (`import unthrown from "@unthrown/oxlint"` → `unthrown.recommended`).
@@ -179,6 +180,43 @@ imports included); the facade companions (`Result.Ok(...)`); and a
 `AsyncResult`. A dropped method _chain_ (`r.map(f);`) or a function whose
 `Result`-ness lives behind an imported declaration needs the type checker and is
 out of scope — no false positives is the design priority.
+
+### `unthrown/no-async-result-race` {#no-async-result-race}
+
+An `AsyncResult` is **eager** — constructing it starts the work. So the
+readable spelling of a sequence, each step in its own `const` and chained
+afterwards, is a race, and a silent one: it still type-checks and still
+returns a `Result`; the steps just run concurrently. This rule flags the later
+construction while an earlier sibling binding in the same statement list is
+still unconsumed:
+
+```ts
+import { OkAsync, allAsync } from "unthrown";
+
+const a = stepA(); // work already in flight (stepA declared `(): AsyncResult<…>`)
+const b = stepB(); // ✗ starts concurrently with `a` — reads as a sequence, runs as a race
+return a.flatMap(() => b);
+
+const r = stepA().flatMap(() => stepB()); // ✓ chained — one statement, one sequence
+const seq = await stepA(); // ✓ consumed before the next starts
+return allAsync([stepA(), stepB()]); // ✓ concurrency, stated as such
+```
+
+A construction is recognised purely syntactically: the async producers
+(`OkAsync`, `ErrAsync`, `DoAsync`, `fromPromise`, `fromSafePromise`,
+`fromExecutor`, `allAsync`, `allFromDictAsync`), the `AsyncResult` companion's
+members, a chain rooted in any of those, a locally-declared function whose
+return annotation is unthrown's `AsyncResult`, or a declarator annotated with
+it — the annotation is the opt-in that catches a service method call the
+syntax alone cannot resolve, and an unannotated one is the documented miss.
+
+Consumption is a **direct** reference: a read inside a nested function is
+deferred, which is exactly how `a.flatMap(() => b)` touches `b` without
+sequencing its already-started work. Two bindings first consumed directly in
+one statement (`allAsync([a, b])`) are the sanctioned join, not a race.
+Manual start-both-await-both concurrency **is** reported — its sanctioned
+spelling is `allAsync([…])` in one statement, and a site that genuinely wants
+the manual form carries a targeted `oxlint-disable` with a reason.
 
 ### `unthrown/no-throw` {#no-throw}
 
