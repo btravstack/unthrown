@@ -73,7 +73,7 @@ ruleTester.run("no-async-result-race", noAsyncResultRace, {
     },
     // The chain roots at a producer, so the whole chain is one construction.
     {
-      code: `import { OkAsync, ErrAsync } from "unthrown";\nconst a = OkAsync(1).map((n) => n + 1);\nconst b = ErrAsync("e").mapErr((e) => e);\nconst r = a.flatMap(() => b);`,
+      code: `import { OkAsync, ErrAsync } from "unthrown";\nconst a = OkAsync(1).map((n) => n + 1);\nconst b = ErrAsync("e").tapFailure(() => {});\nconst r = a.flatMap(() => b);`,
       errors: [{ messageId: "noAsyncResultRace" }],
     },
     // The facade companion constructs too.
