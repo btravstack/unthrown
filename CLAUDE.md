@@ -716,6 +716,13 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
 
 ## Monorepo layout
 
+Every companion package **peers on `unthrown`** (`workspace:^` in
+`peerDependencies`, kept in `devDependencies` for the workspace build; pnpm
+rewrites it to a real `^` range at publish). As a regular dependency the
+package manager was free to fork the tree into two `unthrown` copies, which
+diverge in both type and runtime identity (`isResult` compares across
+copies) — issue #256, observed live in btravstack/start#99.
+
 - `packages/core` → `unthrown` (**zero runtime dependencies** — the exhaustive
   error matcher is built-in (`matcher.ts`, exported as `match`/`P`/
   `NonExhaustiveError`); it replaced the former `ts-pattern` peer so the
@@ -734,9 +741,10 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   `Result` via `fromSchema` / `fromSchemaAsync`, with the validation issues as
   the modeled `E`)
 - `packages/oxlint` → `@unthrown/oxlint` (an oxlint **JS plugin**, peerDep
-  `oxlint`, dep `@oxlint/plugins`; ships **seven rules** — five in the
-  `recommended` preset (`no-ambiguous-error-type`, `no-catch-all-pattern`,
-  `no-unhandled-result`, `no-unused-matcher`, `prefer-async-result`) plus the
+  `oxlint`, dep `@oxlint/plugins`; ships **eight rules** — six in the
+  `recommended` preset (`no-ambiguous-error-type`, `no-async-result-race`,
+  `no-catch-all-pattern`, `no-unhandled-result`, `no-unused-matcher`,
+  `prefer-async-result`) plus the
   opt-ins `no-get-or-throw` and `no-throw`. Purely syntactic AST rules. No TypeDoc API page;
   documented in the Linting guide. Full spec: `packages/oxlint/CLAUDE.md`.)
 - `packages/prisma` → `@unthrown/prisma` (peerDep `@prisma/client` ^7; a Prisma

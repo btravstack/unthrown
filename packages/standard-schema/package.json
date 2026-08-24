@@ -52,8 +52,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@standard-schema/spec": "catalog:",
-    "unthrown": "workspace:^"
+    "@standard-schema/spec": "catalog:"
   },
   "devDependencies": {
     "@btravstack/tsconfig": "catalog:",
@@ -61,7 +60,11 @@
     "@vitest/coverage-v8": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
+    "unthrown": "workspace:^",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "unthrown": "workspace:^"
   },
   "engines": {
     "node": ">=20"

@@ -7,7 +7,7 @@
 [API Reference](https://btravstack.github.io/unthrown/api/boxed/)
 
 ```sh
-pnpm add @unthrown/boxed @bloodyowl/boxed
+pnpm add @unthrown/boxed @bloodyowl/boxed unthrown
 ```
 
 Boxed's `Result` has two channels (`Ok`/`Error`) and no defect channel. Coming

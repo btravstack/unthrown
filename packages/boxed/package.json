@@ -49,9 +49,6 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "unthrown": "workspace:^"
-  },
   "devDependencies": {
     "@bloodyowl/boxed": "catalog:",
     "@btravstack/tsconfig": "catalog:",
@@ -59,10 +56,12 @@
     "@vitest/coverage-v8": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
+    "unthrown": "workspace:^",
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "@bloodyowl/boxed": "^3"
+    "@bloodyowl/boxed": "^3",
+    "unthrown": "workspace:^"
   },
   "engines": {
     "node": ">=20"

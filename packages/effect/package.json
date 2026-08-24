@@ -49,9 +49,6 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "unthrown": "workspace:^"
-  },
   "devDependencies": {
     "@btravstack/tsconfig": "catalog:",
     "@types/node": "catalog:",
@@ -59,10 +56,12 @@
     "effect": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
+    "unthrown": "workspace:^",
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "effect": "^3"
+    "effect": "^3",
+    "unthrown": "workspace:^"
   },
   "engines": {
     "node": ">=20"

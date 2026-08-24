@@ -51,9 +51,6 @@
     "test": "prisma generate && vitest run",
     "typecheck": "prisma generate && tsc --noEmit"
   },
-  "dependencies": {
-    "unthrown": "workspace:^"
-  },
   "devDependencies": {
     "@btravstack/tsconfig": "catalog:",
     "@prisma/adapter-better-sqlite3": "catalog:",
@@ -65,10 +62,12 @@
     "prisma": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
+    "unthrown": "workspace:^",
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "@prisma/client": "^7"
+    "@prisma/client": "^7",
+    "unthrown": "workspace:^"
   },
   "engines": {
     "node": ">=20.19"
