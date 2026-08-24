@@ -1,8 +1,22 @@
+import type { AnyColumn, SelectedFieldsOrdered } from "drizzle-orm";
 import type { PreparedQueryConfig } from "drizzle-orm/pg-core/session";
 import { type AsyncResult, fromPromise, fromSafePromise, type Result } from "unthrown";
 
 import { type PgQueryError, qualifyPgError } from "../errors.js";
 import type { PgUnthrownPreparedQuery } from "./session.js";
+
+// `drizzle-orm/utils` exports `resolveNullableObjectPaths` at runtime since
+// 1.0.0-rc.5 — the async and effect trees both call it to turn the
+// joins-not-nullable map into the nullable-object paths a rows mapper now
+// takes — but the rc's `.d.ts` omits the declaration. This augmentation adds
+// the missing member; the day upstream declares it too, this block becomes a
+// duplicate-identifier error, which is the signal to delete it.
+declare module "drizzle-orm/utils" {
+  function resolveNullableObjectPaths(
+    columns: SelectedFieldsOrdered<AnyColumn>,
+    joinsNotNullableMap: Record<string, boolean> | undefined,
+  ): string[] | undefined;
+}
 
 /**
  * The `then` that makes a query builder awaitable, resolving to a `Result`.

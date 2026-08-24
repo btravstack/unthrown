@@ -37,7 +37,7 @@ catalog:
   better-sqlite3: 13.0.3
   # Ranged peer, exact catalog pin: we subclass drizzle internals
   # (`_prepare`, the `entityKind` brand), so bumps are deliberate.
-  drizzle-orm: 1.0.0-rc.4
+  drizzle-orm: 1.0.0-rc.5-169397b
   effect: 3.22.1
   knip: 6.32.2
   lefthook: 2.1.10
