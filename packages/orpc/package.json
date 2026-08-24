@@ -68,9 +68,6 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "unthrown": "workspace:^"
-  },
   "devDependencies": {
     "@btravstack/tsconfig": "catalog:",
     "@orpc/client": "catalog:",
@@ -81,11 +78,13 @@
     "@vitest/coverage-v8": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
+    "unthrown": "workspace:^",
     "vitest": "catalog:"
   },
   "peerDependencies": {
     "@orpc/client": "^2.0.0-beta",
-    "@orpc/server": "^2.0.0-beta"
+    "@orpc/server": "^2.0.0-beta",
+    "unthrown": "workspace:^"
   },
   "peerDependenciesMeta": {
     "@orpc/server": {

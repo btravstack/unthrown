@@ -7,7 +7,7 @@
 [API Reference](https://btravstack.github.io/unthrown/api/neverthrow/)
 
 ```sh
-pnpm add @unthrown/neverthrow neverthrow
+pnpm add @unthrown/neverthrow neverthrow unthrown
 ```
 
 neverthrow has two channels (`Ok`/`Err`) and no defect channel. Coming **in**,

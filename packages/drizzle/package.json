@@ -59,9 +59,6 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test-d.json"
   },
-  "dependencies": {
-    "unthrown": "workspace:^"
-  },
   "devDependencies": {
     "@btravstack/tsconfig": "catalog:",
     "@testcontainers/postgresql": "catalog:",
@@ -73,11 +70,13 @@
     "pg": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
+    "unthrown": "workspace:^",
     "vitest": "catalog:"
   },
   "peerDependencies": {
     "drizzle-orm": "^1.0.0-rc",
-    "pg": "^8.16.0"
+    "pg": "^8.16.0",
+    "unthrown": "workspace:^"
   },
   "engines": {
     "node": ">=20"

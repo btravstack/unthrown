@@ -7,7 +7,7 @@
 [API Reference](https://btravstack.github.io/unthrown/api/standard-schema/)
 
 ```sh
-pnpm add @unthrown/standard-schema
+pnpm add @unthrown/standard-schema unthrown
 ```
 
 Bridge any [Standard Schema](https://standardschema.dev) validator — **Zod**,

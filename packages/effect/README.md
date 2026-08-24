@@ -7,7 +7,7 @@
 [API Reference](https://btravstack.github.io/unthrown/api/effect/)
 
 ```sh
-pnpm add @unthrown/effect effect
+pnpm add @unthrown/effect effect unthrown
 ```
 
 Effect is the one neighbour that shares unthrown's three-channel shape: an
