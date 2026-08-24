@@ -1,5 +1,44 @@
 # @unthrown/oxlint
 
+## 5.6.0
+
+### Minor Changes
+
+- 75aa13a: `no-catch-all-pattern` now exempts the two sanctioned `P._` uses itself when
+  the file proves them (#230): the matcher is traced to its receiver, and when an
+  in-file `Result` / `AsyncResult` annotation (variable, parameter, or in-file
+  function return annotation) shows `E` to be a single non-union type — or an
+  unresolved type parameter — the catch-all is the legitimate single arm and
+  nothing is reported. In-file type aliases are seen through; an imported named
+  type counts as the single abstraction it names. Where no annotation is in reach
+  (a receiver imported from another module), the rule reports as before and the
+  targeted `oxlint-disable` remains the escape hatch.
+- 72de459: `no-async-result-race`, in the recommended preset
+
+  An `AsyncResult` is eager — constructing it starts the work — so the readable
+  spelling of a sequence, each step in its own `const` and chained afterwards,
+  is a race, and a silent one: it type-checks, returns a `Result`, and runs the
+  steps concurrently. The new rule flags the later construction while an earlier
+  sibling binding in the same statement list is still unconsumed:
+
+  ```ts
+  const a = stepA();
+  const b = stepB(); // ✗ starts concurrently with `a`
+  return a.flatMap(() => b);
+  ```
+
+  Chaining in one statement, consuming the earlier binding first, and the
+  explicit join (`allAsync([a, b])`) are exempt. Manual start-both-await-both is
+  reported — its sanctioned spelling is `allAsync([…])` in one statement — and a
+  site that wants the manual form carries a targeted `oxlint-disable` with a
+  reason.
+
+  Purely syntactic, like its siblings: recognised constructions are unthrown's
+  async producers, the `AsyncResult` companion, chains rooted in either, local
+  functions whose return annotation is unthrown's `AsyncResult`, and declarators
+  annotated with it — the annotation being the opt-in that catches a service
+  method call the syntax alone cannot resolve.
+
 ## 5.5.0
 
 ### Minor Changes
