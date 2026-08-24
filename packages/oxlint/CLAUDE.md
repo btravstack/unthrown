@@ -6,7 +6,7 @@ internal design — live in the root [`CLAUDE.md`](../../CLAUDE.md) and apply
 here too.
 
 An oxlint **JS plugin**, peerDep
-`oxlint`, dep `@oxlint/plugins`; ships **seven rules**: `no-ambiguous-error-type`
+`oxlint`, dep `@oxlint/plugins`; ships **eight rules**: `no-ambiguous-error-type`
 — enforces Thesis #1 against `unknown`/`any`/`Error`/`{}` **and the primitive
 keywords** (`void` included) in `E`, both in a `Result`/`AsyncResult` type
 **annotation** and in the matcher's `returnType<R>()` **pin** — the latter only
@@ -38,7 +38,27 @@ recommended preset — flags a bare `ExpressionStatement` dropping a `Result`:
 a call to an unthrown-imported producer or facade-companion member, or to a
 locally-declared function whose return annotation is unthrown's
 `Result`/`AsyncResult`, awaited or not; deliberately syntactic — a dropped
-method _chain_ like `r.map(f);` is type-dependent and out of scope); and
+method _chain_ like `r.map(f);` is type-dependent and out of scope);
+`no-async-result-race` (**in the recommended preset** — flags a sibling
+`AsyncResult` construction in one statement list while an earlier binding is
+still unconsumed: construction is eager, so the sibling-`const` sequence
+races. A construction is a declarator whose initializer roots — walked through
+a combinator chain — in an async free producer, an `AsyncResult` companion
+member, or a local function annotated `AsyncResult`; a declarator annotated
+`AsyncResult` counts regardless of its initializer, which is the opt-in for a
+service method call the syntax cannot resolve. Consumption is a **direct**
+reference — one whose `Reference.from.variableScope` is the binding's own — so
+a read inside a nested closure defers, which is how `a.flatMap(() => b)`
+touches `b` without sequencing it. Two exemptions: a direct reference to the
+earlier binding before the later initializer ends (an ordinary sequence, or
+consumption BY the construction — `allAsync([a, b])` as an initializer), and
+both bindings first directly consumed in one later statement
+(`return allAsync([a, b])`) unless the later construction was awaited, whose
+references are of the settled `Result`. Start-both-await-both is reported on
+purpose — the sanctioned concurrency is `allAsync` in one statement — and the
+escape hatch is a targeted `oxlint-disable` with a reason. One report per
+later construction, against its nearest open predecessor; cross-block races
+and an un-annotated service call are documented misses); and
 `no-catch-all-pattern` (**in the recommended preset** — reports the catch-all
 `P._` — plus ts-pattern's `P.any` alias, kept because the rule also covers a
 `P` imported straight from there — where `P` is imported from `unthrown` or

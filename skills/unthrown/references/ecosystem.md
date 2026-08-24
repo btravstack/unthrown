@@ -36,9 +36,9 @@ wiring exports: the seven raw matcher functions, `failOnForgottenAwait`, and the
 
 ## Linting: @unthrown/oxlint
 
-An oxlint JS plugin (peer `oxlint`). Seven rules. The type-shaped ones
+An oxlint JS plugin (peer `oxlint`). Eight rules. The type-shaped ones
 (`no-ambiguous-error-type`, `prefer-async-result`, `no-unhandled-result`,
-`no-catch-all-pattern`) resolve bindings by scope analysis, so they only fire
+`no-async-result-race`, `no-catch-all-pattern`) resolve bindings by scope analysis, so they only fire
 on unthrown's own `Result` — another library's is left alone. Three are keyed
 on a name or shape instead, and need no import to resolve:
 `no-unused-matcher` (the `…Cases` method names), `no-get-or-throw` (a
@@ -55,6 +55,12 @@ statement itself — it reports every `throw`, in any file).
   function-type return positions — those must stay `Promise`).
 - `no-unhandled-result` — flags a bare expression statement dropping a
   `Result` (syntactic; a dropped method chain is out of scope).
+- `no-async-result-race` — flags a sibling `AsyncResult` construction while an
+  earlier binding in the same statement list is still unconsumed: construction
+  is eager, so the sibling-`const` sequence races. Chaining and the one-statement
+  join (`allAsync([a, b])`) are exempt; manual start-both-await-both is
+  reported — its sanctioned spelling is `allAsync`, and a deliberate site
+  carries a targeted `oxlint-disable` with a reason.
 - `no-catch-all-pattern` — reports `P._` (and ts-pattern's `P.any`); self-exempts
   when an in-file `Result` annotation proves `E` is a single non-union type or
   an unresolved generic; unprovable keep-the-wildcard sites carry a targeted
