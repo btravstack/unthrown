@@ -269,7 +269,7 @@ export class PgUnthrownDatabase<
     ) => PgUpdateBuilder<TTable, TQueryResult, PgUnthrownUpdateHKT>;
     insert: <TTable extends PgTable>(
       table: TTable,
-    ) => PgInsertBuilder<TTable, TQueryResult, false, PgUnthrownInsertHKT>;
+    ) => PgInsertBuilder<TTable, TQueryResult, "all", false, PgUnthrownInsertHKT>;
     delete: <TTable extends PgTable>(table: TTable) => PgUnthrownDeleteBase<TTable, TQueryResult>;
   } {
     // oxlint-disable-next-line no-this-alias -- the returned members are `function` declarations, not arrows, because each carries overload signatures an arrow cannot; `this` inside them is the call site's, so the database has to be captured.
@@ -342,12 +342,13 @@ export class PgUnthrownDatabase<
 
     function insert<TTable extends PgTable>(
       table: TTable,
-    ): PgInsertBuilder<TTable, TQueryResult, false, PgUnthrownInsertHKT> {
+    ): PgInsertBuilder<TTable, TQueryResult, "all", false, PgUnthrownInsertHKT> {
       return new PgInsertBuilder(
         table,
         self.session,
         self.dialect,
         queries,
+        undefined,
         undefined,
         PgUnthrownInsertBase,
       );
@@ -571,11 +572,12 @@ export class PgUnthrownDatabase<
    */
   insert<TTable extends PgTable>(
     table: TTable,
-  ): PgInsertBuilder<TTable, TQueryResult, false, PgUnthrownInsertHKT> {
+  ): PgInsertBuilder<TTable, TQueryResult, "all", false, PgUnthrownInsertHKT> {
     return new PgInsertBuilder(
       table,
       this.session,
       this.dialect,
+      undefined,
       undefined,
       undefined,
       PgUnthrownInsertBase,

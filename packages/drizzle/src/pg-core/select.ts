@@ -12,7 +12,7 @@ import type {
   SelectResult,
 } from "drizzle-orm/query-builders/select.types";
 import type { ColumnsSelection } from "drizzle-orm/sql/sql";
-import type { Assume } from "drizzle-orm/utils";
+import { resolveNullableObjectPaths, type Assume } from "drizzle-orm/utils";
 import type { AsyncResult } from "unthrown";
 
 import { type ResultThen, resultThen, runSafeQuery } from "./awaitable.js";
@@ -111,12 +111,17 @@ export class PgUnthrownSelectBase<
     const query = this.config.tagged
       ? dialect._sqlToQuery(this.getSQL())
       : dialect.sqlToQuery(this.getSQL());
-    // `getSQL()` — called just above to build `query` — is what populates
-    // `config.fieldsFlat`, so it is set by the time we read it; that ordering is
-    // the same one drizzle's own `_prepare` relies on. `?? []` keeps the type
-    // honest without a non-null assertion.
-    const fieldsList = this.config.fieldsFlat ?? [];
-    const mapper = this.dialect.mapperGenerators.rows(fieldsList, this.joinsNotNullableMap);
+    // `getSQL()` — called just above to build `query` — runs
+    // `_resolveSelection()`, which populates `config.fieldsFlat` (and, under a
+    // set operator, `config.setFieldsFlat`, the list drizzle's own `_prepare`
+    // then prefers), so both are set by the time we read them; that ordering
+    // is the same one drizzle's own `_prepare` relies on. `?? []` keeps the
+    // type honest without a non-null assertion.
+    const fieldsList = this.config.setFieldsFlat ?? this.config.fieldsFlat ?? [];
+    const mapper = this.dialect.mapperGenerators.rows(
+      fieldsList,
+      resolveNullableObjectPaths(fieldsList, this.joinsNotNullableMap),
+    );
     // `.asSafe()` is what keeps `prepare(name).execute()` — a third way to run
     // this read, alongside `execute()` and `await` — on the same defect-only
     // boundary as the other two.

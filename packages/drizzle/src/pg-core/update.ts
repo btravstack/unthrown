@@ -12,7 +12,7 @@ import type { PgViewBase } from "drizzle-orm/pg-core/view-base";
 import type { JoinNullability } from "drizzle-orm/query-builders/select.types";
 import type { ColumnsSelection, SQL } from "drizzle-orm/sql/sql";
 import type { Subquery } from "drizzle-orm/subquery";
-import type { Assume } from "drizzle-orm/utils";
+import { resolveNullableObjectPaths, type Assume } from "drizzle-orm/utils";
 import type { AsyncResult } from "unthrown";
 
 import type { PgQueryError } from "../errors.js";
@@ -97,7 +97,10 @@ export class PgUnthrownUpdateBase<
     const mapper =
       fields === undefined
         ? undefined
-        : this.dialect.mapperGenerators.rows(fields, joinsNotNullableMap);
+        : this.dialect.mapperGenerators.rows(
+            fields,
+            resolveNullableObjectPaths(fields, joinsNotNullableMap),
+          );
     return session.prepareQuery(query, fields ? "arrays" : "raw", name ?? generateName, mapper, {
       type: "update",
       tables: [...extractUsedTable(config.table)],
