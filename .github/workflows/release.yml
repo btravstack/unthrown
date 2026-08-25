@@ -18,5 +18,11 @@ jobs:
       pull-requests: write
       id-token: write
     uses: btravstack/tools/.github/workflows/release-reusable.yml@workflows-v1
+    with:
+      # The exact commit the green CI run measured. Without it a `workflow_run`
+      # checkout takes the default branch's CURRENT tip, which a push landing
+      # after CI went green can have moved — publishing a permanent tarball
+      # from a commit no CI run validated.
+      ref: ${{ github.event.workflow_run.head_sha }}
     secrets:
       RELEASE_PAT: ${{ secrets.RELEASE_PAT }}
