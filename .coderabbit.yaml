@@ -8,6 +8,11 @@ reviews:
   path_instructions:
     - path: "**/*.ts"
       instructions: |
+        When the same diff also changes a `CLAUDE.md`, an `AGENTS.md` or a
+        README, check what it now claims against this code. A sentence that
+        counts call sites, names "the one such site" or describes a signature is
+        a claim that goes stale silently, and one already had.
+
         This repository IS `unthrown`. The idioms other repositories are held to
         are defined here, so do not cite them as external rules — cite the root
         `CLAUDE.md`, which is the authoritative spec, and the thesis section at
@@ -30,9 +35,3 @@ reviews:
 
         `type` not `interface`, `unknown` not `any`, and every relative import
         carries `.js` — `moduleResolution: NodeNext`.
-
-    - path: "**/{CLAUDE,AGENTS}.md"
-      instructions: |
-        This is the spec, not commentary. Check its claims against the code in
-        the same diff: a sentence that counts call sites or describes a
-        signature is a claim that can go stale silently.
