@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=https://storage.googleapis.com/coderabbit_public_assets/schema.v2.json
+
+reviews:
+  path_filters:
+    - "!**/src/generated/**"
+    - "!**/docs/.vitepress/dist/**"
+    - "!pnpm-lock.yaml"
+  path_instructions:
+    - path: "**/*.ts"
+      instructions: |
+        This repository IS `unthrown`. The idioms other repositories are held to
+        are defined here, so do not cite them as external rules — cite the root
+        `CLAUDE.md`, which is the authoritative spec, and the thesis section at
+        the top of it in particular.
+
+        Two things a reviewer gets wrong here specifically:
+
+        - `unthrown/no-throw` is deliberately NOT enabled in this repository. The
+          library's own boundaries throw and catch on purpose; that is the
+          mechanism the rule exists to spare consumers. Do not flag a `throw` or
+          a `try` in `packages/core/src` as a violation without checking what it
+          implements.
+        - A change to a combinator's behaviour is a change to every consumer in
+          the org. Ask whether the invariants section and the migration notes
+          moved with it.
+
+        Comments are sparse by convention: rationale lives in the spec file,
+        not beside the code. Do not ask for more comments, or for TSDoc on a
+        private symbol.
+
+        `type` not `interface`, `unknown` not `any`, and every relative import
+        carries `.js` — `moduleResolution: NodeNext`.
+
+    - path: "**/{CLAUDE,AGENTS}.md"
+      instructions: |
+        This is the spec, not commentary. Check its claims against the code in
+        the same diff: a sentence that counts call sites or describes a
+        signature is a claim that can go stale silently.
