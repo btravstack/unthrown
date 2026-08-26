@@ -2,8 +2,6 @@
 
 reviews:
   path_filters:
-    - "!**/src/generated/**"
-    - "!**/docs/.vitepress/dist/**"
     - "!pnpm-lock.yaml"
   path_instructions:
     - path: "**/*.ts"
