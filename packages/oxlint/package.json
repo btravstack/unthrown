@@ -50,7 +50,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@oxlint/plugins": "^1.78.0"
+    "@oxlint/plugins": "^1.80.0"
   },
   "devDependencies": {
     "@btravstack/tsconfig": "catalog:",
