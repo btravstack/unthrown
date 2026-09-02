@@ -46,8 +46,12 @@ export type SagaAsyncBuilder<T, E> = {
    *
    * @remarks
    * `run` is a **thunk**: an `AsyncResult` starts on construction, so a step
-   * built eagerly would run before the saga reached it. `undo` receives the
-   * value the step produced and answers `AsyncResult<unknown, never>` —
+   * built eagerly would run before the saga reached it. It takes no argument;
+   * `undo` receives the value its own step produced. Either may answer a plain
+   * `Result` in place of an `AsyncResult`, so a synchronous compensation needs
+   * no `toAsync()`.
+   *
+   * An `undo` answers `unknown` in the Ok channel and `never` in the Err one:
    * compensation may not invent a new way for the saga to fail, because the
    * caller is already handling the failure that triggered it.
    */

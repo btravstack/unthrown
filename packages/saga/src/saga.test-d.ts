@@ -31,6 +31,13 @@ SagaAsync().step(
   },
 );
 
+// …and may answer a plain `Result`, so a synchronous compensation needs no
+// `toAsync()` — the same latitude `run` has, deliberately
+SagaAsync().step(
+  () => Ok(1),
+  () => Ok(),
+);
+
 // …and may not fail in a way the caller has to handle: `E` must be `never`
 SagaAsync().step(
   () => Ok(1),

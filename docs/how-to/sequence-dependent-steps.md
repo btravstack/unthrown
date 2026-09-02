@@ -118,8 +118,9 @@ Three things it decides for you, each a trap in the hand-written walk-back:
   built outside the failure branch runs whether or not it was needed — the
   hazard [`unthrown/no-async-result-race`](./lint-your-codebase) exists for.
   Every argument here is a thunk, so there is nothing to build early.
-- **Compensation may not fail.** `undo` answers `AsyncResult<unknown, never>`:
-  the caller is already handling the failure that triggered it, and a second
+- **Compensation may not fail.** `undo` answers `unknown` in the Ok channel and
+  `never` in the Err one: the caller is already handling the failure that
+  triggered it, and a second
   error channel would ask it to handle two. A **defect** inside an undo is
   different — it wins over the failure that triggered it, because a
   compensation that broke is the more urgent report, and every remaining undo

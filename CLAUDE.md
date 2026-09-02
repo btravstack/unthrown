@@ -732,8 +732,9 @@ copies) — issue #256, observed live in btravstack/start#99.
   `expect.extend` registration it also exports the seven raw matcher functions,
   `failOnForgottenAwait`, and the `UnthrownMatchers` type — for manual
   `expect.extend` wiring)
-- `packages/saga` → `@unthrown/saga` (peerDep `unthrown`; one export,
-  `SagaAsync()` — a sequence whose steps carry compensating undos, unwound
+- `packages/saga` → `@unthrown/saga` (peerDep `unthrown`; two exports, the
+  builder entry point `SagaAsync()` and its `SagaAsyncBuilder` type — a
+  sequence whose steps carry compensating undos, unwound
   **LIFO** the moment one fails. `step(run, undo?)` takes **thunks** (an
   `AsyncResult` starts on construction, so an eagerly-built undo would run
   whether or not it was needed — the hazard `unthrown/no-async-result-race`

@@ -34,9 +34,11 @@ const fulfilled = await SagaAsync()
 Every argument is a **thunk**, so nothing is built before the saga reaches it.
 `run()` answers the last step's value, and a failure — `Err` or `Defect` — comes
 back **unchanged**, so a caller triages exactly what it would have without the
-saga. An `undo` receives its own step's value and answers
-`AsyncResult<unknown, never>`: compensation may not invent a new way to fail,
-because the caller is already handling the one that triggered it. The single
+saga. `run` takes no argument; an `undo` receives its own step's value, and
+either may answer a plain `Result` in place of an `AsyncResult`. An `undo`
+answers `unknown` in the Ok channel and `never` in the Err one: compensation
+may not invent a new way to fail, because the caller is already handling the
+one that triggered it. The single
 exception is a **defect inside an undo** — it wins over the failure that
 triggered it, since a compensation that broke is the more urgent report, and
 every remaining undo still runs first.
