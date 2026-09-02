@@ -157,7 +157,7 @@ const build = <T, E>(steps: readonly Step[]): SagaAsyncBuilder<T, E> => ({
  *
  * @example
  * ```ts
- * import { SagaAsync } from "unthrown";
+ * import { SagaAsync } from "@unthrown/saga";
  *
  * const fulfilled = await SagaAsync()
  *   .step(() => place(order), () => cancelPlacement(order))
@@ -169,7 +169,8 @@ const build = <T, E>(steps: readonly Step[]): SagaAsyncBuilder<T, E> => ({
  *
  * @example
  * ```ts
- * import { SagaAsync, ErrAsync, OkAsync } from "unthrown";
+ * import { ErrAsync, OkAsync } from "unthrown";
+ * import { SagaAsync } from "@unthrown/saga";
  *
  * // The undo receives the step's own value, so it can take back exactly what
  * // that step created:
