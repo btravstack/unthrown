@@ -80,6 +80,13 @@ overrides:
   # > testcontainers > archiver pulls an old glob/minimatch. 2.1.4 is the first
   # 2.x release patched for both.
   "brace-expansion@2": "2.1.4"
+  # GHSA-3f6p-5ww8-9rcr: mysql2 accepts a server's downgrade to the
+  # `mysql_clear_password` auth plugin without the client asking for it, which
+  # sends the password in plaintext (<3.22.0). Reaches us through drizzle-orm's
+  # optional `mysql2` peer and through the `prisma` CLI in
+  # `examples/checkout-persistence` — dev only; no published package here has a
+  # runtime dependency on it, and nothing in this repository connects to MySQL.
+  "mysql2@<3.22.0": "3.22.0"
   # GHSA-52cp-r559-cp3m: js-yaml quadratic-CPU merge keys in the legacy 3.x line
   # (via @changesets/cli > read-yaml-file). GHSA-5p4m-2wfm-xmqj then widened the
   # affected range to <3.15.1 and pulled in the 4.x line (<4.3.1) too.
