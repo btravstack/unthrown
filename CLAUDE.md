@@ -732,6 +732,28 @@ copies) — issue #256, observed live in btravstack/start#99.
   `expect.extend` registration it also exports the seven raw matcher functions,
   `failOnForgottenAwait`, and the `UnthrownMatchers` type — for manual
   `expect.extend` wiring)
+- `packages/saga` → `@unthrown/saga` (peerDep `unthrown`; two exports, the
+  builder entry point `SagaAsync()` and its `SagaAsyncBuilder` type — a
+  sequence whose steps carry compensating undos, unwound
+  **LIFO** the moment one fails. `step(run, undo?)` takes **thunks** (an
+  `AsyncResult` starts on construction, so an eagerly-built undo would run
+  whether or not it was needed — the hazard `unthrown/no-async-result-race`
+  exists for), `run()` answers the LAST step's value, and the failure comes
+  back **unchanged** so a caller triages what it would have without the saga.
+  `run` takes no argument; `undo` receives its own step's value, and either may
+  answer a plain `Result` in place of an `AsyncResult`. An `undo` answers
+  `unknown` in the Ok channel and `never` in the Err one: compensation may not
+  invent a new way to fail, because the caller
+  is already handling the one that triggered it. The single exception is a
+  **defect inside an undo** — it wins over the failure that triggered it (a
+  compensation that broke is the more urgent report) and every remaining undo
+  still runs first. Pure control flow: no timers, no clock, no randomness, so
+  it replays deterministically inside a workflow sandbox. It is a **satellite
+  package rather than a core export** because it is a pattern built on the
+  public surface — it operates no channel core does not already expose — and
+  core is a finishable library: a saga in the root would invite a retry
+  algebra and a scheduler beside it. Built on `unthrown`'s public API only, so
+  the boundary is checked by the compiler rather than by review.)
 - `packages/effect` → `@unthrown/effect` (peerDep `effect`)
 - `packages/neverthrow` → `@unthrown/neverthrow` (peerDep `neverthrow`)
 - `packages/boxed` → `@unthrown/boxed` (peerDep `@bloodyowl/boxed` — Boxed's
