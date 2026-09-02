@@ -107,12 +107,15 @@ overrides:
   # (@prisma/dev). 2.0.10 is the first release patched for all three; the
   # resolved hono 4.x satisfies its `hono: ^4` peer.
   "@hono/node-server@<2.0.10": "2.0.10"
-  # GHSA-v2hh-gcrm-f6hx: fast-uri host confusion via literal backslash authority
-  # delimiter. Only the 3.x line is present (via ajv, under commitlint's config
-  # loading and the `prisma` CLI). 3.1.4 was believed patched; the advisory was
-  # subsequently widened to <3.1.5, so the floor moves with it. Scoped to the
-  # vulnerable range so future patched 3.x releases resolve normally.
-  "fast-uri@<3.1.5": "3.1.5"
+  # GHSA-v2hh-gcrm-f6hx (host confusion via a literal backslash authority
+  # delimiter), then four more in the same parser — GHSA-5jgf-p345-68v8,
+  # GHSA-f65p-4m7j-42xc, GHSA-fph4-wmhf-6fwf and GHSA-jqff-g426-hqxp. Only the
+  # 3.x line is present (via ajv, under commitlint's config loading and the
+  # `prisma` CLI). The floor has moved twice as the advisories widened —
+  # 3.1.4, then 3.1.5 — and 3.1.6 is the first release patched for all five.
+  # Scoped to the vulnerable range so future patched 3.x releases resolve
+  # normally.
+  "fast-uri@<3.1.6": "3.1.6"
   # GHSA-c96f-x56v-gq3h: find-my-way HTTP/2 DDoS (<=9.6.0), pulled in through
   # Prisma 7's @prisma/dev dependency chain. 9.7.0 is the first published
   # patched release.
