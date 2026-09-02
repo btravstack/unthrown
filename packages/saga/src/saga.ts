@@ -1,9 +1,20 @@
 // The saga: a sequence whose steps carry compensating undos, unwound LIFO when
 // a later step fails. `DoAsync` is the sibling for a sequence that only ever
 // goes forward.
+//
+// **A package of its own, not a core export.** It is pure control flow over
+// core's types and adds no dependency — but it is a PATTERN rather than a
+// channel operation, and it already carries opinions about sagas (a defect in
+// an undo outranks the failure that triggered it; undos are best effort and all
+// of them run). unthrown's core is meant to be finishable; a saga is where
+// somebody eventually wants policies. Opting in is the boundary.
+//
+// It is built on the PUBLIC surface alone — `fromSafePromise`, `flatMap`,
+// `OkAsync` — so nothing here reaches into core's internals, which is what
+// keeps this package honest about being a consumer.
 
-import { AsyncRes, defectRes, okRes } from "./core.js";
-import type { AsyncResult, Awaitable, Result } from "./types.js";
+import { Ok, OkAsync, fromSafePromise, isDefect, isOk, isResult } from "unthrown";
+import type { AsyncResult, Awaitable, Result } from "unthrown";
 
 /**
  * What a step or an undo may hand back: a `Result`, or an `AsyncResult`.
@@ -49,21 +60,28 @@ export type SagaAsyncBuilder<T, E> = {
 };
 
 /**
- * Adopt whatever a step handed back — a `Result`, an `AsyncResult`, or a throw.
+ * Adopt whatever a step handed back — a `Result`, an `AsyncResult`, a throw, or
+ * something out of contract.
  *
  * A thrown step is a `Defect`, exactly as it would be inside `flatMap`; a
- * rejecting thenable slipped past the types is one too, so the promise this
- * saga folds over never rejects.
+ * rejecting thenable slipped past the types is one too. **A value that is not a
+ * `Result` at all is a `Defect` as well**, rather than an object whose `isOk`
+ * is read a line later: a cast or untyped caller can return `42`, and reading
+ * `.isOk()` off it would throw where nothing catches, rejecting the internal
+ * promise an `AsyncResult` promises never rejects.
  */
-const settle = async (
-  produce: () => Produced<unknown, unknown>,
-): Promise<Result<unknown, unknown>> => {
-  try {
-    return await produce();
-  } catch (cause) {
-    return defectRes(cause);
-  }
-};
+// oxlint-disable-next-line unthrown/no-ambiguous-error-type -- the step's own error type is the caller's; this adapter is deliberately channel-agnostic and the builder re-narrows to `E`
+const settle = (produce: () => Produced<unknown, unknown>): AsyncResult<unknown, unknown> =>
+  fromSafePromise(async () => await produce()).flatMap((settled) =>
+    isResult(settled)
+      ? settled
+      : OkAsync().map((): never => {
+          // oxlint-disable-next-line unthrown/no-throw -- `Defect` has no public constructor, so a throw inside a combinator is the only way to mint one from outside core; this arm is unreachable for a caller who respects the types
+          throw new TypeError(
+            "@unthrown/saga: a step must return a Result or an AsyncResult, and one returned something else",
+          );
+        }),
+  );
 
 /**
  * Run the recorded undos in reverse, best effort.
@@ -73,11 +91,13 @@ const settle = async (
  * The FIRST defect is what comes back, since a compensation that broke is worse
  * news than the failure that triggered it.
  */
-const unwind = async (undos: readonly (() => Produced<unknown, never>)[]) => {
+const unwind = async (
+  undos: readonly (() => Produced<unknown, never>)[],
+): Promise<Result<never, never> | undefined> => {
   let broken: Result<never, never> | undefined;
   for (const undo of [...undos].reverse()) {
     const settled = await settle(undo);
-    if (settled.isDefect() && broken === undefined) broken = settled as Result<never, never>;
+    if (isDefect(settled) && broken === undefined) broken = settled as Result<never, never>;
   }
   return broken;
 };
@@ -86,25 +106,24 @@ const build = <T, E>(steps: readonly Step[]): SagaAsyncBuilder<T, E> => ({
   step: <T2, E2>(run: () => Produced<T2, E2>, undo?: (value: T2) => Produced<unknown, never>) =>
     build<T2, E | E2>([...steps, { run: run as Step["run"], undo: undo as Step["undo"] }]),
   run: () =>
-    new AsyncRes<T, E>(
-      (async (): Promise<Result<T, E>> => {
-        const undos: (() => Produced<unknown, never>)[] = [];
-        let last: unknown = undefined;
-        for (const step of steps) {
-          const settled = await settle(step.run);
-          if (!settled.isOk()) return (await unwind(undos)) ?? (settled as Result<T, E>);
-          last = settled.value;
-          const { undo } = step;
-          if (undo !== undefined) {
-            // Bound to the value HERE: the loop's `last` moves on, and an undo
-            // reading it later would compensate with the wrong step's output.
-            const value = last;
-            undos.push(() => undo(value as never));
-          }
+    // oxlint-disable-next-line unthrown/prefer-async-result -- this IS the argument to `fromSafePromise`; the surface it returns is the `AsyncResult` the rule asks for
+    fromSafePromise(async (): Promise<Result<T, E>> => {
+      const undos: (() => Produced<unknown, never>)[] = [];
+      let last: unknown = undefined;
+      for (const step of steps) {
+        const settled = await settle(step.run);
+        if (!isOk(settled)) return (await unwind(undos)) ?? (settled as Result<T, E>);
+        last = settled.value;
+        const { undo } = step;
+        if (undo !== undefined) {
+          // Bound to the value HERE: the loop's `last` moves on, and an undo
+          // reading it later would compensate with the wrong step's output.
+          const value = last;
+          undos.push(() => undo(value as never));
         }
-        return okRes<T, E>(last as T);
-      })(),
-    ),
+      }
+      return Ok(last as T);
+    }).flatMap((settled) => settled),
 });
 
 /**

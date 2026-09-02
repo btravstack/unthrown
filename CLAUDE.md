@@ -371,19 +371,6 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   pure value). On `AsyncResult`, `bind`'s `f` may return a `Result` or an
   `AsyncResult`. A throw in either becomes a `Defect`; `Err`/`Defect`
   short-circuits/passes through. To go async, lift with `toAsync()`.
-- saga: `SagaAsync()` (aliased `AsyncResult.Saga`) — a sequence whose steps
-  carry compensating undos, unwound **LIFO** the moment one fails.
-  `step(run, undo?)` takes **thunks** (an `AsyncResult` starts on construction,
-  so an eagerly-built undo would run whether or not it was needed — the hazard
-  `unthrown/no-async-result-race` exists for), `run()` answers the LAST step's
-  value, and the failure comes back **unchanged** so a caller triages what it
-  would have without the saga. `undo` receives its own step's value and answers
-  `AsyncResult<unknown, never>`: compensation may not invent a new way to fail,
-  because the caller is already handling the one that triggered it. The single
-  exception is a **defect inside an undo** — it wins over the failure that
-  triggered it (a compensation that broke is the more urgent report) and every
-  remaining undo still runs first. Pure control flow: no timers, no clock, no
-  randomness, so it replays deterministically inside a workflow sandbox.
 - error: `mapErrCases`, `flatMapErrCases`, `recoverErrCases`, `tapErrCases`, `flatTapErrCases` all take
   the Thesis-#5 **matcher callback** `(m: ErrMatcher<E>, defect) => M`
   where `M extends ExhaustiveMatch<…>` (the callback returns the un-terminated
@@ -539,10 +526,9 @@ fromExecutor<T, E>>[0]`) is the grotesque spelling that invites a hand-copied
   the `Result`-producing ones
   (`Result.Ok`/`Err`/`Do`/`fromNullable`/`fromThrowable`/`fromSafeThrowable`/`all`/`allFromDict`/`is*`);
   `AsyncResult.*` holds the `AsyncResult`-producing ones
-  (`AsyncResult.Ok`/`Err`/`Do`/`Saga`/`fromPromise`/`fromSafePromise`/`all`/`allFromDict` —
+  (`AsyncResult.Ok`/`Err`/`Do`/`fromPromise`/`fromSafePromise`/`all`/`allFromDict` —
   the pre-lifted entry points and aggregates drop the `Async` suffix the free
   functions carry (`OkAsync`→`AsyncResult.Ok`, `DoAsync`→`AsyncResult.Do`,
-  `SagaAsync`→`AsyncResult.Saga`,
   `allAsync`→`AsyncResult.all`), since the
   namespace already says async). Both are value+type companions (the value and
   the `Result<T,E>` / `AsyncResult<T,E>` type share one name). The free functions
@@ -746,6 +732,27 @@ copies) — issue #256, observed live in btravstack/start#99.
   `expect.extend` registration it also exports the seven raw matcher functions,
   `failOnForgottenAwait`, and the `UnthrownMatchers` type — for manual
   `expect.extend` wiring)
+- `packages/saga` → `@unthrown/saga` (peerDep `unthrown`; one export,
+  `SagaAsync()` — a sequence whose steps carry compensating undos, unwound
+  **LIFO** the moment one fails. `step(run, undo?)` takes **thunks** (an
+  `AsyncResult` starts on construction, so an eagerly-built undo would run
+  whether or not it was needed — the hazard `unthrown/no-async-result-race`
+  exists for), `run()` answers the LAST step's value, and the failure comes
+  back **unchanged** so a caller triages what it would have without the saga.
+  `run` takes no argument; `undo` receives its own step's value, and either may
+  answer a plain `Result` in place of an `AsyncResult`. An `undo` answers
+  `unknown` in the Ok channel and `never` in the Err one: compensation may not
+  invent a new way to fail, because the caller
+  is already handling the one that triggered it. The single exception is a
+  **defect inside an undo** — it wins over the failure that triggered it (a
+  compensation that broke is the more urgent report) and every remaining undo
+  still runs first. Pure control flow: no timers, no clock, no randomness, so
+  it replays deterministically inside a workflow sandbox. It is a **satellite
+  package rather than a core export** because it is a pattern built on the
+  public surface — it operates no channel core does not already expose — and
+  core is a finishable library: a saga in the root would invite a retry
+  algebra and a scheduler beside it. Built on `unthrown`'s public API only, so
+  the boundary is checked by the compiler rather than by review.)
 - `packages/effect` → `@unthrown/effect` (peerDep `effect`)
 - `packages/neverthrow` → `@unthrown/neverthrow` (peerDep `neverthrow`)
 - `packages/boxed` → `@unthrown/boxed` (peerDep `@bloodyowl/boxed` — Boxed's

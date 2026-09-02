@@ -1,7 +1,22 @@
+import "@unthrown/vitest";
+import { Err, ErrAsync, Ok, OkAsync } from "unthrown";
 import { describe, expect, it, vi } from "vitest";
 
-import { Err, ErrAsync, Ok, OkAsync, SagaAsync } from "./index.js";
-import { boom, defectOf, expectDefect, expectErr, expectOk } from "./test-helpers.js";
+import { SagaAsync } from "./index.js";
+
+/** The stock thrown cause, so specs do not each mint their own. */
+const boom = new Error("boom");
+
+/**
+ * A Defect-state `Result` carrying `boom`. Going through `map` is deliberate: a
+ * defect has no public constructor, so a throw inside a combinator is the only
+ * way to mint one.
+ */
+const defectOf = () =>
+  Ok(0).map((): number => {
+    // oxlint-disable-next-line unthrown/no-throw -- the defect channel is the subject here, and a throw inside a combinator is the only way to reach it
+    throw boom;
+  });
 
 describe("SagaAsync", () => {
   it("answers the last step's value when every step succeeds", async () => {
@@ -9,11 +24,14 @@ describe("SagaAsync", () => {
       .step(() => OkAsync(1))
       .step(() => OkAsync("done"))
       .run();
-    expectOk(result, "done");
+    expect(result).toBeOkWith("done");
   });
 
   it("answers Ok(undefined) for a saga with no steps", async () => {
-    expectOk(await SagaAsync().run(), undefined);
+    // GIVEN nothing to do
+    // WHEN it is run
+    // THEN the empty saga is a success carrying nothing
+    await expect(SagaAsync().run()).toBeOkWith(undefined);
   });
 
   it("runs the steps in order and stops at the first failure", async () => {
@@ -30,7 +48,7 @@ describe("SagaAsync", () => {
       })
       .step(later)
       .run();
-    expectErr(result, "denied");
+    expect(result).toBeErrWith("denied");
     expect(order).toEqual(["a", "b"]);
     expect(later).not.toHaveBeenCalled();
   });
@@ -54,7 +72,7 @@ describe("SagaAsync", () => {
       )
       .step(() => ErrAsync("shipping is down"))
       .run();
-    expectErr(result, "shipping is down");
+    expect(result).toBeErrWith("shipping is down");
     expect(undone).toEqual(["stock", "placement"]);
   });
 
@@ -92,9 +110,9 @@ describe("SagaAsync", () => {
           return OkAsync();
         },
       )
-      .step(() => defectOf(boom))
+      .step(() => defectOf())
       .run();
-    expectDefect(result, boom);
+    expect(result).toBeDefectWith(boom);
     expect(undone).toEqual(["placement"]);
   });
 
@@ -106,18 +124,34 @@ describe("SagaAsync", () => {
         throw boom;
       })
       .run();
-    expectDefect(result, boom);
+    expect(result).toBeDefectWith(boom);
     expect(undo).toHaveBeenCalledTimes(1);
   });
 
   it("accepts a synchronous Result from a step", async () => {
-    expectErr(
-      await SagaAsync()
-        .step(() => Ok(1))
-        .step(() => Err("denied"))
-        .run(),
-      "denied",
-    );
+    // GIVEN steps that answer a plain `Result` rather than an `AsyncResult`
+    // WHEN the saga runs them
+    const result = await SagaAsync()
+      .step(() => Ok(1))
+      .step(() => Err("denied"))
+      .run();
+
+    // THEN both forms are accepted, and the failure comes back unchanged
+    expect(result).toBeErrWith("denied");
+  });
+
+  it("turns a step that answers something other than a Result into a Defect", async () => {
+    // GIVEN a step that a cast — or untyped JavaScript — smuggled past the
+    // types, answering a number instead of a `Result`
+    const outOfContract = () => 42 as unknown as ReturnType<typeof OkAsync<number>>;
+
+    // WHEN the saga runs it
+    const result = await SagaAsync().step(outOfContract).run();
+
+    // THEN it is a Defect rather than a rejection: reading `.isOk()` off a
+    // number would throw where nothing catches, and an `AsyncResult` promises
+    // its internal promise never rejects
+    expect(result).toBeDefectWith(expect.objectContaining({ constructor: TypeError }));
   });
 
   it("answers a defect thrown by an undo, and runs the remaining undos first", async () => {
@@ -140,7 +174,7 @@ describe("SagaAsync", () => {
       .run();
     // The broken compensation wins over the failure that triggered it — and
     // the undo below it still ran.
-    expectDefect(result, boom);
+    expect(result).toBeDefectWith(boom);
     expect(undone).toEqual(["placement"]);
   });
 

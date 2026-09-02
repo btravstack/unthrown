@@ -6,6 +6,7 @@
     [
       "unthrown",
       "@unthrown/vitest",
+      "@unthrown/saga",
       "@unthrown/effect",
       "@unthrown/neverthrow",
       "@unthrown/boxed",

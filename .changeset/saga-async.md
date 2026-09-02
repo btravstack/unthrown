@@ -1,9 +1,9 @@
 ---
-"unthrown": minor
+"@unthrown/saga": minor
 ---
 
-`SagaAsync()`: a sequence whose steps carry compensating undos, unwound LIFO the
-moment one fails.
+`@unthrown/saga`: a sequence whose steps carry compensating undos, unwound LIFO
+the moment one fails.
 
 `DoAsync` sequences steps where a later one needs an earlier one's **value**.
 There was nothing for the sequence where a later step's **failure** has to undo
@@ -45,6 +45,9 @@ It is pure control flow — no timers, no clock, no randomness — so it replays
 deterministically inside a workflow sandbox, which is where its first consumer
 runs.
 
-Aliased `AsyncResult.Saga` on the companion.
+It ships as a satellite package rather than a core export because it is a
+**pattern** built on the public surface — it operates no channel `unthrown`
+does not already expose — and core is a finishable library. Installing it is
+the opt-in; the compiler holds the boundary, since it imports nothing private.
 
 Closes #268.

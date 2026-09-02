@@ -90,10 +90,11 @@ new case is named. Enumerating the arms is what makes the chain self-auditing.
 
 `Do` goes forward. When the third step failing means the first two have to be
 taken back — a placement to cancel, a reservation to release — that is a
-**saga**, and `SagaAsync()` is the shape:
+**saga**, and [`@unthrown/saga`](https://www.npmjs.com/package/@unthrown/saga)
+is the shape:
 
 ```ts
-import { SagaAsync } from "unthrown";
+import { SagaAsync } from "@unthrown/saga";
 
 const fulfilled = await SagaAsync()
   .step(
@@ -125,11 +126,21 @@ Three things it decides for you, each a trap in the hand-written walk-back:
   still runs first.
 
 The failure itself comes back **unchanged**, so a caller triages exactly what it
-would have without the saga. An undo receives its own step's value, so it can
-take back precisely what that step created.
+would have without the saga. `run` takes no argument — it is a thunk, and there
+is nothing to hand it; the undo receives its own step's value, so it can take
+back precisely what that step created. Either may answer a plain `Result` as
+well as an `AsyncResult`, so a synchronous compensation needs no `toAsync()`.
 
 It is pure control flow — no timers, no clock, no randomness — so it replays
 deterministically inside a workflow sandbox.
+
+It is a **separate package**, not a core export: it is a pattern built on the
+public surface — nothing in it reaches a channel `unthrown` does not already
+expose — so installing it is the opt-in.
+
+```sh
+pnpm add @unthrown/saga
+```
 
 ## When to reach for named functions instead
 

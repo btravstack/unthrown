@@ -43,7 +43,6 @@ import {
   OkAsync,
   P,
   Result,
-  SagaAsync,
   TaggedError,
   type TaggedErrorConstructor,
   type TaggedErrorInstance,
@@ -185,13 +184,6 @@ const doChain = Do()
   .map((scope) => scope.a + scope.b);
 
 const doAsyncChain = DoAsync().bind("a", () => OkAsync(1));
-const sagaChain = SagaAsync()
-  .step(
-    () => OkAsync(1),
-    () => OkAsync(),
-  )
-  .run();
-
 const tuple = all([Ok(1), Ok("a")] as const);
 const dict = allFromDict({ a: Ok(1), b: Ok("x") });
 const tupleAsync = allAsync([OkAsync(1), OkAsync("a")] as const);
@@ -306,7 +298,6 @@ export const _skillSurfaceValues = [
   withPayload,
   Namespaced,
   doAsyncChain,
-  sagaChain,
   tupleAsync,
   dictAsync,
   guarded,

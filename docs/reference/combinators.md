@@ -31,7 +31,6 @@ the signatures below abbreviate its callback as `(matcher) => …`.
 | run a **failable** side effect, keep the value | `flatTap`         | `(v: T) => Result<unknown, E2>` → `Result<T, E \| E2>`       | Ok           |
 | validate a success / refine its type           | `ensure`          | `((v: T) => boolean, (v: T) => E2)` → `Result<T, E \| E2>`   | Ok           |
 | sequence steps into a named scope              | `Do`/`bind`/`let` | `bind(k, (scope) => Result<U, E2>)` → `Result<{…}, E \| E2>` | Ok           |
-| sequence steps that must be **taken back**     | `SagaAsync`       | `step(run, undo?)` → `run(): AsyncResult<T, E \| E2>`        | Ok           |
 | replace the value with a constant              | `as`              | `(value: U)` → `Result<U, E>`                                | Ok           |
 | drop the value (success type becomes `void`)   | `discard`         | `()` → `Result<void, E>`                                     | Ok           |
 | transform the error (matched)                  | `mapErrCases`     | `(matcher) => …` → `Result<T, E2>`                           | Err          |

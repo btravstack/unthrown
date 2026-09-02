@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Assertion bindings are the point here, and they are never read.
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": ["src/**/*.test-d.ts"],
+  "exclude": ["node_modules", "dist"]
+}

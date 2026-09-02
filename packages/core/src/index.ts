@@ -11,7 +11,6 @@ export type { Matcher, PatternMatcher, UniversalPattern } from "./matcher.js";
 export { Err, ErrAsync, isDefect, isErr, isOk, Ok, OkAsync } from "./constructors.js";
 export { isResult, GetError } from "./core.js";
 export { Do, DoAsync } from "./do.js";
-export { SagaAsync } from "./saga.js";
 export { AsyncResult, Result } from "./facade.js";
 export {
   all,
@@ -27,7 +26,6 @@ export {
 } from "./interop.js";
 export { TaggedError } from "./tagged.js";
 
-export type { SagaAsyncBuilder } from "./saga.js";
 export type { Settle } from "./interop.js";
 export type { TaggedErrorConstructor, TaggedErrorInstance } from "./tagged.js";
 export type {
