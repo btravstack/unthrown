@@ -19,6 +19,7 @@ import {
   fromSafeThrowable,
   fromThrowable,
 } from "./interop.js";
+import { SagaAsync } from "./saga.js";
 import type { AsyncResult as AsyncResultType, Result as ResultType } from "./types.js";
 
 /**
@@ -84,7 +85,8 @@ export type Result<T, E> = ResultType<T, E>;
 /**
  * Companion object grouping the **`AsyncResult`-producing** entry points under
  * the matching namespace: {@link AsyncResult.Ok}, {@link AsyncResult.Err},
- * {@link AsyncResult.Do}, {@link AsyncResult.fromExecutor},
+ * {@link AsyncResult.Do}, {@link AsyncResult.Saga},
+ * {@link AsyncResult.fromExecutor},
  * {@link AsyncResult.fromPromise}, {@link AsyncResult.fromSafePromise},
  * {@link AsyncResult.all}, {@link AsyncResult.allFromDict}.
  *
@@ -95,7 +97,8 @@ export type Result<T, E> = ResultType<T, E>;
  * than on {@link Result}; the namespace
  * already conveys "async", so the members drop the `Async` suffix their free
  * functions carry (`AsyncResult.Ok` is `OkAsync`; `AsyncResult.Err` is
- * `ErrAsync`; `AsyncResult.Do` is `DoAsync`; `AsyncResult.all` is `allAsync`;
+ * `ErrAsync`; `AsyncResult.Do` is `DoAsync`;
+ * `AsyncResult.Saga` is `SagaAsync`; `AsyncResult.all` is `allAsync`;
  * `AsyncResult.allFromDict` is
  * `allFromDictAsync`). Like {@link Result}, the free functions remain the
  * primary, tree-shakeable API; the value `AsyncResult` and the type
@@ -117,6 +120,7 @@ export const AsyncResult = {
   Ok: OkAsync,
   Err: ErrAsync,
   Do: DoAsync,
+  Saga: SagaAsync,
   fromExecutor,
   fromPromise,
   fromSafePromise,

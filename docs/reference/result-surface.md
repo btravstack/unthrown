@@ -70,14 +70,15 @@ by method, on the [`ResultMethods`](/api/core/#resultmethods) and
 
 The constructors are tree-shakeable free functions:
 
-| Constructor       | Produces                 | Notes                                                        |
-| ----------------- | ------------------------ | ------------------------------------------------------------ |
-| `Ok(value)`       | `Result<T, never>`       | `Ok()` (no arg) constructs a `void` success                  |
-| `Err(error)`      | `Result<never, E>`       |                                                              |
-| `OkAsync(value)`  | `AsyncResult<T, never>`  | pre-lifted `Ok(value).toAsync()`; `OkAsync()` mirrors `Ok()` |
-| `ErrAsync(error)` | `AsyncResult<never, E>`  | pre-lifted `Err(error).toAsync()`                            |
-| `Do()`            | `Result<{}, never>`      | do-notation entry — an empty object scope                    |
-| `DoAsync()`       | `AsyncResult<{}, never>` | pre-lifted `Do().toAsync()`; alias `AsyncResult.Do`          |
+| Constructor       | Produces                 | Notes                                                                            |
+| ----------------- | ------------------------ | -------------------------------------------------------------------------------- |
+| `Ok(value)`       | `Result<T, never>`       | `Ok()` (no arg) constructs a `void` success                                      |
+| `Err(error)`      | `Result<never, E>`       |                                                                                  |
+| `OkAsync(value)`  | `AsyncResult<T, never>`  | pre-lifted `Ok(value).toAsync()`; `OkAsync()` mirrors `Ok()`                     |
+| `ErrAsync(error)` | `AsyncResult<never, E>`  | pre-lifted `Err(error).toAsync()`                                                |
+| `Do()`            | `Result<{}, never>`      | do-notation entry — an empty object scope                                        |
+| `DoAsync()`       | `AsyncResult<{}, never>` | pre-lifted `Do().toAsync()`; alias `AsyncResult.Do`                              |
+| `SagaAsync()`     | a saga builder           | steps with compensating undos, unwound LIFO on failure; alias `AsyncResult.Saga` |
 
 There is **no** `Defect` constructor — a defect-state `Result` arises only at
 boundaries, and the qualify-time `defect` helper is injected, not exported. See

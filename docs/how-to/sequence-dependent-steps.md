@@ -86,6 +86,51 @@ Because binds **union** their error types, adding a failable step also adds a
 case to `E` — and the `errCases` matcher at the end stops compiling until that
 new case is named. Enumerating the arms is what makes the chain self-auditing.
 
+## When a later step's failure must undo the earlier ones
+
+`Do` goes forward. When the third step failing means the first two have to be
+taken back — a placement to cancel, a reservation to release — that is a
+**saga**, and `SagaAsync()` is the shape:
+
+```ts
+import { SagaAsync } from "unthrown";
+
+const fulfilled = await SagaAsync()
+  .step(
+    () => place(order),
+    () => cancelPlacement(order),
+  )
+  .step(
+    () => reserveStock(order),
+    () => releaseStock(order),
+  )
+  .step(() => arrangeShipping(order))
+  .run();
+// shipping failed → stock released, then placement cancelled, then the Err
+```
+
+Three things it decides for you, each a trap in the hand-written walk-back:
+
+- **The undos run in reverse.** Getting that backwards is silent, and the
+  hand-written version has nothing to check it.
+- **Nothing runs early.** An `AsyncResult` starts on construction, so an undo
+  built outside the failure branch runs whether or not it was needed — the
+  hazard [`unthrown/no-async-result-race`](./lint-your-codebase) exists for.
+  Every argument here is a thunk, so there is nothing to build early.
+- **Compensation may not fail.** `undo` answers `AsyncResult<unknown, never>`:
+  the caller is already handling the failure that triggered it, and a second
+  error channel would ask it to handle two. A **defect** inside an undo is
+  different — it wins over the failure that triggered it, because a
+  compensation that broke is the more urgent report, and every remaining undo
+  still runs first.
+
+The failure itself comes back **unchanged**, so a caller triages exactly what it
+would have without the saga. An undo receives its own step's value, so it can
+take back precisely what that step created.
+
+It is pure control flow — no timers, no clock, no randomness — so it replays
+deterministically inside a workflow sandbox.
+
 ## When to reach for named functions instead
 
 If a chain grows long enough that `Do` feels heavy, that is usually a sign the

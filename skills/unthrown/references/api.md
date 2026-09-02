@@ -146,6 +146,35 @@ const r = Do()
 Errors/defects short-circuit; a throw in a step becomes a `Defect`. There is
 **no** generator (`gen`/`yield*`) do-notation — deliberately excluded.
 
+## Saga
+
+`SagaAsync()` (alias `AsyncResult.Saga`) sequences steps that must be **taken
+back**: each `step(run, undo?)` records an undo, and the first failure unwinds
+them LIFO before the failure comes back unchanged.
+
+```ts
+import { SagaAsync } from "unthrown";
+
+await SagaAsync()
+  .step(
+    () => place(order),
+    () => cancelPlacement(order),
+  )
+  .step(
+    () => reserveStock(order),
+    () => releaseStock(order),
+  )
+  .step(() => arrangeShipping(order))
+  .run();
+// AsyncResult<Shipment, PlacementFailed | OutOfStock | ShippingUnavailable>
+```
+
+Both arguments are **thunks** (an `AsyncResult` starts on construction).
+`run()` answers the last step's value. `undo` receives its own step's value and
+answers `AsyncResult<unknown, never>` — compensation may not add an error the
+caller must handle; a **defect** in an undo wins over the failure that
+triggered it, after the remaining undos run.
+
 ## Aggregates
 
 All four short-circuit on the first `Err`, any `Defect` dominates, and none
@@ -176,8 +205,9 @@ group them **by what they return**:
 - `Result.*`: `Ok`, `Err`, `Do`, `fromNullable`, `fromThrowable`,
   `fromSafeThrowable`, `all`, `allFromDict`, `isOk`/`isErr`/`isDefect`/`isResult`.
 - `AsyncResult.*`: `Ok` (= `OkAsync`), `Err` (= `ErrAsync`), `Do`
-  (= `DoAsync`), `fromExecutor`, `fromPromise`, `fromSafePromise`, `all`
-  (= `allAsync`), `allFromDict` (= `allFromDictAsync`).
+  (= `DoAsync`), `Saga` (= `SagaAsync`), `fromExecutor`, `fromPromise`,
+  `fromSafePromise`, `all` (= `allAsync`), `allFromDict`
+  (= `allFromDictAsync`).
 
 Both are value + type companions — `Result<T, E>` / `AsyncResult<T, E>` are the
 same names as types.

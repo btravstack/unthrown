@@ -371,6 +371,19 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   pure value). On `AsyncResult`, `bind`'s `f` may return a `Result` or an
   `AsyncResult`. A throw in either becomes a `Defect`; `Err`/`Defect`
   short-circuits/passes through. To go async, lift with `toAsync()`.
+- saga: `SagaAsync()` (aliased `AsyncResult.Saga`) — a sequence whose steps
+  carry compensating undos, unwound **LIFO** the moment one fails.
+  `step(run, undo?)` takes **thunks** (an `AsyncResult` starts on construction,
+  so an eagerly-built undo would run whether or not it was needed — the hazard
+  `unthrown/no-async-result-race` exists for), `run()` answers the LAST step's
+  value, and the failure comes back **unchanged** so a caller triages what it
+  would have without the saga. `undo` receives its own step's value and answers
+  `AsyncResult<unknown, never>`: compensation may not invent a new way to fail,
+  because the caller is already handling the one that triggered it. The single
+  exception is a **defect inside an undo** — it wins over the failure that
+  triggered it (a compensation that broke is the more urgent report) and every
+  remaining undo still runs first. Pure control flow: no timers, no clock, no
+  randomness, so it replays deterministically inside a workflow sandbox.
 - error: `mapErrCases`, `flatMapErrCases`, `recoverErrCases`, `tapErrCases`, `flatTapErrCases` all take
   the Thesis-#5 **matcher callback** `(m: ErrMatcher<E>, defect) => M`
   where `M extends ExhaustiveMatch<…>` (the callback returns the un-terminated
@@ -526,9 +539,10 @@ fromExecutor<T, E>>[0]`) is the grotesque spelling that invites a hand-copied
   the `Result`-producing ones
   (`Result.Ok`/`Err`/`Do`/`fromNullable`/`fromThrowable`/`fromSafeThrowable`/`all`/`allFromDict`/`is*`);
   `AsyncResult.*` holds the `AsyncResult`-producing ones
-  (`AsyncResult.Ok`/`Err`/`Do`/`fromPromise`/`fromSafePromise`/`all`/`allFromDict` —
+  (`AsyncResult.Ok`/`Err`/`Do`/`Saga`/`fromPromise`/`fromSafePromise`/`all`/`allFromDict` —
   the pre-lifted entry points and aggregates drop the `Async` suffix the free
   functions carry (`OkAsync`→`AsyncResult.Ok`, `DoAsync`→`AsyncResult.Do`,
+  `SagaAsync`→`AsyncResult.Saga`,
   `allAsync`→`AsyncResult.all`), since the
   namespace already says async). Both are value+type companions (the value and
   the `Result<T,E>` / `AsyncResult<T,E>` type share one name). The free functions
