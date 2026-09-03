@@ -1,4 +1,4 @@
-import { Err, Ok, P } from "unthrown";
+import { Err, Ok, P, OkAsync, ErrAsync } from "unthrown";
 import { expect, test } from "vitest";
 import "@unthrown/vitest";
 
@@ -18,9 +18,9 @@ const LINE = { sku: "COFFEE-1KG", quantity: 2, unitPrice: 12_00 };
  * is about, so the failure under test is unambiguous.
  */
 const deps = (over: Partial<CheckoutDeps> = {}): CheckoutDeps => ({
-  findCart: (id) => Ok({ id, lines: [LINE] } satisfies Cart).toAsync(),
+  findCart: (id) => OkAsync({ id, lines: [LINE] } satisfies Cart),
   reserve: () => Ok(),
-  charge: () => Ok({ reference: "pay_123" }).toAsync(),
+  charge: () => OkAsync({ reference: "pay_123" }),
   ...over,
 });
 
@@ -32,17 +32,14 @@ test("an order is placed when every step succeeds", async () => {
 
 test("a missing cart surfaces as CartNotFound, not a throw", async () => {
   const result = await placeOrder(
-    deps({ findCart: (id) => Err(new CartNotFound({ cartId: id })).toAsync() }),
+    deps({ findCart: (id) => ErrAsync(new CartNotFound({ cartId: id })) }),
     "cart_missing",
   );
   await expect(result).toBeErrTagged("CartNotFound", { cartId: "cart_missing" });
 });
 
 test("an empty cart is its own case, distinct from a missing one", async () => {
-  const result = await placeOrder(
-    deps({ findCart: (id) => Ok({ id, lines: [] }).toAsync() }),
-    "cart_1",
-  );
+  const result = await placeOrder(deps({ findCart: (id) => OkAsync({ id, lines: [] }) }), "cart_1");
   await expect(result).toBeErrTagged("CartEmpty", { cartId: "cart_1" });
 });
 
@@ -93,7 +90,7 @@ test("a reservation step that throws surfaces as a Defect, not a silent Ok", asy
 
 test("a declined payment keeps its code for the edge to branch on", async () => {
   const result = await placeOrder(
-    deps({ charge: () => Err(new PaymentDeclined({ code: "card_expired" })).toAsync() }),
+    deps({ charge: () => ErrAsync(new PaymentDeclined({ code: "card_expired" })) }),
     "cart_1",
   );
   await expect(result).toBeErrTagged("PaymentDeclined", { code: "card_expired" });

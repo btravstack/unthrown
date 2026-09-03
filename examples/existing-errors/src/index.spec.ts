@@ -1,4 +1,4 @@
-import { Err, Ok } from "unthrown";
+import { ErrAsync, OkAsync } from "unthrown";
 import { expect, test } from "vitest";
 import "@unthrown/vitest";
 
@@ -20,8 +20,8 @@ import {
 const TICKET: Ticket = { id: "t_1", assignee: null };
 
 const store = (over: Partial<TicketStore> = {}): TicketStore => ({
-  find: () => Ok(TICKET).toAsync(),
-  assign: (ticket, to) => Ok({ ...ticket, assignee: to }).toAsync(),
+  find: () => OkAsync(TICKET),
+  assign: (ticket, to) => OkAsync({ ...ticket, assignee: to }),
   ...over,
 });
 
@@ -34,7 +34,7 @@ test("a `kind`-discriminated class union composes with no tag anywhere", async (
 
 test("the not-found branch narrows to TicketNotFound and reads `ticketId`", async () => {
   const result = await assignTicketForHttp(
-    store({ find: (id) => Err(new TicketNotFound(id)).toAsync() }),
+    store({ find: (id) => ErrAsync(new TicketNotFound(id)) }),
     "t_missing",
     "ada",
   );
@@ -43,7 +43,7 @@ test("the not-found branch narrows to TicketNotFound and reads `ticketId`", asyn
 
 test("the locked branch narrows to TicketLocked and reads `lockedBy`", async () => {
   const result = await assignTicketForHttp(
-    store({ assign: (ticket) => Err(new TicketLocked(ticket.id, "grace")).toAsync() }),
+    store({ assign: (ticket) => ErrAsync(new TicketLocked(ticket.id, "grace")) }),
     "t_1",
     "ada",
   );
@@ -59,10 +59,10 @@ const BROKE = { code: "INSUFFICIENT_FUNDS" } satisfies BillingError;
 const THROTTLED = { code: "RATE_LIMITED", retryAfter: 30 } satisfies BillingError;
 
 test("a plain object union folds at the edge, grouped arms included", async () => {
-  const declined = billing(() => Err(DECLINED).toAsync());
-  const broke = billing(() => Err(BROKE).toAsync());
-  const throttled = billing(() => Err(THROTTLED).toAsync());
-  const paid = billing(() => Ok({ reference: "pay_1" }).toAsync());
+  const declined = billing(() => ErrAsync(DECLINED));
+  const broke = billing(() => ErrAsync(BROKE));
+  const throttled = billing(() => ErrAsync(THROTTLED));
+  const paid = billing(() => OkAsync({ reference: "pay_1" }));
 
   // the two grouped codes share one arm — both still named
   expect(await chargeForHttp(declined, 100)).toBe(402);
@@ -73,11 +73,9 @@ test("a plain object union folds at the edge, grouped arms included", async () =
 
 test("a transport blow-up is a defect, not a fourth billing code", async () => {
   const exploding = billing(() =>
-    Ok(0)
-      .toAsync()
-      .map((): { reference: string } => {
-        throw new Error("socket hang up");
-      }),
+    OkAsync(0).map((): { reference: string } => {
+      throw new Error("socket hang up");
+    }),
   );
 
   expect(await chargeForHttp(exploding, 100)).toBe(500);

@@ -763,11 +763,11 @@ copies) — issue #256, observed live in btravstack/start#99.
   `Result` via `fromSchema` / `fromSchemaAsync`, with the validation issues as
   the modeled `E`)
 - `packages/oxlint` → `@unthrown/oxlint` (an oxlint **JS plugin**, peerDep
-  `oxlint`, dep `@oxlint/plugins`; ships **eight rules** — six in the
+  `oxlint`, dep `@oxlint/plugins`; ships **nine rules** — six in the
   `recommended` preset (`no-ambiguous-error-type`, `no-async-result-race`,
   `no-catch-all-pattern`, `no-unhandled-result`, `no-unused-matcher`,
   `prefer-async-result`) plus the
-  opt-ins `no-get-or-throw` and `no-throw`. Purely syntactic AST rules. No TypeDoc API page;
+  opt-ins `no-get-or-throw`, `no-throw` and `prefer-pre-lifted`. Purely syntactic AST rules. No TypeDoc API page;
   documented in the Linting guide. Full spec: `packages/oxlint/CLAUDE.md`.)
 - `packages/prisma` → `@unthrown/prisma` (peerDep `@prisma/client` ^7; a Prisma
   Client **extension** — `$extends(unthrownPrisma)` adds `try*` `AsyncResult`

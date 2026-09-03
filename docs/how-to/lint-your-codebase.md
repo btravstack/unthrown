@@ -24,6 +24,7 @@ Register the plugin and turn its rules on in your `.oxlintrc.json`:
     "unthrown/prefer-async-result": "error",
     "unthrown/no-throw": "error",
     "unthrown/no-get-or-throw": "error",
+    "unthrown/prefer-pre-lifted": "error",
     "unthrown/no-catch-all-pattern": "error"
   },
   "overrides": [
@@ -39,7 +40,8 @@ The default export also exposes a `recommended` preset — an oxlint config that
 registers the plugin and enables `no-ambiguous-error-type`, `no-async-result-race`,
 `no-unhandled-result`, `no-unused-matcher`, `prefer-async-result`, and
 `no-catch-all-pattern`
-(`no-throw` and `no-get-or-throw` are the two explicit opt-ins) — for setups
+(`no-throw`, `no-get-or-throw` and `prefer-pre-lifted` are the explicit
+opt-ins) — for setups
 that build their config programmatically
 (`import unthrown from "@unthrown/oxlint"` → `unthrown.recommended`).
 
@@ -316,6 +318,60 @@ The two rules close different doors, and enabling both closes the room:
 | ------------------------- | --------------- | ------------------------------------------------------------ |
 | **`no-get-or-throw` off** | escapes: both   | escape: `getOrThrow()`                                       |
 | **`no-get-or-throw` on**  | escape: `throw` | **no lint-clean escape — fold with `recoverErrCases`+`get`** |
+
+### `unthrown/prefer-pre-lifted` {#prefer-pre-lifted}
+
+**An opt-in rule.** `OkAsync(value)` and `ErrAsync(error)` are what unthrown
+ships for constructing an `AsyncResult`; `Ok(value).toAsync()` builds a
+`Result` and immediately throws it away for its async twin.
+
+```ts
+const a = Ok(value).toAsync(); // ✗ flagged  → OkAsync(value)
+const b = Err(error).toAsync(); // ✗ flagged  → ErrAsync(error)
+const c = Ok().toAsync(); // ✗ flagged  → OkAsync()
+const d = Ok(undefined).toAsync(); // ✗ flagged  → OkAsync()
+```
+
+**The receiver is the whole test**, and that is what makes this rule safe where
+the removed `prefer-ensure` was not. `prefer-ensure` had to decide whether an
+`Ok(x)` inside a callback carried the same `x` the callback was handed — an
+identity judgement across a scope, and the source of its false positives. Here
+the question is syntactic: a call to the imported `Ok` or `Err`, immediately
+followed by `.toAsync()`.
+
+So `.toAsync()` lifting a `Result` that **already exists** is the combinator
+doing its actual job, and is never reported — which is the majority use:
+
+```ts
+const a = placeOrder(id, quantity).toAsync(); // ✓
+const b = fromNullable(row, () => e).toAsync(); // ✓
+const c = probesOptions.toAsync(); // ✓
+```
+
+Autofixable: the pre-lifted name with the arguments untouched, `Ok()` and
+`Ok(undefined)` both collapsing to `OkAsync()`. When the pre-lifted name is not
+already in scope the fix also adds the specifier to the existing `unthrown`
+import — the common case, since a file constructing `Ok(...)` has no reason to
+have imported `OkAsync`. It is withheld when the name is bound to something
+else, and when there is no specifier list to extend (a namespace import).
+
+The fix adds a specifier but never prunes one: when it rewrites the last
+`Ok(...)` in a file, the now-unused `Ok` import is left behind for
+`no-unused-vars` to report — visible, not silent. And because every fix in a
+file also edits that file's import, oxlint applies them a few per pass; run
+`--fix` until it reports nothing.
+
+The constructors resolve through **scope**, not by name: a rename
+(`Ok as ok`) still reports, and an `Ok` imported from another library does not.
+The namespace form (`u.Ok(v).toAsync()`) and a computed access
+(`Ok(v)["toAsync"]()`) are documented misses.
+
+Opt-in because it is a spelling preference rather than a thesis about
+correctness — `Ok(v).toAsync()` and `OkAsync(v)` are the same value, and the
+only differences are an allocation nobody profiles and a reader's second
+glance. It is a rule rather than a convention because that is exactly the
+profile only a linter holds: it type-checks, tests stay green, and it is
+invisible in review.
 
 ### `unthrown/no-catch-all-pattern` {#no-catch-all-pattern}
 

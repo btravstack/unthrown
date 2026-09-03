@@ -39,7 +39,18 @@ describe("the agent skill's rule inventory matches the plugin", () => {
   });
 
   it("states the right rule count", () => {
-    const spelled = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight"];
+    const spelled = [
+      "zero",
+      "one",
+      "two",
+      "three",
+      "four",
+      "five",
+      "six",
+      "seven",
+      "eight",
+      "nine",
+    ];
     const expected = spelled[RULE_NAMES.length];
     // Any *other* number-word next to "oxlint rules" is stale.
     const stale = spelled

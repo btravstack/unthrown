@@ -1,5 +1,5 @@
 import { Future, Result as BoxedResult } from "@bloodyowl/boxed";
-import { Err, fromSafePromise, Ok, type Result } from "unthrown";
+import { Err, fromSafePromise, Ok, type Result, OkAsync } from "unthrown";
 import { describe, expect, it } from "vitest";
 
 import { fromBoxed, fromBoxedFuture, toBoxed, toBoxedFuture } from "./index.js";
@@ -37,7 +37,7 @@ describe("fromBoxed", () => {
 
 describe("toBoxedFuture", () => {
   it("maps Ok across and triages a Defect", async () => {
-    const okR = await toBoxedFuture(Ok(1).toAsync(), () => "x").toPromise();
+    const okR = await toBoxedFuture(OkAsync(1), () => "x").toPromise();
     expect(okR.isOk() && okR.get()).toBe(1);
     const defR = await toBoxedFuture(
       aDefect.toAsync(),

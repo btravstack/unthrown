@@ -84,6 +84,12 @@ statement itself — it reports every `throw`, in any file).
   that reads the thrown value) carries a targeted `oxlint-disable` with a
   reason. Opt-in because it bans a core language statement — but the only way
   to enforce the ban, oxlint having no `no-restricted-syntax`.
+- `prefer-pre-lifted` — reports `.toAsync()` on a freshly constructed
+  `Ok(...)`/`Err(...)`; `OkAsync(...)`/`ErrAsync(...)` are what unthrown ships
+  for that. The receiver is the whole test, so `.toAsync()` on a `Result` that
+  already exists is never touched. Autofixable, adding the specifier to the
+  existing `unthrown` import. Opt-in because it is a spelling preference, not a
+  thesis about correctness.
 
 ## Prisma: @unthrown/prisma
 

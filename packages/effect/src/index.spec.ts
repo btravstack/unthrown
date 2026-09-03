@@ -1,5 +1,5 @@
 import { Cause, Effect, Either, Exit, FiberId, Option } from "effect";
-import { Err, Ok, type Result } from "unthrown";
+import { Err, Ok, type Result, OkAsync } from "unthrown";
 import { describe, expect, it } from "vitest";
 
 import { fromEffect, fromEither, fromExit, toEffect, toEither, toExit } from "./index.js";
@@ -104,7 +104,7 @@ describe("toEffect", () => {
   });
 
   it("accepts an AsyncResult (the AsyncResult -> Effect direction)", async () => {
-    expect(await Effect.runPromise(toEffect(Ok(1).toAsync()))).toBe(1);
+    expect(await Effect.runPromise(toEffect(OkAsync(1)))).toBe(1);
     const exit = await Effect.runPromiseExit(toEffect(aDefect.toAsync()));
     expect(Exit.isFailure(exit) && Option.getOrNull(Cause.dieOption(exit.cause))).toBe(boom);
   });

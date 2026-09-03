@@ -1,5 +1,5 @@
 // @unthrown/oxlint — an oxlint (JS) plugin that enforces unthrown's conventions
-// at lint time. Eight rules:
+// at lint time. Nine rules:
 //
 //   unthrown/no-ambiguous-error-type  — keep `E` a concrete domain error
 //                                        (no unknown/any/Error/{}), i.e. Thesis #1;
@@ -20,6 +20,10 @@
 //   unthrown/no-throw                 — ban the `throw` statement; return `Err(...)`
 //                                        and let the boundaries own the defect
 //                                        channel (opt-in; not in `recommended`).
+//   unthrown/prefer-pre-lifted        — ban `.toAsync()` on a freshly built
+//                                        `Ok(...)`/`Err(...)`; use `OkAsync(...)`
+//                                        / `ErrAsync(...)` (opt-in; not in
+//                                        `recommended`).
 //
 // Enable the bundled `recommended` preset, or wire the rules by hand. See the
 // package README.
@@ -36,6 +40,7 @@ import { noThrow } from "./rules/no-throw.js";
 import { noUnhandledResult } from "./rules/no-unhandled-result.js";
 import { noUnusedMatcher } from "./rules/no-unused-matcher.js";
 import { preferAsyncResult } from "./rules/prefer-async-result.js";
+import { preferPreLifted } from "./rules/prefer-pre-lifted.js";
 
 type UnthrownPlugin = Plugin & { recommended: OxlintConfig };
 
@@ -50,10 +55,11 @@ const plugin = eslintCompatPlugin({
     "no-unhandled-result": noUnhandledResult,
     "no-unused-matcher": noUnusedMatcher,
     "prefer-async-result": preferAsyncResult,
+    "prefer-pre-lifted": preferPreLifted,
   },
 }) as UnthrownPlugin;
 
-// Two deliberate opt-outs from the preset.
+// Three deliberate opt-outs from the preset.
 //
 // `no-throw` bans a core language statement, so it only suits a codebase that
 // has committed to the convention end to end — every sanctioned `throw` (a
@@ -68,6 +74,15 @@ const plugin = eslintCompatPlugin({
 // preset rule has: `getOrThrow()` is the right tool in a test, so an existing
 // suite does not pass until an `overrides` entry exempts the test glob. A
 // preset rule that breaks every consumer's tests on upgrade is a poor default.
+//
+// `prefer-pre-lifted` is a spelling preference, not a thesis about
+// correctness: `Ok(v).toAsync()` and `OkAsync(v)` are the same value, and the
+// only differences are an allocation nobody profiles and a reader's second
+// glance. A consumer who does not share the preference should not inherit it
+// from a preset. It is a rule rather than a convention for the reason #260
+// records: btravstack/btravstack documented it, asserted one violation, and a
+// sweep found thirty-three — a style point that type-checks, tests green and is
+// invisible in review is one only a linter holds.
 //
 // `no-catch-all-pattern` IS in the preset. Enumerating every error case by name
 // is unthrown's default position — the exhaustive matcher exists so a failure

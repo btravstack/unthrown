@@ -3,7 +3,7 @@ import {
   PaymentDeclined,
   type CheckoutDeps,
 } from "@unthrown/example-checkout-domain";
-import { Err, Ok } from "unthrown";
+import { ErrAsync, Ok, OkAsync } from "unthrown";
 import { expect, test } from "vitest";
 
 import { createCaller } from "./index.js";
@@ -11,9 +11,9 @@ import { createCaller } from "./index.js";
 const LINE = { sku: "COFFEE-1KG", quantity: 2, unitPrice: 12_00 };
 
 const deps = (over: Partial<CheckoutDeps> = {}): CheckoutDeps => ({
-  findCart: (id) => Ok({ id, lines: [LINE] }).toAsync(),
+  findCart: (id) => OkAsync({ id, lines: [LINE] }),
   reserve: () => Ok(),
-  charge: () => Ok({ reference: "pay_123" }).toAsync(),
+  charge: () => OkAsync({ reference: "pay_123" }),
   ...over,
 });
 
@@ -25,7 +25,7 @@ test("a placed order comes back as the procedure's output", async () => {
 
 test("a modelled failure arrives as a typed, inferable ORPCError", async () => {
   const caller = createCaller(
-    deps({ findCart: (id) => Err(new CartNotFound({ cartId: id })).toAsync() }),
+    deps({ findCart: (id) => ErrAsync(new CartNotFound({ cartId: id })) }),
   );
   await expect(caller.placeOrder({ cartId: "nope" })).rejects.toMatchObject({
     code: "NOT_FOUND",
@@ -34,7 +34,7 @@ test("a modelled failure arrives as a typed, inferable ORPCError", async () => {
 
 test("a declined payment maps to its own status, not a generic 500", async () => {
   const caller = createCaller(
-    deps({ charge: () => Err(new PaymentDeclined({ code: "card_expired" })).toAsync() }),
+    deps({ charge: () => ErrAsync(new PaymentDeclined({ code: "card_expired" })) }),
   );
   await expect(caller.placeOrder({ cartId: "cart_1" })).rejects.toMatchObject({
     code: "PAYMENT_REQUIRED",
