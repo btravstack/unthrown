@@ -171,10 +171,14 @@ export const preferPreLifted = defineRule({
           ...(canFix && {
             fix: (fixer) => {
               // `Ok()` and `Ok(undefined)` are the same value, and `OkAsync()`
-              // is how unthrown spells it.
-              const [first] = receiver.arguments;
+              // is how unthrown spells it. Collapsing needs the argument list
+              // to be EXACTLY that one `undefined`: `Ok` takes one argument,
+              // so anything trailing it is not a value the fix may drop —
+              // dropping `Ok(undefined, sideEffect())`'s second argument would
+              // delete the call.
+              const [first, ...rest] = receiver.arguments;
               const args =
-                first === undefined || isGlobalUndefined(scope, first)
+                first === undefined || (rest.length === 0 && isGlobalUndefined(scope, first))
                   ? ""
                   : receiver.arguments
                       .map((argument) => context.sourceCode.getText(argument))

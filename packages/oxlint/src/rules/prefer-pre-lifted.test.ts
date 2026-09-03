@@ -107,6 +107,13 @@ ruleTester.run("prefer-pre-lifted", preferPreLifted, {
       errors: [{ messageId: "preferPreLifted" }],
       output: null,
     },
+    // Only a LONE `undefined` collapses: anything trailing it is not the fix's
+    // to drop, and dropping it would delete the call.
+    {
+      code: `${IMPORT}const a = Ok(undefined, sideEffect()).toAsync();`,
+      output: `import { Ok, Err, OkAsync } from "unthrown";\nconst a = OkAsync(undefined, sideEffect());`,
+      errors: [{ messageId: "preferPreLifted" }],
+    },
     // A shadowed `undefined` is a VALUE, not the global — collapsing it would
     // discard the argument. The rewrite carries it across.
     {
