@@ -9,7 +9,7 @@ const manifest: { peerDependencies: Record<string, string> } = JSON.parse(
 );
 
 describe("@unthrown/oxlint plugin", () => {
-  it("exposes all eight rules under the `unthrown` plugin name", () => {
+  it("exposes all nine rules under the `unthrown` plugin name", () => {
     expect(plugin.meta?.name).toBe("unthrown");
     expect(Object.keys(plugin.rules).sort()).toEqual([
       "no-ambiguous-error-type",
@@ -20,6 +20,7 @@ describe("@unthrown/oxlint plugin", () => {
       "no-unhandled-result",
       "no-unused-matcher",
       "prefer-async-result",
+      "prefer-pre-lifted",
     ]);
   });
 

@@ -5,7 +5,7 @@ import {
   err as neverthrowErr,
   ok as neverthrowOk,
 } from "neverthrow";
-import { Err, Ok, type Result } from "unthrown";
+import { Err, Ok, type Result, OkAsync } from "unthrown";
 import { describe, expect, it } from "vitest";
 
 import { fromNeverthrow, fromNeverthrowAsync, toNeverthrow, toNeverthrowAsync } from "./index.js";
@@ -43,7 +43,7 @@ describe("fromNeverthrow", () => {
 
 describe("toNeverthrowAsync", () => {
   it("maps Ok across and triages a Defect", async () => {
-    const okR = await toNeverthrowAsync(Ok(1).toAsync(), () => "x");
+    const okR = await toNeverthrowAsync(OkAsync(1), () => "x");
     expect(okR.isOk() && okR.value).toBe(1);
     const defR = await toNeverthrowAsync(aDefect.toAsync(), (cause) => `bug:${String(cause)}`);
     expect(defR.isErr() && defR.error).toBe(`bug:${String(boom)}`);
