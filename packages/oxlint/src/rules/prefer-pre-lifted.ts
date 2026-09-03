@@ -2,6 +2,7 @@ import { defineRule } from "@oxlint/plugins";
 import type { ESTree, Scope } from "@oxlint/plugins";
 
 import { getImportBinding, importedName } from "../helpers/get-import-binding.js";
+import { isLocallyBound } from "../helpers/is-locally-bound.js";
 
 const MODULE = "unthrown";
 
@@ -12,12 +13,19 @@ const PRE_LIFTED = { Ok: "OkAsync", Err: "ErrAsync" } as const;
  * The `unthrown` import declaration whose specifier list the fix can extend.
  * A namespace import has none, so it yields `undefined` and the fix stays
  * withheld rather than rewriting to a qualified name — a different edit.
+ *
+ * A types-only `import type { … }` is skipped even though it has specifiers:
+ * the fix adds a VALUE, and a specifier added there is a type-only binding
+ * used at runtime, which does not compile. A file can carry both declarations
+ * — a types-only one first and the value one below — so this picks by kind,
+ * never by position.
  */
 const unthrownImport = (program: ESTree.Program): ESTree.ImportDeclaration | undefined =>
   program.body.find(
     (statement): statement is ESTree.ImportDeclaration =>
       statement.type === "ImportDeclaration" &&
       statement.source.value === MODULE &&
+      statement.importKind !== "type" &&
       statement.specifiers.some((specifier) => specifier.type === "ImportSpecifier"),
   );
 
@@ -40,12 +48,17 @@ const nameStatus = (scope: Scope, name: string): "imported" | "taken" | "free" =
     if (!variable) continue;
     const def = variable.defs[0];
     if (def === undefined) continue;
-    const isOwnImport =
+    // A type-only binding of the right name is NOT the value the rewrite
+    // needs — `import type { OkAsync }` compiles until something calls it.
+    // Both spellings count: the whole declaration, and the single specifier.
+    const isOwnValueImport =
       def.parent?.type === "ImportDeclaration" &&
       def.parent.source.value === MODULE &&
+      def.parent.importKind !== "type" &&
       def.node.type === "ImportSpecifier" &&
+      def.node.importKind !== "type" &&
       importedName(def.node.imported) === name;
-    return isOwnImport ? "imported" : "taken";
+    return isOwnValueImport ? "imported" : "taken";
   }
   return "free";
 };
@@ -87,8 +100,9 @@ const nameStatus = (scope: Scope, name: string): "imported" | "taken" | "free" =
  * collapsing to `OkAsync()`. When the pre-lifted name is not already in scope
  * the fix ALSO adds the specifier to the existing `unthrown` import — the
  * common case, since a file constructing `Ok(...)` has no reason to have
- * imported `OkAsync`. It is withheld when there is no specifier list to extend,
- * which in practice means a namespace import.
+ * imported `OkAsync`. It is withheld when there is no VALUE specifier list to
+ * extend — a namespace import, or an `unthrown` import that is types-only,
+ * since a value specifier added to `import type { … }` would not compile.
  *
  * The fix adds a specifier but never prunes one: rewriting the last `Ok(...)`
  * in a file leaves the now-unused `Ok` import for `no-unused-vars` to report,
@@ -160,7 +174,7 @@ export const preferPreLifted = defineRule({
               // is how unthrown spells it.
               const [first] = receiver.arguments;
               const args =
-                first === undefined || isUndefined(first)
+                first === undefined || isGlobalUndefined(scope, first)
                   ? ""
                   : receiver.arguments
                       .map((argument) => context.sourceCode.getText(argument))
@@ -178,6 +192,15 @@ export const preferPreLifted = defineRule({
   },
 });
 
-/** Whether an argument is the literal `undefined` — `Ok(undefined)` is `Ok()`. */
-const isUndefined = (argument: ESTree.Node): boolean =>
-  argument.type === "Identifier" && argument.name === "undefined";
+/**
+ * Whether an argument is the global `undefined` — `Ok(undefined)` is `Ok()`.
+ *
+ * `undefined` is not a reserved word, so a parameter or a `let` can shadow it
+ * (`(undefined) => Ok(undefined).toAsync()`), and collapsing THAT to
+ * `OkAsync()` would silently discard the value. Resolution goes through scope
+ * for the same reason the bare-`Error` check does.
+ */
+const isGlobalUndefined = (scope: Scope, argument: ESTree.Node): boolean =>
+  argument.type === "Identifier" &&
+  argument.name === "undefined" &&
+  !isLocallyBound(scope, argument);

@@ -31,6 +31,11 @@ is the profile only a linter holds: `btravstack/btravstack` documented this
 convention, asserted one violation, and a sweep found thirty-three. It
 type-checks, tests stay green, and it is invisible in review.
 
+The fix never adds a value specifier to an `import type { … }`, and treats a
+type-only `OkAsync` binding as taken rather than as already imported — both
+would produce code that does not compile. A shadowed `undefined` parameter is
+resolved through scope, so only the global collapses to `OkAsync()`.
+
 This repository now enables it too, and the autofix cleaned 21 sites across
 `packages/boxed`, `packages/effect` and four examples.
 
