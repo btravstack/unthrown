@@ -1,6 +1,6 @@
 {
   "name": "@unthrown/saga",
-  "version": "5.7.0",
+  "version": "5.8.0",
   "description": "A saga for unthrown's AsyncResult: steps with compensating undos, unwound LIFO",
   "keywords": [
     "compensation",

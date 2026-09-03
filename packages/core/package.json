@@ -1,6 +1,6 @@
 {
   "name": "unthrown",
-  "version": "5.7.0",
+  "version": "5.8.0",
   "description": "Explicit errors as values, with a separate defect (panic) channel",
   "keywords": [
     "defect",
