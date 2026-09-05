@@ -192,8 +192,8 @@ const tuple = all([Ok(1), Ok("a")] as const);
 const dict = allFromDict({ a: Ok(1), b: Ok("x") });
 const tupleAsync = allAsync([OkAsync(1), OkAsync("a")] as const);
 const dictAsync = allFromDictAsync({ a: OkAsync(1), b: OkAsync("x") });
-const validatedTuple = validateAll([Ok(1), Ok("a")] as const, () => Err("failures" as const));
-const validatedDict = validateAllFromDict({ a: Ok(1), b: Ok("x") }, () => Err("failures" as const));
+const validatedTuple = validateAll([Ok(1), Ok("a")] as const, () => "failures" as const);
+const validatedDict = validateAllFromDict({ a: Ok(1), b: Ok("x") }, () => "failures" as const);
 const asyncValidatedTuple = validateAllAsync([OkAsync(1), OkAsync("a")] as const, () =>
   Err("failures" as const),
 );
