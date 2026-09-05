@@ -46,6 +46,10 @@ import {
   TaggedError,
   type TaggedErrorConstructor,
   type TaggedErrorInstance,
+  validateAll,
+  validateAllAsync,
+  validateAllFromDict,
+  validateAllFromDictAsync,
 } from "./index.js";
 
 type Equal<X, Y> =
@@ -188,6 +192,14 @@ const tuple = all([Ok(1), Ok("a")] as const);
 const dict = allFromDict({ a: Ok(1), b: Ok("x") });
 const tupleAsync = allAsync([OkAsync(1), OkAsync("a")] as const);
 const dictAsync = allFromDictAsync({ a: OkAsync(1), b: OkAsync("x") });
+const validatedTuple = validateAll([Ok(1), Ok("a")] as const, () => Err("failures" as const));
+const validatedDict = validateAllFromDict({ a: Ok(1), b: Ok("x") }, () => Err("failures" as const));
+const asyncValidatedTuple = validateAllAsync([OkAsync(1), OkAsync("a")] as const, () =>
+  Err("failures" as const),
+);
+const asyncValidatedDict = validateAllFromDictAsync({ a: OkAsync(1), b: OkAsync("x") }, () =>
+  Err("failures" as const),
+);
 
 declare const unknownValue: unknown;
 const guarded = isResult(unknownValue);
@@ -209,6 +221,8 @@ const viaFacade = [
   Result.fromSafeThrowable(() => 1),
   Result.all([Ok(1)] as const),
   Result.allFromDict({ a: Ok(1) }),
+  Result.validateAll([Ok(1), Ok("a")] as const, () => Err("failures" as const)),
+  Result.validateAllFromDict({ a: Ok(1), b: Ok("x") }, () => Err("failures" as const)),
 ] as const;
 const viaAsyncFacade = [
   AsyncResult.Ok(1),
@@ -218,6 +232,10 @@ const viaAsyncFacade = [
   AsyncResult.fromSafePromise(Promise.resolve(1)),
   AsyncResult.all([OkAsync(1)] as const),
   AsyncResult.allFromDict({ a: OkAsync(1) }),
+  AsyncResult.validateAll([OkAsync(1), OkAsync("a")] as const, () => Err("failures" as const)),
+  AsyncResult.validateAllFromDict({ a: OkAsync(1), b: OkAsync("x") }, () =>
+    Err("failures" as const),
+  ),
 ] as const;
 
 // --- references/api.md: the P namespace ---------------------------------------
@@ -272,6 +290,8 @@ export type _SkillSurface = [
   // (a readonly tuple in, a mutable positional tuple out — the `AllOk` mapping)
   Expect<Equal<OkOf<typeof tuple>, [number, string]>>,
   Expect<Equal<OkOf<typeof dict>, { a: number; b: string }>>,
+  Expect<Equal<OkOf<typeof validatedTuple>, [number, string]>>,
+  Expect<Equal<OkOf<typeof validatedDict>, { a: number; b: string }>>,
   // FailureView's second parameter defaults, so `FailureView<E>` is spellable
   Expect<Equal<typeof failureView, FailureView<AgeError, never>>>,
 ];
@@ -300,6 +320,8 @@ export const _skillSurfaceValues = [
   doAsyncChain,
   tupleAsync,
   dictAsync,
+  asyncValidatedTuple,
+  asyncValidatedDict,
   guarded,
   okGuard,
   errGuard,

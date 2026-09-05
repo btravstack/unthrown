@@ -20,6 +20,10 @@ import {
   isResult,
   Ok,
   Result,
+  validateAll,
+  validateAllAsync,
+  validateAllFromDict,
+  validateAllFromDictAsync,
 } from "./index.js";
 import { boom } from "./test-helpers.js";
 
@@ -54,6 +58,8 @@ describe("Result facade mirrors the free functions", () => {
     expect(Result.Do).toBe(Do);
     expect(Result.all).toBe(all);
     expect(Result.allFromDict).toBe(allFromDict);
+    expect(Result.validateAll).toBe(validateAll);
+    expect(Result.validateAllFromDict).toBe(validateAllFromDict);
     expect(Result.fromNullable(null, () => "absent").getErr()).toBe("absent");
     expect(Result.all([Result.Ok(1), Result.Ok(2)]).get()).toEqual([1, 2]);
     expect(Result.allFromDict({ a: Result.Ok(1) }).get()).toEqual({ a: 1 });
@@ -64,6 +70,8 @@ describe("Result facade mirrors the free functions", () => {
     expect("fromSafePromise" in Result).toBe(false);
     expect("allAsync" in Result).toBe(false);
     expect("allFromDictAsync" in Result).toBe(false);
+    expect("validateAllAsync" in Result).toBe(false);
+    expect("validateAllFromDictAsync" in Result).toBe(false);
   });
 });
 
@@ -74,6 +82,8 @@ describe("AsyncResult facade groups the async-producing entry points", () => {
     expect(AsyncResult.Do).toBe(DoAsync);
     expect(AsyncResult.all).toBe(allAsync);
     expect(AsyncResult.allFromDict).toBe(allFromDictAsync);
+    expect(AsyncResult.validateAll).toBe(validateAllAsync);
+    expect(AsyncResult.validateAllFromDict).toBe(validateAllFromDictAsync);
   });
 
   it("AsyncResult.Do starts an async do-chain", async () => {

@@ -18,6 +18,10 @@ import {
   fromSafePromise,
   fromSafeThrowable,
   fromThrowable,
+  validateAll,
+  validateAllAsync,
+  validateAllFromDict,
+  validateAllFromDictAsync,
 } from "./interop.js";
 import type { AsyncResult as AsyncResultType, Result as ResultType } from "./types.js";
 
@@ -26,7 +30,8 @@ import type { AsyncResult as AsyncResultType, Result as ResultType } from "./typ
  * single, discoverable namespace: {@link Result.Ok}, {@link Result.Err},
  * {@link Result.Do}, {@link Result.fromNullable}, {@link Result.fromThrowable},
  * {@link Result.fromSafeThrowable}, {@link Result.all},
- * {@link Result.allFromDict}, {@link Result.isOk}, {@link Result.isErr},
+ * {@link Result.allFromDict}, {@link Result.validateAll},
+ * {@link Result.validateAllFromDict}, {@link Result.isOk}, {@link Result.isErr},
  * {@link Result.isDefect}, {@link Result.isResult}.
  *
  * @remarks
@@ -56,6 +61,8 @@ export const Result = {
   fromSafeThrowable,
   all,
   allFromDict,
+  validateAll,
+  validateAllFromDict,
   isOk,
   isErr,
   isDefect,
@@ -86,7 +93,8 @@ export type Result<T, E> = ResultType<T, E>;
  * the matching namespace: {@link AsyncResult.Ok}, {@link AsyncResult.Err},
  * {@link AsyncResult.Do}, {@link AsyncResult.fromExecutor},
  * {@link AsyncResult.fromPromise}, {@link AsyncResult.fromSafePromise},
- * {@link AsyncResult.all}, {@link AsyncResult.allFromDict}.
+ * {@link AsyncResult.all}, {@link AsyncResult.allFromDict},
+ * {@link AsyncResult.validateAll}, {@link AsyncResult.validateAllFromDict}.
  *
  * @remarks
  * The async sibling of {@link Result}. Statics are grouped by what they
@@ -97,7 +105,8 @@ export type Result<T, E> = ResultType<T, E>;
  * functions carry (`AsyncResult.Ok` is `OkAsync`; `AsyncResult.Err` is
  * `ErrAsync`; `AsyncResult.Do` is `DoAsync`; `AsyncResult.all` is `allAsync`;
  * `AsyncResult.allFromDict` is
- * `allFromDictAsync`). Like {@link Result}, the free functions remain the
+ * `allFromDictAsync`; `AsyncResult.validateAll` is `validateAllAsync`). Like
+ * {@link Result}, the free functions remain the
  * primary, tree-shakeable API; the value `AsyncResult` and the type
  * {@link AsyncResult} share one name.
  *
@@ -122,6 +131,8 @@ export const AsyncResult = {
   fromSafePromise,
   all: allAsync,
   allFromDict: allFromDictAsync,
+  validateAll: validateAllAsync,
+  validateAllFromDict: validateAllFromDictAsync,
 } as const;
 
 /**

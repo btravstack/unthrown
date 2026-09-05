@@ -45,18 +45,38 @@ cost of a second composition style, generator-transpilation overhead, and a
 long enough that `Do` feels heavy, that is usually a sign the steps deserve named
 functions composed with `flatMap`.
 
-## No error accumulation (`Validation`)
+## Accumulation, but only into a domain error
 
-`all` / `allFromDict` (and their async pair) **short-circuit on the first
-`Err`** — they are not error accumulation. There is no `combineWithAllErrors`, no
-`Validation` applicative.
+`all` / `allFromDict` (and their async pair) **report the first `Err`**.
+`validateAll` / `validateAllFromDict` (and theirs) **accumulate every one**. What
+unthrown does not have is a `Validation` applicative, or anything that puts an
+`E[]` in the error channel.
 
-Accumulating every failure is a genuinely different operation with a different
-type (`Result<T, E[]>`-shaped), most useful for form validation — and for that
-case the [Standard Schema bridge](../how-to/validate-with-standard-schema) already
-hands you the validator's full issues array as the modeled error. Building a
-second accumulation primitive into the core would widen the surface for a job a
-validator does better.
+For **form validation** the original argument still holds, and it is why
+`validateAll` is not the tool there: accumulating field errors is most useful on
+schema-shaped input, and the
+[Standard Schema bridge](../how-to/validate-with-standard-schema) already hands
+you the validator's full issues array as the modeled error. Reaching for
+`validateAll` on a request body is duplicating a job a validator does better.
+
+What the argument does **not** reach is independent checks you wrote yourself —
+business rules that hit the database and encode policy rather than shape. No
+validator can express `checkCreditLimit(customer)`, and reporting only the first
+violation of five is a genuinely worse product. That is the case `validateAll`
+exists for.
+
+The part worth defending is the mandatory `merge`. neverthrow's
+`combineWithAllErrors` returns `Result<T[], E[]>`; unthrown makes you supply
+`(errors) => E2`. An `E[]` is a _shape_, not a domain failure — and
+[Thesis #1](./why-unthrown) says `E` holds anticipated domain failures, each one
+something a caller can match on and act upon. `E[]` pushes that decision to every
+consuming site, forever. Naming an `E2` makes it once, where the errors are
+collected and where you actually know what "several rules failed" means.
+
+Two smaller consequences fall out of the same reasoning: a `Defect` still
+dominates and discards the accumulated errors (a batch with an unmodeled failure
+in it produced violations you can't trust), and `merge` must be synchronous (an
+`async` merge would land an unqualified `Promise` in `E`).
 
 ## No `Defect` constructor
 

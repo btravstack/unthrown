@@ -136,9 +136,10 @@ functions carry (`AsyncResult.all` **is** `allAsync`; `AsyncResult.Ok` **is**
 ## Aggregating: `all` / `allFromDict`
 
 `all` collects a **tuple/array** of `Result`s into a `Result` of all their
-values; `allFromDict` takes a **record** for named results. Both short-circuit on
-the first `Err`, and any `Defect` dominates (even over an earlier `Err`). Neither
-is error accumulation.
+values; `allFromDict` takes a **record** for named results. Both report the
+**first** `Err`, and any `Defect` dominates (even over an earlier `Err`). To
+report every error instead, see
+[`validateAll`](#accumulating-validateall-validateallfromdict) below.
 
 ```ts
 import { all, allFromDict, Ok, type Result } from "unthrown";
@@ -159,6 +160,38 @@ const [a, b] = (
   await allAsync([fromSafePromise(loadA()), fromSafePromise(loadB())])
 ).get();
 ```
+
+## Accumulating: `validateAll` / `validateAllFromDict`
+
+The accumulating counterparts. Same success channel as `all` (positional tuples,
+collapsing arrays); the difference is the error channel — every `Err` is collected
+and folded by a mandatory `merge` into one named domain error, rather than the
+first one winning.
+
+```ts
+import { validateAll, validateAllFromDict, Ok, Err } from "unthrown";
+
+validateAll([Ok(1), Err("stock"), Err("credit")], (errors) =>
+  errors.join(" and "),
+);
+// => Err("stock and credit")
+
+validateAllFromDict(
+  { vatRate: Err("range"), currency: Ok("EUR"), dueDate: Err("past") },
+  (entries) => entries.map(([key]) => key),
+);
+// => Err(["vatRate", "dueDate"])
+```
+
+| Rule                 | Behaviour                                                                  |
+| -------------------- | -------------------------------------------------------------------------- |
+| `merge` totality     | receives a **non-empty** list; never called on an all-`Ok` input           |
+| `Defect`             | still **dominates** — accumulated errors are discarded, `merge` not called |
+| throw inside `merge` | becomes a `Defect`                                                         |
+| `async merge`        | a compile error (`NotThenable`) — a `Promise` in `E` is unqualified        |
+| record entries       | `[key, error]`, **correlated per key**, in `Object.keys` order             |
+
+`validateAllAsync` / `validateAllFromDictAsync` are the concurrent counterparts. Both forms do the same work as `all` — every input has already run by the time the aggregate sees it — so the choice is purely which errors get reported. See [Combine parallel results](../how-to/combine-parallel-results#accumulate-every-error-with-validateall).
 
 ## Interop constructors
 

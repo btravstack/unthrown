@@ -98,6 +98,70 @@ A test pins it:
 await expect(result).toBeDefectWith(boom);
 ```
 
+## When you want _every_ failure: `reviewCart`
+
+`reserveAll` stops at the first bad line, and for placing an order that is right —
+the transaction is over, so checking the rest is wasted work.
+
+Rendering a **cart-review screen** is the opposite. Telling a shopper about one
+unavailable line, then a second one after they fix it, is a worse product. So
+`review.ts` reaches for the accumulating aggregate:
+
+```ts
+validateAll(
+  cart.lines.map((line) => deps.reserve(line).map(() => line)),
+  (violations) => new CartRejected({ violations }),
+);
+// Result<readonly CartLine[], CartRejected>
+```
+
+The `merge` argument is **mandatory**, and that is the design talking.
+neverthrow's `combineWithAllErrors` would hand the caller an `OutOfStock[]`; an
+array is a _shape_, not a domain failure, so every consuming site would have to
+work out what it means. `CartRejected` decides once, here, and keeps a structured
+payload the edge can render however it likes.
+
+Two rules are worth seeing in the tests. `merge` receives a **non-empty** list, so
+it is total — there is no "shouldn't happen" branch, and it is simply not called
+when every line reserves. And a `Defect` still **dominates**: the test that makes
+one line blow up gets a defect back, with the `OutOfStock` it beat discarded,
+because a violation computed alongside broken code is not a violation you can
+trust.
+
+That test also shows something easy to get wrong. `deps.reserve` runs while the
+array is being **built**, before `validateAll` sees anything — so a raw `throw`
+there escapes the aggregate entirely. The defect has to arrive the way defects
+always do, through a boundary (`fromSafeThrowable`). The throw → defect net covers
+callbacks _inside_ combinators, not the code that produced their arguments.
+
+## Named checks keep their key: `checkPolicies`
+
+`validateAllFromDict` hands `merge` a list of `[key, error]` **entries**,
+correlated per key:
+
+```ts
+(entries) =>
+  new CheckoutBlocked({
+    reasons: entries.map((entry) => {
+      switch (entry[0]) {
+        case "minimum":
+          return `total ${entry[1].total} < ${entry[1].minimum}`;
+        case "region":
+          return `no shipping to ${entry[1].region}`;
+      }
+    }),
+  });
+```
+
+The union is `["minimum", BelowMinimum] | ["region", UnservedRegion]`, **not**
+the cross product — so switching on the key narrows the error with no casts and
+no re-checking, `["region", BelowMinimum]` would not compile, and the `switch`
+needs no `default` to be exhaustive.
+
+That correlation is what makes the record form worth having. It still tells you
+which check failed even when two of them share one error type, which a flat list
+of errors could not.
+
 ## Where to go next
 
 - Store and read it back: [Checkout persistence](./checkout-persistence).

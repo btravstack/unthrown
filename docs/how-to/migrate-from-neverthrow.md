@@ -20,7 +20,7 @@
 | `ResultAsync.fromPromise(p, mapErr)` | `fromPromise(p, qualify)`                         | `qualify` must return `E` **or** `defect(cause)` — triage is forced                    |
 | `ResultAsync.fromSafePromise(p)`     | `fromSafePromise(p)`                              | a rejection becomes a `Defect`, not an `Err`                                           |
 | `Result.combine([...])`              | `all([...])`                                      | any `Defect` dominates                                                                 |
-| `Result.combineWithAllErrors`        | —                                                 | error accumulation is deliberately excluded                                            |
+| `Result.combineWithAllErrors`        | `validateAll([...], merge)`                       | `merge` is mandatory: the errors fold into a named `E2`, never an `E[]`                |
 | `safeTry(function* …)`               | `Do().bind(…).let(…)`                             | see [do-notation](./sequence-dependent-steps)                                          |
 | `fromThrowable(fn, mapErr)`          | `fromThrowable(fn, qualify)`                      | same idea, plus the defect arm                                                         |
 

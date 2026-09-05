@@ -179,8 +179,9 @@ triggered it, after the remaining undos run.
 
 ## Aggregates
 
-All four short-circuit on the first `Err`, any `Defect` dominates, and none
-accumulate errors (deliberately excluded).
+Eight functions in two families. Any `Defect` **dominates** in all of them; the families differ only in which `Err`s get reported. Neither short-circuits any _work_ — every input has already run by the time the aggregate sees it.
+
+**Fail-fast — the first `Err` wins:**
 
 - `all([r1, r2])` — tuple in, positional tuple out
   (`Result<[A, B], E1 | E2>`); a dynamic `Result<T, E>[]` collapses to
@@ -189,6 +190,16 @@ accumulate errors (deliberately excluded).
   parallel work without tupling.
 - `allAsync` / `allFromDictAsync` — the `AsyncResult` twins; resolve
   concurrently, never reject. Facade: `AsyncResult.all` / `AsyncResult.allFromDict`.
+
+**Accumulating — every `Err`, merged into one domain error:**
+
+- `validateAll([r1, r2], merge)` → `Result<[A, B], E2>`. Same success channel as `all`; `merge: (errors) => E2` is **mandatory** — the errors fold into a named domain error, never an `E[]`.
+- `validateAllFromDict({ a: ra, b: rb }, merge)` → `Result<{ a: A; b: B }, E2>`. `merge` receives `[key, error]` **entries**, correlated per key (`["a", E1] | ["b", E2]`), in `Object.keys` order — so a `switch` on the key narrows the error.
+- `validateAllAsync` / `validateAllFromDictAsync` — the `AsyncResult` twins. Facade: `AsyncResult.validateAll` / `AsyncResult.validateAllFromDict`.
+
+Rules for `merge`: it receives a **non-empty** list (so it is total, and is never called on an all-`Ok` input); a `Defect` dominates it, discarding the accumulated errors without calling it; a throw inside it becomes a `Defect`; and it must be **synchronous** — an `async` merge is a compile error.
+
+For **schema-shaped** input (a request body, a form), use `@unthrown/standard-schema`'s `fromSchema` instead — a validator already hands you every issue as the modeled error. `validateAll` is for independent checks you wrote yourself.
 
 ## Guards
 
@@ -205,11 +216,12 @@ The free functions are primary (tree-shakeable). Two opt-in companion objects
 group them **by what they return**:
 
 - `Result.*`: `Ok`, `Err`, `Do`, `fromNullable`, `fromThrowable`,
-  `fromSafeThrowable`, `all`, `allFromDict`, `isOk`/`isErr`/`isDefect`/`isResult`.
+  `fromSafeThrowable`, `all`, `allFromDict`, `validateAll`,
+  `validateAllFromDict`, `isOk`/`isErr`/`isDefect`/`isResult`.
 - `AsyncResult.*`: `Ok` (= `OkAsync`), `Err` (= `ErrAsync`), `Do`
-  (= `DoAsync`), `fromExecutor`, `fromPromise`,
-  `fromSafePromise`, `all` (= `allAsync`), `allFromDict`
-  (= `allFromDictAsync`).
+  (= `DoAsync`), `fromExecutor`, `fromPromise`, `fromSafePromise`, `all`
+  (= `allAsync`), `allFromDict` (= `allFromDictAsync`), `validateAll`
+  (= `validateAllAsync`), `validateAllFromDict` (= `validateAllFromDictAsync`).
 
 Both are value + type companions — `Result<T, E>` / `AsyncResult<T, E>` are the
 same names as types.

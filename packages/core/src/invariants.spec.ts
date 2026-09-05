@@ -1,11 +1,25 @@
 // Explicit guards for the load-bearing runtime invariants documented in
 // CLAUDE.md. Most get a dedicated `describe` here; a couple are guarded where
-// their feature lives instead — prototype-pollution safety and `all` / `allAsync`
-// Defect-dominance are covered in `aggregate.spec.ts`.
+// their feature lives instead — prototype-pollution safety and Defect-dominance
+// (for the fail-fast `all` family and the accumulating `validateAll` one alike)
+// are covered in `aggregate.spec.ts`.
 
 import { describe, expect, it, vi } from "vitest";
 
-import { Do, Err, fromExecutor, fromSafePromise, Ok, P, type Result, GetError } from "./index.js";
+import {
+  Do,
+  Err,
+  fromExecutor,
+  fromSafePromise,
+  Ok,
+  P,
+  type Result,
+  GetError,
+  validateAll,
+  validateAllAsync,
+  validateAllFromDict,
+  validateAllFromDictAsync,
+} from "./index.js";
 import { adoptionProbe, boom, defectOf, flushMicrotasks } from "./test-helpers.js";
 
 describe("Invariant 1: throw inside any combinator becomes a Defect", () => {
@@ -58,6 +72,19 @@ describe("Invariant 1: throw inside any combinator becomes a Defect", () => {
     expect(defectOf(boom).tapDefect(t).isDefect()).toBe(true);
     expect(Err("e").tapFailure(t).isDefect()).toBe(true);
     expect(defectOf(boom).tapFailure(t).isDefect()).toBe(true);
+  });
+
+  it("covers the aggregates' `merge` too — the one callback outside the method surface", async () => {
+    const t = () => {
+      throw boom;
+    };
+    // `merge` is user code inside a core function, so the same rule holds: an
+    // aggregate never lets a throw escape as a raw throw, which is what keeps
+    // the "one match at the edge, no try/catch" promise true for these too.
+    expect(validateAll([Err("e")], t).isDefect()).toBe(true);
+    expect(validateAllFromDict({ a: Err("e") }, t).isDefect()).toBe(true);
+    expect((await validateAllAsync([Err("e").toAsync()], t)).isDefect()).toBe(true);
+    expect((await validateAllFromDictAsync({ a: Err("e").toAsync() }, t)).isDefect()).toBe(true);
   });
 });
 
