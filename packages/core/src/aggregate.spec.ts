@@ -11,6 +11,10 @@ import {
   fromSafePromise,
   Ok,
   type Result,
+  validateAll,
+  validateAllAsync,
+  validateAllFromDict,
+  validateAllFromDictAsync,
 } from "./index.js";
 import { boom, defectOf, expectErr, expectOk } from "./test-helpers.js";
 
@@ -214,5 +218,148 @@ describe("allFromDictAsync", () => {
     };
     const r = await allFromDictAsync(bad);
     expect(r.isDefect()).toBe(true);
+  });
+});
+
+// The accumulating aggregates funnel into the same `foldArray`/`foldRecord` as
+// the fail-fast four, so the shared rules (Defect dominates, throw in `merge`
+// becomes a Defect, a non-Result element becomes a Defect) are asserted once on
+// `validateAll`; the other three cover only what is theirs — key correlation,
+// concurrent settling, prototype safety.
+const join = (errors: readonly string[]) => errors.join(",");
+const joinEntries = (entries: readonly (readonly [string, string])[]) =>
+  entries.map(([key, error]) => `${key}:${error}`).join(",");
+
+describe("validateAll", () => {
+  it("collects a tuple of Ok values, preserving positional types", () => {
+    const r = validateAll([Ok(1), Ok("two"), Ok(true)], join);
+    // merge never ran, so the error channel is only ever the merged type
+    expect(r.getOrNull()).toEqual([1, "two", true]);
+  });
+
+  it("accumulates EVERY Err, in input order, and merges them", () => {
+    const r = validateAll([Ok(1), Err("stock"), Ok(3), Err("credit")], join);
+    expectErr(r, "stock,credit");
+  });
+
+  it("calls merge with a non-empty list — never on an all-Ok input", () => {
+    let calls = 0;
+    const r = validateAll([Ok(1), Ok(2)], (errors) => {
+      calls += 1;
+      return join(errors);
+    });
+    expect(calls).toBe(0);
+    expect(r.getOrNull()).toEqual([1, 2]);
+  });
+
+  it("lets a Defect dominate, discarding the accumulated errors without calling merge", () => {
+    let calls = 0;
+    const r = validateAll([Err("a"), Err("b"), defectOf(boom)], (errors) => {
+      calls += 1;
+      return join(errors);
+    });
+    expect(calls).toBe(0);
+    expect(r.isDefect()).toBe(true);
+    expectOk(
+      r.recoverDefect((c) => Ok(c === boom)),
+      true,
+    );
+  });
+
+  it("turns a throw inside merge into a Defect — nothing escapes as a raw throw", () => {
+    const r = validateAll([Err("a")], () => {
+      throw boom;
+    });
+    expect(r.isDefect()).toBe(true);
+    expectOk(
+      r.recoverDefect((c) => Ok(c === boom)),
+      true,
+    );
+  });
+
+  it("returns Ok([]) for an empty tuple, typed as the empty tuple", () => {
+    const r = validateAll([], join);
+    const empty: Result<[], string> = r;
+    expect(empty.getOrNull()).toEqual([]);
+  });
+
+  it("surfaces an out-of-contract non-Result element as a Defect", () => {
+    const bad = [Ok(1), undefined, Ok(3)] as unknown as Result<number, never>[];
+    expect(validateAll(bad, join).isDefect()).toBe(true);
+  });
+});
+
+describe("validateAllFromDict", () => {
+  it("collects a record of Ok values into a record, keyed by name", () => {
+    const r = validateAllFromDict({ id: Ok(1), name: Ok("ada") }, joinEntries);
+    expect(r.getOrNull()).toEqual({ id: 1, name: "ada" });
+  });
+
+  it("accumulates every Err as a [key, error] entry, in Object.keys order", () => {
+    const r = validateAllFromDict(
+      { vatRate: Err("range"), currency: Ok("EUR"), dueDate: Err("past") },
+      joinEntries,
+    );
+    expectErr(r, "vatRate:range,dueDate:past");
+  });
+
+  it("does not let a `__proto__` key pollute the prototype", () => {
+    const r = validateAllFromDict(
+      { ["__proto__"]: Ok({ polluted: true }), safe: Ok(1) },
+      joinEntries,
+    );
+    expect(r.isOk()).toBe(true);
+    expect(({} as Record<string, unknown>)["polluted"]).toBeUndefined();
+  });
+});
+
+describe("validateAllAsync", () => {
+  it("resolves concurrently and accumulates every Err", async () => {
+    const r = await validateAllAsync(
+      [fromSafePromise(Promise.resolve(1)), Err("stock").toAsync(), Err("credit").toAsync()],
+      join,
+    );
+    expectErr(r, "stock,credit");
+  });
+
+  it("collects Ok values, preserving positional types", async () => {
+    const r = await validateAllAsync(
+      [fromSafePromise(Promise.resolve(1)), fromSafePromise(Promise.resolve("two"))],
+      join,
+    );
+    expect(r.getOrNull()).toEqual([1, "two"]);
+  });
+
+  it("adopts a raw rejecting thenable as a Defect, never rejecting the internal promise", async () => {
+    const rejecting = Promise.reject(boom) as unknown as AsyncResult<number, string>;
+    const r = await validateAllAsync([fromSafePromise(Promise.resolve(1)), rejecting], join);
+    expect(r.isDefect()).toBe(true);
+  });
+});
+
+describe("validateAllFromDictAsync", () => {
+  it("accumulates every Err as a [key, error] entry", async () => {
+    const r = await validateAllFromDictAsync(
+      { stock: Err("none").toAsync(), credit: Ok(500).toAsync(), zone: Err("unserved").toAsync() },
+      joinEntries,
+    );
+    expectErr(r, "stock:none,zone:unserved");
+  });
+
+  it("collects a record of Ok values, keyed by name", async () => {
+    const r = await validateAllFromDictAsync(
+      { a: fromSafePromise(Promise.resolve(1)), b: fromSafePromise(Promise.resolve("x")) },
+      joinEntries,
+    );
+    expect(r.getOrNull()).toEqual({ a: 1, b: "x" });
+  });
+
+  it("does not let a `__proto__` key pollute the prototype", async () => {
+    const r = await validateAllFromDictAsync(
+      { ["__proto__"]: Ok({ polluted: true }).toAsync(), safe: Ok(1).toAsync() },
+      joinEntries,
+    );
+    expect(r.isOk()).toBe(true);
+    expect(({} as Record<string, unknown>)["polluted"]).toBeUndefined();
   });
 });

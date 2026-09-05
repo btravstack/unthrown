@@ -23,6 +23,10 @@ export {
   fromSafePromise,
   fromSafeThrowable,
   fromThrowable,
+  validateAll,
+  validateAllAsync,
+  validateAllFromDict,
+  validateAllFromDictAsync,
 } from "./interop.js";
 export { TaggedError } from "./tagged.js";
 

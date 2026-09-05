@@ -149,8 +149,8 @@ was planned).
   with **no surrounding `try/catch`**.
 - **An out-of-contract non-`Result` surfaces as a `Defect`, never a raw
   throw/rejection.** Reachable only from untyped/cast callers: the aggregates
-  (`all` / `allFromDict` and their async pair) turn a non-`Result` element into
-  a `TypeError`-caused `Defect`, and every combinator whose callback is
+  (`all` / `allFromDict` / `validateAll` / `validateAllFromDict` and their async
+  counterparts) turn a non-`Result` element into a `TypeError`-caused `Defect`, and every combinator whose callback is
   constrained to return a `Result` (`flatMap`, `flatTap`, `bind`, `flatMapErrCases`,
   `flatTapErrCases`, `recoverDefect` — both surfaces; the async ones check the
   **awaited** value, so a legitimately returned `AsyncResult` still passes)
@@ -517,19 +517,45 @@ fromExecutor<T, E>>[0]`) is the grotesque spelling that invites a hand-copied
   `Result<{ a: A }, E>`) — named parallel work without tupling. Array and record
   are **separate functions**, not one overload (positional vs named is a distinct
   concept). All four short-circuit on the first `Err`, let any `Defect` dominate,
-  and are **not** error accumulation (which stays deliberately excluded);
-  `allAsync` / `allFromDictAsync` resolve concurrently (order preserved) and never
-  reject. The record fold writes keys via `Object.defineProperty`, so a
-  caller-supplied `"__proto__"` key can't pollute the prototype.
+  and `allAsync` / `allFromDictAsync` resolve concurrently (order preserved) and
+  never reject. The record fold builds its object with `Object.fromEntries`, so a
+  caller-supplied `"__proto__"` key can't pollute the prototype (`fromEntries`
+  defines own properties rather than assigning — the guarantee is the built-in's,
+  not a hand-written `defineProperty` loop's).
+- **accumulating** aggregate: `validateAll` / `validateAllFromDict` and their
+  async pair `validateAllAsync` / `validateAllFromDictAsync` — same four shapes,
+  same success channel (positional tuple, collapsing array, record), but **every**
+  `Err` is collected in input order and folded by a **mandatory
+  `merge: (errors) => E2`** whose return becomes the modeled error. `merge` is
+  what keeps this on-thesis: an `E[]` in the error channel is a _shape_, not an
+  anticipated domain failure (Thesis #1), and it would push "what does it mean
+  that several rules failed?" to every consuming site forever — so unthrown has
+  no `Validation` applicative and no `combineWithAllErrors`. `merge` receives a
+  **non-empty** list, so it is total (never called on an all-`Ok` batch); the
+  record form hands it **`[key, error]` entries correlated per key**
+  (`{ a: Result<A, E1>; b: Result<B, E2> }` → `["a", E1] | ["b", E2]`, so a
+  `switch` on the key narrows the error and an impossible pairing does not
+  typecheck), in `Object.keys` order. A `Defect` still **dominates** and discards
+  the accumulated errors — `merge` is not called, because violations computed
+  alongside an unmodeled failure aren't trustworthy — a throw in `merge` becomes
+  a `Defect`, and `merge` must be **synchronous** (`NotThenable`): an `async` one
+  would land an unqualified `Promise` in `E`. All four share the fail-fast forms'
+  folds (`foldArray` / `foldRecord`, which take the `merge` as an optional
+  parameter), so the `Defect` domination, non-`Result` hardening and prototype
+  guarantee come from one place. Scope: **not** the tool for schema-shaped input
+  (a request body, a form) — `@unthrown/standard-schema`'s `fromSchema` already
+  hands you every issue as the modeled error; these are for independent checks
+  you wrote yourself, business rules a validator can't express.
 - facade: two companion objects alias the standalone entry points, **grouped by
   what they return** so a static lives in exactly one namespace. `Result.*` holds
   the `Result`-producing ones
-  (`Result.Ok`/`Err`/`Do`/`fromNullable`/`fromThrowable`/`fromSafeThrowable`/`all`/`allFromDict`/`is*`);
+  (`Result.Ok`/`Err`/`Do`/`fromNullable`/`fromThrowable`/`fromSafeThrowable`/`all`/`allFromDict`/`validateAll`/`validateAllFromDict`/`is*`);
   `AsyncResult.*` holds the `AsyncResult`-producing ones
-  (`AsyncResult.Ok`/`Err`/`Do`/`fromPromise`/`fromSafePromise`/`all`/`allFromDict` —
+  (`AsyncResult.Ok`/`Err`/`Do`/`fromPromise`/`fromSafePromise`/`all`/`allFromDict`/`validateAll`/`validateAllFromDict` —
   the pre-lifted entry points and aggregates drop the `Async` suffix the free
   functions carry (`OkAsync`→`AsyncResult.Ok`, `DoAsync`→`AsyncResult.Do`,
-  `allAsync`→`AsyncResult.all`), since the
+  `allAsync`→`AsyncResult.all`, `validateAllAsync`→`AsyncResult.validateAll`),
+  since the
   namespace already says async). Both are value+type companions (the value and
   the `Result<T,E>` / `AsyncResult<T,E>` type share one name). The free functions
   remain the primary, tree-shakeable API; the companions are opt-in sugar (only
@@ -575,7 +601,9 @@ fromExecutor<T, E>>[0]`) is the grotesque spelling that invites a hand-copied
 
 Deliberately **excluded** for now: **generator** do-notation (`gen`/`yield*`
 "safeTry" style — the fluent `Do`/`bind`/`let`/`DoAsync` above covers sequential
-code without the generator machinery), accumulation/`Validation`,
+code without the generator machinery), a `Validation` applicative / an `E[]`
+error channel (accumulation itself now exists as `validateAll` above, but only
+folded into a domain error by a mandatory `merge`),
 **serialization** (a `Result` does not survive `structuredClone`/JSON by design
 — fold with `match` at the boundary and re-enter through a constructor/boundary
 on the other side), and aliases
@@ -992,7 +1020,10 @@ onRejected)`, so the fixture records the handler _and invokes it_, proving both
   enforced by thresholds in its `vitest.config.ts`.
 - **Type-level tests:** `packages/core/src/types.test-d.ts` asserts the
   type-level behaviour the runtime can't (the conditional `all`/`allFromDict`
-  shapes, `Exclude<R, Defect>` boundary inference, `flatTap`/`recoverErrCases` channel
+  shapes — and `validateAll`/`validateAllFromDict`'s, where `merge` carries a
+  conditional type on both sides (`ErrOf<Rs[number]>` in, `NotThenable<E2>` out)
+  and a deflected inference would silently degrade its parameter to `unknown[]`
+  with no compile error — `Exclude<R, Defect>` boundary inference, `flatTap`/`recoverErrCases` channel
   widening, the `this is …` guard narrowing, `match`'s `errCases`-matcher
   exhaustiveness (a missing tag does not compile; the folded type unions the
   branch returns), and the

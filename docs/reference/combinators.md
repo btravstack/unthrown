@@ -23,27 +23,29 @@ moves the channels: `flatMap` widens `E` to `E | E2`, `recoverErrCases` empties 
 [exhaustive matcher](#the-error-channel) rather than a single callback;
 the signatures below abbreviate its callback as `(matcher) => …`.
 
-| I want to…                                     | use               | signature                                                    | channel      |
-| ---------------------------------------------- | ----------------- | ------------------------------------------------------------ | ------------ |
-| transform the success value                    | `map`             | `(v: T) => U` → `Result<U, E>`                               | Ok           |
-| chain a `Result`-returning step                | `flatMap`         | `(v: T) => Result<U, E2>` → `Result<U, E \| E2>`             | Ok           |
-| run a side effect, keep the value              | `tap`             | `(v: T) => void` → `Result<T, E>`                            | Ok           |
-| run a **failable** side effect, keep the value | `flatTap`         | `(v: T) => Result<unknown, E2>` → `Result<T, E \| E2>`       | Ok           |
-| validate a success / refine its type           | `ensure`          | `((v: T) => boolean, (v: T) => E2)` → `Result<T, E \| E2>`   | Ok           |
-| sequence steps into a named scope              | `Do`/`bind`/`let` | `bind(k, (scope) => Result<U, E2>)` → `Result<{…}, E \| E2>` | Ok           |
-| replace the value with a constant              | `as`              | `(value: U)` → `Result<U, E>`                                | Ok           |
-| drop the value (success type becomes `void`)   | `discard`         | `()` → `Result<void, E>`                                     | Ok           |
-| transform the error (matched)                  | `mapErrCases`     | `(matcher) => …` → `Result<T, E2>`                           | Err          |
-| try a fallback that returns a `Result`         | `flatMapErrCases` | `(matcher) => …` → `Result<T \| U, E2>`                      | Err          |
-| turn an error into a success value             | `recoverErrCases` | `(matcher) => …` → `Result<T \| U, never>`                   | Err          |
-| run a side effect on the error                 | `tapErrCases`     | `(matcher) => …` → `Result<T, E>`                            | Err          |
-| run a **failable** side effect on the error    | `flatTapErrCases` | `(matcher) => …` → `Result<T, E \| E2>`                      | Err          |
-| recover from a defect (rare)                   | `recoverDefect`   | `(cause) => Result<U, E2>` → `Result<T \| U, E \| E2>`       | Defect       |
-| observe a defect, e.g. log it                  | `tapDefect`       | `(cause) => void` → `Result<T, E>`                           | Defect       |
-| observe **any** failure (error _or_ defect)    | `tapFailure`      | `(f: FailureView<E>) => void` → `Result<T, E>`               | Err + Defect |
-| handle all three channels at the edge          | `match`           | `{ ok, errCases, defect }` → `R`                             | all          |
-| combine an array of `Result`s                  | `all`             | `Result<T, E>[]` → `Result<T[], E>`                          | —            |
-| combine a record of `Result`s                  | `allFromDict`     | `{ [k]: Result<T, E> }` → `Result<{ [k]: T }, E>`            | —            |
+| I want to…                                     | use                   | signature                                                    | channel      |
+| ---------------------------------------------- | --------------------- | ------------------------------------------------------------ | ------------ |
+| transform the success value                    | `map`                 | `(v: T) => U` → `Result<U, E>`                               | Ok           |
+| chain a `Result`-returning step                | `flatMap`             | `(v: T) => Result<U, E2>` → `Result<U, E \| E2>`             | Ok           |
+| run a side effect, keep the value              | `tap`                 | `(v: T) => void` → `Result<T, E>`                            | Ok           |
+| run a **failable** side effect, keep the value | `flatTap`             | `(v: T) => Result<unknown, E2>` → `Result<T, E \| E2>`       | Ok           |
+| validate a success / refine its type           | `ensure`              | `((v: T) => boolean, (v: T) => E2)` → `Result<T, E \| E2>`   | Ok           |
+| sequence steps into a named scope              | `Do`/`bind`/`let`     | `bind(k, (scope) => Result<U, E2>)` → `Result<{…}, E \| E2>` | Ok           |
+| replace the value with a constant              | `as`                  | `(value: U)` → `Result<U, E>`                                | Ok           |
+| drop the value (success type becomes `void`)   | `discard`             | `()` → `Result<void, E>`                                     | Ok           |
+| transform the error (matched)                  | `mapErrCases`         | `(matcher) => …` → `Result<T, E2>`                           | Err          |
+| try a fallback that returns a `Result`         | `flatMapErrCases`     | `(matcher) => …` → `Result<T \| U, E2>`                      | Err          |
+| turn an error into a success value             | `recoverErrCases`     | `(matcher) => …` → `Result<T \| U, never>`                   | Err          |
+| run a side effect on the error                 | `tapErrCases`         | `(matcher) => …` → `Result<T, E>`                            | Err          |
+| run a **failable** side effect on the error    | `flatTapErrCases`     | `(matcher) => …` → `Result<T, E \| E2>`                      | Err          |
+| recover from a defect (rare)                   | `recoverDefect`       | `(cause) => Result<U, E2>` → `Result<T \| U, E \| E2>`       | Defect       |
+| observe a defect, e.g. log it                  | `tapDefect`           | `(cause) => void` → `Result<T, E>`                           | Defect       |
+| observe **any** failure (error _or_ defect)    | `tapFailure`          | `(f: FailureView<E>) => void` → `Result<T, E>`               | Err + Defect |
+| handle all three channels at the edge          | `match`               | `{ ok, errCases, defect }` → `R`                             | all          |
+| combine an array of `Result`s                  | `all`                 | `Result<T, E>[]` → `Result<T[], E>`                          | —            |
+| combine a record of `Result`s                  | `allFromDict`         | `{ [k]: Result<T, E> }` → `Result<{ [k]: T }, E>`            | —            |
+| combine an array, **reporting every error**    | `validateAll`         | `+ (errors) => E2` → `Result<T[], E2>`                       | —            |
+| combine a record, **reporting every error**    | `validateAllFromDict` | `+ (entries) => E2` → `Result<{ [k]: T }, E2>`               | —            |
 
 ## Behavior at a glance
 
@@ -232,6 +234,7 @@ Use this table to move between the two:
 | add an **async** step mid-chain           | `.flatMap((v) => fromPromise(work(v), qualify))`      |
 | add a **sync** step to an async chain     | `.flatMap((v) => Ok(v + 1))` — a `Result` is accepted |
 | combine async results                     | `allAsync` / `allFromDictAsync`                       |
+| combine async, reporting every error      | `validateAllAsync` / `validateAllFromDictAsync`       |
 
 ```ts
 // A chain that crosses an async boundary stays an AsyncResult to the end.

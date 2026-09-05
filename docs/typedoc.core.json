@@ -32,6 +32,9 @@
     "Unset",
     "BranchReturn",
     "PinnedOut",
-    "PinTooLate"
+    "PinTooLate",
+    "DictErrEntry",
+    "AsyncDictErrEntry",
+    "NonEmpty"
   ]
 }

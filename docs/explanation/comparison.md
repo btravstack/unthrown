@@ -21,7 +21,7 @@ callback throws**.
 | Boundary forces error typing       | ✅ mandatory `qualify`            | partial²               | partial²   | ✅                    | ✅ `catch` (or `safe`)              |
 | `Option` type                      | ❌ (deliberate)                   | ❌                     | ✅         | ✅                    | ❌                                  |
 | Tagged errors                      | ✅ `TaggedError`                  | ❌                     | ❌         | ✅ `Data.TaggedError` | ❌                                  |
-| Error accumulation                 | ❌ (deliberate)                   | `combineWithAllErrors` | ❌         | ✅                    | ✅ `collect`                        |
+| Error accumulation                 | ✅ `validateAll` (merged to `E2`) | `combineWithAllErrors` | ❌         | ✅                    | ✅ `collect`                        |
 | Runtime dependencies (core)        | **0** (matcher built-in)          | 0                      | 0          | a runtime             | 0                                   |
 
 ¹ byethrow's combinators don't `try/catch`; it relies on an oxlint rule
@@ -77,8 +77,8 @@ This isn't a clean sweep — pick the tool for the job:
 
 - **byethrow** — if you want a lightweight, pipe-idiomatic Result with **one**
   failure axis and don't need the defect distinction, it's an excellent, smaller,
-  more mature choice. It also ships error-accumulating `collect`, which unthrown
-  deliberately omits.
+  more mature choice. Its error-accumulating `collect` returns the errors as an
+  array; unthrown's `validateAll` makes you merge them into a named domain error instead.
 - **neverthrow** — the established, widely-adopted class-based option; reach for
   it if ecosystem maturity outweighs the defect channel.
 - **boxed** — if you specifically want an `Option` type and a broader functional

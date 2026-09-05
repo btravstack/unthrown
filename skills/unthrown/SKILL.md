@@ -261,7 +261,8 @@ what `no-ambiguous-error-type` flags.
 
 - **[references/api.md](references/api.md)** — the full combinator table
   (by-intent + per-channel behavior), matcher patterns (`P.*`), do-notation
-  (`Do`/`bind`/`let`), aggregates (`all`/`allFromDict` + async), guards,
+  (`Do`/`bind`/`let`), aggregates (`all`/`allFromDict` + the accumulating
+  `validateAll`/`validateAllFromDict`, and their async twins), guards,
   facade namespaces (`Result.*`/`AsyncResult.*`), and utility types. Read when
   choosing a combinator or writing anything beyond the basics above.
 - **[references/ecosystem.md](references/ecosystem.md)** — the `@unthrown/*`

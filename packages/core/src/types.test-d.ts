@@ -41,6 +41,10 @@ import {
   type Result,
   TaggedError,
   type TaggedErrorInstance,
+  validateAll,
+  validateAllAsync,
+  validateAllFromDict,
+  validateAllFromDictAsync,
 } from "./index.js";
 
 // --- assertion helpers -------------------------------------------------------
@@ -101,6 +105,98 @@ type _tupleAsync = Expect<Equal<typeof tupleAsync, AsyncResult<[number, string],
 
 const dictAsync = allFromDictAsync({ id: Ok(1).toAsync(), name: Ok("ada").toAsync() });
 type _dictAsync = Expect<Equal<typeof dictAsync, AsyncResult<{ id: number; name: string }, never>>>;
+
+// --- validateAll*: accumulate every Err, merged into one modeled error -------
+//
+// Same success channel as `all` (positional tuples, collapsing arrays, `[]` for
+// the empty tuple); the error channel is whatever `merge` returns. These pin the
+// inference the design hinged on — CLAUDE.md bans conditional types on
+// inference-bearing parameters, and `merge` carries one on BOTH sides
+// (`ErrOf<Rs[number]>` in, `NotThenable<E2>` out). If either deflects, the
+// parameter silently degrades to `unknown[]` with no compile error; these
+// assertions are what makes that loud.
+
+class MergedViolations {
+  readonly _tag = "MergedViolations" as const;
+}
+
+// the merged error type infers from `merge`'s return — no explicit type argument
+const validated = validateAll([r1, r2], (errors) => {
+  // `merge` sees the exact error union, as a NON-EMPTY list (it is called only
+  // when at least one Err was collected, so it is total)
+  type _errs = Expect<Equal<typeof errors, readonly ["e1" | "e2", ...("e1" | "e2")[]]>>;
+  return new MergedViolations();
+});
+type _validated = Expect<Equal<typeof validated, Result<[number, string], MergedViolations>>>;
+
+// a dynamic array still collapses to `T[]`
+const validatedArr = validateAll(arr, (errors) => {
+  type _errs = Expect<Equal<typeof errors, readonly ["e", ..."e"[]]>>;
+  return new MergedViolations();
+});
+type _validatedArr = Expect<Equal<typeof validatedArr, Result<number[], MergedViolations>>>;
+
+// the empty tuple stays `[]` here too
+const validatedEmpty = validateAll([], () => new MergedViolations());
+type _validatedEmpty = Expect<Equal<typeof validatedEmpty, Result<[], MergedViolations>>>;
+
+// an async `merge` does not compile — its Promise would land unqualified in E
+// @ts-expect-error merge is synchronous (NotThenable)
+validateAll([r1, r2], async () => new MergedViolations());
+
+// the record form's entries are CORRELATED per key: `["vatRate", DateOutOfRange]`
+// is not representable, and a switch on the key narrows the error. This is what
+// keeps two checks sharing one error type distinguishable.
+declare const rate: Result<number, "RuleViolated">;
+declare const ccy: Result<string, "RuleViolated">;
+declare const due: Result<Date, "DateOutOfRange">;
+
+type Entry =
+  | readonly ["vatRate", "RuleViolated"]
+  | readonly ["currency", "RuleViolated"]
+  | readonly ["dueDate", "DateOutOfRange"];
+
+const validatedDict = validateAllFromDict(
+  { vatRate: rate, currency: ccy, dueDate: due },
+  (entries) => {
+    type _entries = Expect<Equal<typeof entries, readonly [Entry, ...Entry[]]>>;
+    return new MergedViolations();
+  },
+);
+type _validatedDict = Expect<
+  Equal<
+    typeof validatedDict,
+    Result<{ vatRate: number; currency: string; dueDate: Date }, MergedViolations>
+  >
+>;
+
+// @ts-expect-error merge is synchronous (NotThenable), record form
+validateAllFromDict({ vatRate: rate }, async () => new MergedViolations());
+
+// async counterparts infer identically through the Awaitable then-channel
+const validatedAsync = validateAllAsync([r1.toAsync(), r2.toAsync()], (errors) => {
+  type _errs = Expect<Equal<typeof errors, readonly ["e1" | "e2", ...("e1" | "e2")[]]>>;
+  return new MergedViolations();
+});
+type _validatedAsync = Expect<
+  Equal<typeof validatedAsync, AsyncResult<[number, string], MergedViolations>>
+>;
+
+type AsyncEntry = readonly ["a", "e1"] | readonly ["b", "e2"];
+
+const validatedDictAsync = validateAllFromDictAsync(
+  { a: r1.toAsync(), b: r2.toAsync() },
+  (entries) => {
+    type _entries = Expect<Equal<typeof entries, readonly [AsyncEntry, ...AsyncEntry[]]>>;
+    return new MergedViolations();
+  },
+);
+type _validatedDictAsync = Expect<
+  Equal<typeof validatedDictAsync, AsyncResult<{ a: number; b: string }, MergedViolations>>
+>;
+
+// @ts-expect-error merge is synchronous (NotThenable), async form
+validateAllAsync([r1.toAsync()], async () => new MergedViolations());
 
 // --- boundaries: `Defect` is subtracted from the error channel ---------------
 
