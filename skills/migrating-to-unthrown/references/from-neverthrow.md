@@ -22,7 +22,7 @@ Apply mechanically; the judgment calls live in SKILL.md's decide-once list.
 | `ResultAsync.fromSafePromise(p)`          | `fromSafePromise(p)`                              | a rejection becomes a `Defect`, not an `Err`                                    |
 | `Result.fromThrowable(fn, mapErr)`        | `fromThrowable(fn, qualify)`                      | wraps the function; same triage                                                 |
 | `Result.combine([...])`                   | `all([...])` / `allAsync([...])`                  | record variant: `allFromDict` / `allFromDictAsync`                              |
-| `Result.combineWithAllErrors([...])`      | `validateAll([...], merge)`                       | `merge` is mandatory — see below; record variant: `validateAllFromDict`         |
+| `Result.combineWithAllErrors([...])`      | `validateAll([...], merge)` / `validateAllAsync([...], merge)` | `merge` is mandatory — see below; record variants: `validateAllFromDict` / `validateAllFromDictAsync` |
 | `safeTry(function* () { yield* … })`      | `Do()` / `DoAsync()` + `.bind(name, f)` + `.let`  | see rewrite below                                                               |
 | `fromPromise` re-thrown / `_unsafeUnwrap` | `get()` (needs `E = never`) / `getOrThrow()`      | type-gated extraction; no `_unsafe*` family                                     |
 
