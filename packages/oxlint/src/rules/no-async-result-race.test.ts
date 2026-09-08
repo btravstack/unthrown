@@ -76,6 +76,16 @@ ruleTester.run("no-async-result-race", noAsyncResultRace, {
       code: `import { OkAsync, ErrAsync } from "unthrown";\nconst a = OkAsync(1).map((n) => n + 1);\nconst b = ErrAsync("e").tapFailure(() => {});\nconst r = a.flatMap(() => b);`,
       errors: [{ messageId: "noAsyncResultRace" }],
     },
+    // The accumulating aggregates construct too — the race this rule exists for
+    // is just as invisible on `validateAllAsync` as on `allAsync`.
+    {
+      code: `import { validateAllAsync, OkAsync } from "unthrown";\nconst a = validateAllAsync([OkAsync(1)], merge);\nconst b = OkAsync(2);\nconst r = a.flatMap(() => b);`,
+      errors: [{ messageId: "noAsyncResultRace" }],
+    },
+    {
+      code: `import { AsyncResult } from "unthrown";\nconst a = AsyncResult.validateAllFromDict({ a: 1 }, merge);\nconst b = AsyncResult.Ok(2);\nconst r = a.flatMap(() => b);`,
+      errors: [{ messageId: "noAsyncResultRace" }],
+    },
     // The facade companion constructs too.
     {
       code: `import { AsyncResult } from "unthrown";\nconst a = AsyncResult.Ok(1);\nconst b = AsyncResult.fromPromise(Promise.resolve(2), (e) => e);\nconst r = a.flatMap(() => b);`,

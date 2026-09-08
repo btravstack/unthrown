@@ -26,6 +26,10 @@ const FREE_PRODUCERS: ReadonlySet<string> = new Set([
   "allAsync",
   "allFromDict",
   "allFromDictAsync",
+  "validateAll",
+  "validateAllAsync",
+  "validateAllFromDict",
+  "validateAllFromDictAsync",
 ]);
 
 // The producing members of the facade companions (`Result.Ok(...)`,
@@ -41,6 +45,8 @@ const COMPANION_PRODUCERS: Readonly<Record<string, ReadonlySet<string>>> = {
     "fromSafeThrowable",
     "all",
     "allFromDict",
+    "validateAll",
+    "validateAllFromDict",
   ]),
   AsyncResult: new Set([
     "Ok",
@@ -51,6 +57,8 @@ const COMPANION_PRODUCERS: Readonly<Record<string, ReadonlySet<string>>> = {
     "fromSafePromise",
     "all",
     "allFromDict",
+    "validateAll",
+    "validateAllFromDict",
   ]),
 };
 

@@ -19,6 +19,8 @@ const ASYNC_FREE_PRODUCERS: ReadonlySet<string> = new Set([
   "fromExecutor",
   "allAsync",
   "allFromDictAsync",
+  "validateAllAsync",
+  "validateAllFromDictAsync",
 ]);
 
 // The producing members of the `AsyncResult` facade companion.
@@ -31,6 +33,8 @@ const COMPANION_PRODUCERS: ReadonlySet<string> = new Set([
   "fromSafePromise",
   "all",
   "allFromDict",
+  "validateAll",
+  "validateAllFromDict",
 ]);
 
 /**

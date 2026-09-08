@@ -29,7 +29,8 @@ import { allFromDict, Ok } from "unthrown";
 allFromDict({ id: Ok(1), name: Ok("ada") }).get(); // => { id: 1, name: "ada" }
 ```
 
-Both report the **first** `Err` and stop looking. To report every one instead, see [Accumulate every error](#accumulate-every-error-with-validateall) below.
+Both report the **first** `Err`, unless a later input carries a `Defect` — the walk
+keeps looking so a `Defect` still takes precedence. To report every error instead, see [Accumulate every error](#accumulate-every-error-with-validateall) below.
 
 ## Combine async results concurrently
 

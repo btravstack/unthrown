@@ -20,6 +20,10 @@ const FREE_PRODUCERS = [
   "allAsync",
   "allFromDict",
   "allFromDictAsync",
+  "validateAll",
+  "validateAllAsync",
+  "validateAllFromDict",
+  "validateAllFromDictAsync",
 ] as const;
 
 ruleTester.run("no-unhandled-result", noUnhandledResult, {
@@ -73,6 +77,14 @@ ruleTester.run("no-unhandled-result", noUnhandledResult, {
     },
     {
       code: `import { AsyncResult } from "unthrown";\nAsyncResult.fromPromise(p, q);`,
+      errors: [{ messageId: "noUnhandledResult" }],
+    },
+    {
+      code: `import { Result } from "unthrown";\nResult.validateAll([Ok(1)], merge);`,
+      errors: [{ messageId: "noUnhandledResult" }],
+    },
+    {
+      code: `import { AsyncResult } from "unthrown";\nAsyncResult.validateAllFromDict({ a }, merge);`,
       errors: [{ messageId: "noUnhandledResult" }],
     },
     {

@@ -169,7 +169,19 @@ and folded by a mandatory `merge` into one named domain error, rather than the
 first one winning.
 
 ```ts
-import { validateAll, validateAllFromDict, Ok, Err } from "unthrown";
+import {
+  validateAll,
+  validateAllFromDict,
+  Ok,
+  Err,
+  TaggedError,
+} from "unthrown";
+
+class InvalidInvoice extends TaggedError("InvalidInvoice")<{
+  fields: readonly string[];
+}> {
+  override message = `invalid: ${this.fields.join(", ")}`;
+}
 
 validateAll([Ok(1), Err("stock"), Err("credit")], (errors) =>
   errors.join(" and "),
@@ -178,9 +190,11 @@ validateAll([Ok(1), Err("stock"), Err("credit")], (errors) =>
 
 validateAllFromDict(
   { vatRate: Err("range"), currency: Ok("EUR"), dueDate: Err("past") },
-  (entries) => entries.map(([key]) => key),
+  (entries) => new InvalidInvoice({ fields: entries.map(([key]) => key) }),
 );
-// => Err(["vatRate", "dueDate"])
+// => Err(InvalidInvoice) — `merge` names the failure; returning the raw
+//    `entries` array would put a *shape* in `E`, which is what `merge` exists
+//    to prevent
 ```
 
 | Rule                 | Behaviour                                                                  |

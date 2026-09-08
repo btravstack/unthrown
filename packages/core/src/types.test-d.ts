@@ -156,6 +156,8 @@ type Entry =
   | readonly ["currency", "RuleViolated"]
   | readonly ["dueDate", "DateOutOfRange"];
 
+type Entry2 = readonly ["vatRate", "RuleViolated"];
+
 const validatedDict = validateAllFromDict(
   { vatRate: rate, currency: ccy, dueDate: due },
   (entries) => {
@@ -197,6 +199,27 @@ type _validatedDictAsync = Expect<
 
 // @ts-expect-error merge is synchronous (NotThenable), async form
 validateAllAsync([r1.toAsync()], async () => new MergedViolations());
+
+// @ts-expect-error merge is synchronous (NotThenable), async record form
+validateAllFromDictAsync({ a: r1.toAsync() }, async () => new MergedViolations());
+
+// An infallible input contributes NO entry — an uninhabited `["infallible", never]`
+// arm would still force a dead `case` on every `switch` over the key (and fail
+// `noImplicitReturns`). An optional key contributes its entry without `undefined`.
+declare const infallible: Result<boolean, never>;
+declare const optional: { vatRate?: Result<number, "RuleViolated"> };
+
+validateAllFromDict({ vatRate: rate, infallible }, (entries) => {
+  type _entries = Expect<Equal<typeof entries, readonly [Entry2, ...Entry2[]]>>;
+  return new MergedViolations();
+});
+
+validateAllFromDict(optional, (entries) => {
+  const [key, error] = entries[0];
+  type _entry = Expect<Equal<typeof key, "vatRate">>;
+  type _err = Expect<Equal<typeof error, "RuleViolated">>;
+  return new MergedViolations();
+});
 
 // --- boundaries: `Defect` is subtracted from the error channel ---------------
 

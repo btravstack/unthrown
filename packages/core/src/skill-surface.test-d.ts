@@ -194,11 +194,13 @@ const tupleAsync = allAsync([OkAsync(1), OkAsync("a")] as const);
 const dictAsync = allFromDictAsync({ a: OkAsync(1), b: OkAsync("x") });
 const validatedTuple = validateAll([Ok(1), Ok("a")] as const, () => "failures" as const);
 const validatedDict = validateAllFromDict({ a: Ok(1), b: Ok("x") }, () => "failures" as const);
-const asyncValidatedTuple = validateAllAsync([OkAsync(1), OkAsync("a")] as const, () =>
-  Err("failures" as const),
+const asyncValidatedTuple = validateAllAsync(
+  [OkAsync(1), OkAsync("a")] as const,
+  () => "failures" as const,
 );
-const asyncValidatedDict = validateAllFromDictAsync({ a: OkAsync(1), b: OkAsync("x") }, () =>
-  Err("failures" as const),
+const asyncValidatedDict = validateAllFromDictAsync(
+  { a: OkAsync(1), b: OkAsync("x") },
+  () => "failures" as const,
 );
 
 declare const unknownValue: unknown;
@@ -221,8 +223,8 @@ const viaFacade = [
   Result.fromSafeThrowable(() => 1),
   Result.all([Ok(1)] as const),
   Result.allFromDict({ a: Ok(1) }),
-  Result.validateAll([Ok(1), Ok("a")] as const, () => Err("failures" as const)),
-  Result.validateAllFromDict({ a: Ok(1), b: Ok("x") }, () => Err("failures" as const)),
+  Result.validateAll([Ok(1), Ok("a")] as const, () => "failures" as const),
+  Result.validateAllFromDict({ a: Ok(1), b: Ok("x") }, () => "failures" as const),
 ] as const;
 const viaAsyncFacade = [
   AsyncResult.Ok(1),
@@ -232,10 +234,8 @@ const viaAsyncFacade = [
   AsyncResult.fromSafePromise(Promise.resolve(1)),
   AsyncResult.all([OkAsync(1)] as const),
   AsyncResult.allFromDict({ a: OkAsync(1) }),
-  AsyncResult.validateAll([OkAsync(1), OkAsync("a")] as const, () => Err("failures" as const)),
-  AsyncResult.validateAllFromDict({ a: OkAsync(1), b: OkAsync("x") }, () =>
-    Err("failures" as const),
-  ),
+  AsyncResult.validateAll([OkAsync(1), OkAsync("a")] as const, () => "failures" as const),
+  AsyncResult.validateAllFromDict({ a: OkAsync(1), b: OkAsync("x") }, () => "failures" as const),
 ] as const;
 
 // --- references/api.md: the P namespace ---------------------------------------
@@ -292,6 +292,11 @@ export type _SkillSurface = [
   Expect<Equal<OkOf<typeof dict>, { a: number; b: string }>>,
   Expect<Equal<OkOf<typeof validatedTuple>, [number, string]>>,
   Expect<Equal<OkOf<typeof validatedDict>, { a: number; b: string }>>,
+  // `merge` returns the domain error itself, so `E2` is that value — not a Result
+  Expect<Equal<ErrOf<typeof validatedTuple>, "failures">>,
+  Expect<Equal<ErrOf<typeof validatedDict>, "failures">>,
+  Expect<Equal<AsyncErrOf<typeof asyncValidatedTuple>, "failures">>,
+  Expect<Equal<AsyncErrOf<typeof asyncValidatedDict>, "failures">>,
   // FailureView's second parameter defaults, so `FailureView<E>` is spellable
   Expect<Equal<typeof failureView, FailureView<AgeError, never>>>,
 ];

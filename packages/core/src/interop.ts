@@ -464,11 +464,27 @@ type AllOk<
   Ts extends readonly unknown[],
 > = number extends Rs["length"] ? Ts[number][] : Ts;
 
-/** A `[key, error]` pair from a record aggregate, correlated per key. @internal */
-type DictErrEntry<R> = { [K in keyof R]: readonly [K, ErrOf<R[K]>] }[keyof R];
+/**
+ * A `[key, error]` pair from a record aggregate, correlated per key.
+ *
+ * @remarks
+ * `-?` because the mapped type is homomorphic: an optional input key would
+ * otherwise carry its optionality through and put `undefined` in the entry
+ * union, breaking the documented `([key, error]) => …` destructure. An entry
+ * whose error channel is `never` (an infallible input — every `@unthrown/drizzle`
+ * read) is dropped rather than emitted as an uninhabited `[K, never]` arm, which
+ * a `switch` over the key would still have to write a dead case for.
+ *
+ * @internal
+ */
+type DictErrEntry<R> = {
+  [K in keyof R]-?: [ErrOf<R[K]>] extends [never] ? never : readonly [K, ErrOf<R[K]>];
+}[keyof R];
 
 /** The {@link AsyncResult} counterpart of {@link DictErrEntry}. @internal */
-type AsyncDictErrEntry<R> = { [K in keyof R]: readonly [K, AsyncErrOf<R[K]>] }[keyof R];
+type AsyncDictErrEntry<R> = {
+  [K in keyof R]-?: [AsyncErrOf<R[K]>] extends [never] ? never : readonly [K, AsyncErrOf<R[K]>];
+}[keyof R];
 
 /** A non-empty readonly list — `merge` runs only when an `Err` was collected. @internal */
 type NonEmpty<T> = readonly [T, ...T[]];
@@ -548,7 +564,20 @@ function foldArray(
     // `merge` is user code, so the throw → defect rule applies: nothing escapes
     // an aggregate as a raw throw.
     try {
-      return Err(merge(errors as unknown as NonEmpty<IndexedErr>));
+      const merged = merge(errors as unknown as NonEmpty<IndexedErr>);
+      // `merge` is `NotThenable`-constrained, but a cast/untyped caller can
+      // still hand us an async one. `Err(<Promise>)` would put an unqualified
+      // thenable in `E` and float its rejection — a Defect instead, adopted and
+      // silenced (the sibling of `thenableReturnDefect`'s net).
+      if (isThenable(merged)) {
+        silenceIfThenable(merged);
+        return defectRes(
+          new TypeError(
+            "unthrown: an accumulating aggregate's `merge` must be SYNCHRONOUS, but it returned a thenable — its rejection would escape qualification.",
+          ),
+        );
+      }
+      return Err(merged);
     } catch (cause) {
       return defectRes(cause);
     }

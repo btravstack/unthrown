@@ -84,7 +84,7 @@ after every file:
 
 - **[references/from-neverthrow.md](references/from-neverthrow.md)** — the
   neverthrow→unthrown mapping table, the `mapErr`/`orElse`/`safeTry`/`match`
-  rewrites, the `combineWithAllErrors` gap, and a worked seam.
+  rewrites, `combineWithAllErrors` → `validateAll`, and a worked seam.
 - **[references/from-boxed.md](references/from-boxed.md)** — the Boxed→unthrown
   mapping table (Result, Future, statics), the `Option` decision tree, and the
   `AsyncData`/`retry`/`concurrent` gaps.

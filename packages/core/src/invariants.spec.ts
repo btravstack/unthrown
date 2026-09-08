@@ -356,6 +356,14 @@ describe("Invariant 6: a DISCARDED thenable is adopted, so its rejection never f
     ["flatMap", (t: PromiseLike<never>) => Ok(1).flatMap((() => t) as never)],
     ["flatTap", (t: PromiseLike<never>) => Ok(1).flatTap((() => t) as never)],
     ["bind", (t: PromiseLike<never>) => Do().bind("a", (() => t) as never)],
+    [
+      "validateAll merge",
+      (t: PromiseLike<never>) => validateAll([Err("e" as const)], (() => t) as never),
+    ],
+    [
+      "validateAllFromDict merge",
+      (t: PromiseLike<never>) => validateAllFromDict({ a: Err("e" as const) }, (() => t) as never),
+    ],
     ["fromExecutor", (t: PromiseLike<never>) => fromExecutor<number, never>(() => t)],
     [
       "fromExecutor settle",
@@ -382,6 +390,16 @@ describe("Invariant 6: a DISCARDED thenable is adopted, so its rejection never f
         .toAsync()
         .tapFailure((() => t) as never),
     );
+  });
+
+  it("an async `merge` yields a Defect, never `Err(<Promise>)`", () => {
+    // `merge` is `NotThenable`-constrained, so this needs a cast — but a
+    // thenable in `E` is un-triaged by definition, and its rejection would
+    // float. Both aggregate folds mint a Defect instead.
+    const { thenable } = adoptionProbe();
+    const async = (() => thenable) as never;
+    expect(validateAll([Err("e" as const)], async).isDefect()).toBe(true);
+    expect(validateAllFromDict({ a: Err("e" as const) }, async).isDefect()).toBe(true);
   });
 
   it("the observer still passes the original result through unchanged", () => {
