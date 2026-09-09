@@ -33,7 +33,9 @@ export const reviewCart = (
  * they are correlated per key — the union is
  * `["minimum", BelowMinimum] | ["region", UnservedRegion]`, not the cross
  * product. So the `switch` below narrows the error from the key with no casts
- * and no re-checking, and `["region", BelowMinimum]` would not compile.
+ * and no re-checking, and `["region", BelowMinimum]` would not compile. The
+ * correlation survives destructuring the entry, so the branches read as
+ * `[check, violation]` rather than `entry[0]` / `entry[1]`.
  *
  * That correlation is what keeps the record form worth having: it still names
  * the failing check even when two of them share one error type, where a flat
@@ -52,12 +54,12 @@ export const checkPolicies = (deps: PolicyDeps, cart: Cart): Result<void, Checko
     },
     (entries) =>
       new CheckoutBlocked({
-        reasons: entries.map((entry) => {
-          switch (entry[0]) {
+        reasons: entries.map(([check, violation]) => {
+          switch (check) {
             case "minimum":
-              return `total ${entry[1].total} < ${entry[1].minimum}`;
+              return `total ${violation.total} < ${violation.minimum}`;
             case "region":
-              return `no shipping to ${entry[1].region}`;
+              return `no shipping to ${violation.region}`;
           }
         }),
       }),

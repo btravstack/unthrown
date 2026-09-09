@@ -114,7 +114,9 @@ export function fromThrowable<A extends unknown[], T, R>(
   return (...args: A): Result<T, E> => {
     try {
       const value = fn(...args);
-      return isThenable(value) ? thenableReturnDefect<T, E>(value) : (Ok(value) as Result<T, E>);
+      return isThenable(value)
+        ? thenableReturnDefect<T, E>(value, SYNC_FN_THENABLE)
+        : (Ok(value) as Result<T, E>);
     } catch (cause) {
       return qualifyToResult<T, E>(cause, triage);
     }
@@ -160,7 +162,9 @@ export function fromSafeThrowable<A extends unknown[], T>(
   return (...args: A): Result<T, never> => {
     try {
       const value = fn(...args);
-      return isThenable(value) ? thenableReturnDefect<T, never>(value) : Ok(value);
+      return isThenable(value)
+        ? thenableReturnDefect<T, never>(value, SYNC_FN_THENABLE)
+        : Ok(value);
     } catch (cause) {
       return defectRes<T, never>(cause);
     }
@@ -412,34 +416,50 @@ function qualifyToResult<T, E>(
 }
 
 /**
- * The Defect minted when a **synchronous** boundary's `fn` returns a thenable —
- * i.e. an `async` function was handed to {@link fromThrowable} /
- * {@link fromSafeThrowable}.
+ * The message for {@link thenableReturnDefect} at a **synchronous boundary** —
+ * an `async` function handed to {@link fromThrowable} / {@link fromSafeThrowable}.
+ *
+ * @internal
+ */
+const SYNC_FN_THENABLE =
+  "unthrown: fromThrowable/fromSafeThrowable wrap a SYNCHRONOUS function, but `fn` returned a thenable — its rejection would escape qualification. Use fromPromise/fromSafePromise instead.";
+
+/**
+ * The message for {@link thenableReturnDefect} in an **accumulating aggregate** —
+ * an `async` `merge` handed to {@link validateAll} and friends.
+ *
+ * @internal
+ */
+const MERGE_THENABLE =
+  "unthrown: an accumulating aggregate's `merge` must be SYNCHRONOUS, but it returned a thenable — its rejection would escape qualification.";
+
+/**
+ * The Defect minted where a callback that must be **synchronous** returned a
+ * thenable: a `fn` handed to {@link fromThrowable} / {@link fromSafeThrowable},
+ * or a `merge` handed to an accumulating aggregate.
  *
  * @remarks
  * This is the sibling of the thenable-`qualify` net in {@link qualifyToResult},
  * and it closes a strictly worse hole. A synchronous boundary only ever sees a
  * synchronous `throw`, so an async `fn`'s rejection never reaches `qualify` at
  * all: it would sit inside `Ok(<Promise>)`, un-triaged, and then float as an
- * unhandled rejection — which terminates the process on Node by default.
+ * unhandled rejection — which terminates the process on Node by default. An
+ * async `merge` is the same hole one channel over: `Err(<Promise>)`.
  *
- * Unlike the combinator callbacks, this cannot be banned at compile time
- * without collateral damage: `T & NotThenable<T>` on `fn`'s return makes a
- * **generic** function unassignable, so `fromSafeThrowable(structuredClone)`
- * stops compiling and `T` collapses to `unknown`. (The phantom rest-tuple guard
- * `fromPromise` uses fares worse.) So the ban is enforced here, at runtime,
- * where it costs nothing: a Defect, plus adopt-and-silence so the orphaned
- * rejection cannot float.
+ * The `fn` case cannot be banned at compile time without collateral damage:
+ * `T & NotThenable<T>` on `fn`'s return makes a **generic** function
+ * unassignable, so `fromSafeThrowable(structuredClone)` stops compiling and `T`
+ * collapses to `unknown`. (The phantom rest-tuple guard `fromPromise` uses fares
+ * worse.) `merge` *is* `NotThenable`-constrained, but a cast or an untyped
+ * caller still reaches here. Either way the runtime answer is the same, and it
+ * costs nothing: a Defect, plus adopt-and-silence so the orphaned rejection
+ * cannot float.
  *
  * @internal
  */
-function thenableReturnDefect<T, E>(value: unknown): Result<T, E> {
-  void Promise.resolve(value).then(undefined, () => undefined);
-  return defectRes<T, E>(
-    new TypeError(
-      "unthrown: fromThrowable/fromSafeThrowable wrap a SYNCHRONOUS function, but `fn` returned a thenable — its rejection would escape qualification. Use fromPromise/fromSafePromise instead.",
-    ),
-  );
+function thenableReturnDefect<T, E>(value: unknown, message: string): Result<T, E> {
+  silenceIfThenable(value);
+  return defectRes<T, E>(new TypeError(message));
 }
 
 /**
@@ -567,16 +587,9 @@ function foldArray(
       const merged = merge(errors as unknown as NonEmpty<IndexedErr>);
       // `merge` is `NotThenable`-constrained, but a cast/untyped caller can
       // still hand us an async one. `Err(<Promise>)` would put an unqualified
-      // thenable in `E` and float its rejection — a Defect instead, adopted and
-      // silenced (the sibling of `thenableReturnDefect`'s net).
-      if (isThenable(merged)) {
-        silenceIfThenable(merged);
-        return defectRes(
-          new TypeError(
-            "unthrown: an accumulating aggregate's `merge` must be SYNCHRONOUS, but it returned a thenable — its rejection would escape qualification.",
-          ),
-        );
-      }
+      // thenable in `E` and float its rejection — the same net the synchronous
+      // boundaries use, one channel over.
+      if (isThenable(merged)) return thenableReturnDefect(merged, MERGE_THENABLE);
       return Err(merged);
     } catch (cause) {
       return defectRes(cause);
@@ -634,7 +647,8 @@ function nameErrors<Entry>(errors: NonEmpty<IndexedErr>, keys: readonly string[]
  * `Err`. A **fixed tuple** keeps its positional types — `all([Ok(1), Ok("a")])`
  * is `Result<[number, string], …>` — while a **dynamic array** `Result<T, E>[]`
  * collapses to `Result<T[], E>` with no cast. For a **record** keyed by name,
- * use {@link allFromDict}.
+ * use {@link allFromDict}. To report **every** `Err` instead of only the first,
+ * use {@link validateAll}.
  *
  * @category Aggregate
  *
@@ -663,7 +677,9 @@ export function all<Rs extends readonly Result<unknown, unknown>[]>(
  *
  * @remarks
  * Same folding rules as {@link all}: first `Err` short-circuits, any `Defect`
- * dominates. This is **not** error accumulation.
+ * dominates. This is **not** error accumulation — for that, reach for
+ * {@link validateAllFromDict}, which accumulates every `Err` and folds them into
+ * one modeled error.
  *
  * @category Aggregate
  *
@@ -692,7 +708,8 @@ export function allFromDict<R extends ResultRecord>(
  * The inputs are resolved **concurrently** (order preserved); the resolved
  * `Result`s are then folded with the same rules as {@link all} — first `Err`
  * short-circuits, any `Defect` dominates. As ever, the returned `AsyncResult`'s
- * internal promise never rejects. For a **record**, use {@link allFromDictAsync}.
+ * internal promise never rejects. For a **record**, use {@link allFromDictAsync};
+ * to report **every** `Err`, use {@link validateAllAsync}.
  *
  * @category Aggregate
  *
@@ -725,7 +742,8 @@ export function allAsync<Rs extends readonly AsyncResult<unknown, unknown>[]>(
  *
  * @remarks
  * Resolved concurrently (order preserved), folded with the {@link all} rules,
- * and the internal promise never rejects.
+ * and the internal promise never rejects. To report **every** `Err`, use
+ * {@link validateAllFromDictAsync}.
  *
  * @category Aggregate
  *

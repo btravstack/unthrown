@@ -142,12 +142,12 @@ correlated per key:
 ```ts
 (entries) =>
   new CheckoutBlocked({
-    reasons: entries.map((entry) => {
-      switch (entry[0]) {
+    reasons: entries.map(([check, violation]) => {
+      switch (check) {
         case "minimum":
-          return `total ${entry[1].total} < ${entry[1].minimum}`;
+          return `total ${violation.total} < ${violation.minimum}`;
         case "region":
-          return `no shipping to ${entry[1].region}`;
+          return `no shipping to ${violation.region}`;
       }
     }),
   });
@@ -156,7 +156,9 @@ correlated per key:
 The union is `["minimum", BelowMinimum] | ["region", UnservedRegion]`, **not**
 the cross product — so switching on the key narrows the error with no casts and
 no re-checking, `["region", BelowMinimum]` would not compile, and the `switch`
-needs no `default` to be exhaustive.
+needs no `default` to be exhaustive. The correlation survives destructuring the
+entry, so the branches name their halves instead of reading `entry[0]` /
+`entry[1]`.
 
 That correlation is what makes the record form worth having. It still tells you
 which check failed even when two of them share one error type, which a flat list
