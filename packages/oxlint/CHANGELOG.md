@@ -1,5 +1,16 @@
 # @unthrown/oxlint
 
+## 5.9.0
+
+### Patch Changes
+
+- 352c204: `no-unhandled-result` and `no-async-result-race` now recognise the accumulating
+  aggregates. Both rules resolve producers by name, so a dropped
+  `validateAll(...)` statement went unreported and the sibling-race
+  `no-async-result-race` exists for was invisible on `validateAllAsync`. The four
+  free functions and their `Result.*` / `AsyncResult.*` facade members are now in
+  the producer sets.
+
 ## 5.8.0
 
 ### Minor Changes
