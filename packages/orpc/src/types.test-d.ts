@@ -1,12 +1,14 @@
 // Type-level tests, checked by the package's regular `tsc --noEmit` (the file
 // has no runtime — nothing imports it). They guard the claims the bridge is
-// built on: the error channel is EXACTLY the inferable `ORPCError` union
-// (declared via `.errors` or returned as a value) with everything else
-// subtracted into the defect channel, that inference survives
-// `.handler(handlerResult(...))` and every `.result()` builder state, and that
-// a non-`ORPCError` error channel is rejected at compile time. Assertions
-// accumulate in the exported `_Assertions` tuple (so nothing is an unused
-// local); `@ts-expect-error` guards the cases that must NOT compile.
+// built on: the error channel is EXACTLY the defined `ORPCError` union
+// declared via `.errors({...})` (an undeclared thrown `ORPCError` is
+// statically invisible — `never` — since oRPC has no returned-error channel
+// to infer it from) with everything else subtracted into the defect channel,
+// that inference survives `.handler(handlerResult(...))` and every
+// `.result()` builder state, and that a non-`ORPCError` error channel is
+// rejected at compile time. Assertions accumulate in the exported
+// `_Assertions` tuple (so nothing is an unused local); `@ts-expect-error`
+// guards the cases that must NOT compile.
 
 import { ORPCError } from "@orpc/client";
 import { oc } from "@orpc/contract";
@@ -35,24 +37,25 @@ const find = os
     ),
   );
 
-// …and RETURNED as a value with no declaration at all (the v2 mechanism).
-const returned = os.handler(
+// …and an ORPCError THROWN with no `.errors({...})` declaration at all — no
+// longer inferable post beta.34 (there is no returned-error channel left to
+// infer it from), so it is statically invisible on the client (`never`),
+// even though at runtime it is a real Defect (proven in index.spec.ts).
+const undeclared = os.handler(
   handlerResult(() =>
     flip ? Ok(1) : Err(new ORPCError("RATE_LIMITED", { data: { retryAfter: 60 } })),
   ),
 );
 
-declare const client: RouterClient<{ find: typeof find; returned: typeof returned }>;
+declare const client: RouterClient<{ find: typeof find; undeclared: typeof undeclared }>;
 
 const found = fromCall(client.find({ id: 1 }));
 type FoundOk = Expect<Equal<AsyncOkOf<typeof found>, { name: string }>>;
 type FoundErrCode = Expect<Equal<AsyncErrOf<typeof found>["code"], "NOT_FOUND">>;
 
-const rated = fromCall(client.returned());
-type RatedOk = Expect<Equal<AsyncOkOf<typeof rated>, number>>;
-type RatedErr = Expect<
-  Equal<AsyncErrOf<typeof rated>, ORPCError<"RATE_LIMITED", { retryAfter: number }>>
->;
+const undeclaredCall = fromCall(client.undeclared());
+type UndeclaredOk = Expect<Equal<AsyncOkOf<typeof undeclaredCall>, number>>;
+type UndeclaredErr = Expect<Equal<AsyncErrOf<typeof undeclaredCall>, never>>;
 
 // The non-ORPCError arm (ThrowableError, network failures) is subtracted into
 // the defect channel — never `unknown`, never `Error`, in `E`.
@@ -63,7 +66,9 @@ type NoThrowableInE = Expect<Equal<Extract<AsyncErrOf<typeof found>, { code?: ne
 const rc = createResultClient(client);
 const viaClient = rc.find({ id: 1 });
 type ClientMirrorsFromCall = Expect<Equal<typeof viaClient, typeof found>>;
-type NestedShape = Expect<Equal<ReturnType<ResultClient<typeof client>["returned"]>, typeof rated>>;
+type NestedShape = Expect<
+  Equal<ReturnType<ResultClient<typeof client>["undeclared"]>, typeof undeclaredCall>
+>;
 
 // --- .result() infers on every builder state -----------------------------------
 
@@ -108,8 +113,8 @@ implement(contract).result(() => Ok(42));
 export type _Assertions = [
   FoundOk,
   FoundErrCode,
-  RatedOk,
-  RatedErr,
+  UndeclaredOk,
+  UndeclaredErr,
   NoThrowableInE,
   ClientMirrorsFromCall,
   NestedShape,

@@ -1,27 +1,29 @@
 // @unthrown/orpc/server — the server half of the oRPC bridge.
 //
-// oRPC v2 handlers can RETURN an `ORPCError` as a value and have it inferred
-// end-to-end (typed on the client, recognisable via `isInferableError`). That
-// makes eliminating a `Result` at the procedure boundary a straight
-// three-way mapping:
+// oRPC v2 (beta.34+) has no returned-error channel: a value returned from a
+// handler is always the success payload, even an `ORPCError`. The only way to
+// surface a typed, defined error is to THROW an `ORPCError` whose `code` is
+// declared in the procedure's `.errors({...})` map — oRPC reconciles a
+// matching code's `defined` flag to `true` on the wire. That makes
+// eliminating a `Result` at the procedure boundary a straight three-way
+// mapping:
 //
-//   Ok(value)  → return value          (the procedure's output)
-//   Err(error) → return the ORPCError  (oRPC marks it inferable — typed E2E)
-//   Defect     → rethrow the cause     (oRPC collapses it to INTERNAL_SERVER_ERROR)
+//   Ok(value)  → return value         (the procedure's output)
+//   Err(error) → throw the ORPCError  (a declared code lands defined — typed E2E)
+//   Defect     → rethrow the cause    (oRPC collapses an opaque cause to INTERNAL_SERVER_ERROR)
 //
 // The handler's `Err` channel is constrained to `ORPCError`: mapping a domain
 // error into one — `mapErrCases((m) => m.with(P.tag("NotFound"), () => errors.NOT_FOUND({...})))`,
 // one arm per case of `E` — is the explicit triage point at the transport
 // boundary (Thesis #3).
 
-import {
-  type AnyORPCError,
-  type Context,
-  type ErrorMap,
-  ORPCError,
-  type ORPCErrorConstructorMap,
-  type ProcedureHandler,
-  type ProcedureHandlerOptions,
+import type {
+  AnyORPCError,
+  Context,
+  ErrorMap,
+  ORPCErrorConstructorMap,
+  ProcedureHandler,
+  ProcedureHandlerOptions,
 } from "@orpc/server";
 import type { AsyncResult, Result } from "unthrown";
 
@@ -52,9 +54,10 @@ export type ResultHandler<
  * The elimination boundary of the server half: `Ok` becomes the procedure's
  * output; `Err` (constrained to `ORPCError` — build one with the injected
  * `errors.CODE(...)` constructors, or map a domain error via `mapErrCases` first)
- * is returned as a value, which oRPC marks *inferable* so the client sees it
- * fully typed; a `Defect` rethrows its original cause, which oRPC collapses
- * to `INTERNAL_SERVER_ERROR` — a bug stays a defect, never a typed error.
+ * is thrown, so a declared code reaches the client as a defined, typed error;
+ * a `Defect` rethrows its original cause — oRPC collapses an opaque cause to
+ * `INTERNAL_SERVER_ERROR`, but a bug stays a defect either way, never a
+ * typed error.
  *
  * Like `match` handlers, the callback may be `async` (an edge elimination is
  * exempt from the no-thenable rule): a rejection or throw inside it cannot
@@ -92,7 +95,7 @@ export function handlerResult<
   TErrorMap extends ErrorMap,
 >(
   handler: ResultHandler<TCurrentContext, TInput, TOutput, TError, TErrorMap>,
-): ProcedureHandler<TCurrentContext, TInput, TOutput | TError, ORPCErrorConstructorMap<TErrorMap>> {
+): ProcedureHandler<TCurrentContext, TInput, TOutput, ORPCErrorConstructorMap<TErrorMap>> {
   return async (opts, input) => {
     const result = await handler(opts, input);
     // Branch via the guards rather than `match`: this library code is generic in
@@ -101,11 +104,10 @@ export function handlerResult<
     // concrete triage (`.mapErrCases((matcher) => …)`) still happens at the endpoint.
     if (result.isOk()) return result.value;
     if (result.isErr()) {
-      // Unreachable through well-typed code (`TError extends AnyORPCError`); a
-      // widened or raw-JS caller's non-ORPCError `Err` must not be returned, or
-      // oRPC would serve it as a SUCCESSFUL output. Throw it so it lands on
-      // oRPC's defect path instead.
-      if (result.error instanceof ORPCError) return result.error;
+      // Always THROW, never return: oRPC (beta.34+) treats any returned value —
+      // an `ORPCError` included — as the success payload, so returning it here
+      // would serve the error as a 200 (or fail output validation into a 500).
+      // Throwing a declared code is what earns it `defined: true` on the wire.
       throw result.error;
     }
     throw result.cause; // Defect — rethrow the cause onto oRPC's defect path.

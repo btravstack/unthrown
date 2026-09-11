@@ -1,13 +1,22 @@
 // @unthrown/orpc/client — the client half of the oRPC bridge.
 //
-// oRPC v2 splits failures exactly the way unthrown does: an error a procedure
-// declares (`.errors({...})`) or returns as a value is *inferable* — typed
-// end-to-end and recognisable at runtime via `isInferableError` — while
-// everything else is collapsed to `INTERNAL_SERVER_ERROR`. The bridge maps
-// that split onto the `Result` variants: inferable → `Err`, anything else →
-// `Defect`. Qualification happens once, in here (Thesis #3): the triage
-// decision was already made when the procedure declared (or returned) its
-// errors, so no per-call `qualify` is asked of the caller.
+// oRPC v2 splits failures exactly the way unthrown does: an error whose code
+// is declared in the procedure's `.errors({...})` map is *defined* — typed
+// end-to-end and recognisable at runtime via `isDefinedError` (`error
+// instanceof ORPCError && error.defined`) — while everything else is a
+// `Defect`, whether or not oRPC scrubbed its payload (an opaque thrown
+// `Error` collapses to `INTERNAL_SERVER_ERROR`; an undeclared `ORPCError`
+// keeps its real `code`/`data` but is still never `defined`). The bridge
+// maps that split onto the `Result` variants: defined → `Err`, anything
+// else → `Defect`. Qualification
+// happens once, in here (Thesis #3): the triage decision was already made
+// when the procedure declared its errors, so no per-call `qualify` is asked
+// of the caller.
+//
+// Do NOT widen the predicate to `cause instanceof ORPCError`: an undeclared
+// 500 and a malformed-response error are both `ORPCError`s with
+// `defined: false`, and widening would put those unmodeled failures in the
+// error channel instead of the defect channel.
 //
 // The error channel stays the raw `ORPCError` union, discriminated by `code` —
 // no re-wrapping into a second error concept.
@@ -17,7 +26,7 @@ import {
   type AnyORPCError,
   type Client,
   type ClientRest,
-  isInferableError,
+  isDefinedError,
   type PromiseWithError,
   type ThrowableError,
 } from "@orpc/client";
@@ -27,12 +36,12 @@ import { type AsyncResult, fromPromise } from "unthrown";
  * Lift a single oRPC call into an `AsyncResult`.
  *
  * @remarks
- * The error channel is the call's *inferable* errors — the `ORPCError`s the
- * procedure declares via `.errors({...})` or returns as values, extracted as
+ * The error channel is the call's *defined* errors — the `ORPCError`s whose
+ * `code` the procedure declares via `.errors({...})`, extracted as
  * `Extract<TError, AnyORPCError>` and discriminated by `code`. Any other
- * rejection (network failure, an undeclared throw collapsed to
- * `INTERNAL_SERVER_ERROR`, a malformed response) is a `Defect`: unmodeled,
- * flowing past the error combinators, panicking at `get`.
+ * rejection (network failure, an undeclared `ORPCError`, an opaque throw
+ * collapsed to `INTERNAL_SERVER_ERROR`, a malformed response) is a `Defect`:
+ * unmodeled, flowing past the error combinators, panicking at `get`.
  *
  * Accepts the promise of a client procedure call or of oRPC's server-side
  * `call(procedure, input)` — anything typed `PromiseWithError`.
@@ -60,19 +69,21 @@ export function fromCall<TOutput, TError = ThrowableError>(
 }
 
 // The shared boundary behind `fromCall` and the proxy client: `fromPromise`
-// with the inferable-error triage. The thunk form matters for the proxy — the
+// with the defined-error triage. The thunk form matters for the proxy — the
 // wrapped callable runs INSIDE the boundary, so even a synchronous throw lands
 // in the Defect channel instead of escaping raw.
 function liftCall<TOutput, TError>(
   promise: PromiseWithError<TOutput, TError> | (() => PromiseWithError<TOutput, TError>),
 ): AsyncResult<TOutput, Extract<TError, AnyORPCError>> {
-  // The triage runs with the concrete `AnyORPCError` union — `qualify`'s
-  // `NotThenable` return constraint cannot be proven over the unresolved
-  // `TError` parameter (the same generic-`E` concession as guards-over-match).
-  const lifted: AsyncResult<TOutput, AnyORPCError> = fromPromise(promise, (cause, defect) => {
-    const candidate = cause as AnyORPCError;
-    return isInferableError(candidate) ? candidate : defect(cause);
-  });
+  // `qualify` must return the error value itself or `defect(cause)` — never a
+  // `Result` — so `isDefinedError` alone decides the channel. `isDefinedError`
+  // is `error instanceof ORPCError && error.defined`: do NOT widen this to
+  // `cause instanceof ORPCError`, or an undeclared 500 and a
+  // `MALFORMED_ORPC_RESPONSE` (both `ORPCError`s with `defined: false`) would
+  // land in the error channel instead of the defect channel.
+  const lifted: AsyncResult<TOutput, AnyORPCError> = fromPromise(promise, (cause, defect) =>
+    isDefinedError(cause) ? cause : defect(cause),
+  );
   // Re-attach the call's declared error union to the untyped rejection cause —
   // the same trust the pre-lift `cause as TError` cast expressed, applied once
   // at the boundary.

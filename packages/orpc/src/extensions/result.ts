@@ -3,7 +3,10 @@
 // Importing this module patches oRPC's builders (module augmentation + a
 // prototype assignment, the packaging `@orpc/experimental-effect` uses for
 // `.effect()`), so a procedure can be declared directly from a
-// `Result`-returning handler:
+// `Result`-returning handler. `DecoratedProcedure` (beta.34+) carries no
+// declared-error-union type argument any more — `Err` is thrown, not
+// returned, so its code is typed only when `.errors({...})` declares it,
+// exactly like oRPC's own `.handler`:
 //
 //   import "@unthrown/orpc/extensions/result";
 //
@@ -51,9 +54,11 @@ declare module "@orpc/server" {
   interface Builder<TInitialContext extends Context, TErrorMap extends ErrorMap> {
     /**
      * `.handler(handlerResult(fn))` as a builder method: declare the
-     * procedure from a `Result`-returning handler. `Ok` is the output, `Err`
-     * (an `ORPCError`) surfaces to the client fully typed, a `Defect` stays a
-     * defect (`INTERNAL_SERVER_ERROR`).
+     * procedure from a `Result`-returning handler. `Ok` is the output; `Err`
+     * (an `ORPCError`) is thrown, reaching the client typed only when its
+     * code is declared via `.errors({...})` — an undeclared one is routed to
+     * the defect channel by `@unthrown/orpc/client`. A `Defect` stays a
+     * defect.
      */
     result<TOutput, TError extends AnyORPCError>(
       handler: ResultHandler<TInitialContext, unknown, TOutput, TError, TErrorMap>,
@@ -61,9 +66,8 @@ declare module "@orpc/server" {
       TInitialContext,
       object,
       Schema<void, unknown>,
-      Schema<Exclude<TOutput, AnyORPCError>>,
-      TErrorMap,
-      TError | Extract<TOutput, AnyORPCError>
+      Schema<TOutput>,
+      TErrorMap
     >;
   }
 
@@ -85,9 +89,8 @@ declare module "@orpc/server" {
       TInitialContext,
       TInjectedContext,
       Schema<void, unknown>,
-      Schema<Exclude<TOutput, AnyORPCError>>,
-      TErrorMap,
-      TError | Extract<TOutput, AnyORPCError>
+      Schema<TOutput>,
+      TErrorMap
     >;
   }
 
@@ -110,9 +113,8 @@ declare module "@orpc/server" {
       TInitialContext,
       TInjectedContext,
       TInputSchema,
-      Schema<Exclude<TOutput, AnyORPCError>>,
-      TErrorMap,
-      TError | Extract<TOutput, AnyORPCError>
+      Schema<TOutput>,
+      TErrorMap
     >;
   }
 
@@ -136,8 +138,7 @@ declare module "@orpc/server" {
       TInjectedContext,
       Schema<void, unknown>,
       TOutputSchema,
-      TErrorMap,
-      TError | Extract<TOutput, AnyORPCError>
+      TErrorMap
     >;
   }
 
@@ -162,8 +163,7 @@ declare module "@orpc/server" {
       TInjectedContext,
       TInputSchema,
       TOutputSchema,
-      TErrorMap,
-      TError | Extract<TOutput, AnyORPCError>
+      TErrorMap
     >;
   }
 

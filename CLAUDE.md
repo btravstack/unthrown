@@ -813,9 +813,10 @@ copies) — issue #256, observed live in btravstack/start#99.
   suite is the one that needs a running Docker daemon. Full spec:
   `packages/drizzle/CLAUDE.md`.)
 - `packages/orpc` → `@unthrown/orpc` (peerDeps `@orpc/client` + `@orpc/server`
-  at `^2.0.0-beta`, the server one optional; a two-way bridge on oRPC v2's
-  returned-`ORPCError` inference — `Ok` ↔ output, `Err` ↔ a returned inferable
-  `ORPCError`, `Defect` ↔ everything else. Three entry points, no root export.
+  at `^2.0.0-beta.34`, the server one optional; a two-way bridge on oRPC v2's
+  defined-`ORPCError` mechanism — `Ok` ↔ output, `Err` ↔ a thrown `ORPCError`
+  the procedure declared via `.errors({...})`, `Defect` ↔ everything else
+  (including an undeclared `ORPCError`). Three entry points, no root export.
   **Outside the fixed version group.** Full spec: `packages/orpc/CLAUDE.md`.)
 - shared config is **external**, not a workspace package: the tsconfig and
   typedoc bases come from the catalog dependencies `@btravstack/tsconfig` and

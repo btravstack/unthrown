@@ -6,11 +6,13 @@
 // collapsed to `INTERNAL_SERVER_ERROR` instead of surfacing raw.
 //
 // The load-bearing mappings, each provoked for real:
-//   Ok        → the procedure's output           → `Ok` on the client
-//   Err       → a RETURNED ORPCError (inferable) → typed `Err` on the client
-//   Defect    → a rethrown cause                 → `Defect` on the client
+//   Ok        → the procedure's output              → `Ok` on the client
+//   Err       → a THROWN, DECLARED ORPCError        → typed `Err` on the client
+//   Defect    → a rethrown cause, or an undeclared
+//               ORPCError thrown with no matching
+//               `.errors({...})` entry              → `Defect` on the client
 
-import { createORPCClient, isInferableError, ORPCError } from "@orpc/client";
+import { createORPCClient, isDefinedError, ORPCError } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import { oc } from "@orpc/contract";
 import {
@@ -42,9 +44,10 @@ const find = os
     ),
   );
 
-// An error RETURNED as a value without any `.errors({...})` declaration — the
-// v2 path this whole design leans on.
-const returned = os
+// An ORPCError thrown with no matching `.errors({...})` entry — post
+// beta.34, oRPC has no returned-error channel and no way to infer an
+// undeclared code as defined, so this always lands as a Defect.
+const undeclared = os
   .input(type<{ limit: number }>())
   .handler(
     handlerResult(({ input }) =>
@@ -73,7 +76,7 @@ const throwing = os.handler(
 const asyncOk = os.handler(handlerResult(async () => Ok("async")));
 const liftedOk = os.handler(handlerResult(() => fromSafePromise(Promise.resolve(42))));
 
-const router = { planet: { find }, returned, buggy, throwing, asyncOk, liftedOk };
+const router = { planet: { find }, undeclared, buggy, throwing, asyncOk, liftedOk };
 const client = createRouterClient(router);
 const rc = createResultClient(client);
 
@@ -82,22 +85,25 @@ describe("handlerResult over the in-process client", () => {
     await expect(rc.planet.find({ id: 1 })).toBeOkWith({ name: "Mars" });
   });
 
-  test("Err(errors.X()) surfaces as a typed, inferable Err", async () => {
+  test("Err(errors.X()) surfaces as a typed, defined Err", async () => {
     const result = await rc.planet.find({ id: 999 });
     expect(result).toBeErr();
     if (result.isErr()) {
       expect(result.error).toBeInstanceOf(ORPCError);
       expect(result.error.code).toBe("NOT_FOUND");
-      expect(isInferableError(result.error)).toBe(true);
+      expect(isDefinedError(result.error)).toBe(true);
     }
   });
 
-  test("a returned, undeclared ORPCError is inferable too — data preserved", async () => {
-    const result = await rc.returned({ limit: 0 });
-    expect(result).toBeErr();
-    if (result.isErr()) {
-      expect(result.error.code).toBe("RATE_LIMITED");
-      expect(result.error.data).toEqual({ retryAfter: 60 });
+  test("an undeclared ORPCError (no `.errors()` entry) is a Defect, cause preserved", async () => {
+    const result = await rc.undeclared({ limit: 0 });
+    expect(result).toBeDefect();
+    if (result.isDefect()) {
+      expect(result.cause).toBeInstanceOf(ORPCError);
+      const cause = result.cause as ORPCError<"RATE_LIMITED", { retryAfter: number }>;
+      expect(cause.code).toBe("RATE_LIMITED");
+      expect(cause.data).toEqual({ retryAfter: 60 });
+      expect(isDefinedError(cause)).toBe(false);
     }
   });
 
@@ -260,7 +266,7 @@ describe("createResultClient", () => {
 describe("through a real serialization round-trip (RPCHandler ↔ RPCLink)", () => {
   // The link's `fetch` loops straight back into the handler: a genuine
   // request/response cycle — JSON serialization, error collapsing, the
-  // `inferable` flag on the wire — without opening a socket.
+  // `defined` flag on the wire — without opening a socket.
   const handler = new RPCHandler(router);
   const link = new RPCLink({
     url: "/rpc",
@@ -286,10 +292,20 @@ describe("through a real serialization round-trip (RPCHandler ↔ RPCLink)", () 
     }
   });
 
-  test("a returned, undeclared Err survives serialization — data intact", async () => {
-    const result = await wire.returned({ limit: 0 });
-    expect(result).toBeErr();
-    if (result.isErr()) expect(result.error.data).toEqual({ retryAfter: 60 });
+  test("an undeclared thrown error survives serialization but stays a Defect", async () => {
+    const result = await wire.undeclared({ limit: 0 });
+    expect(result).toBeDefect();
+    if (result.isDefect()) {
+      // The wire preserves the real code and data — oRPC does not scrub an
+      // ORPCError's payload the way it does an opaque thrown `Error` — but
+      // with no matching `.errors({...})` entry it is never `defined`, so
+      // this bridge routes it to the defect channel regardless.
+      expect(result.cause).toBeInstanceOf(ORPCError);
+      const cause = result.cause as ORPCError<"RATE_LIMITED", { retryAfter: number }>;
+      expect(cause.code).toBe("RATE_LIMITED");
+      expect(cause.data).toEqual({ retryAfter: 60 });
+      expect(isDefinedError(cause)).toBe(false);
+    }
   });
 
   test("a defect is collapsed to INTERNAL_SERVER_ERROR and stays a Defect", async () => {
@@ -299,7 +315,7 @@ describe("through a real serialization round-trip (RPCHandler ↔ RPCLink)", () 
       // Over the wire the raw cause must NOT leak; oRPC collapses it.
       expect(result.cause).toBeInstanceOf(ORPCError);
       expect((result.cause as ORPCError<string, unknown>).code).toBe("INTERNAL_SERVER_ERROR");
-      expect(isInferableError(result.cause)).toBe(false);
+      expect(isDefinedError(result.cause)).toBe(false);
     }
   });
 });

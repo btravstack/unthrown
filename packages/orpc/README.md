@@ -13,15 +13,18 @@ pnpm add @unthrown/orpc unthrown
 ```
 
 oRPC v2 splits failures the way unthrown does: an error a procedure **declares**
-(`.errors({...})`) or **returns as a value** is _inferable_ — typed end-to-end —
-while everything else collapses to `INTERNAL_SERVER_ERROR`. The bridge maps that
-split onto the `Result` variants, in both directions:
+via `.errors({...})` is _defined_ — typed end-to-end — while everything else is
+a `Defect`. `defined` alone decides the channel; it is not about payload
+scrubbing — an undeclared `ORPCError`'s `code`/`data` still reach the client
+intact, just as a Defect. oRPC only scrubs an opaque thrown `Error` down to
+`INTERNAL_SERVER_ERROR`. The bridge maps that split onto the `Result`
+variants, in both directions:
 
-| unthrown     | oRPC v2                                       |
-| ------------ | --------------------------------------------- |
-| `Ok(value)`  | the procedure's output                        |
-| `Err(error)` | a returned `ORPCError` — inferable, typed E2E |
-| `Defect`     | everything else (`INTERNAL_SERVER_ERROR`)     |
+| unthrown     | oRPC v2                                           |
+| ------------ | ------------------------------------------------- |
+| `Ok(value)`  | the procedure's output                            |
+| `Err(error)` | a thrown, declared `ORPCError` — typed E2E        |
+| `Defect`     | everything else (undeclared `ORPCError` included) |
 
 The error channel stays the raw `ORPCError` union, discriminated by `code` — no
 second error concept in between.
@@ -47,9 +50,10 @@ const find = os
 ```
 
 `Ok` becomes the output; `Err` (constrained to `ORPCError` — the `mapErrCases` at the
-endpoint is the explicit triage point) is returned as a value and oRPC marks it
-inferable; a `Defect` rethrows its cause and stays a defect. A handler may also
-be written as `.result(...)` directly, by opting into the builder extension:
+endpoint is the explicit triage point) is thrown, so a code declared in
+`.errors({...})` reaches the client defined and typed; a `Defect` rethrows its
+cause and stays a defect. A handler may also be written as `.result(...)`
+directly, by opting into the builder extension:
 
 ```ts
 import { P } from "unthrown";
@@ -93,7 +97,7 @@ const greeting = await rc.planet
   });
 ```
 
-Every procedure returns `AsyncResult<Output, InferableErrors>`: the inferable
+Every procedure returns `AsyncResult<Output, DefinedErrors>`: the defined
 `ORPCError`s land in the error channel, anything else (network failure, an
 undeclared throw, a malformed response) is a `Defect`. `fromCall(promise)` is
 the one-shot form — it also lifts oRPC's server-side `call(procedure, input)`.
@@ -103,8 +107,10 @@ collapse to one `Result`. Keep calling those on the raw client.
 
 ## Versioning
 
-`@unthrown/orpc` targets **oRPC v2** (peer range `^2.0.0-beta` while v2 is in
-beta) and its majors track oRPC's cadence, not the unthrown family's.
+`@unthrown/orpc` targets **oRPC v2** (peer range `^2.0.0-beta.34` — beta.34
+removed the returned-error/inferable-flag mechanism this bridge previously
+relied on, so earlier betas are unsupported) and its majors track oRPC's
+cadence, not the unthrown family's.
 
 ## License
 
