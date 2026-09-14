@@ -15,7 +15,7 @@ catalog:
   "@btravstack/lefthook": 0.1.1
   "@btravstack/oxlint": 0.2.1
   "@btravstack/theme": 2.0.0
-  "@btravstack/tsconfig": 0.2.0
+  "@btravstack/tsconfig": 0.4.0
   "@btravstack/typedoc": 0.1.0
   "@changesets/cli": 3.0.1
   "@commitlint/cli": 21.2.2
