@@ -37,7 +37,7 @@ export class PgUnthrownRaw<TResult> extends PgRaw<TResult> {
     return this.prepared.execute(placeholderValues);
   }
 
-  override _prepare(): PgUnthrownPreparedQuery<{ execute: TResult }> {
+  _prepare(): PgUnthrownPreparedQuery<{ execute: TResult }> {
     return this.prepared;
   }
 
