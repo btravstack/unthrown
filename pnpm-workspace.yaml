@@ -53,7 +53,7 @@ catalog:
   typedoc-plugin-markdown: 4.13.0
   typescript: 7.0.2
   vitepress: 1.6.4
-  vitepress-plugin-llms: 1.13.5
+  vitepress-plugin-llms: 1.14.0
   vitest: 4.1.11
   zod: 4.6.5
 
