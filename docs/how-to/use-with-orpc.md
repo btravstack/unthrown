@@ -12,15 +12,16 @@ pnpm add @unthrown/orpc unthrown
 
 oRPC's error model already agrees with the [thesis](../explanation/why-unthrown):
 an error whose code a procedure **declares** (`.errors({...})`) is _defined_ —
-typed end-to-end — while everything else collapses to `INTERNAL_SERVER_ERROR`
-or reaches the client undefined. That is exactly the `Err` /
+typed end-to-end — while everything else is not: an opaque thrown `Error`
+collapses to `INTERNAL_SERVER_ERROR`, and an undeclared `ORPCError` keeps its
+`code` and `data` on the wire but arrives undefined. That is exactly the `Err` /
 [`Defect`](../explanation/the-defect-channel) split:
 
-| unthrown     | oRPC v2                                    |
-| ------------ | ------------------------------------------ |
-| `Ok(value)`  | the procedure's output                     |
-| `Err(error)` | a thrown, declared `ORPCError` — typed E2E |
-| `Defect`     | everything else (`INTERNAL_SERVER_ERROR`)  |
+| unthrown     | oRPC v2                                          |
+| ------------ | ------------------------------------------------ |
+| `Ok(value)`  | the procedure's output                           |
+| `Err(error)` | a thrown, declared `ORPCError` — typed E2E       |
+| `Defect`     | everything else, undeclared `ORPCError` included |
 
 Qualification happens **once, inside the bridge**: the triage decision was already
 made when the procedure declared its errors, so no per-call
@@ -159,8 +160,9 @@ Branch on `code` — in `match`'s `errCases` matcher (as above), a `switch`, or 
 standalone `match`. Because these are plain `ORPCError`s rather than
 `TaggedError`s, `P.tag(...)` doesn't apply — match on the `code` field instead.
 
-Anything else — a network failure, an undeclared throw collapsed to
-`INTERNAL_SERVER_ERROR`, a malformed response — is a `Defect`: it flows past your
+Anything else — a network failure, an opaque throw collapsed to
+`INTERNAL_SERVER_ERROR`, an undeclared `ORPCError` (its `code` and `data` intact),
+a malformed response — is a `Defect`: it flows past your
 error combinators and [panics at `get`](../explanation/the-defect-channel), because
 it is a bug (or an outage), not an outcome your domain models.
 

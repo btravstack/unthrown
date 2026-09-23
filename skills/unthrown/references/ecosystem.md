@@ -187,7 +187,8 @@ const rows = (await db.select().from(users)).get();
 Peers `@orpc/client` + `@orpc/contract` + optional `@orpc/server`
 (^2.0.0-beta.34). Mapping: `Ok` ↔ output, `Err` ↔ a thrown _defined_
 `ORPCError` (its code declared via `.errors({...})`), `Defect` ↔ everything else
-(collapses to `INTERNAL_SERVER_ERROR` on the wire). Three entry points, no root export:
+(an opaque throw collapses to `INTERNAL_SERVER_ERROR` on the wire; an undeclared
+`ORPCError` keeps its `code` and `data`, but is never defined). Three entry points, no root export:
 
 - `@unthrown/orpc/server` — `handlerResult(fn)` adapts a `Result`-returning
   handler; `Err` must be an `ORPCError` (do the `mapErrCases` into
