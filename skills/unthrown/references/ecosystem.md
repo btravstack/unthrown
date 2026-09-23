@@ -184,19 +184,22 @@ const rows = (await db.select().from(users)).get();
 
 ## oRPC: @unthrown/orpc
 
-Peers `@orpc/client` + optional `@orpc/server` (^2.0.0-beta). Mapping: `Ok` ↔
-output, `Err` ↔ returned _inferable_ `ORPCError` (declared via `.errors({...})`
-or returned as a value), `Defect` ↔ everything else (collapses to
-`INTERNAL_SERVER_ERROR` on the wire). Three entry points, no root export:
+Peers `@orpc/client` + `@orpc/contract` + optional `@orpc/server`
+(^2.0.0-beta.34). Mapping: `Ok` ↔ output, `Err` ↔ a thrown _defined_
+`ORPCError` (its code declared via `.errors({...})`), `Defect` ↔ everything else
+(collapses to `INTERNAL_SERVER_ERROR` on the wire). Three entry points, no root export:
 
 - `@unthrown/orpc/server` — `handlerResult(fn)` adapts a `Result`-returning
   handler; `Err` must be an `ORPCError` (do the `mapErrCases` into
-  `errors.CODE(...)` at the endpoint); a `Defect` rethrows its cause. The
+  `errors.CODE(...)` at the endpoint); a `Defect` rethrows its cause (an
+  `ORPCError` cause wrapped, so it can never answer a declared code). The
   callback may be async (an elimination edge, exempt like `match`).
 - `@unthrown/orpc/extensions/result` — opt-in `.result()` builder method
   (side-effectful import: prototype patches + module augmentation).
 - `@unthrown/orpc/client` — `fromCall(promise)` lifts one call;
-  `createResultClient(client)` wraps a whole router. `E` is the raw inferable
+  `createResultClient(client, { contract })` wraps a whole router; the
+  `contract` reconciles each rejection against the client's own `.errors()`, so
+  a code only a newer server declares is a `Defect`. `E` is the raw defined
   `ORPCError` union discriminated by `code` — match with
   `.with({ code: "NOT_FOUND" }, …)`, not `P.tag`.
 - Event-iterator (streaming) procedures are out of scope — use the raw client.

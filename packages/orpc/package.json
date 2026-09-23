@@ -83,6 +83,7 @@
   },
   "peerDependencies": {
     "@orpc/client": "^2.0.0-beta.34",
+    "@orpc/contract": "^2.0.0-beta.34",
     "@orpc/server": "^2.0.0-beta.34",
     "unthrown": "workspace:^"
   },

@@ -20,6 +20,15 @@
 //
 // The error channel stays the raw `ORPCError` union, discriminated by `code` —
 // no re-wrapping into a second error concept.
+//
+// Whose `defined` decides? By default the wire's: an oRPC server reconciles a
+// thrown `ORPCError` against ITS contract before sending it. Across a rolling
+// deploy that contract can be newer than the client's, so a code the client
+// never declared would arrive `defined` and land in an `E` that has no arm for
+// it. Handing `createResultClient` the client's own contract re-reconciles
+// every rejection against it (`reconcileORPCError`: declared code AND `data`
+// passing its schema), so the channel follows the types the caller compiled
+// against, whatever server answered.
 
 import {
   type AnyNestedClient,
@@ -27,9 +36,16 @@ import {
   type Client,
   type ClientRest,
   isDefinedError,
+  ORPCError,
   type PromiseWithError,
+  RECURSIVE_CLIENT_UNWRAP_KEYS,
   type ThrowableError,
 } from "@orpc/client";
+import {
+  getProcedureContractOrThrow,
+  reconcileORPCError,
+  type RouterContract,
+} from "@orpc/contract";
 import { type AsyncResult, fromPromise } from "unthrown";
 
 /**
@@ -102,20 +118,42 @@ export type ResultClient<T extends AnyNestedClient> =
     : { [K in keyof T]: T[K] extends AnyNestedClient ? ResultClient<T[K]> : never };
 
 /**
+ * Options of {@link createResultClient}.
+ *
+ * @category Client
+ */
+export type CreateResultClientOptions = {
+  /**
+   * The contract the client was built from. When given, every rejected call
+   * is reconciled against the procedure's own `.errors({...})` entry before
+   * triage: an `Err` is then a code the client declares, with `data` that
+   * passed its schema, whatever `defined` flag the server sent. Without it,
+   * the server's `defined` flag decides.
+   */
+  contract?: RouterContract;
+};
+
+/**
  * Wrap an oRPC client so every procedure call returns an
  * `AsyncResult` — {@link fromCall} applied to the whole router.
  *
  * @remarks
  * The mirror of oRPC's own `createSafeClient`, producing `AsyncResult`s
- * instead of `SafeResult` tuples: inferable errors land in the error channel
+ * instead of `SafeResult` tuples: defined errors land in the error channel
  * (the raw `ORPCError` union, discriminated by `code`), everything else is a
  * `Defect`. Call options (`signal`, `context`, `lastEventId`) pass through
  * untouched.
+ *
+ * Pass the client's `contract` whenever client and server deploy
+ * independently: the error channel is then decided by the contract the
+ * caller compiled against, not by the server's (see
+ * {@link CreateResultClientOptions.contract}).
  *
  * Event-iterator (streaming) procedures are out of scope: a stream does not
  * collapse to one `Result`. Keep calling those on the raw client.
  *
  * @param client - the oRPC client (or any nested router segment) to wrap.
+ * @param options - see {@link CreateResultClientOptions}.
  *
  * @category Client
  *
@@ -123,7 +161,7 @@ export type ResultClient<T extends AnyNestedClient> =
  * ```ts
  * import { createResultClient } from "@unthrown/orpc/client";
  *
- * const rc = createResultClient(client);
+ * const rc = createResultClient(client, { contract });
  *
  * const greeting = await rc.planet
  *   .find({ id })
@@ -140,32 +178,55 @@ export type ResultClient<T extends AnyNestedClient> =
  *   });
  * ```
  */
-export function createResultClient<T extends AnyNestedClient>(client: T): ResultClient<T> {
-  const target = (...args: unknown[]) => {
-    const procedure = client as (...rest: unknown[]) => PromiseWithError<unknown, unknown>;
-    // The call is passed as a THUNK: a callable that throws synchronously
-    // (out of contract for a real oRPC client, but reachable through the
-    // untyped proxy) becomes a Defect instead of escaping as a raw throw.
-    return liftCall(() => procedure(...args));
+export function createResultClient<T extends AnyNestedClient>(
+  client: T,
+  options: CreateResultClientOptions = {},
+): ResultClient<T> {
+  return wrapClient(client, options.contract, []) as ResultClient<T>;
+}
+
+function wrapClient(
+  client: AnyNestedClient,
+  contract: RouterContract | undefined,
+  path: readonly string[],
+): unknown {
+  const procedure = client as (...rest: unknown[]) => PromiseWithError<unknown, unknown>;
+  const reconcile = async (cause: unknown): Promise<never> => {
+    // The contract lookup runs only on a rejection, inside the boundary: a
+    // path the contract does not know surfaces as a Defect, never a throw.
+    throw contract !== undefined && cause instanceof ORPCError
+      ? await reconcileORPCError(
+          getProcedureContractOrThrow(contract, [...path])["~orpc"].errorMap,
+          cause,
+        )
+      : cause;
   };
-  const proxy = new Proxy(target, {
+  // The call is passed as a THUNK: a callable that throws synchronously (out
+  // of contract for a real oRPC client, but reachable through the untyped
+  // proxy) becomes a Defect instead of escaping as a raw throw.
+  const target = (...args: unknown[]) =>
+    liftCall(() => procedure(...args).catch(reconcile) as PromiseWithError<unknown, unknown>);
+  const cache = new Map<string, unknown>();
+  return new Proxy(target, {
     get(_, prop) {
-      // Never expose a callable `then`. The trap wraps every object/function
-      // property, so on a client whose own proxy answers *any* key with a
-      // nested procedure, `rc.then` would become callable and `await rc` would
-      // invoke it — the classic accidental-thenable trap. oRPC's own client
-      // proxy happens to guard `then` today, but that is its invariant to
-      // change, not ours to depend on.
-      if (prop === "then") return undefined;
-      const value = (client as Record<PropertyKey, unknown>)[prop];
+      // oRPC's own reserved keys (`then`, `bind`, `call`, `apply`, `toString`,
+      // `valueOf`, `toJSON`) are answered by the function target, never
+      // wrapped: a wrapped `then` would make `await rc` invoke a procedure,
+      // and a wrapped `toString` would return an `AsyncResult`.
+      if (typeof prop !== "string" || RECURSIVE_CLIENT_UNWRAP_KEYS.has(prop)) {
+        return Reflect.get(target, prop);
+      }
+      if (cache.has(prop)) return cache.get(prop);
+      const value = (client as Record<string, unknown>)[prop];
       // A nested router segment (object) or procedure (function) is wrapped
-      // recursively; anything else (a symbol-keyed well-known, an own field
-      // of a callable client) passes through untouched.
+      // recursively; anything else (an own field of a callable client) passes
+      // through untouched.
       if ((typeof value !== "object" || value === null) && typeof value !== "function") {
         return value;
       }
-      return createResultClient(value as AnyNestedClient);
+      const wrapped = wrapClient(value as AnyNestedClient, contract, [...path, prop]);
+      cache.set(prop, wrapped);
+      return wrapped;
     },
   });
-  return proxy as ResultClient<T>;
 }

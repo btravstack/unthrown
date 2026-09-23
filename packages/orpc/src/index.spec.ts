@@ -14,7 +14,7 @@
 
 import { createORPCClient, isDefinedError, ORPCError } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
-import { oc } from "@orpc/contract";
+import { oc, type RouterContractClient, type Schema } from "@orpc/contract";
 import {
   type AnyORPCError,
   call,
@@ -26,7 +26,7 @@ import {
 } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import "@unthrown/vitest";
-import { type AsyncResult, Err, fromSafePromise, Ok, type Result } from "unthrown";
+import { type AsyncResult, Err, fromPromise, fromSafePromise, Ok, type Result } from "unthrown";
 import { describe, expect, test } from "vitest";
 
 import { createResultClient, fromCall } from "./client.js";
@@ -127,6 +127,25 @@ describe("handlerResult over the in-process client", () => {
     await expect(rc.liftedOk()).toBeOkWith(42);
   });
 
+  test("a Defect whose cause is a declared ORPCError never reaches the client as an Err", async () => {
+    // A downstream oRPC call qualified as a defect: raw, the cause would be
+    // reconciled against THIS procedure's `.errors({...})` and its declared
+    // code would flip to defined.
+    const leaky = os
+      .errors({ NOT_FOUND: {} })
+      .handler(
+        handlerResult(() =>
+          fromPromise(Promise.reject(new ORPCError("NOT_FOUND")), (cause, defect) => defect(cause)),
+        ),
+      );
+    const result = await fromCall(call(leaky, undefined));
+    expect(result).toBeDefect();
+    if (result.isDefect()) {
+      expect(isDefinedError(result.cause)).toBe(false);
+      expect((result.cause as Error).cause).toBeInstanceOf(ORPCError);
+    }
+  });
+
   test("a non-ORPCError Err smuggled past the types routes to the defect path", async () => {
     // Through well-typed code this is unreachable (`TError extends
     // AnyORPCError`); a widened caller must not have its error served as a
@@ -217,6 +236,16 @@ describe("createResultClient", () => {
     expect((rc.planet as unknown as Record<string, unknown>)["then"]).toBeUndefined();
     // …so awaiting it resolves to the client itself rather than hanging.
     await expect(Promise.resolve(rc as unknown as Promise<unknown>)).resolves.toBe(rc);
+  });
+
+  test("a nested segment is wrapped once and reused", () => {
+    expect(rc.planet).toBe(rc.planet);
+    expect(rc.planet.find).toBe(rc.planet.find);
+  });
+
+  test("oRPC's reserved keys are answered by the target, never wrapped as procedures", () => {
+    expect(typeof rc.planet.toString()).toBe("string");
+    expect((rc.planet as unknown as Record<string, unknown>)["bind"]).toBe(Function.prototype.bind);
   });
 
   test("results chain with combinators", async () => {
@@ -317,5 +346,79 @@ describe("through a real serialization round-trip (RPCHandler ↔ RPCLink)", () 
       expect((result.cause as ORPCError<string, unknown>).code).toBe("INTERNAL_SERVER_ERROR");
       expect(isDefinedError(result.cause)).toBe(false);
     }
+  });
+});
+
+describe("createResultClient with the client's own contract", () => {
+  // A rolling deploy: the client compiled against `before`, the server already
+  // serves `after`, which declares a new code and loosens NOT_FOUND's data.
+  const idSchema: Schema<{ id: number }, { id: number }> = {
+    "~standard": {
+      version: 1,
+      vendor: "test",
+      validate: (value) =>
+        typeof (value as { id?: unknown } | undefined)?.id === "number"
+          ? { value: value as { id: number } }
+          : { issues: [{ message: "id must be a number" }] },
+    },
+  };
+  const lookupInput = type<{ answer: "missing" | "gone" | "bad-data" }>();
+  const before = { lookup: oc.input(lookupInput).errors({ NOT_FOUND: { data: idSchema } }) };
+  const after = {
+    lookup: oc.input(lookupInput).errors({ NOT_FOUND: { data: type<unknown>() }, GONE: {} }),
+  };
+
+  const server = implement(after);
+  const handler = new RPCHandler(
+    server.router({
+      lookup: server.lookup.result(({ input, errors }) =>
+        Err(
+          input.answer === "gone"
+            ? errors.GONE()
+            : errors.NOT_FOUND({ data: input.answer === "missing" ? { id: 1 } : { id: "1" } }),
+        ),
+      ),
+    }),
+  );
+  const client = createORPCClient<RouterContractClient<typeof before>>(
+    new RPCLink({
+      url: "/rpc",
+      fetch: async (url, init) => {
+        const request = new Request(new URL(url, "http://in-memory.test"), init);
+        const { response } = await handler.handle(request, { prefix: "/rpc" });
+        return response ?? new Response("no procedure matched", { status: 404 });
+      },
+    }),
+  );
+
+  test("a code the client declares, with valid data, is an Err", async () => {
+    const result = await createResultClient(client, { contract: before }).lookup({
+      answer: "missing",
+    });
+    expect(result).toBeErr();
+    if (result.isErr()) expect(result.error.data).toEqual({ id: 1 });
+  });
+
+  test("a code only the server declares is a Defect", async () => {
+    const result = await createResultClient(client, { contract: before }).lookup({
+      answer: "gone",
+    });
+    expect(result).toBeDefect();
+    if (result.isDefect()) {
+      expect((result.cause as ORPCError<string, unknown>).code).toBe("GONE");
+    }
+  });
+
+  test("declared-code data failing the client's schema is a Defect", async () => {
+    const result = await createResultClient(client, { contract: before }).lookup({
+      answer: "bad-data",
+    });
+    expect(result).toBeDefect();
+  });
+
+  test("without the contract, the server's `defined` flag decides", async () => {
+    // The unguarded default: `GONE` lands in an `E` typed as NOT_FOUND only.
+    const result = await createResultClient(client).lookup({ answer: "gone" });
+    expect(result).toBeErr();
   });
 });

@@ -11,25 +11,25 @@ pnpm add @unthrown/orpc unthrown
 ```
 
 oRPC's error model already agrees with the [thesis](../explanation/why-unthrown):
-an error a procedure **declares** (`.errors({...})`) or **returns as a value** is
-_inferable_ — typed end-to-end — while everything else collapses to
-`INTERNAL_SERVER_ERROR`. That is exactly the `Err` /
+an error whose code a procedure **declares** (`.errors({...})`) is _defined_ —
+typed end-to-end — while everything else collapses to `INTERNAL_SERVER_ERROR`
+or reaches the client undefined. That is exactly the `Err` /
 [`Defect`](../explanation/the-defect-channel) split:
 
-| unthrown     | oRPC v2                                       |
-| ------------ | --------------------------------------------- |
-| `Ok(value)`  | the procedure's output                        |
-| `Err(error)` | a returned `ORPCError` — inferable, typed E2E |
-| `Defect`     | everything else (`INTERNAL_SERVER_ERROR`)     |
+| unthrown     | oRPC v2                                    |
+| ------------ | ------------------------------------------ |
+| `Ok(value)`  | the procedure's output                     |
+| `Err(error)` | a thrown, declared `ORPCError` — typed E2E |
+| `Defect`     | everything else (`INTERNAL_SERVER_ERROR`)  |
 
 Qualification happens **once, inside the bridge**: the triage decision was already
-made when the procedure declared (or returned) its errors, so no per-call
+made when the procedure declared its errors, so no per-call
 `qualify` is asked of you.
 
 ::: info oRPC v2
-The package targets oRPC **v2** (peer range `^2.0.0-beta`), whose
-returned-`ORPCError` inference is what the server half builds on. Its majors track
-oRPC's cadence, not the unthrown family's.
+The package targets oRPC **v2** (peer range `^2.0.0-beta.34`), whose defined
+`ORPCError` — a thrown error whose code `.errors({...})` declares — is what both
+halves build on. Its majors track oRPC's cadence, not the unthrown family's.
 :::
 
 ## Server: handlers that return a `Result`
@@ -67,25 +67,30 @@ per case, which failures the client is invited to handle and which are bugs. Add
 a case to the repository and this endpoint stops compiling until it decides.
 
 - `Ok` becomes the procedure's output.
-- `Err` is **returned as a value**; oRPC marks it inferable, so the client sees it
+- `Err` is **thrown**; oRPC marks a declared code defined, so the client sees it
   fully typed. The error channel is constrained to `ORPCError` — the `mapErrCases` that
   turns a domain error into one (here `errors.NOT_FOUND()`) is the explicit triage
   point at the transport boundary.
 - A `Defect` rethrows its original cause, which oRPC collapses to
   `INTERNAL_SERVER_ERROR`. A bug stays a defect — it never becomes a typed error
-  your client is invited to handle.
+  your client is invited to handle. An `ORPCError` cause (a downstream call you
+  qualified as a defect) is wrapped first: raw, oRPC would match its code against
+  this procedure's `.errors({...})` and serve it defined.
 
-A returned `ORPCError` needs no `.errors({...})` declaration — v2 infers it from
-the handler's type:
+An `ORPCError` whose code the procedure does **not** declare is never defined: its
+`code` and `data` survive on the wire, but the client files it as a `Defect`.
+Declare every code a client should handle:
 
 ```ts
-const limited = os.handler(
-  handlerResult(({ input }) =>
-    tooMany(input)
-      ? Err(new ORPCError("RATE_LIMITED", { data: { retryAfter: 60 } }))
-      : Ok("welcome"),
-  ),
-);
+const limited = os
+  .errors({ RATE_LIMITED: { data: z.object({ retryAfter: z.number() }) } })
+  .handler(
+    handlerResult(({ input, errors }) =>
+      tooMany(input)
+        ? Err(errors.RATE_LIMITED({ data: { retryAfter: 60 } }))
+        : Ok("welcome"),
+    ),
+  );
 // the client's error channel: ORPCError<"RATE_LIMITED", { retryAfter: number }>
 ```
 
@@ -127,7 +132,7 @@ patching a third-party prototype is unwelcome.
 ```ts
 import { createResultClient } from "@unthrown/orpc/client";
 
-const rc = createResultClient(client);
+const rc = createResultClient(client, { contract });
 
 const greeting = await rc.planet
   .find({ id })
@@ -143,21 +148,32 @@ const greeting = await rc.planet
   });
 ```
 
-`E` is exactly the set of codes the procedure declares or returns — so listing
+`E` is exactly the set of codes the procedure declares — so listing
 them is finite and mechanical, and adding a code server-side lights up every
 client call site.
 
-The error channel is the raw inferable `ORPCError` union, discriminated by `code`
+The error channel is the raw defined `ORPCError` union, discriminated by `code`
 — deliberately **not** re-wrapped into [tagged errors](./model-errors): oRPC
 already ships a discriminated error type, and one concept should have one name.
 Branch on `code` — in `match`'s `errCases` matcher (as above), a `switch`, or a
 standalone `match`. Because these are plain `ORPCError`s rather than
 `TaggedError`s, `P.tag(...)` doesn't apply — match on the `code` field instead.
 
-Anything non-inferable — a network failure, an undeclared throw collapsed to
+Anything else — a network failure, an undeclared throw collapsed to
 `INTERNAL_SERVER_ERROR`, a malformed response — is a `Defect`: it flows past your
 error combinators and [panics at `get`](../explanation/the-defect-channel), because
 it is a bug (or an outage), not an outcome your domain models.
+
+### Passing the contract
+
+An oRPC server reconciles each thrown `ORPCError` against _its_ contract before
+answering, so without more the client trusts the server's version of
+`.errors({...})`. During a rolling deploy that version can be newer: a code the
+client never declared arrives `defined` and lands in an `E` with no arm for it.
+Pass the `contract` the client was built from and every rejection is reconciled
+against the client's own declaration instead (oRPC's `reconcileORPCError`: the
+code must be declared **and** its `data` must pass the declared schema) — what
+the client did not compile against is a `Defect`.
 
 `fromCall` is the one-shot form, and also lifts oRPC's server-side
 `call(procedure, input)`:

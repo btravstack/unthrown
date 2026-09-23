@@ -52,7 +52,9 @@ const find = os
 `Ok` becomes the output; `Err` (constrained to `ORPCError` — the `mapErrCases` at the
 endpoint is the explicit triage point) is thrown, so a code declared in
 `.errors({...})` reaches the client defined and typed; a `Defect` rethrows its
-cause and stays a defect. A handler may also be written as `.result(...)`
+cause and stays a defect — an `ORPCError` cause is wrapped first, so a
+downstream error qualified as a defect answers `INTERNAL_SERVER_ERROR`, never
+its own declared code. A handler may also be written as `.result(...)`
 directly, by opting into the builder extension:
 
 ```ts
@@ -80,7 +82,7 @@ and on contract-first `implement(...)` implementers.)
 ```ts
 import { createResultClient } from "@unthrown/orpc/client";
 
-const rc = createResultClient(client);
+const rc = createResultClient(client, { contract });
 
 const greeting = await rc.planet
   .find({ id })
@@ -102,12 +104,20 @@ Every procedure returns `AsyncResult<Output, DefinedErrors>`: the defined
 undeclared throw, a malformed response) is a `Defect`. `fromCall(promise)` is
 the one-shot form — it also lifts oRPC's server-side `call(procedure, input)`.
 
+Pass the `contract` the client was built from whenever client and server deploy
+independently. Every rejection is then reconciled against the client's own
+`.errors({...})` (oRPC's `reconcileORPCError`: a declared code, with `data`
+passing its schema), so a code only a newer server declares is a `Defect`
+instead of an `Err` your `errCases` has no arm for. Without it, the `defined`
+flag the server sent decides.
+
 Event-iterator (streaming) procedures are out of scope: a stream does not
 collapse to one `Result`. Keep calling those on the raw client.
 
 ## Versioning
 
-`@unthrown/orpc` targets **oRPC v2** (peer range `^2.0.0-beta.34` — beta.34
+`@unthrown/orpc` targets **oRPC v2** (peers `@orpc/client` and `@orpc/contract`,
+optional `@orpc/server`, range `^2.0.0-beta.34` — beta.34
 removed the returned-error/inferable-flag mechanism this bridge previously
 relied on, so earlier betas are unsupported) and its majors track oRPC's
 cadence, not the unthrown family's.

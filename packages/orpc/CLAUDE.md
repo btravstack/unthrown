@@ -5,9 +5,10 @@ theses, the load-bearing runtime invariants, the public surface and the
 internal design — live in the root [`CLAUDE.md`](../../CLAUDE.md) and apply
 here too.
 
-PeerDeps `@orpc/client` + `@orpc/server`
+PeerDeps `@orpc/client` + `@orpc/contract` + `@orpc/server`
 at `^2.0.0-beta.34` — **peers, not deps**: `isDefinedError` is an
 `instanceof ORPCError` check, the same dual-copy hazard as `isResult`;
+`@orpc/contract` supplies `reconcileORPCError` and the path lookup;
 `@orpc/server` is an **optional** peer so a browser-only consumer skips it.
 beta.34 removed oRPC's returned-error channel and the `inferable` flag
 outright (middleapi/orpc#1987) — a returned value, `ORPCError` included, is
@@ -26,8 +27,10 @@ entry points, **no root export**: `./server` — `handlerResult(fn)` adapts a
 `mapErrCases` into `errors.CODE(...)` at the endpoint is the Thesis-#3 triage
 point; `Err` is always THROWN, never returned — returning would serve it as
 a successful output or fail output validation into a 500; a `Defect`
-rethrows its cause; the callback may be async — an elimination edge, exempt
-like `match`). `./extensions/result` — the opt-in `.result()` builder
+rethrows its cause — an `ORPCError` cause wrapped in a plain `Error` first,
+because oRPC reconciles every thrown `ORPCError` against the procedure's
+`.errors()` and a declared code would otherwise reach the client defined;
+the callback may be async — an elimination edge, exempt like `match`). `./extensions/result` — the opt-in `.result()` builder
 method via `declare module "@orpc/server"` augmentation + two prototype
 patches (`Builder`, `ProcedureImplementer` — every builder state shares the
 `Builder` class at runtime); the package's ONE side-effectful entry, listed
@@ -36,8 +39,15 @@ in a `sideEffects` array (the `@orpc/experimental-effect` packaging).
 argument, so the builder's `.result()` overloads no longer merge an
 `Extract<TOutput, AnyORPCError>` arm into it either — output is plain
 `Schema<TOutput>`. `./client` — `fromCall(promise)` lifts a single call
-(client call or server-side `call(...)`), `createResultClient(client)`
-recursively wraps a router (the `createSafeClient` mirror): `E` is the raw
+(client call or server-side `call(...)`), `createResultClient(client, { contract? })`
+recursively wraps a router (the `createSafeClient` mirror; each nested
+segment wrapped once and cached, oRPC's `RECURSIVE_CLIENT_UNWRAP_KEYS`
+answered by the target, never wrapped). With `contract`, every rejected
+`ORPCError` is re-reconciled against the client's own procedure entry
+(`reconcileORPCError`: declared code AND `data` passing its schema) before
+triage, so the channel follows the contract the caller compiled against, not
+the server's `defined` flag — the rolling-deploy case, where a newer server
+declares a code the client's `E` has no arm for. Either way: `E` is the raw
 defined `ORPCError` union discriminated by `code` — deliberately NOT
 re-wrapped into `TaggedError` (match it on `code`, e.g.
 `.mapErrCases((matcher) => matcher.with({ code: "NOT_FOUND" }, …))`); the

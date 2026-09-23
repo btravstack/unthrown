@@ -10,13 +10,15 @@
 //
 //   Ok(value)  → return value         (the procedure's output)
 //   Err(error) → throw the ORPCError  (a declared code lands defined — typed E2E)
-//   Defect     → rethrow the cause    (oRPC collapses an opaque cause to INTERNAL_SERVER_ERROR)
+//   Defect     → rethrow the cause    (oRPC collapses an opaque cause to INTERNAL_SERVER_ERROR;
+//                                      an ORPCError cause is wrapped first, see handlerResult)
 //
 // The handler's `Err` channel is constrained to `ORPCError`: mapping a domain
 // error into one — `mapErrCases((m) => m.with(P.tag("NotFound"), () => errors.NOT_FOUND({...})))`,
 // one arm per case of `E` — is the explicit triage point at the transport
 // boundary (Thesis #3).
 
+import { ORPCError } from "@orpc/client";
 import type {
   AnyORPCError,
   Context,
@@ -57,7 +59,9 @@ export type ResultHandler<
  * is thrown, so a declared code reaches the client as a defined, typed error;
  * a `Defect` rethrows its original cause — oRPC collapses an opaque cause to
  * `INTERNAL_SERVER_ERROR`, but a bug stays a defect either way, never a
- * typed error.
+ * typed error. A cause that is itself an `ORPCError` (a downstream oRPC call
+ * qualified as a defect) is wrapped in a plain `Error` first, so it too
+ * answers `INTERNAL_SERVER_ERROR` instead of its own code and status.
  *
  * Like `match` handlers, the callback may be `async` (an edge elimination is
  * exempt from the no-thenable rule): a rejection or throw inside it cannot
@@ -110,6 +114,12 @@ export function handlerResult<
       // Throwing a declared code is what earns it `defined: true` on the wire.
       throw result.error;
     }
-    throw result.cause; // Defect — rethrow the cause onto oRPC's defect path.
+    // Defect — rethrow onto oRPC's defect path. An `ORPCError` cause is
+    // wrapped: raw, oRPC would reconcile it against this procedure's
+    // `.errors({...})`, and a declared code would reach the client as a
+    // defined, typed error.
+    throw result.cause instanceof ORPCError
+      ? new Error("Unmodeled failure", { cause: result.cause })
+      : result.cause;
   };
 }
