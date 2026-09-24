@@ -298,6 +298,21 @@ const nestedCte = db.$with("n").as(db.with(insertCte).select().from(insertCte));
 const cteNested = async () => await db.with(nestedCte).select().from(nestedCte);
 type _cteNestedErr = Expect<Equal<ErrChannel<typeof cteNested>, PgQueryError>>;
 
+// A chained read (drizzle re-types `.where()` through the HKT) and a read over
+// a read both stay reads.
+const filteredCte = db.$with("f").as(db.select().from(users).where(eq(users.id, 1)));
+const cteFiltered = async () => await db.with(filteredCte).select().from(filteredCte);
+type _cteFilteredErr = Expect<Equal<ErrChannel<typeof cteFiltered>, never>>;
+const readOverRead = db.$with("rr").as(db.with(readCte).select().from(readCte));
+const cteReadOverRead = async () => await db.with(readOverRead).select().from(readOverRead);
+type _cteReadOverReadErr = Expect<Equal<ErrChannel<typeof cteReadOverRead>, never>>;
+
+// The callback form builds on drizzle's stock QueryBuilder, whose own `with()`
+// can nest a writing CTE this type cannot see — so it counts as writing.
+const builderCte = db.$with("b").as((qb) => qb.select().from(users));
+const cteBuilder = async () => await db.with(builderCte).select().from(builderCte);
+type _cteBuilderErr = Expect<Equal<ErrChannel<typeof cteBuilder>, PgQueryError>>;
+
 // Raw SQL cannot be inspected, so it counts as writing.
 const rawCte = db.$with("s", { id: users.id }).as(sql`select id from users`);
 const cteRaw = async () => await db.with(rawCte).select().from(rawCte);

@@ -360,10 +360,24 @@ describe("PgUnthrownDatabase — CTEs and relational queries", () => {
     const { db } = makeDb(violation());
 
     const adults = db.$with("adults").as(db.select().from(users));
-    const viaBuilder = db.$with("qb").as((qb) => qb.select().from(users));
+    const nested = db.$with("nested").as(db.with(adults).select().from(adults));
 
     await expect(db.with(adults).select().from(adults)).toBeDefect();
-    await expect(db.with(adults, viaBuilder).select().from(viaBuilder).execute()).toBeDefect();
+    await expect(db.with(adults, nested).select().from(nested).execute()).toBeDefect();
+  });
+
+  it("qualifies a CTE from drizzle's stock QueryBuilder as a possible write", async () => {
+    // The callback form hands over drizzle's own QueryBuilder, whose `with()`
+    // can nest a writing CTE that neither the type nor this package's
+    // bookkeeping can see — so its 23505 must stay an Err, not a Defect.
+    const { db } = makeDb(violation());
+
+    const written = db.$with("w").as(db.insert(users).values({ id: 1, name: "ada" }).returning());
+    const viaBuilder = db.$with("qb").as((qb) => qb.with(written).select().from(written));
+    const plain = db.$with("plain").as((qb) => qb.select().from(users));
+
+    await expect(db.with(viaBuilder).select().from(viaBuilder)).toBeErr();
+    await expect(db.with(plain).select().from(plain)).toBeErr();
   });
 
   it("builds a CTE from a raw SQL fragment and an explicit selection", async () => {

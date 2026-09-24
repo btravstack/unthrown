@@ -19,8 +19,9 @@ Transaction, CTE and error-serialisation fixes.
 - **A select over a writing CTE is typed and qualified as a write.**
   `db.with(db.$with("x").as(db.insert(t).values(v).returning())).select()` runs
   a real `INSERT`, but carried `E = never` and turned a 23505 into a `Defect`. It
-  now carries `PgQueryError`. A CTE over raw SQL counts as writing too; a CTE over
-  a plain select stays a read. `PgUnthrownSelectBase`, `PgUnthrownSelectHKT` and
+  now carries `PgQueryError`. A CTE over raw SQL or built in the `.as((qb) => …)`
+  callback form (drizzle's stock query builder, which can nest a write) counts as
+  writing too; a CTE over a plain `db.select()` stays a read. `PgUnthrownSelectBase`, `PgUnthrownSelectHKT` and
   `PgUnthrownSelectBuilder` gain a trailing `TError` parameter (default `never`),
   and `CteError` and `WithListError` are exported.
 - **Modeled errors no longer serialise driver detail.** `detail` (which quotes

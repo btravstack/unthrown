@@ -1,4 +1,4 @@
-import { entityKind, is } from "drizzle-orm/entity";
+import { entityKind } from "drizzle-orm/entity";
 import type { PgColumn } from "drizzle-orm/pg-core/columns/common";
 import type { PgDialect } from "drizzle-orm/pg-core/dialect";
 import {
@@ -8,7 +8,6 @@ import {
   QueryBuilder,
 } from "drizzle-orm/pg-core/query-builders";
 import { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query";
-import { PgSelectBase } from "drizzle-orm/pg-core/query-builders/select";
 import type { SelectedFields } from "drizzle-orm/pg-core/query-builders/select.types";
 import type { PgQueryResultHKT, PgQueryResultKind } from "drizzle-orm/pg-core/session";
 import type { WithSubqueryWithSelection } from "drizzle-orm/pg-core/subquery";
@@ -37,6 +36,7 @@ import { PgUnthrownRefreshMaterializedView } from "./refresh-materialized-view.j
 import {
   PgUnthrownSelectBase,
   type PgUnthrownSelectBuilder,
+  type PgUnthrownSelectHKT,
   readOnlyCtes,
   withListWrites,
 } from "./select.js";
@@ -60,25 +60,13 @@ export type CteError<TError> = { readonly _: { readonly unthrownError?: TError }
 
 /**
  * What a CTE built from `Q` may raise: one of this package's selects raises
- * what it would raise on its own, any other select (drizzle's `QueryBuilder`)
- * only reads, and anything else — an insert, update or delete — may write.
+ * what it would raise on its own; anything else may write — an insert, update
+ * or delete, and a select from drizzle's stock `QueryBuilder` (the callback
+ * form), whose own `WITH` list can nest a writing CTE this type cannot see.
  */
-type SourceError<Q> =
-  Q extends PgUnthrownSelectBase<
-    infer _TableName,
-    infer _Selection,
-    infer _SelectMode,
-    infer _NullabilityMap,
-    infer _Dynamic,
-    infer _Excluded,
-    infer _Result,
-    infer _Fields,
-    infer E
-  >
-    ? E
-    : Q extends { readonly _: { readonly selectMode: unknown } }
-      ? never
-      : PgQueryError;
+type SourceError<Q> = Q extends { readonly _: { readonly hkt: PgUnthrownSelectHKT<infer E> } }
+  ? E
+  : PgQueryError;
 
 /**
  * The error channel a `WITH` list adds to its select: the union of what its
@@ -297,12 +285,11 @@ export class PgUnthrownDatabase<
       );
       // The runtime half of `PgUnthrownWithBuilder`'s `CteError`, by the same
       // rule: one of this package's selects reads unless its own `WITH` list
-      // may write; any other select (drizzle's `QueryBuilder`) reads; anything
-      // else — an insert, update or delete, or raw SQL — may write.
+      // may write; anything else — an insert, update or delete, raw SQL, or a
+      // stock `QueryBuilder` select (whose `WITH` list may nest a write) — may
+      // write.
       const reads =
-        built instanceof PgUnthrownSelectBase
-          ? !withListWrites(built._.config.withList)
-          : is(built, PgSelectBase);
+        built instanceof PgUnthrownSelectBase && !withListWrites(built._.config.withList);
       if (reads) readOnlyCtes.add(cte);
       return cte;
     };

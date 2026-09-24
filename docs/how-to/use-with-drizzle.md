@@ -108,8 +108,10 @@ const rows = await db.with(created).select().from(created);
 //    ^? Result<{ id: number; email: string }[], PgQueryError>
 ```
 
-A CTE over raw SQL counts as writing too, since its text cannot be inspected; a
-CTE over a plain select stays a read, so `get()` still compiles on it.
+A CTE over raw SQL counts as writing too, since its text cannot be inspected, and
+so does one built in the callback form (`.as((qb) => qb.select()…)`): that is
+drizzle's stock query builder, whose own `with()` can nest a write. A CTE over a
+plain `db.select()` stays a read, so `get()` still compiles on it.
 :::
 
 ::: warning `refreshMaterializedView` is a read by decision

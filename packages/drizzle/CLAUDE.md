@@ -57,9 +57,11 @@ a `Defect` under `E = never`). The type half is the internal `PgUnthrownWithBuil
 listed in `intentionallyNotExported`: TypeDoc on TypeScript 6 runs out of heap
 expanding it, and `build-api.ts` still printed a ✓ for the crashed run):
 `db.$with` stamps each CTE with a phantom `CteError` in drizzle's `_` type bag
-(the source select's own channel, `never` for drizzle's `QueryBuilder` select,
-`PgQueryError` for anything else — an insert/update/delete, and **raw SQL**,
-which cannot be inspected), and `db.with(...ctes)` threads `WithListError` into
+(a `db.select()`'s own channel, recognised through its `PgUnthrownSelectHKT` in
+the `_.hkt` slot so chained methods keep it; `PgQueryError` for anything else —
+an insert/update/delete, **raw SQL**, which cannot be inspected, and a select
+from drizzle's stock `QueryBuilder` (the `.as((qb) => …)` callback form), whose
+own `with()` can nest a writing CTE nothing here can see), and `db.with(...ctes)` threads `WithListError` into
 the select HKT's `TError` parameter, which every chained method carries. The
 runtime half is a `readOnlyCtes` `WeakSet` filled by the same rule; a CTE
 absent from it — including one a stock drizzle `$with` built — is treated as
