@@ -193,7 +193,9 @@ promise never rejects**: `await asyncResult` always yields a `Result`. Three
 deltas:
 
 1. **Combinator callbacks are synchronous.** A raw `Promise` return does not
-   compile (it would bypass qualification). Async work re-enters through a
+   compile (it would bypass qualification) — error-matcher branches included
+   (`mapErrCases` / `recoverErrCases` too; only `match`'s handlers may be
+   async). Async work re-enters through a
    boundary and composes with `flatMap`:
    ```ts
    const status = await findUser(id) // Result<User, NotFound>

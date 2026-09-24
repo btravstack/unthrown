@@ -7,6 +7,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  all,
+  allAsync,
+  allFromDict,
+  allFromDictAsync,
   Do,
   Err,
   fromExecutor,
@@ -20,7 +24,14 @@ import {
   validateAllFromDict,
   validateAllFromDictAsync,
 } from "./index.js";
-import { adoptionProbe, boom, defectOf, flushMicrotasks } from "./test-helpers.js";
+import {
+  adoptionProbe,
+  boom,
+  defectOf,
+  expectDefect,
+  flushMicrotasks,
+  lazyThenable,
+} from "./test-helpers.js";
 
 describe("Invariant 1: throw inside any combinator becomes a Defect", () => {
   it("every catching combinator converts a thrown callback into a Defect", () => {
@@ -85,6 +96,35 @@ describe("Invariant 1: throw inside any combinator becomes a Defect", () => {
     expect(validateAllFromDict({ a: Err("e") }, t).isDefect()).toBe(true);
     expect((await validateAllAsync([Err("e").toAsync()], t)).isDefect()).toBe(true);
     expect((await validateAllFromDictAsync({ a: Err("e").toAsync() }, t)).isDefect()).toBe(true);
+  });
+
+  it("covers an out-of-contract aggregate CONTAINER too — never a raw (or synchronous) throw", async () => {
+    // Untyped callers: no container at all, or a record whose getter throws.
+    const hostile = Object.defineProperty({}, "a", {
+      enumerable: true,
+      get: () => {
+        throw boom;
+      },
+    });
+    const merge = () => "merged";
+    const sync = [
+      all(undefined as never),
+      allFromDict(null as never),
+      allFromDict(hostile),
+      validateAll(undefined as never, merge),
+      validateAllFromDict(hostile, merge),
+    ];
+    for (const r of sync) expect(r.isDefect()).toBe(true);
+    expectDefect(allFromDict(hostile), boom); // the thrown value is the cause
+    // The async forms must not throw synchronously, and must resolve to a Defect.
+    const pending = [
+      allAsync(undefined as never),
+      allFromDictAsync(null as never),
+      allFromDictAsync(hostile),
+      validateAllAsync(undefined as never, merge),
+      validateAllFromDictAsync(hostile, merge),
+    ];
+    for (const r of await Promise.all(pending)) expect(r.isDefect()).toBe(true);
   });
 });
 
@@ -315,7 +355,7 @@ describe("Invariant 5: an AsyncResult's internal promise never rejects", () => {
   });
 });
 
-describe("Invariant 6: a DISCARDED thenable is adopted, so its rejection never floats", () => {
+describe("Invariant 6: a DISCARDED promise is silenced, and a lazy thenable is never started", () => {
   // The observers throw their callback's return value away, and the
   // Result-returning combinators reject a non-Result one. A thenable that
   // slipped past `NotThenable` (a cast, a raw-JS caller) is therefore dropped
@@ -323,9 +363,9 @@ describe("Invariant 6: a DISCARDED thenable is adopted, so its rejection never f
   // default. Worse for an observer: its whole job is to surface a failure, and
   // this is the one path where the failure would be invisible.
   //
-  // Asserted POSITIVELY, via `adoptionProbe`: `Promise.resolve(x)` calls
-  // `x.then(onFulfilled, onRejected)`, so an `onRejected` function arriving at
-  // the fixture is proof the value was adopted. The earlier shape asserted the
+  // Asserted POSITIVELY, via `adoptionProbe` (a Promise instance): the net
+  // calls `x.then(undefined, onRejected)`, so an `onRejected` function arriving
+  // at the fixture is proof the value was held. The earlier shape asserted the
   // *absence* of a global `unhandledRejection` after two `setTimeout(0)`s —
   // a negative assertion on a timing heuristic, which cannot tell "never fires"
   // from "fires later than the window", so it could have silently stopped
@@ -333,15 +373,15 @@ describe("Invariant 6: a DISCARDED thenable is adopted, so its rejection never f
   const expectAdopted = async (run: (thenable: PromiseLike<never>) => unknown): Promise<void> => {
     const { thenable, adoptions } = adoptionProbe();
     // Awaiting settles an AsyncResult's pipeline (a sync Result is not thenable,
-    // so this is just a microtask turn); the extra flush lets
-    // `Promise.resolve(thenable)` reach the fixture's `then`.
+    // so this is just a microtask turn); the extra flush lets the pipeline
+    // reach the fixture's `then`.
     await run(thenable);
     await flushMicrotasks();
     expect(adoptions).toHaveLength(1);
     expect(typeof adoptions[0]?.onRejected).toBe("function");
   };
 
-  it.each([
+  const nets: [string, (t: PromiseLike<never>) => unknown][] = [
     ["tap", (t: PromiseLike<never>) => Ok(1).tap((() => t) as never)],
     ["tapDefect", (t: PromiseLike<never>) => defectOf(boom).tapDefect((() => t) as never)],
     ["tapFailure", (t: PromiseLike<never>) => Err("e" as const).tapFailure((() => t) as never)],
@@ -370,8 +410,42 @@ describe("Invariant 6: a DISCARDED thenable is adopted, so its rejection never f
       (t: PromiseLike<never>) =>
         fromExecutor<number, never>((s) => (s as unknown as (v: unknown) => void)(t)),
     ],
-  ])("%s adopts a smuggled thenable rather than dropping it", async (_label, run) => {
+    [
+      "async tap",
+      (t: PromiseLike<never>) =>
+        Ok(1)
+          .toAsync()
+          .tap((() => t) as never),
+    ],
+    [
+      "mapErrCases",
+      (t: PromiseLike<never>) =>
+        Err("e" as const).mapErrCases(((m: never) =>
+          (m as { with: (p: string, h: () => unknown) => unknown }).with("e", () => t)) as never),
+    ],
+    [
+      "recoverErrCases",
+      (t: PromiseLike<never>) =>
+        Err("e" as const).recoverErrCases(((m: never) =>
+          (m as { with: (p: string, h: () => unknown) => unknown }).with("e", () => t)) as never),
+    ],
+  ];
+
+  it.each(nets)("%s silences a smuggled promise rather than dropping it", async (_label, run) => {
     await expectAdopted(run);
+  });
+
+  // The other half of the same rule: `Promise.resolve(x)` calls `x.then`, which
+  // STARTS a lazy thenable (a PrismaPromise, a query builder). Adopting one to
+  // silence it ran the very effect the pipeline was refusing — so a non-Promise
+  // thenable is classified but never touched. Not awaited: `fromExecutor`
+  // returning an unstarted thenable never settles, by design.
+  it.each(nets)("%s never calls `then` on a lazy thenable", async (_label, run) => {
+    const { thenable, calls } = lazyThenable();
+    run(thenable);
+    await flushMicrotasks();
+    await flushMicrotasks();
+    expect(calls()).toBe(0);
   });
 
   it("the async surface adopts it too", async () => {
@@ -400,6 +474,20 @@ describe("Invariant 6: a DISCARDED thenable is adopted, so its rejection never f
     const async = (() => thenable) as never;
     expect(validateAll([Err("e" as const)], async).isDefect()).toBe(true);
     expect(validateAllFromDict({ a: Err("e" as const) }, async).isDefect()).toBe(true);
+  });
+
+  it("an async mapErrCases / recoverErrCases branch yields a Defect, never Err/Ok(<Promise>)", () => {
+    // Banned at compile time; a cast or an untyped caller still reaches here.
+    const { thenable } = lazyThenable();
+    const branch = ((m: never) =>
+      (m as { with: (p: string, h: () => unknown) => unknown }).with("e", () => thenable)) as never;
+    for (const r of [
+      Err("e" as const).mapErrCases(branch),
+      Err("e" as const).recoverErrCases(branch),
+    ]) {
+      expect(r.isDefect()).toBe(true);
+      if (r.isDefect()) expect(r.cause).toBeInstanceOf(TypeError);
+    }
   });
 
   it("the observer still passes the original result through unchanged", () => {

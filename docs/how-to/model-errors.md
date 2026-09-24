@@ -224,6 +224,18 @@ const described = parsed.mapErrCases((matcher) =>
 );
 ```
 
+::: warning Structurally identical classes defeat `P.instanceOf`'s exhaustiveness
+The runtime check is `instanceof`, but the compile-time one is `Exclude` — and
+TypeScript is structural. Two classes with the same shape
+(`class A extends Error {}`, `class B extends Error {}`) are the same type, so
+a match naming only `A` compiles as exhaustive, and at runtime a `B` fails
+`instanceof A` and becomes a `Defect`. Give each class something that tells it
+apart — a `readonly kind = "A"` literal field, or `TaggedError`, whose `_tag`
+is exactly that — and the missing arm is a compile error again. Third-party
+classes usually differ already (`at` vs `afterMs` above); when they do not,
+tell them apart in `qualify` instead, by returning your own tagged error.
+:::
+
 `P.when(guard)` covers whatever the other two can't express — an arbitrary type
 guard, including one over a primitive.
 

@@ -34,6 +34,7 @@ import {
   isOk,
   isResult,
   match,
+  type Matcher,
   P,
   Ok,
   OkAsync,
@@ -46,6 +47,8 @@ import {
   validateAllFromDict,
   validateAllFromDictAsync,
 } from "./index.js";
+// Internal diagnostic type, imported for the branded-diagnostics assertion only.
+import type { UnhandledCases } from "./matcher.js";
 
 // --- assertion helpers -------------------------------------------------------
 
@@ -653,10 +656,21 @@ declare function sometimesWork(): Promise<number>;
   // A raw Promise / async branch would bypass qualification where the
   // combinator awaits it — flatMapErrCases / flatTapErrCases — so those reject it via
   // their builder-output constraint; tapErrCases rejects it too, because its branch
-  // results are DISCARDED (a rejected Promise would float unobserved). Only
-  // the non-awaiting transformers mapErrCases / recoverErrCases run the handler
-  // synchronously with no await, so an async branch there is merely a visible
-  // Promise-valued result, not a rejection bypass.
+  // results are DISCARDED (a rejected Promise would float unobserved). The
+  // non-awaiting transformers mapErrCases / recoverErrCases reject it as well:
+  // an async branch put `Err(<Promise>)` / `Ok(<Promise>)` in the channel — a
+  // Promise in `E` is exactly the un-triaged value Thesis #3 forbids — and its
+  // rejection floated unobserved.
+  // @ts-expect-error — an async mapErrCases branch is banned
+  r.mapErrCases((matcher) => matcher.with(P._, async () => "x"));
+  // @ts-expect-error — an async recoverErrCases branch is banned
+  r.recoverErrCases((matcher) => matcher.with(P._, async () => 1));
+  // @ts-expect-error — a sometimes-async mapErrCases branch is banned
+  r.mapErrCases((matcher) => matcher.with(P._, () => (sometimesFlag ? 1 : sometimesWork())));
+  // @ts-expect-error — an async mapErrCases branch is banned (async surface)
+  ar.mapErrCases((matcher) => matcher.with(P._, async () => "x"));
+  // @ts-expect-error — an async recoverErrCases branch is banned (async surface)
+  ar.recoverErrCases((matcher) => matcher.with(P._, async () => 1));
   // @ts-expect-error — an async flatMapErrCases branch is banned
   r.flatMapErrCases((matcher) => matcher.with(P._, async () => Ok(1)));
   // @ts-expect-error — an async flatTapErrCases branch is banned
@@ -1334,3 +1348,100 @@ void fromExecutor((settle) => {
   // @ts-expect-error - T/E default to never with no explicit args or contextual target
   settle(Ok(1));
 });
+
+// --- the branded diagnostics say what to do -----------------------------------
+
+// get/getErr: the `this` gate BECOMES the explanation on a fallible receiver
+// (it used to report a `DefectView` mismatch), and stays the receiver on an
+// empty one.
+type _getGateMessage = Expect<
+  Equal<
+    ThisParameterType<typeof rFallible.get>,
+    "unthrown: get() needs an empty error channel (E = never) — handle the Err first with recoverErrCases / match / flatMapErrCases, or use getOr / getOrElse / getOrNull / getOrUndefined"
+  >
+>;
+type _getErrGateMessage = Expect<
+  Equal<
+    ThisParameterType<typeof rFallible.getErr>,
+    "unthrown: getErr() needs an empty success channel (T = never) — narrow with isErr() first, or fold with match"
+  >
+>;
+type _getGateOpen = Expect<Equal<ThisParameterType<typeof rNever.get>, Result<number, never>>>;
+// A generic `T` with an empty error channel still extracts.
+function _genericGet<T>(r: Result<T, never>): T {
+  return r.get();
+}
+void _genericGet;
+
+// A non-exhaustive builder's `.exhaustive` is named for what is missing.
+type _unhandled = Expect<Equal<Matcher<"a" | "b", "b", number>["exhaustive"], UnhandledCases<"b">>>;
+
+// An async bind / awaiting branch names the fix: the marker's alias is what
+// the "Property 'flatMap' is missing in type 'Promise<…>'" error prints.
+{
+  const ar = Ok(1).toAsync() as AsyncResult<number, "e">;
+  // @ts-expect-error — an async flatMap callback is banned (ReturnAnAsyncResultNotAPromise)
+  ar.flatMap(async () => Ok(1));
+  // @ts-expect-error — an async flatTap callback is banned
+  ar.flatTap(async () => Ok(1));
+  const scope = Ok({}).toAsync();
+  // @ts-expect-error — an async bind callback is banned
+  scope.bind("x", async () => Ok(1));
+  // …while returning an AsyncResult still infers precisely through the marker.
+  const chained = ar.flatMap((n) => ErrAsync("f" as const).map(() => n));
+  type _Chained = Expect<Equal<typeof chained, AsyncResult<number, "e" | "f">>>;
+  const tapped = ar.flatTapErrCases((m) => m.with("e", () => ErrAsync("audit" as const)));
+  type _Tapped = Expect<Equal<typeof tapped, AsyncResult<number, "e" | "audit">>>;
+}
+
+// --- an empty object pattern is rejected where it is written ------------------
+
+{
+  const r = Ok(1) as Result<number, { code: "A" } | { code: "B" }>;
+  // `{}` matched every object at runtime, and `Exclude<E, {}>` erased every
+  // case — an unflagged catch-all. It is now a compile error at the pattern.
+  // @ts-expect-error — `{}` is not a pattern
+  r.mapErrCases((m) => m.with({}, () => 1));
+  // @ts-expect-error — not even grouped with a real one
+  r.mapErrCases((m) => m.with({ code: "A" }, {}, () => 1));
+  // Keyed patterns, `null` / `undefined` literals and every P.* pattern are fine.
+  const named = r.mapErrCases((m) => m.with({ code: "A" }, { code: "B" }, (e) => e.code));
+  type _Named = Expect<Equal<typeof named, Result<number, "A" | "B">>>;
+  const nullable = Ok(1) as Result<number, null | undefined>;
+  const lit = nullable.mapErrCases((m) =>
+    m.with(null, () => "null" as const).with(undefined, () => "undef" as const),
+  );
+  type _Lit = Expect<Equal<typeof lit, Result<number, "null" | "undef">>>;
+}
+
+// --- P.instanceOf over structurally identical classes: a KNOWN limitation -----
+
+// TypeScript is structural: two classes with the same shape are the same type,
+// so `Exclude<A | B, A>` is `never` and matching only `A` is "exhaustive" —
+// while at runtime a `B` fails `instanceof A` and becomes a Defect (the
+// combinators' NonExhaustiveError → Defect net). Pinned here so a change in
+// either direction is noticed; the remedy (a distinguishing field) is below.
+{
+  class SameA extends Error {}
+  class SameB extends Error {}
+  const r = Ok(1) as Result<number, SameA | SameB>;
+  // Compiles although SameB is never named — the limitation.
+  const unsound = r.mapErrCases((m) => m.with(P.instanceOf(SameA), () => "a" as const));
+  type _Unsound = Expect<Equal<typeof unsound, Result<number, "a">>>;
+
+  // The remedy: give each class a distinguishing literal field (or use
+  // TaggedError, whose `_tag` is exactly that). Now SameB must be named.
+  class KindA extends Error {
+    readonly kind = "A";
+  }
+  class KindB extends Error {
+    readonly kind = "B";
+  }
+  const k = Ok(1) as Result<number, KindA | KindB>;
+  // @ts-expect-error — KindB is unhandled once the classes differ structurally
+  k.mapErrCases((m) => m.with(P.instanceOf(KindA), () => "a" as const));
+  const sound = k.mapErrCases((m) =>
+    m.with(P.instanceOf(KindA), () => "a" as const).with(P.instanceOf(KindB), () => "b" as const),
+  );
+  type _Sound = Expect<Equal<typeof sound, Result<number, "a" | "b">>>;
+}

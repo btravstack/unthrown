@@ -18,6 +18,7 @@ import { type Defect, defect, isDefectMarker } from "./defect.js";
 import { match } from "./matcher.js";
 import type {
   AsyncResult,
+  Awaitable,
   Bound,
   DefectView,
   ErrMatcher,
@@ -31,7 +32,11 @@ import type {
   OkOf,
   OkView,
   Result,
+  ReturnAnAsyncResultNotAPromise,
 } from "./types.js";
+
+/** What an awaiting combinator accepts in place of an `AsyncResult`. @internal */
+type AwaitableResult<T, E> = Awaitable<Result<T, E>> & ReturnAnAsyncResultNotAPromise;
 
 /**
  * Thrown by a {@link Result}'s `get` / `getErr` when the assertion is
@@ -192,6 +197,7 @@ class Res<T, E> {
     try {
       const out = runMatch(f, this.error);
       if (isDefectMarker(out)) return defectRes(out.cause);
+      if (isThenable(out)) return asyncBranchDefect(out);
       return errRes(out as MatchErrOut<M>);
     } catch (cause) {
       return defectRes(cause);
@@ -221,6 +227,7 @@ class Res<T, E> {
     try {
       const out = runMatch(f, this.error);
       if (isDefectMarker(out)) return defectRes(out.cause);
+      if (isThenable(out)) return asyncBranchDefect(out);
       return okRes(out as MatchErrOut<M>);
     } catch (cause) {
       return defectRes(cause);
@@ -467,7 +474,8 @@ export function defectRes<T, E>(cause: unknown): Result<T, E> {
  * brand the prototype carries — so a `Result` built by **another copy** of
  * unthrown, e.g. the CJS and ESM builds loaded side by side, is still
  * recognised). A look-alike plain object (`{ tag: "Ok" }`) carries neither and
- * is **not** matched. An `AsyncResult` is not a `Result` and returns `false`.
+ * is **not** matched; nor is a forgery built on the real prototype whose `tag` or
+ * payload is a getter (both must be own data properties). An `AsyncResult` is not a `Result` and returns `false`.
  *
  * @returns `true` when `x` is a `Result` produced by this library.
  *
@@ -494,23 +502,50 @@ export function defectRes<T, E>(cause: unknown): Result<T, E> {
  * @category Guards
  */
 export function isResult(x: unknown): x is Result<unknown, unknown> {
-  if (x instanceof Res) return true;
-  // Dual-copy / cross-realm fallback: another copy of unthrown has its own
-  // `Res`, so `instanceof` fails — but its prototype carries the shared
-  // `Symbol.for` brand. Reading the brand off the prototype chain keeps the
-  // guarantee that a structural look-alike (no unthrown prototype) still fails.
   // Fail-closed: this guard exists for untyped boundaries, so a hostile input
-  // (a Proxy `get` trap or a throwing getter at the brand key) is `false`,
-  // never a throw.
+  // (a Proxy trap or a throwing getter) is `false`, never a throw.
   try {
-    return (
-      (typeof x === "object" || typeof x === "function") &&
-      x !== null &&
-      Reflect.get(x, RESULT_BRAND) === true
-    );
+    // `instanceof` first; the dual-copy / cross-realm fallback reads the shared
+    // `Symbol.for` brand off the prototype chain (another copy of unthrown has
+    // its own `Res`, so `instanceof` fails), which keeps a structural look-alike
+    // with no unthrown prototype out.
+    const branded =
+      x instanceof Res ||
+      ((typeof x === "object" || typeof x === "function") &&
+        x !== null &&
+        Reflect.get(x, RESULT_BRAND) === true);
+    return branded && hasOwnVariantShape(x);
   } catch {
     return false;
   }
+}
+
+/** Each variant's payload key. @internal */
+const PAYLOAD_KEY = { Ok: "value", Err: "error", Defect: "cause" } as const;
+
+/**
+ * Does `x` carry a variant's shape as own **data** properties — `tag` one of
+ * the three variants, plus that variant's payload key?
+ *
+ * @remarks
+ * A brand is not enough: the prototype (and so the brand) is reachable from any
+ * genuine `Result`, so `Object.create(protoOf(Ok(1)))` with a throwing `tag` or
+ * payload getter passed the guard and then threw — raw out of `all`, or as a
+ * rejection out of an `AsyncResult` that must never reject. Every genuine
+ * `Result`, from any copy of the library, is a frozen object literal whose `tag`
+ * and payload are own data properties, so reading their descriptors (which
+ * never runs a getter) accepts all of them and no getter-bearing forgery.
+ *
+ * @internal
+ */
+function hasOwnVariantShape(x: object): boolean {
+  const tag = Object.getOwnPropertyDescriptor(x, "tag");
+  if (tag === undefined || !("value" in tag)) return false;
+  const variant: unknown = tag.value;
+  if (variant !== "Ok" && variant !== "Err" && variant !== "Defect") return false;
+  const key = PAYLOAD_KEY[variant];
+  const payload = Object.getOwnPropertyDescriptor(x, key);
+  return payload !== undefined && "value" in payload;
 }
 
 /**
@@ -539,9 +574,9 @@ function passThrough<T, E>(self: Result<unknown, unknown>): Result<T, E> {
  * - inside a `try` that routes the throw to a `Defect` (the boundaries in
  *   `interop.ts`, where a hostile value arriving at a triage point *is* an
  *   unmodeled failure and should surface as one); or
- * - through {@link silenceIfThenable}, for a value being **discarded**, where
- *   there is no Defect channel to route to and the only correct answer is to
- *   drop it without throwing.
+ * - to classify a value that is then **discarded** (a `Defect` minted, the
+ *   value handed to {@link silenceIfThenable}), where the only correct answer
+ *   is to drop it without throwing — and without starting a lazy thenable.
  *
  * Calling it bare, outside both, is a bug: the throw escapes into whatever
  * context invoked it.
@@ -557,29 +592,39 @@ export function isThenable(x: unknown): boolean {
 }
 
 /**
- * Adopt-and-silence a thenable a combinator is about to **discard**.
+ * Silence a **genuine `Promise`** a combinator or boundary is about to
+ * **discard** — and leave every other thenable untouched.
  *
  * @remarks
  * The observers (`tap`, `tapErrCases`, `tapDefect`, `tapFailure`) throw their
  * callback's return value away, and the `Result`-returning combinators reject a
- * non-`Result` one. Either way, a thenable that slipped past `NotThenable` (a
+ * non-`Result` one. Either way, a promise that slipped past `NotThenable` (a
  * cast, a raw-JS caller) is dropped while still in flight — and if it later
  * rejects, nothing is holding it, so the rejection floats unhandled and takes
  * the process down on Node by default. Worse for an observer: its whole job is
  * to make a failure visible, and this is the one path where the failure is
- * invisible.
+ * invisible. Attaching a no-op rejection handler costs nothing and changes no
+ * outcome.
  *
- * Adopting it costs one microtask and makes the rejection a no-op. The
- * boundaries already do exactly this for a thenable `qualify` and a thenable
- * `fn` (see `interop.ts`); this is the same net on the combinator side.
+ * Only a `Promise` **instance** is touched. A promise is already running, so
+ * handling its rejection starts nothing; a non-`Promise` thenable may be
+ * **lazy** — a `PrismaPromise`, a query builder — whose work begins only when
+ * `then` is called. Adopting one (`Promise.resolve(x)` calls `x.then`) would
+ * *run* the effect the caller is being told was refused: `fromSafeThrowable(()
+ * => prisma.user.deleteMany())` returned a `Defect` and deleted the rows
+ * anyway. A lazy thenable that is never started cannot reject, so there is
+ * nothing to silence. Callers still *classify* any thenable (a `Defect` where
+ * the spec says so) via {@link isThenable}; this only decides what to adopt.
+ *
+ * Total: a hostile `then` getter or `Symbol.hasInstance` path is swallowed.
  *
  * @internal
  */
 export function silenceIfThenable(value: unknown): void {
   try {
-    if (isThenable(value)) void Promise.resolve(value).then(undefined, () => undefined);
+    if (value instanceof Promise) void value.then(undefined, () => undefined);
   } catch {
-    // A hostile `then` getter threw — there is nothing adoptable here.
+    // A hostile `then` threw — there is nothing to hold on to.
   }
 }
 
@@ -598,6 +643,24 @@ function nonResultCallbackDefect<T, E>(returned?: unknown): Result<T, E> {
   // thenable, so a later rejection cannot float (see `silenceIfThenable`).
   silenceIfThenable(returned);
   return defectRes(new TypeError("unthrown: a combinator callback returned a non-Result value"));
+}
+
+/**
+ * The Defect minted when a non-awaiting error transformer (`mapErrCases` /
+ * `recoverErrCases`) gets a thenable branch output past the compile-time ban
+ * (a cast, an untyped caller): never `Err(<Promise>)` / `Ok(<Promise>)` — a
+ * Promise in the channel is un-triaged — and a genuine Promise is silenced so
+ * its rejection cannot float. The sibling of the aggregates' async-`merge` net.
+ *
+ * @internal
+ */
+function asyncBranchDefect<T, E>(out: unknown): Result<T, E> {
+  silenceIfThenable(out);
+  return defectRes(
+    new TypeError(
+      "unthrown: mapErrCases/recoverErrCases branches must be SYNCHRONOUS, but one returned a thenable — lift async work with fromPromise and use flatMapErrCases",
+    ),
+  );
 }
 
 /**
@@ -659,10 +722,24 @@ function observerThrowToDefect<T, E>(thrown: unknown, original: unknown): Result
  * @internal
  */
 function scopeOf(value: unknown): object {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new TypeError("bind/let requires an object scope — start a do-chain with Do()");
+  if (typeof value !== "object" || value === null || !isPlainScope(value)) {
+    throw new TypeError("bind/let requires a plain object scope — start a do-chain with Do()");
   }
   return value;
+}
+
+/**
+ * A *plain* object: its prototype is `null` or an `Object.prototype` (any
+ * realm's — recognised by having no prototype of its own). The spread that
+ * merges a `bind`/`let` key copies only own enumerable data, so a class
+ * instance's getters and prototype methods — and an array's identity — would
+ * silently vanish while the type still claimed them.
+ *
+ * @internal
+ */
+function isPlainScope(value: object): boolean {
+  const proto: unknown = Object.getPrototypeOf(value);
+  return proto === null || Object.getPrototypeOf(proto) === null;
 }
 
 /**
@@ -805,6 +882,9 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   // gate is re-imposed in `types.ts`.
   mapErrCases(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
+    // The public signature's phantom async-branch guard (`SyncBranches`) —
+    // compile-time only, never passed.
+    ..._guard: readonly unknown[]
   ): AsyncResult<T, never> {
     return this.#lift((r) => r.mapErrCases(f) as Result<T, never>);
   }
@@ -813,7 +893,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     f: (
       matcher: ErrMatcher<E>,
       defect: (cause: unknown) => Defect,
-    ) => ExhaustiveMatch<Result<unknown, unknown> | AsyncResult<unknown, unknown> | Defect>,
+    ) => ExhaustiveMatch<Result<unknown, unknown> | AwaitableResult<unknown, unknown> | Defect>,
   ): AsyncResult<T, never> {
     return new AsyncRes<T, never>(
       this.#promise.then(async (r) => {
@@ -821,7 +901,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
         try {
           const out = runMatch(f, r.error);
           if (isDefectMarker(out)) return defectRes<T, never>(out.cause);
-          const inner = await (out as Result<unknown, unknown> | AsyncResult<unknown, unknown>);
+          const inner = await (out as Result<unknown, unknown> | AwaitableResult<unknown, unknown>);
           if (!isResult(inner)) return nonResultCallbackDefect<T, never>(inner);
           return inner as Result<T, never>;
         } catch (cause) {
@@ -833,6 +913,8 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
 
   recoverErrCases(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
+    // The public signature's phantom async-branch guard — never passed.
+    ..._guard: readonly unknown[]
   ): AsyncResult<T, never> {
     return this.#lift((r) => r.recoverErrCases(f) as Result<T, never>);
   }
@@ -847,7 +929,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     f: (
       matcher: ErrMatcher<E>,
       defect: (cause: unknown) => Defect,
-    ) => ExhaustiveMatch<Result<unknown, unknown> | AsyncResult<unknown, unknown>>,
+    ) => ExhaustiveMatch<Result<unknown, unknown> | AwaitableResult<unknown, unknown>>,
   ): AsyncResult<T, E> {
     return new AsyncRes<T, E>(
       this.#promise.then(async (r) => {
@@ -859,7 +941,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
           // Same observer treatment as the sync surface — the observed error
           // survives alongside the caller's cause.
           if (isDefectMarker(out)) return observerThrowToDefect(out.cause, r.error);
-          const inner = await (out as Result<unknown, unknown> | AsyncResult<unknown, unknown>);
+          const inner = await (out as Result<unknown, unknown> | AwaitableResult<unknown, unknown>);
           if (!isResult(inner)) return nonResultCallbackDefect(inner);
           // Keep the original error on success; an Err/Defect from the effect wins.
           return inner.tag === "Ok" ? passThrough(r) : passThrough(inner);

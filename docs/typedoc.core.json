@@ -18,8 +18,6 @@
     "*"
   ],
   "intentionallyNotExported": [
-    "Result",
-    "AsyncResult",
     "Defect",
     "Props",
     "AllOk",
@@ -27,7 +25,10 @@
     "AsyncResultRecord",
     "ExhaustiveMatch",
     "MatchOut",
-    "NonExhaustive",
+    "UnhandledCases",
+    "NoEmptyPattern",
+    "SyncBranches",
+    "ReturnAnAsyncResultNotAPromise",
     "MatchedOf",
     "Unset",
     "BranchReturn",

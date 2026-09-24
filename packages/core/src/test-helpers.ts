@@ -68,35 +68,55 @@ export function expectDefect<T, E>(result: Result<T, E>, cause: unknown = boom):
 }
 
 /**
- * A thenable that records how it was adopted, for the "a discarded thenable is
- * adopted" invariant.
+ * A genuine `Promise` (it passes `instanceof Promise`, like any promise a
+ * combinator can be handed) that records how it was silenced, for the "a
+ * discarded promise is silenced" invariant.
  *
  * @remarks
- * `Promise.resolve(x)` calls `x.then(onFulfilled, onRejected)` — so an
- * `onRejected` function arriving here is **positive, deterministic proof** that
- * the value was adopted rather than dropped. It replaces the previous shape,
- * which asserted the *absence* of a global `unhandledRejection` after two
- * `setTimeout(0)`s: a negative assertion on a timing heuristic can silently stop
- * protecting, because a rejection firing later than the window looks identical
- * to one that never fires. This settles in a single microtask instead.
+ * The nets attach a rejection handler with `value.then(undefined, onRejected)`
+ * — so an `onRejected` function arriving here is **positive, deterministic
+ * proof** that the value was held rather than dropped. It replaces an older
+ * shape which asserted the *absence* of a global `unhandledRejection` after two
+ * `setTimeout(0)`s: a negative assertion on a timing heuristic can silently
+ * stop protecting, because a rejection firing later than the window looks
+ * identical to one that never fires. This settles in a single microtask instead.
  */
 export function adoptionProbe(): {
   thenable: PromiseLike<never>;
   adoptions: readonly { onRejected: unknown }[];
 } {
   const adoptions: { onRejected: unknown }[] = [];
-  const thenable = {
-    // oxlint-disable-next-line no-thenable -- the point of the fixture: it must look thenable to be adopted
+  // `Promise.prototype` in the chain is what makes it a Promise instance; the
+  // own `then` records instead of settling anything real.
+  const thenable = Object.assign(Object.create(Promise.prototype) as object, {
+    // oxlint-disable-next-line no-thenable -- the point of the fixture: it must be a Promise to be silenced
     then(_onFulfilled: unknown, onRejected: unknown) {
       adoptions.push({ onRejected });
-      // Drive the adopted rejection immediately. Recording alone would only
+      // Drive the silenced rejection immediately. Recording alone would only
       // prove the handler was INSTALLED; invoking it proves it actually
       // swallows the rejection — still with no timer and no global listener.
       if (typeof onRejected === "function") (onRejected as (cause: unknown) => void)(boom);
     },
-  };
-  return { thenable: thenable as unknown as PromiseLike<never>, adoptions };
+  });
+  return { thenable: thenable as PromiseLike<never>, adoptions };
 }
 
-/** Flush the microtask queue — enough for `Promise.resolve(thenable)` to adopt. */
+/**
+ * A **lazy** thenable — the shape of a `PrismaPromise` or a query builder, whose
+ * work starts only when `then` is called. Not a `Promise` instance. Every
+ * thenable net must classify it without ever calling `then`; `calls()` counts
+ * the calls that would have run the effect.
+ */
+export function lazyThenable(): { thenable: PromiseLike<never>; calls: () => number } {
+  let calls = 0;
+  const thenable = {
+    // oxlint-disable-next-line no-thenable -- the point of the fixture: a thenable that is not a Promise
+    then() {
+      calls += 1;
+    },
+  };
+  return { thenable: thenable as unknown as PromiseLike<never>, calls: () => calls };
+}
+
+/** Flush the microtask queue — enough for a pipeline to reach the fixture's `then`. */
 export const flushMicrotasks = (): Promise<void> => Promise.resolve();

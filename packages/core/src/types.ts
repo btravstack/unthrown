@@ -1,7 +1,16 @@
 // unthrown — public type surface. Pure types, no runtime.
 
 import type { Defect } from "./defect.js";
+import type { AsyncResult, Result } from "./facade.js";
 import type { match } from "./matcher.js";
+
+// `Result` / `AsyncResult` are DECLARED in `facade.ts`, next to their companion
+// objects, and only re-exported here so the rest of core keeps importing its
+// types from one module. One declaration per name is load-bearing: a second
+// `Result`/`AsyncResult` declaration (the former re-alias) made the d.ts bundler
+// rename one to `Result$1`/`AsyncResult$1`, which it never exported — so a
+// consumer's `export const x = OkAsync(1)` failed declaration emit (TS4023).
+export type { AsyncResult, Result };
 
 /**
  * Flatten an intersection into a single object literal so accumulated `bind` /
@@ -96,6 +105,64 @@ export type MatchOut<M> = M extends ExhaustiveMatch<infer O> ? O : never;
 export type MatchErrOut<M> = Exclude<MatchOut<M>, Defect>;
 
 /**
+ * The phantom rest-tuple guard that bans an **async branch** in the
+ * non-awaiting error transformers (`mapErrCases` / `recoverErrCases`): empty
+ * for a synchronous builder output, an impossible extra argument (labelled
+ * with the explanation) when any branch returns a thenable.
+ *
+ * @remarks
+ * Those two run the matched branch without awaiting it, so an `async` branch
+ * put `Err(<Promise>)` / `Ok(<Promise>)` in the channel — a `Promise` in `E` is
+ * the un-triaged value Thesis #3 forbids — and its rejection floated
+ * unobserved.
+ *
+ * The first test, `[O] extends [Pass]`, is the **generic escape**: `Pass` is
+ * what the receiver's own channels already hold (`E` for `mapErrCases`,
+ * `T | E` for `recoverErrCases`), so re-emitting the error — the sanctioned
+ * `P._` use inside a helper generic in `E` — resolves to `[]` even while `E` is
+ * an unresolved type parameter. No `NotThenable`-style check can: TypeScript
+ * cannot decide "is not thenable" for an unresolved `E`, so `M &
+ * NotThenable<…>` (the `tapErrCases` spelling) rejected that helper outright.
+ * A thenable already in `E` is no new hole. Encoded as a trailing phantom
+ * (the `fromPromise` shape) rather than on the callback's return, which keeps
+ * the inference-bearing callback free of conditional types. A `this` gate
+ * would print the message more directly but breaks the verified `out T, out E`
+ * variance annotations (`Pass` mentions both). An `any` output (a mocked
+ * branch) is let through, as `U & NotThenable<U>` does.
+ *
+ * @internal
+ */
+export type SyncBranches<O, Pass> = [O] extends [Pass | Defect]
+  ? []
+  : 0 extends 1 & O
+    ? []
+    : [Extract<O, PromiseLike<unknown>>] extends [never]
+      ? []
+      : [
+          unthrown_errorMatcherBranchesAreSynchronous: "an async branch would put a Promise in the channel — lift async work with fromPromise and use flatMapErrCases",
+        ];
+
+/**
+ * The marker that keeps a bare `Promise` out of the async binds (`flatMap` /
+ * `flatTap` / `bind`) and the awaiting error combinators (`flatMapErrCases` /
+ * `flatTapErrCases`): every `AsyncResult` has a `flatMap`, a `Promise` has
+ * none, so a raw rejection cannot bypass qualification.
+ *
+ * @remarks
+ * Structurally it is just `{ flatMap: unknown }`; the **name** is the
+ * diagnostic. An `async` callback fails with "Property 'flatMap' is missing in
+ * type 'Promise<…>' but required in type 'ReturnAnAsyncResultNotAPromise'",
+ * which says what to do — instead of the anonymous `{ flatMap: unknown }`, or
+ * (in the error combinators, which named `AsyncResult` itself) a list of 25
+ * missing methods. It always sits beside `Awaitable<Result<…>>`, so inference
+ * runs through the then-channel and stays junk-free (see
+ * {@link AsyncResultMethods.flatMap}).
+ *
+ * @internal
+ */
+export type ReturnAnAsyncResultNotAPromise = { flatMap: unknown };
+
+/**
  * The fluent method surface every {@link Result} variant carries — the
  * combinators (`map`, `flatMap`, `mapErrCases`, `match`, `get`, …), documented one
  * per entry below. Factored out so the three variants ({@link OkView},
@@ -180,8 +247,9 @@ export type ResultMethods<out T, out E> = {
    * step. `f` receives the scope accumulated so far and returns a `Result`; on
    * `Ok` the value is added as `{ ...scope, [name]: value }`, on `Err`/`Defect`
    * the chain short-circuits. Errors union (`E | E2`). A throw becomes a
-   * `Defect` — as does calling `bind` on a non-object scope (e.g. `Ok(5).bind`),
-   * which is misuse: the scope is always an object inside a real `Do()` chain.
+   * `Defect` — as does calling `bind` on a non-object or non-plain scope (e.g.
+   * `Ok(5).bind`, or a class instance whose getters the merge would drop), which
+   * is misuse: the scope is always a plain object inside a real `Do()` chain.
    * (`let` is the pure-value counterpart.)
    *
    * @typeParam K - the key the bound value is stored under.
@@ -286,7 +354,10 @@ export type ResultMethods<out T, out E> = {
    * the union of the branch returns with the `Defect` arm subtracted
    * (`Exclude<O, Defect>`) — a branch returning `defect(cause)` converts that case
    * to a `Defect` and drops it from `E`. Runs only on `Err`; `Ok` and `Defect`
-   * pass through. A branch that throws also becomes a `Defect`.
+   * pass through. A branch that throws also becomes a `Defect`. Branches are
+   * **synchronous**: an `async` branch is a compile error (its `Promise` would
+   * land in `E` un-triaged), and a thenable slipped past the types becomes a
+   * `Defect`.
    *
    * **Name every case.** Match on anything the matcher supports — `_tag`,
    * `code`, structural shape, guards — and group the cases that share a handler
@@ -300,9 +371,15 @@ export type ResultMethods<out T, out E> = {
    *
    * @typeParam M - the exhaustive builder the callback returns.
    * @param f - builds the match over the error (returns the un-terminated builder).
+   * @param _asyncBranchBanned_liftWithFromPromiseThenFlatMapErrCases - compile-time
+   * only; never pass it. Empty for synchronous branches; an **async** branch
+   * demands this impossible argument, so the call fails to compile (its name is
+   * the fix).
    */
   mapErrCases<M extends ExhaustiveMatch<unknown>>(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+    // phantom async-branch ban, never passed — see SyncBranches
+    ..._asyncBranchBanned_liftWithFromPromiseThenFlatMapErrCases: SyncBranches<MatchOut<M>, E>
   ): Result<T, MatchErrOut<M>>;
 
   /**
@@ -330,13 +407,21 @@ export type ResultMethods<out T, out E> = {
    * The result type is `Result<T | U, never>`, but `never` describes only the
    * **error** channel — a `Defect` can still be present at runtime. A branch may
    * return `defect(cause)` (which stays a `Defect`, not a recovery). Runs only on
-   * `Err`; `Ok` and `Defect` pass through.
+   * `Err`; `Ok` and `Defect` pass through. Branches are **synchronous**: an
+   * `async` branch is a compile error, and a thenable slipped past the types
+   * becomes a `Defect`.
    *
    * @typeParam M - the exhaustive builder the callback returns.
    * @param f - builds the match; each branch produces a success value.
+   * @param _asyncBranchBanned_liftWithFromPromiseThenFlatMapErrCases - compile-time
+   * only; never pass it. Empty for synchronous branches; an **async** branch
+   * demands this impossible argument, so the call fails to compile (its name is
+   * the fix).
    */
   recoverErrCases<M extends ExhaustiveMatch<unknown>>(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+    // phantom async-branch ban, never passed — see SyncBranches
+    ..._asyncBranchBanned_liftWithFromPromiseThenFlatMapErrCases: SyncBranches<MatchOut<M>, T | E>
   ): Result<T | MatchErrOut<M>, never>;
 
   /**
@@ -486,8 +571,8 @@ export type ResultMethods<out T, out E> = {
    * Compiles only when the error channel is empty (`E = never`) — eliminate
    * modeled errors first (`match` / `recoverErrCases` / `flatMapErrCases`), or reach for the
    * `getOr` / `getOrElse` / `getOrNull` / `getOrUndefined` family (which
-   * recover an `Err`). If you get a `'this' context` type error here, that is
-   * the gate: the receiver still has a non-`never` error channel.
+   * recover an `Err`). The gate is a `this` type that becomes an explanatory
+   * string when `E` is not `never`, so the compile error names the fix.
    *
    * `E = never` empties only the **modeled** error channel — a `Defect` can
    * still be present, and `get()` **rethrows its original cause** (it
@@ -495,7 +580,11 @@ export type ResultMethods<out T, out E> = {
    *
    * @returns the `Ok` value.
    */
-  get(this: Result<T, never>): T;
+  get(
+    this: [E] extends [never]
+      ? Result<T, never>
+      : "unthrown: get() needs an empty error channel (E = never) — handle the Err first with recoverErrCases / match / flatMapErrCases, or use getOr / getOrElse / getOrNull / getOrUndefined",
+  ): T;
   /**
    * Extract the modeled error.
    *
@@ -509,7 +598,11 @@ export type ResultMethods<out T, out E> = {
    *
    * @returns the `Err` value.
    */
-  getErr(this: Result<never, E>): E;
+  getErr(
+    this: [T] extends [never]
+      ? Result<never, E>
+      : "unthrown: getErr() needs an empty success channel (T = never) — narrow with isErr() first, or fold with match",
+  ): E;
   /**
    * The success value, or `fallback` on `Err`.
    *
@@ -673,46 +766,6 @@ export interface DefectView<out T = never, out E = never> extends ResultMethods<
 export type FailureView<E, T = never> = ErrView<E, T> | DefectView<T, E>;
 
 /**
- * The core type of the library: a computation that has either succeeded with a
- * value of type `T` or failed with a *modeled* error of type `E`.
- *
- * @remarks
- * A `Result` is a **discriminated union** of three variants, distinguished by a
- * `tag` of `"Ok"` | `"Err"` | `"Defect"`:
- *
- * - **`Ok`** — a success carrying a `value: T`.
- * - **`Err`** — a modeled, anticipated failure carrying an `error: E`.
- * - **`Defect`** — an *unmodeled* failure carrying an unknown `cause`. A Defect
- *   never appears in `E`; it is the library's third, out-of-band channel.
- *
- * Because it is a real union, you can match it natively (a `switch` on `tag`, or
- * the built-in `match(...).with({ tag: "Ok" }, …).exhaustive()`), *and* it
- * carries the full method surface ({@link ResultMethods}) for fluent chaining.
- * Either way, the payload (`value`/`error`/`cause`) is only reachable after you
- * narrow — so "check before you access" still holds.
- *
- * @typeParam T - the success value type.
- * @typeParam E - the modeled error type (only anticipated domain failures).
- *
- * @example
- * ```ts
- * import { Ok, Err, type Result } from "unthrown";
- *
- * function half(n: number): Result<number, "odd"> {
- *   return n % 2 === 0 ? Ok(n / 2) : Err("odd");
- * }
- *
- * const message = half(10).match({
- *   ok: (n) => `got ${n}`,
- *   // every case of `E` named — here the one literal it holds
- *   errCases: (matcher) => matcher.with("odd", () => "failed: odd"),
- *   defect: (cause) => `bug: ${String(cause)}`,
- * });
- * ```
- */
-export type Result<T, E> = OkView<T, E> | ErrView<E, T> | DefectView<T, E>;
-
-/**
  * A success-only thenable: awaitable, but deliberately **not** a full
  * `PromiseLike`.
  *
@@ -776,7 +829,7 @@ export type AsyncResultMethods<out T, out E> = {
    */
   flatMap<U, E2>(
     // async branch spelled `Awaitable & { flatMap }` for junk-free inference — see @remarks
-    f: (value: T) => Result<U, E2> | (Awaitable<Result<U, E2>> & { flatMap: unknown }),
+    f: (value: T) => Result<U, E2> | (Awaitable<Result<U, E2>> & ReturnAnAsyncResultNotAPromise),
   ): AsyncResult<U, E | E2>;
   /**
    * Asynchronous {@link ResultMethods.tap | tap}. `f` is synchronous; a throw
@@ -798,7 +851,9 @@ export type AsyncResultMethods<out T, out E> = {
   flatTap<E2>(
     // See `flatMap` above for why the async branch is `Awaitable<…> & { flatMap }`
     // rather than `AsyncResult<…>` (junk-free `E2` inference; excludes raw Promises).
-    f: (value: T) => Result<unknown, E2> | (Awaitable<Result<unknown, E2>> & { flatMap: unknown }),
+    f: (
+      value: T,
+    ) => Result<unknown, E2> | (Awaitable<Result<unknown, E2>> & ReturnAnAsyncResultNotAPromise),
   ): AsyncResult<T, E | E2>;
   /**
    * Asynchronous {@link ResultMethods.bind | bind} (do-notation). `f` may return
@@ -809,7 +864,7 @@ export type AsyncResultMethods<out T, out E> = {
     name: K,
     // See `flatMap` above for why the async branch is `Awaitable<…> & { flatMap }`
     // rather than `AsyncResult<…>` (junk-free `U`/`E2` inference; excludes raw Promises).
-    f: (scope: T) => Result<U, E2> | (Awaitable<Result<U, E2>> & { flatMap: unknown }),
+    f: (scope: T) => Result<U, E2> | (Awaitable<Result<U, E2>> & ReturnAnAsyncResultNotAPromise),
   ): AsyncResult<Bound<T, K, U>, E | E2>;
   /**
    * Asynchronous {@link ResultMethods.let | let} (do-notation). `f` returns a
@@ -843,10 +898,13 @@ export type AsyncResultMethods<out T, out E> = {
 
   /**
    * Asynchronous {@link ResultMethods.mapErrCases | mapErrCases} — the same exhaustive
-   * {@link ErrMatcher} form; the combinator calls `.exhaustive()`.
+   * {@link ErrMatcher} form; the combinator calls `.exhaustive()`. Branches are
+   * synchronous — an `async` branch is a compile error, as on the sync surface.
    */
   mapErrCases<M extends ExhaustiveMatch<unknown>>(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+    // phantom async-branch ban, never passed — see SyncBranches
+    ..._asyncBranchBanned_liftWithFromPromiseThenFlatMapErrCases: SyncBranches<MatchOut<M>, E>
   ): AsyncResult<T, MatchErrOut<M>>;
 
   /**
@@ -855,7 +913,11 @@ export type AsyncResultMethods<out T, out E> = {
    * return a `Result` **or** an `AsyncResult`.
    */
   flatMapErrCases<
-    M extends ExhaustiveMatch<Result<unknown, unknown> | AsyncResult<unknown, unknown> | Defect>,
+    M extends ExhaustiveMatch<
+      | Result<unknown, unknown>
+      | (Awaitable<Result<unknown, unknown>> & ReturnAnAsyncResultNotAPromise)
+      | Defect
+    >,
   >(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
   ): AsyncResult<
@@ -870,6 +932,8 @@ export type AsyncResultMethods<out T, out E> = {
    */
   recoverErrCases<M extends ExhaustiveMatch<unknown>>(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+    // phantom async-branch ban, never passed — see SyncBranches
+    ..._asyncBranchBanned_liftWithFromPromiseThenFlatMapErrCases: SyncBranches<MatchOut<M>, T | E>
   ): AsyncResult<T | MatchErrOut<M>, never>;
 
   /**
@@ -905,7 +969,9 @@ export type AsyncResultMethods<out T, out E> = {
     f: (
       matcher: ErrMatcher<E>,
       defect: (cause: unknown) => Defect,
-    ) => ExhaustiveMatch<Result<unknown, E2> | AsyncResult<unknown, E2>>,
+    ) => ExhaustiveMatch<
+      Result<unknown, E2> | (Awaitable<Result<unknown, E2>> & ReturnAnAsyncResultNotAPromise)
+    >,
   ): AsyncResult<T, E | E2>;
 
   /**
@@ -948,13 +1014,21 @@ export type AsyncResultMethods<out T, out E> = {
    * error channel is empty (`this: AsyncResult<T, never>`); the returned promise
    * rejects on a `Defect` (rethrowing its cause).
    */
-  get(this: AsyncResult<T, never>): Promise<T>;
+  get(
+    this: [E] extends [never]
+      ? AsyncResult<T, never>
+      : "unthrown: get() needs an empty error channel (E = never) — handle the Err first with recoverErrCases / match / flatMapErrCases, or use getOr / getOrElse / getOrNull / getOrUndefined",
+  ): Promise<T>;
   /**
    * Asynchronous {@link ResultMethods.getErr | getErr}. Compiles only when
    * the success channel is empty (`this: AsyncResult<never, E>`); the returned
    * promise rejects on a `Defect` (rethrowing its cause).
    */
-  getErr(this: AsyncResult<never, E>): Promise<E>;
+  getErr(
+    this: [T] extends [never]
+      ? AsyncResult<never, E>
+      : "unthrown: getErr() needs an empty success channel (T = never) — narrow with isErr() first, or fold with match",
+  ): Promise<E>;
   /** Asynchronous {@link ResultMethods.getOr | getOr}. */
   getOr<U>(fallback: U): Promise<T | U>;
   /** Asynchronous {@link ResultMethods.getOrElse | getOrElse}. */
@@ -975,31 +1049,6 @@ export type AsyncResultMethods<out T, out E> = {
       : AsyncResult<T, E>,
   ): Promise<T>;
 };
-
-/**
- * The asynchronous counterpart of {@link Result}: an awaitable wrapper carrying
- * the {@link AsyncResultMethods} surface, collapsing to a `Result<T, E>` when
- * `await`-ed.
- *
- * @remarks
- * **Combinator callbacks are synchronous.** A raw `Promise` may never enter an
- * `AsyncResult` method — that would be an un-qualified async boundary, and its
- * rejection would silently become a `Defect`, skipping the triage that
- * {@link fromPromise} forces. To do further async work, re-enter through a
- * qualified boundary and compose it: `ar.flatMap((v) => fromPromise(work(v),
- * qualify))`. The eliminators (`get`, …) return promises; the binds
- * (`flatMap`, `flatTap`, `flatMapErrCases`, `recoverDefect`) additionally accept an
- * `AsyncResult`. Its combinators are documented one per entry on
- * {@link AsyncResultMethods}.
- *
- * To pattern-match an `AsyncResult`, `await` it first: `match(await ar)`.
- *
- * @typeParam T - the success value type.
- * @typeParam E - the modeled error type.
- */
-// oxlint-disable-next-line typescript/consistent-type-definitions -- see OkView: the variance annotations require an interface
-export interface AsyncResult<out T, out E>
-  extends Awaitable<Result<T, E>>, AsyncResultMethods<T, E> {}
 
 /**
  * Extract the success type `T` from a `Result` type — derive one type from
