@@ -86,7 +86,10 @@ was planned).
    transition can (see the catch-all invariant below), so `P._` stays exported
    and functional; the untyped boundary (`isResult`, where `E` is `unknown`) is
    the same shape. `@unthrown/oxlint`'s `no-catch-all-pattern` — **in the
-   `recommended` preset** — enforces this, and those sites carry a targeted
+   `recommended` preset** — enforces this. It exempts a generic-`E` or
+   single-type-`E` site itself when the matcher's receiver traces to an in-file
+   `Result`/`AsyncResult` annotation proving it; only a site whose proof is out
+   of reach (a receiver imported from another module) carries a targeted
    `oxlint-disable` with a reason. Each branch
    receives the narrowed variant and the **injected `defect` helper** — the
    same injection `qualify` gets (Thesis #3), the sanctioned deliberate
@@ -111,8 +114,7 @@ was planned).
    un-terminated builder; `match` runs `.exhaustive()`) — so folding at the edge
    is exhaustive too, and there is no blanket `err` callback left to silently
    drop a value. The handler key carries the same `…Cases` suffix as the
-   combinators (and a leftover 4.x `err:` handler is now an excess-property
-   compile error, not a silent runtime break). Its `errCases` handler receives
+   combinators. Its `errCases` handler receives
    the matcher but **no `defect` helper** — `match` folds to a
    plain value, with no `Defect` output channel; the separate `defect` case
    handles a `Result` that already carries one. (This subsumes the former
@@ -120,8 +122,8 @@ was planned).
    matcher and `P.tag(t)`, and it works on any discriminant, not only `_tag`.)
    The value-surrendering extractors (`getOr` / `getOrElse` / `getOrNull` /
    `getOrUndefined`) stay exempt — the value is being surrendered anyway. **The
-   matcher is built-in** (`matcher.ts` — it replaced the former `ts-pattern`
-   peer, keeping its call-site shape): a purpose-built, shallow matcher whose
+   matcher is built-in** (`matcher.ts`; why: see the zero-dependency rule under
+   Toolchain): a purpose-built, shallow matcher whose
    exhaustiveness is plain `Exclude` over a tracked `Remaining` parameter, with
    `match`, `P` (`_`, `tag`, `instanceOf`, `when` — a primitive-type wildcard is
    `P.when` with a `typeof` guard, and grouping patterns under one handler is
@@ -136,7 +138,7 @@ was planned).
    exported from core — first-class in one import,
    dual-copy-safe (patterns carry a `Symbol.for` brand). Deliberately **not**
    supported: deep structural inversion, `P.select`, array patterns — the
-   complexity (and cross-version instability) the replacement removed.
+   matcher stays shallow.
 
 ## Load-bearing runtime invariants (tests must guard these)
 
@@ -250,8 +252,7 @@ was planned).
   `[R] extends [PromiseLike<…>]`: the latter is false for a PARTIAL union, so a
   _sometimes_-async callback (`flag ? 1 : work()`) compiled on every guarded
   surface — still an unawaited effect whose rejection the pipeline never sees.
-  Same reasoning `fromPromise`'s async-qualify guard always used; the type
-  itself only picked it up in 5.1. Guarded in `types.test-d.ts`.
+  Same reasoning as `fromPromise`'s async-qualify guard. Guarded in `types.test-d.ts`.
 - **A sync boundary's `fn` is sync too — enforced at RUNTIME, not by the
   types.** `fromThrowable` / `fromSafeThrowable` wrap a synchronous function, so
   they only ever see a synchronous `throw`: an `async` `fn` rejects long after
@@ -310,12 +311,14 @@ was planned).
   survives the de-promotion in Thesis #5 for the generic-`E` case: it is the
   **only** arm that can terminate a match over an unresolved `E` (even a
   universal `P.when` guard is excluded from the overload by the
-  `UniversalPattern` marker), so the generic-`E` helper keeps it behind a
-  targeted `oxlint-disable … unthrown/no-catch-all-pattern` naming that
-  reason. (The other sanctioned use — an `E` that is a single type, not a
-  union of cases, with no discriminant to name arms against — needs no such
-  proof: there is nothing to enumerate, so the one catch-all arm already **is**
-  the enumeration, disabled the same way.)
+  `UniversalPattern` marker), so the generic-`E` helper keeps it. (The other sanctioned use — an `E`
+  that is a single type, not a union of cases, with no discriminant to name
+  arms against — needs no such proof: there is nothing to enumerate, so the one
+  catch-all arm already **is** the enumeration.) `no-catch-all-pattern`
+  exempts both itself when an in-file `Result`/`AsyncResult` annotation on the
+  matcher's receiver proves them; where it cannot see the proof, the site
+  carries a targeted `oxlint-disable … unthrown/no-catch-all-pattern` with that
+  reason.
   Library code that
   folds a generic `Result<T, E>` per-channel (the interop `to*` bridges,
   `@unthrown/orpc`'s `handlerResult`) still uses the `isOk` / `isErr` /
@@ -433,8 +436,7 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
   included — it is a pattern like `P.instanceOf` or `P.when`, so it is spelled
   like one; there is **no** standalone `tag` export. These make the error
   matcher, and matching a whole `Result` (`match(r).with({ tag: "Ok" }, …)`),
-  first-class in one import — the former `@unthrown/pattern` package and the
-  former `ts-pattern` re-exports, now one owned module.
+  first-class in one import.
 - errors: `GetError` (from `core.ts`) is also a public export — the defensive
   wrong-variant error `get`/`getErr` throw, reachable only through a cast or a
   raw-JS caller (see the type-gated extractor invariant).
@@ -551,7 +553,7 @@ fromExecutor<T, E>>[0]`) is the grotesque spelling that invites a hand-copied
   the `Result`-producing ones
   (`Result.Ok`/`Err`/`Do`/`fromNullable`/`fromThrowable`/`fromSafeThrowable`/`all`/`allFromDict`/`validateAll`/`validateAllFromDict`/`is*`);
   `AsyncResult.*` holds the `AsyncResult`-producing ones
-  (`AsyncResult.Ok`/`Err`/`Do`/`fromPromise`/`fromSafePromise`/`all`/`allFromDict`/`validateAll`/`validateAllFromDict` —
+  (`AsyncResult.Ok`/`Err`/`Do`/`fromPromise`/`fromSafePromise`/`fromExecutor`/`all`/`allFromDict`/`validateAll`/`validateAllFromDict` —
   the pre-lifted entry points and aggregates drop the `Async` suffix the free
   functions carry (`OkAsync`→`AsyncResult.Ok`, `DoAsync`→`AsyncResult.Do`,
   `allAsync`→`AsyncResult.all`, `validateAllAsync`→`AsyncResult.validateAll`),
@@ -640,11 +642,9 @@ library can be "done".
   where the matcher signatures make `E` invariant — so the intersection form
   silently loses the covariance for unresolved-generic targets: a concrete
   `Err(x)` then fails to widen into a generic error union
-  (`Result<T, G | RuntimeError>`), which is exactly the v5-beta regression this
-  shape fixed. v4 didn't need any of this: its plain `(e: E) => …` callbacks sat
-  in bivariantly-compared method-parameter positions (the same reason
-  neverthrow's class surface widens without annotations); the exhaustive matcher
-  is what made declared variance mandatory. TS **verifies** every annotation
+  (`Result<T, G | RuntimeError>`). Plain `(e: E) => …` callbacks would sit in
+  bivariantly-compared method-parameter positions and need none of this; the
+  exhaustive matcher is what makes declared variance mandatory. TS **verifies** every annotation
   (TS2636 if unprovable); `Result` (a union of the annotated views) inherits the
   fast path. **`ErrMatcher<E>` (the built-in `Matcher`,
   invariant in its input) must stay in a callback parameter position only**: it
@@ -659,8 +659,7 @@ library can be "done".
   `[R] extends [never]` carve-out keeps an always-throwing qualify legal) — NOT
   `R & NotThenable<R>` on the qualify's return: that conditional made TS defer
   qualify's inference and collapse `T` to `unknown` when the promise argument
-  was an inline `.then(…)` chain (a v5-beta regression; v4's identical
-  union-parameter signature was fine without the conditional). `fromThrowable`
+  was an inline `.then(…)` chain. `fromThrowable`
   keeps `NotThenable` on its qualify — its `T` infers directly from `fn`, so
   nothing is disturbed. General rule: a conditional-type constraint may sit on a
   parameter only if no _other_ parameter's inference can be deflected by it;
@@ -753,9 +752,7 @@ copies) — issue #256, observed live in btravstack/start#99.
 
 - `packages/core` → `unthrown` (**zero runtime dependencies** — the exhaustive
   error matcher is built-in (`matcher.ts`, exported as `match`/`P`/
-  `NonExhaustiveError`); it replaced the former `ts-pattern` peer so the
-  exhaustiveness guarantee can never vary with a consumer-resolved third-party
-  version, and nothing needs installing alongside `unthrown`)
+  `NonExhaustiveError`) — see the zero-dependency rule under Toolchain)
 - `packages/vitest` → `@unthrown/vitest` (peerDep `vitest`; besides the
   `expect.extend` registration it also exports the seven raw matcher functions,
   `failOnForgottenAwait`, and the `UnthrownMatchers` type — for manual
@@ -812,8 +809,9 @@ copies) — issue #256, observed live in btravstack/start#99.
   `E = never`, enforced at runtime. **Outside the fixed version group.** Its
   suite is the one that needs a running Docker daemon. Full spec:
   `packages/drizzle/CLAUDE.md`.)
-- `packages/orpc` → `@unthrown/orpc` (peerDeps `@orpc/client` + `@orpc/server`
-  at `^2.0.0-beta.34`, the server one optional; a two-way bridge on oRPC v2's
+- `packages/orpc` → `@unthrown/orpc` (peerDeps `@orpc/client`,
+  `@orpc/contract` and `@orpc/server` at `^2.0.0-beta.34`, the server one
+  optional; a two-way bridge on oRPC v2's
   defined-`ORPCError` mechanism — `Ok` ↔ output, `Err` ↔ a thrown `ORPCError`
   the procedure declared via `.errors({...})`, `Defect` ↔ everything else
   (including an undeclared `ORPCError`). Three entry points, no root export.
@@ -862,10 +860,11 @@ copies) — issue #256, observed live in btravstack/start#99.
   own TypeScript (see the toolchain section). One `typedoc.<name>.json` per
   documented package points its `entryPoints`/`tsconfig` back at that package's
   sources and writes straight into `api/<name>/`; `scripts/build-api.ts` runs
-  the nine concurrently. There is no per-package `build:docs` and no copy step.
-  Only `core`, `drizzle` and `orpc` keep a `typedoc.<name>.json` of their own —
-  they carry a `categoryOrder`, an `intentionallyNotExported`, or several entry
-  points (`orpc` has no root export at all). The other six differ solely in
+  the ten concurrently (wiping stale `api/*/` output first, and printing any
+  TypeDoc warning a successful run would otherwise swallow). There is no per-package `build:docs` and no copy step.
+  Only `core`, `drizzle`, `orpc` and `saga` keep a `typedoc.<name>.json` of
+  their own — they carry a `categoryOrder`, an `intentionallyNotExported`, or
+  several entry points (`orpc` has no root export at all). The other six differ solely in
   name/entryPoints/tsconfig/out, so they share `typedoc.base.json` and take
   those four on the command line from `build-api.ts`, which derives them from
   the directory name (CLI arguments beat the options file).
@@ -946,7 +945,11 @@ channel?**
   (`fromSchema(schema, input)`), a stale Prisma error model, and "the six oxlint
   rules" after the seventh landed. `packages/oxlint/src/skill.test.ts` pins the
   mechanically-checkable part — the rule inventory, the spelled-out count, and
-  which rules sit under the preset vs opt-in headings. The **prose still needs a
+  which rules sit under the preset vs opt-in headings — and the root README's
+  package table (every published package, every rule name).
+  `packages/core/src/skill-surface.test-d.ts` compiles every core export the
+  skill names, spelled as the skill spells it. Neither can check a prose table
+  or a signature written inside a markdown row. The **prose still needs a
   human**: when a package's public surface changes, update the skill in the same
   PR as the docs site.
 - **The repo dogfoods `@unthrown/oxlint`.** `.oxlintrc.json` enables the plugin
@@ -1001,16 +1004,9 @@ onRejected)`, so the fixture records the handler _and invokes it_, proving both
   spelling suggestion, which TypeScript 7 adds where a similar name exists);
   everything else fails, and a renamed export fails on the _preamble import_ as
   TS2305/TS2724, which is never ignored.
-  This extractor stays **core-only** — rolling it out to the satellites is not
-  the direction taken (#191); the runnable `examples/` packages are the repo's
-  answer to prose rot outside core, and the satellites' `@example` blocks
-  remain unguarded. Beware the count that motivated that issue: a naive
-  `grep -c @example packages/prisma/src` reports **81**, but 47 of those are in
-  Prisma's own **generated** client and 30 more are in `index.spec.ts` /
-  `types.test-d.ts`, which the extractor skips by name. The public API surface
-  the extractor would actually see is `index.ts` alone — **4** blocks. The
-  earlier figures in this file (34) and on #191 (~80) were both artefacts of
-  counting generated and test files. `@unthrown/drizzle` takes the same idea from the other end:
+  This extractor stays **core-only** (#191): the runnable `examples/` packages
+  are the repo's answer to prose rot outside core, and the satellites'
+  `@example` blocks remain unguarded. `@unthrown/drizzle` takes the same idea from the other end:
   `src/docs-examples.test-d.ts` is a type-level file holding every sample its
   README, its guide page and its `@example` blocks ship, so a sample that stops
   compiling fails the gate. (It caught two live defects when it was written — a
@@ -1040,16 +1036,17 @@ onRejected)`, so the fixture records the handler _and invokes it_, proving both
   regression fails the gate. The file is excluded from the build, coverage,
   oxlint, and knip (it has no runtime).
 - Public API carries full **TSDoc**; `pnpm --filter @unthrown/docs build` must
-  stay typedoc-warning-free (it runs all nine `typedoc.<name>.json` configs).
+  stay typedoc-warning-free (it runs TypeDoc for all ten documented packages —
+  four with their own `typedoc.<name>.json`, six on the shared
+  `typedoc.base.json` — and prints every warning).
 - One concept = one name. Resist convenience aliases.
 - **The error-matcher combinators carry a `*Cases` suffix** (`mapErrCases`,
   `flatMapErrCases`, `recoverErrCases`, `tapErrCases`, `flatTapErrCases`) —
   **not** the bare `mapErr`/`tapErr`. The callback receives a matcher
   over the error's _cases_, not the value, so the suffix names the protocol and
-  keeps it distinct from the value-taking success surface (`map`/`tap`). This
-  reverses the earlier plan to keep the bare `map*`/`tap*` names (weighed and
-  changed 2026-07): the functor-style name promised a `(e) => …` callback the
-  combinators never accept. There is **no** plain-callback `mapErr` variant —
+  keeps it distinct from the value-taking success surface (`map`/`tap`): a
+  functor-style name would promise a `(e) => …` callback the combinators never
+  accept. There is **no** plain-callback `mapErr` variant —
   that would reopen the blanket-handling hole the matcher closes. Do not
   re-litigate or add bare aliases. Documented user-side in the
   exhaustive-error-matching guide.
