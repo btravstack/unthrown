@@ -64,7 +64,6 @@ const GUIDE_SIDEBAR = [
       { text: "Migrate from try/catch", link: "/how-to/migrate-from-try-catch" },
       { text: "Migrate from neverthrow", link: "/how-to/migrate-from-neverthrow" },
       { text: "Migrate from Boxed", link: "/how-to/migrate-from-boxed" },
-      { text: "Upgrade from 4.x to 5.0", link: "/how-to/upgrade-to-v5" },
     ],
   },
   {

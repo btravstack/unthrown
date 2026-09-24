@@ -2,9 +2,7 @@
 
 ## `unthrown@4.x` → `5.0`
 
-The full, worked guide lives in the docs:
-**[Upgrade from 4.x to 5.0](https://btravstack.github.io/unthrown/how-to/upgrade-to-v5)**.
-The headline breaking surface, so you have it up front:
+The breaking surface:
 
 - **Error combinators renamed** with a `…Cases` suffix (each takes an exhaustive
   matcher): `mapErr` → `mapErrCases`, `flatMapErr` → `flatMapErrCases`,
