@@ -56,6 +56,14 @@ const CATCH_ALL_PROPS: ReadonlySet<string> = new Set(["_", "any"]);
  * one name is one abstraction, and enumerating its internal arms would reach
  * through it.
  *
+ * The empty object pattern (`.with({}, handler)`) is reported too: an object
+ * pattern with no keys matches every object at runtime and covers every object
+ * member of `E` at the type level — the same catch-all without `P`. It is
+ * reported only on a real matcher chain (the injected matcher of an
+ * error-matcher callback, or a `match(…)` imported from `unthrown` /
+ * `ts-pattern`), and never exempted: where a catch-all is needed, `P._` is the
+ * spelling the proof recognises.
+ *
  * Resolves `P` by its imported name via scope analysis, so a rename
  * (`import { P as Pattern }`) still fires and a decoy (`const P = …`) does not.
  * A namespace import (`import * as ns from "unthrown"; ns.P._`) is a documented
@@ -66,16 +74,34 @@ export const noCatchAllPattern = defineRule({
     type: "suggestion",
     docs: {
       description:
-        "Disallow the `P._` catch-all (and ts-pattern's `P.any` alias) in an unthrown matcher — enumerate every error case by name. Exempt when an in-file `Result` annotation proves `E` is a single non-union type or an unresolved generic; elsewhere the escape hatch is a targeted `oxlint-disable`",
+        "Disallow the `P._` catch-all (and ts-pattern's `P.any` alias, and the empty object pattern `{}`) in an unthrown matcher — enumerate every error case by name. Exempt when an in-file `Result` annotation proves `E` is a single non-union type or an unresolved generic; elsewhere the escape hatch is a targeted `oxlint-disable`",
       recommended: true,
     },
     messages: {
+      emptyObjectPattern:
+        'Unexpected `{}` pattern — an object pattern with no keys matches every object, so it is the `P._` catch-all in disguise. Enumerate every error case by name — `.with(P.tag("A"), P.tag("B"), …, handler)` or `.with({ code: "A" }, …)`. Where a catch-all is genuinely needed (a helper generic in `E`, or a single non-union `E`), spell it `P._`.',
       noCatchAll:
         'Unexpected `P.{{prop}}` catch-all. Enumerate every error case by name — `.with(P.tag("A"), P.tag("B"), …, handler)`, grouping cases that share a handler — so a new error can\'t be silently absorbed. If `E` really is a single non-union type (or a helper\'s type parameter), an in-file `Result<_, E>` annotation on the receiver proves it and silences this rule; where no annotation is in reach, keep a targeted `oxlint-disable` with a reason.',
     },
   },
   createOnce: (context) => {
     return {
+      // `.with({}, h)`: an object pattern with no keys matches every object at
+      // runtime, and at the type level it covers every object member of `E` —
+      // `P._` spelled without `P`. Never exempt: where a catch-all is genuinely
+      // needed, `P._` is the spelling the single-type proof recognises, and the
+      // only arm that also closes a match over a generic `E`.
+      ObjectExpression: (node) => {
+        if (node.properties.length > 0) return;
+        const withCall = node.parent;
+        // A pattern is any `.with(…)` argument but the last (the handler).
+        if (withCall.type !== "CallExpression") return;
+        const index = withCall.arguments.indexOf(node);
+        if (index === -1 || index === withCall.arguments.length - 1) return;
+        const root = builderRoot(withCall);
+        if (root === undefined || !isMatcherRoot(context, root)) return;
+        context.report({ node, messageId: "emptyObjectPattern" });
+      },
       MemberExpression: (node) => {
         if (node.object.type !== "Identifier") return;
 
@@ -136,6 +162,29 @@ function isProvenSingleTypeArm(
   // The catch-all must be a direct argument of a `.with(…)` call.
   const withCall = node.parent;
   if (withCall.type !== "CallExpression" || !withCall.arguments.includes(node)) return false;
+  const root = builderRoot(withCall);
+  if (root?.type !== "Identifier") return false;
+
+  // The root must be the matcher: the first parameter of a callback handed
+  // directly to an error-matcher surface.
+  const fn = matcherCallback(context, root);
+  if (fn === undefined) return false;
+
+  const receiver = matcherReceiver(fn);
+  if (receiver === undefined) return false;
+
+  const errorType = annotatedErrorType(context, receiver);
+  if (errorType === undefined) return false;
+
+  return !resolvesToUnion(errorType, typeAliasesOf(context.sourceCode.ast), new Set());
+}
+
+/**
+ * The root of the matcher builder chain a `.with(…)` call hangs off — `m` in
+ * `m.returnType<R>().with(…).with(…)` — or `undefined` when the call is not a
+ * `.with(…)` at all.
+ */
+function builderRoot(withCall: ESTree.CallExpression): ESTree.Node | undefined {
   const withCallee = withCall.callee;
   if (
     withCallee.type !== "MemberExpression" ||
@@ -143,10 +192,8 @@ function isProvenSingleTypeArm(
     withCallee.property.type !== "Identifier" ||
     withCallee.property.name !== "with"
   ) {
-    return false;
+    return undefined;
   }
-
-  // Descend the builder chain (`m.returnType<R>().with(…).with(…)`) to its root.
   let root: ESTree.Node = withCallee.object;
   while (
     root.type === "CallExpression" &&
@@ -157,24 +204,40 @@ function isProvenSingleTypeArm(
   ) {
     root = root.callee.object;
   }
-  if (root.type !== "Identifier") return false;
+  return root;
+}
 
-  // The root must be the matcher: the first parameter of a callback handed
-  // directly to an error-matcher surface.
+/**
+ * The callback whose FIRST parameter `root` is, when that callback is handed
+ * directly to an error-matcher surface (a `*ErrCases` combinator or `match`'s
+ * `errCases`) — i.e. `root` is the injected matcher. `undefined` otherwise.
+ */
+function matcherCallback(
+  context: { sourceCode: SourceCodeLike },
+  root: ESTree.Node,
+): ESTree.Node | undefined {
   const def = context.sourceCode.getScope(root).references.find((ref) => ref.identifier === root)
     ?.resolved?.defs[0];
-  if (def?.type !== "Parameter") return false;
+  if (def?.type !== "Parameter") return undefined;
   const fn = def.node;
-  if (fn.type !== "ArrowFunctionExpression" && fn.type !== "FunctionExpression") return false;
-  if (fn.params[0]?.type !== "Identifier" || fn.params[0].name !== def.name.name) return false;
+  if (fn.type !== "ArrowFunctionExpression" && fn.type !== "FunctionExpression") return undefined;
+  if (fn.params[0]?.type !== "Identifier" || fn.params[0].name !== def.name.name) return undefined;
+  return fn;
+}
 
-  const receiver = matcherReceiver(fn);
-  if (receiver === undefined) return false;
-
-  const errorType = annotatedErrorType(context, receiver);
-  if (errorType === undefined) return false;
-
-  return !resolvesToUnion(errorType, typeAliasesOf(context.sourceCode.ast), new Set());
+/**
+ * Whether a builder chain roots in a matcher: the injected matcher parameter of
+ * an error-matcher callback, or a free `match(value)` call imported from
+ * `unthrown` / `ts-pattern`.
+ */
+function isMatcherRoot(context: { sourceCode: SourceCodeLike }, root: ESTree.Node): boolean {
+  if (root.type === "Identifier") {
+    const fn = matcherCallback(context, root);
+    return fn !== undefined && matcherReceiver(fn) !== undefined;
+  }
+  if (root.type !== "CallExpression" || root.callee.type !== "Identifier") return false;
+  const binding = getImportBinding(context.sourceCode.getScope(root.callee), root.callee);
+  return binding !== undefined && binding.imported === "match" && SOURCES.has(binding.source);
 }
 
 // One alias scan per file, however many catch-alls it carries: the map is
