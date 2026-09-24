@@ -32,7 +32,7 @@
     "turbo": "catalog:"
   },
   "engines": {
-    "node": ">=22.19"
+    "node": ">=22.22"
   },
   "packageManager": "pnpm@12.4.1"
 }

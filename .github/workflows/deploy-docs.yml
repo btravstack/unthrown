@@ -41,10 +41,10 @@ on:
       - ".github/workflows/deploy-docs.yml"
   workflow_dispatch:
 
+# Least privilege: the build job (which runs `pnpm install`, twice on the versioned path) gets
+# read-only contents; only `deploy` holds the Pages write + OIDC token it actually uses.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   # A Pages deploy replaces the whole site, so only one may be in flight: serialize them. A Release
@@ -84,7 +84,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Full history + tags: the stable site is built from the latest stable tag.
           fetch-depth: 0
@@ -148,8 +148,9 @@ jobs:
         if: steps.meta.outputs.prerelease == 'true'
         env:
           DOCS_VERSIONS: ${{ steps.meta.outputs.versions_stable }}
+          STABLE_TAG: ${{ steps.meta.outputs.stable_tag }}
         run: |
-          git worktree add /tmp/stable-docs "${{ steps.meta.outputs.stable_tag }}"
+          git worktree add /tmp/stable-docs "$STABLE_TAG"
           cd /tmp/stable-docs
           pnpm install --frozen-lockfile
           pnpm --filter ./docs exec turbo build
@@ -162,7 +163,7 @@ jobs:
           cp -r docs/.vitepress/dist/* site/beta/
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v5
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: site
 
@@ -173,7 +174,10 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     name: Deploy
+    permissions:
+      pages: write
+      id-token: write
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
