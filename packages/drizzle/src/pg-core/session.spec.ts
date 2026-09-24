@@ -24,6 +24,7 @@ describe("PgUnthrownPreparedQuery", () => {
 
   it("qualifies a constraint violation into the error channel", async () => {
     const cause = Object.assign(new Error("dup"), {
+      severity: "ERROR",
       code: "23505",
       constraint: "c",
       table: "t",
@@ -76,7 +77,11 @@ describe("PgUnthrownPreparedQuery", () => {
   it("still triages a wrapped constraint violation into the modeled channel", async () => {
     // The wrapper must not cost the triage: `qualifyPgError` reads the SQLSTATE
     // through one `cause` level, which is exactly the shape it now always sees.
-    const cause = Object.assign(new Error("dup"), { code: "23505", constraint: "c" });
+    const cause = Object.assign(new Error("dup"), {
+      severity: "ERROR",
+      code: "23505",
+      constraint: "c",
+    });
 
     const r = await prepared(() => Promise.reject(cause)).execute();
 

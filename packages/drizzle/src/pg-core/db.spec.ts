@@ -90,7 +90,11 @@ const makeDb = (answer: () => Promise<unknown>) => {
 const rows = (value: unknown) => async () => value;
 
 const violation = () => {
-  const cause = Object.assign(new Error("dup"), { code: "23505", constraint: "users_pkey" });
+  const cause = Object.assign(new Error("dup"), {
+    severity: "ERROR",
+    code: "23505",
+    constraint: "users_pkey",
+  });
   return async () => {
     throw cause;
   };

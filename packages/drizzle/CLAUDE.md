@@ -118,6 +118,14 @@ select-shape inference: reimplementing them would mean reimplementing
 the finished promise would put the qualification boundary _after_ the
 compilation throw. The cost is a real coupling to unpublished internals — the
 reason the peer range stays broad and the integration suite is not optional.
+`qualifyPgError` triages only an error the **server** reported — `code` **and**
+`severity` (PostgreSQL sends a severity with every error), directly or one
+`cause` level down — so a callback's own `throw` carrying `{ code: "23505" }`
+is a defect, not a modeled `Err`. The five error classes make `detail` (which
+quotes row values) and `cause` (the `DrizzleQueryError`, with the SQL and bound
+params) **non-enumerable** in their constructors: still readable, but skipped
+by `JSON.stringify`/spread, so an error serialised unmapped does not leak data.
+The docs still say never to send one to a client unmapped.
 `qualifyPgError` **is** a `qualify` — `(cause, defect)`, generic in the marker
 type — so it drops into a `fromPromise` at a boundary of your own; `db.$client`
 is the escape hatch (a stock `drizzle-orm/node-postgres` db over the same

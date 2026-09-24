@@ -41,7 +41,7 @@ type Ran = {
 type Answers = Readonly<Record<string, () => Promise<{ rows: unknown[] }>>>;
 
 const pgError = (code: string, extra: Record<string, unknown> = {}) =>
-  Object.assign(new Error(`pg ${code}`), { code, ...extra });
+  Object.assign(new Error(`pg ${code}`), { severity: "ERROR", code, ...extra });
 
 /**
  * A recording stand-in for a node-postgres client.

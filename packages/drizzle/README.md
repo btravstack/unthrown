@@ -58,6 +58,11 @@ const r = await db
   );
 ```
 
+Never send a modeled error to a client unmapped: its `detail` quotes the
+offending row and its `cause` carries the SQL and bound params. Both are
+non-enumerable — `JSON.stringify` skips them — but still readable, so map each
+tag to the response you mean to send, as above.
+
 Transactions follow the `Ok`/`Err`/`Defect` rule directly — `Ok` commits,
 `Err` and `Defect` both roll back, with no separate `tx.rollback()` to learn:
 

@@ -138,6 +138,16 @@ names the offending column and has no constraint name of its own. Nothing parses
 `detail` for a column list — PostgreSQL localizes message text, so only
 `constraint` / `table` / `column` are read.
 
+::: danger Never send a modeled error to a client unmapped
+`detail` quotes the offending row (`Key (email)=(a@b.c) already exists.`) and
+`cause` is the `DrizzleQueryError` carrying the SQL and its bound params. Both
+are **non-enumerable**, so `JSON.stringify(error)` and `{ ...error }` leave them
+out, but they are still one property access away — and anything that walks an
+error's own properties (a logger, an error reporter) can still find them. Map
+each tag to the response you mean to send, as the `mapErrCases` example below
+does, rather than returning the error object itself.
+:::
+
 A query builder is a **thenable**, not an `AsyncResult`. To reach the
 combinators, either `await` it into a `Result` first, or end the chain in
 `.execute()`:
