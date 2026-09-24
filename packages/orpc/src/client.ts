@@ -62,6 +62,11 @@ import { type AsyncResult, fromPromise } from "unthrown";
  * Accepts the promise of a client procedure call or of oRPC's server-side
  * `call(procedure, input)` — anything typed `PromiseWithError`.
  *
+ * `fromCall` has no contract to check against: the `defined` flag the server
+ * sent decides the channel, and `error.data` is trusted, **not validated**.
+ * Against a server you do not fully trust, prefer
+ * {@link createResultClient} with its `contract` option.
+ *
  * @typeParam TOutput - the procedure's output type.
  * @typeParam TError - the call's error union; only its `ORPCError` arm is
  * modeled, the rest is subtracted into the defect channel.
@@ -127,8 +132,11 @@ export type CreateResultClientOptions = {
    * The contract the client was built from. When given, every rejected call
    * is reconciled against the procedure's own `.errors({...})` entry before
    * triage: an `Err` is then a code the client declares, with `data` that
-   * passed its schema, whatever `defined` flag the server sent. Without it,
-   * the server's `defined` flag decides.
+   * passed its schema, whatever `defined` flag the server sent.
+   *
+   * Recommended whenever the server is not fully trusted: without it, the
+   * server's `defined` flag decides and `error.data` reaches `E` **unvalidated**
+   * — typed as the declared schema's output, but never checked against it.
    */
   contract?: RouterContract;
 };
@@ -144,10 +152,11 @@ export type CreateResultClientOptions = {
  * `Defect`. Call options (`signal`, `context`, `lastEventId`) pass through
  * untouched.
  *
- * Pass the client's `contract` whenever client and server deploy
- * independently: the error channel is then decided by the contract the
- * caller compiled against, not by the server's (see
- * {@link CreateResultClientOptions.contract}).
+ * Pass the client's `contract` whenever the server is not fully trusted or
+ * deploys independently: the error channel is then decided by the contract
+ * the caller compiled against, not by the server's, and `error.data` is
+ * validated against its schema (see {@link CreateResultClientOptions.contract}).
+ * Without it, `data` is trusted as sent.
  *
  * Event-iterator (streaming) procedures are out of scope: a stream does not
  * collapse to one `Result`. Keep calling those on the raw client.
@@ -192,14 +201,25 @@ function wrapClient(
 ): unknown {
   const procedure = client as (...rest: unknown[]) => PromiseWithError<unknown, unknown>;
   const reconcile = async (cause: unknown): Promise<never> => {
+    if (contract === undefined || !(cause instanceof ORPCError)) throw cause;
     // The contract lookup runs only on a rejection, inside the boundary: a
-    // path the contract does not know surfaces as a Defect, never a throw.
-    throw contract !== undefined && cause instanceof ORPCError
-      ? await reconcileORPCError(
-          getProcedureContractOrThrow(contract, [...path])["~orpc"].errorMap,
-          cause,
-        )
-      : cause;
+    // path the contract does not know surfaces as a Defect, never a throw —
+    // and the Defect keeps the rejection being reconciled, aggregated after
+    // the lookup's own failure (unthrown's observer-throw convention), rather
+    // than letting the lookup's TypeError replace it.
+    let reconciled: unknown;
+    try {
+      reconciled = await reconcileORPCError(
+        getProcedureContractOrThrow(contract, [...path])["~orpc"].errorMap,
+        cause,
+      );
+    } catch (failure) {
+      throw new AggregateError(
+        [failure, cause],
+        "@unthrown/orpc: reconciling a rejection against the client contract failed; errors[0] is that failure, errors[1] the original rejection",
+      );
+    }
+    throw reconciled;
   };
   // The call is passed as a THUNK: a callable that throws synchronously (out
   // of contract for a real oRPC client, but reachable through the untyped
