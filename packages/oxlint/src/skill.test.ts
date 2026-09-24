@@ -89,8 +89,18 @@ describe("the root README's package table matches the workspace", () => {
     "utf8",
   );
 
-  it("names every rule the plugin ships", () => {
-    expect(RULE_NAMES.filter((name) => !readme.includes(`\`${name}\``))).toEqual([]);
+  // The table under `## Packages`, one row per package keyed by its name —
+  // scoped so a rule or package mentioned elsewhere in the README can't pass.
+  const section = readme.slice(readme.indexOf("## Packages"));
+  const rows = new Map(
+    [...section.slice(0, section.indexOf("\n## ", 1)).matchAll(/^\| \[`([^`]+)`\].*$/gm)].map(
+      ([row, name]) => [name!, row],
+    ),
+  );
+
+  it("names every rule the plugin ships in the oxlint row", () => {
+    const row = rows.get("@unthrown/oxlint") ?? "";
+    expect(RULE_NAMES.filter((name) => !row.includes(`\`${name}\``))).toEqual([]);
   });
 
   it("has a row for every published package", () => {
@@ -106,6 +116,6 @@ describe("the root README's package table matches the workspace", () => {
       .filter((pkg) => pkg.private !== true)
       .map((pkg) => pkg.name);
     expect(published).toContain("unthrown");
-    expect(published.filter((name) => !readme.includes(`| [\`${name}\`]`))).toEqual([]);
+    expect(published.filter((name) => !rows.has(name))).toEqual([]);
   });
 });
