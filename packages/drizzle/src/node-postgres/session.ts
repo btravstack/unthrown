@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import { entityKind } from "drizzle-orm/entity";
 import { type Logger, NoopLogger } from "drizzle-orm/logger";
 import type { NodePgQueryResultHKT } from "drizzle-orm/node-postgres/session";
@@ -10,6 +12,7 @@ import pg from "pg";
 import {
   type AsyncResult,
   fromPromise,
+  fromSafePromise,
   isErr,
   isOk,
   isResult,
@@ -425,6 +428,12 @@ export class NodePgUnthrownSession<
  *
  * @category Session
  */
+/**
+ * The transaction handles whose nested-transaction lock the current async
+ * context holds — i.e. whose nested callback is running here. @internal
+ */
+const holding = new AsyncLocalStorage<ReadonlySet<object>>();
+
 export class NodePgUnthrownTransaction<
   TRelations extends AnyRelations = EmptyRelations,
 > extends PgUnthrownDatabase<NodePgQueryResultHKT, TRelations> {
@@ -488,7 +497,8 @@ export class NodePgUnthrownTransaction<
    * is safe, and each keeps its own outcome. Start a nested transaction from
    * inside a nested callback through the handle that callback receives: the
    * enclosing handle is busy until that callback finishes, so a transaction
-   * started on it from inside waits for itself and never settles.
+   * started on it from inside could only wait for itself — it is a `Defect`
+   * (a `TypeError` naming the mistake) instead.
    *
    * @example
    * ```ts
@@ -520,10 +530,22 @@ export class NodePgUnthrownTransaction<
     // opened after it — the other's writes vanish while it still reports `Ok`,
     // or its own `release` fails with 3B001. Distinct names cannot fix that;
     // only running siblings one after another can.
-    // ponytail: the lock is per handle, so a nested callback that starts a
-    // transaction on the ENCLOSING handle waits for itself forever — use the
-    // handle the callback receives. Async-context tracking would lift that.
-    const run = this.#nested.then(() => this.#runSavepoint(fn));
+    // The lock is per handle, so a nested callback that starts a transaction
+    // on the ENCLOSING handle would wait for itself forever. The async context
+    // knows which handles' callbacks are running here: that call is a Defect
+    // instead of a hang.
+    if (holding.getStore()?.has(this)) {
+      return fromSafePromise(
+        Promise.reject(
+          new TypeError(
+            "A nested transaction was started on the enclosing handle from inside one of its own nested callbacks, which would wait for itself forever — start it on the handle the callback receives.",
+          ),
+        ),
+      );
+    }
+    const held = new Set(holding.getStore()).add(this);
+    const guarded = (tx: NodePgUnthrownTransaction<TRelations>) => holding.run(held, () => fn(tx));
+    const run = this.#nested.then(() => this.#runSavepoint(guarded));
     this.#nested = run.then(noop, noop);
     return fromPromise(run, qualifyPgError).flatMap((inner) => inner);
   }

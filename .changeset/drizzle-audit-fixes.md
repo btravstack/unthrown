@@ -10,7 +10,8 @@ Transaction, CTE and error-serialisation fixes.
   the wrong savepoint — `b`'s writes vanished while it reported `Ok`, or its
   release failed with 3B001. Nested transactions on one handle now run one after
   another, in start order. Start further nesting from inside a nested callback on
-  the handle that callback receives.
+  the handle that callback receives — starting it on the enclosing handle, which
+  could only wait for itself, is a `Defect` (`TypeError`) rather than a hang.
 - **A pooled client is guarded while checked out.** A connection dropping
   mid-transaction emitted an unhandled `error` event (fatal on Node); the session
   now listens for it, and a client that errored or whose `ROLLBACK` failed is

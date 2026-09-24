@@ -682,6 +682,62 @@ describe("transactions on a connection pool", () => {
     ).toEqual([32]);
   });
 
+  it("makes nesting on the enclosing handle from inside its nested callback a Defect, not a hang", async () => {
+    // `tx` is busy until the nested callback settles, so waiting on its lock
+    // from inside that callback could never finish.
+    const result = await db.transaction((tx) =>
+      tx.transaction((nested) =>
+        nested
+          .insert(users)
+          .values({ id: 40, email: "c40@x.y" })
+          .execute()
+          .flatMap(() =>
+            tx.transaction((inner) =>
+              inner.insert(users).values({ id: 41, email: "c41@x.y" }).execute(),
+            ),
+          ),
+      ),
+    );
+
+    expect(isDefect(result) && result.cause).toBeInstanceOf(TypeError);
+    // The Defect rolled the whole transaction back.
+    expect(
+      await survivorsOf(
+        db
+          .select({ id: users.id })
+          .from(users)
+          .where(inArray(users.id, [40, 41])),
+      ),
+    ).toEqual([]);
+  });
+
+  it("still runs nesting on the received handle, and siblings started one after another", async () => {
+    const result = await db.transaction((tx) =>
+      tx
+        .transaction((nested) =>
+          nested.transaction((inner) =>
+            inner.insert(users).values({ id: 42, email: "c42@x.y" }).execute(),
+          ),
+        )
+        .flatMap(() =>
+          tx.transaction((nested) =>
+            nested.insert(users).values({ id: 43, email: "c43@x.y" }).execute(),
+          ),
+        ),
+    );
+
+    expect(isOk(result)).toBe(true);
+    expect(
+      await survivorsOf(
+        db
+          .select({ id: users.id })
+          .from(users)
+          .where(inArray(users.id, [42, 43]))
+          .orderBy(users.id),
+      ),
+    ).toEqual([42, 43]);
+  });
+
   it("renders the transaction config into the BEGIN", async () => {
     const result = await db.transaction(
       (tx) =>

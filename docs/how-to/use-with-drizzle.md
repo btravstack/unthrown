@@ -348,7 +348,8 @@ unwind each other. `allAsync([tx.transaction(a), tx.transaction(b)])` is
 therefore safe and keeps each outcome, but inside a nested callback start any
 further nesting on the handle that callback receives: the enclosing handle is
 busy until the callback finishes, so a transaction started on it from inside
-waits for itself and never settles.
+could only wait for itself — it becomes a `Defect` (a `TypeError` naming the
+mistake) instead of hanging.
 
 `tx.setTransaction({ isolationLevel: "serializable" })` sets the characteristics
 of a transaction already in progress; the `db.transaction(fn, config)` second

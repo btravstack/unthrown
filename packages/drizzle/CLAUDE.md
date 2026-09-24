@@ -84,8 +84,10 @@ newer one — the sibling's writes vanished while it still reported `Ok`, or
 its own `release` failed with 3B001. So nested transactions started on one
 handle are **serialised** by a promise-chain lock on that handle and run in
 start order; the cost is that a nested callback must start further nesting on
-the handle it _receives_ — starting one on the enclosing (busy) handle waits
-for itself and never settles. A **pooled** client is guarded for the length
+the handle it _receives_ — starting one on the enclosing (busy) handle could
+only wait for itself, so it is detected through an `AsyncLocalStorage` of the
+handles whose nested callback is running in the current async context and
+becomes a `Defect` (`TypeError`) instead of a hang. A **pooled** client is guarded for the length
 of its checkout: pg-pool detaches its own `error` listener on checkout, so a
 connection dropping mid-transaction emitted an unhandled `error` (fatal on
 Node); the session attaches one, and a client that reported an error **or**
