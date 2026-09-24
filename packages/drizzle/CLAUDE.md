@@ -49,7 +49,19 @@ agree, `prepare(name).execute()` included (reads hand back
 `PgUnthrownSafePreparedQuery`). `refreshMaterializedView` is a read **by
 explicit decision** even though `REFRESH … CONCURRENTLY` can raise a real
 23505 against the view's unique index — a duplicate-producing matview is a bug
-in the view definition, not a domain outcome. Writes (`insert`, `update`,
+in the view definition, not a domain outcome. **A select is a read only while
+its `WITH` list reads**: `db.with(db.$with("x").as(db.insert(t)…returning()))
+.select()` runs a real `INSERT`, so it carries `PgQueryError` and routes
+through `runQuery`, not the defect-only path (it used to turn a real 23505 into
+a `Defect` under `E = never`). The type half is `PgUnthrownWithBuilder`:
+`db.$with` stamps each CTE with a phantom `CteError` in drizzle's `_` type bag
+(the source select's own channel, `never` for drizzle's `QueryBuilder` select,
+`PgQueryError` for anything else — an insert/update/delete, and **raw SQL**,
+which cannot be inspected), and `db.with(...ctes)` threads `WithListError` into
+the select HKT's `TError` parameter, which every chained method carries. The
+runtime half is a `readOnlyCtes` `WeakSet` filled by the same rule; a CTE
+absent from it — including one a stock drizzle `$with` built — is treated as
+writing, matching `WithListError`'s default. Writes (`insert`, `update`,
 `delete`, ``db.execute(sql`…`)``, `transaction`) carry the **whole**
 `PgQueryError` union, unnarrowed: a `delete` still raises 23505 through an
 `ON DELETE SET DEFAULT`. **Transactions**: `Ok` commits; `Err` **and**

@@ -317,6 +317,19 @@ describe("SQLSTATE mapping against a real PostgreSQL", () => {
     expect(expectErrOf(deleted, ForeignKeyViolation).constraint).toBe("posts_author_id_fkey");
   });
 
+  it("models a 23505 raised by a writing CTE, not only by a bare insert", async () => {
+    // `with "w" as (insert … returning …) select …` runs a real INSERT. Routed
+    // through the read path it used to come back a Defect under `E = never`.
+    const fresh = db.$with("w").as(db.insert(users).values({ id: 7, email: "g@h.i" }).returning());
+    await expect(db.with(fresh).select({ id: fresh.id }).from(fresh)).toBeOkWith([{ id: 7 }]);
+
+    const clash = db.$with("w").as(db.insert(users).values({ id: 8, email: "a@b.c" }).returning());
+    const result = await db.with(clash).select().from(clash);
+    const error = expectErrOf(result, UniqueConstraintViolation);
+    expect(error.constraint).toBe("users_email_key");
+    expect(sqlstateOf(error.cause)).toBe("23505");
+  });
+
   it("hands the whole union to an exhaustive match, every case named", async () => {
     // The payoff of the modeled channel: the five tags are the WHOLE of `E`, so
     // this compiles with no catch-all — and would stop compiling if the union grew.
