@@ -266,6 +266,7 @@ failed on either channel with `tapFailure`:
 
 ```ts
 import { SpanStatusCode, trace } from "@opentelemetry/api";
+import { OkAsync, type AsyncResult } from "unthrown";
 
 const tracer = trace.getTracer("users");
 
@@ -274,7 +275,10 @@ const traced = <T, E>(
   run: () => AsyncResult<T, E>,
 ): AsyncResult<T, E> => {
   const span = tracer.startSpan(name);
-  return run()
+  // Called inside `flatMap`, so a synchronous throw from `run` is a Defect the
+  // observers below still see — called bare, it would skip them and leak the span.
+  return OkAsync()
+    .flatMap(run)
     .tapFailure((failure) => {
       span.setStatus({ code: SpanStatusCode.ERROR, message: failure.tag });
       if (failure.tag === "Defect") span.recordException(String(failure.cause));
