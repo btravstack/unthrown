@@ -1,7 +1,16 @@
 // unthrown — public type surface. Pure types, no runtime.
 
 import type { Defect } from "./defect.js";
+import type { AsyncResult, Result } from "./facade.js";
 import type { match } from "./matcher.js";
+
+// `Result` / `AsyncResult` are DECLARED in `facade.ts`, next to their companion
+// objects, and only re-exported here so the rest of core keeps importing its
+// types from one module. One declaration per name is load-bearing: a second
+// `Result`/`AsyncResult` declaration (the former re-alias) made the d.ts bundler
+// rename one to `Result$1`/`AsyncResult$1`, which it never exported — so a
+// consumer's `export const x = OkAsync(1)` failed declaration emit (TS4023).
+export type { AsyncResult, Result };
 
 /**
  * Flatten an intersection into a single object literal so accumulated `bind` /
@@ -673,46 +682,6 @@ export interface DefectView<out T = never, out E = never> extends ResultMethods<
 export type FailureView<E, T = never> = ErrView<E, T> | DefectView<T, E>;
 
 /**
- * The core type of the library: a computation that has either succeeded with a
- * value of type `T` or failed with a *modeled* error of type `E`.
- *
- * @remarks
- * A `Result` is a **discriminated union** of three variants, distinguished by a
- * `tag` of `"Ok"` | `"Err"` | `"Defect"`:
- *
- * - **`Ok`** — a success carrying a `value: T`.
- * - **`Err`** — a modeled, anticipated failure carrying an `error: E`.
- * - **`Defect`** — an *unmodeled* failure carrying an unknown `cause`. A Defect
- *   never appears in `E`; it is the library's third, out-of-band channel.
- *
- * Because it is a real union, you can match it natively (a `switch` on `tag`, or
- * the built-in `match(...).with({ tag: "Ok" }, …).exhaustive()`), *and* it
- * carries the full method surface ({@link ResultMethods}) for fluent chaining.
- * Either way, the payload (`value`/`error`/`cause`) is only reachable after you
- * narrow — so "check before you access" still holds.
- *
- * @typeParam T - the success value type.
- * @typeParam E - the modeled error type (only anticipated domain failures).
- *
- * @example
- * ```ts
- * import { Ok, Err, type Result } from "unthrown";
- *
- * function half(n: number): Result<number, "odd"> {
- *   return n % 2 === 0 ? Ok(n / 2) : Err("odd");
- * }
- *
- * const message = half(10).match({
- *   ok: (n) => `got ${n}`,
- *   // every case of `E` named — here the one literal it holds
- *   errCases: (matcher) => matcher.with("odd", () => "failed: odd"),
- *   defect: (cause) => `bug: ${String(cause)}`,
- * });
- * ```
- */
-export type Result<T, E> = OkView<T, E> | ErrView<E, T> | DefectView<T, E>;
-
-/**
  * A success-only thenable: awaitable, but deliberately **not** a full
  * `PromiseLike`.
  *
@@ -975,31 +944,6 @@ export type AsyncResultMethods<out T, out E> = {
       : AsyncResult<T, E>,
   ): Promise<T>;
 };
-
-/**
- * The asynchronous counterpart of {@link Result}: an awaitable wrapper carrying
- * the {@link AsyncResultMethods} surface, collapsing to a `Result<T, E>` when
- * `await`-ed.
- *
- * @remarks
- * **Combinator callbacks are synchronous.** A raw `Promise` may never enter an
- * `AsyncResult` method — that would be an un-qualified async boundary, and its
- * rejection would silently become a `Defect`, skipping the triage that
- * {@link fromPromise} forces. To do further async work, re-enter through a
- * qualified boundary and compose it: `ar.flatMap((v) => fromPromise(work(v),
- * qualify))`. The eliminators (`get`, …) return promises; the binds
- * (`flatMap`, `flatTap`, `flatMapErrCases`, `recoverDefect`) additionally accept an
- * `AsyncResult`. Its combinators are documented one per entry on
- * {@link AsyncResultMethods}.
- *
- * To pattern-match an `AsyncResult`, `await` it first: `match(await ar)`.
- *
- * @typeParam T - the success value type.
- * @typeParam E - the modeled error type.
- */
-// oxlint-disable-next-line typescript/consistent-type-definitions -- see OkView: the variance annotations require an interface
-export interface AsyncResult<out T, out E>
-  extends Awaitable<Result<T, E>>, AsyncResultMethods<T, E> {}
 
 /**
  * Extract the success type `T` from a `Result` type — derive one type from

@@ -1,8 +1,12 @@
 // Result facade — a discoverable namespace alias for the standalone entry
 // points. The free functions remain the primary, tree-shakeable API; this
 // object is a separate export, so `import { Ok }` never pulls it in. The value
-// `Result` and the type `Result<T, E>` (types.ts) share a name — the
-// companion-object pattern. See CLAUDE.md → "Internal design".
+// `Result` and the type `Result<T, E>` share a name — the companion-object
+// pattern — and BOTH are declared here, once. A second declaration elsewhere
+// (the former `types.ts` original plus a re-alias here) made the d.ts bundler
+// rename one to `Result$1`/`AsyncResult$1` and never export it, which broke a
+// consumer's declaration emit (TS4023). `types.ts` re-exports these types.
+// See CLAUDE.md → "Internal design".
 
 import { Err, ErrAsync, isDefect, isErr, isOk, Ok, OkAsync } from "./constructors.js";
 import { isResult } from "./core.js";
@@ -23,7 +27,7 @@ import {
   validateAllFromDict,
   validateAllFromDictAsync,
 } from "./interop.js";
-import type { AsyncResult as AsyncResultType, Result as ResultType } from "./types.js";
+import type { AsyncResultMethods, Awaitable, DefectView, ErrView, OkView } from "./types.js";
 
 /**
  * Companion object grouping the **`Result`-producing** entry points under a
@@ -70,23 +74,54 @@ export const Result = {
 } as const;
 
 /**
- * `Result<T, E>` — the core discriminated union. Shares its name with the
- * {@link Result | companion object} above (the value and type are one name); this
- * is the type half.
+ * The core type of the library: a computation that has either succeeded with a
+ * value of type `T` or failed with a *modeled* error of type `E`. Shares its
+ * name with the {@link Result | companion object} above (the value and type are
+ * one name); this is the type half.
  *
  * @remarks
- * A `Result` is a discriminated union, so TypeDoc can't list its methods on this
- * alias. Its fluent combinators (`map`, `flatMap`, `match`, `get`, …) are
- * documented one per entry on {@link ResultMethods} — the shared method surface
- * every variant carries. For "which one do I reach for?", see the
+ * A `Result` is a **discriminated union** of three variants, distinguished by a
+ * `tag` of `"Ok"` | `"Err"` | `"Defect"`:
+ *
+ * - **`Ok`** — a success carrying a `value: T`.
+ * - **`Err`** — a modeled, anticipated failure carrying an `error: E`.
+ * - **`Defect`** — an *unmodeled* failure carrying an unknown `cause`. A Defect
+ *   never appears in `E`; it is the library's third, out-of-band channel.
+ *
+ * Because it is a real union, you can match it natively (a `switch` on `tag`, or
+ * the built-in `match(...).with({ tag: "Ok" }, …).exhaustive()`), *and* it
+ * carries the full method surface for fluent chaining. Either way, the payload
+ * (`value`/`error`/`cause`) is only reachable after you narrow — so "check
+ * before you access" still holds.
+ *
+ * TypeDoc can't list a union's methods on this alias: its fluent combinators
+ * (`map`, `flatMap`, `match`, `get`, …) are documented one per entry on
+ * {@link ResultMethods} — the shared method surface every variant carries. For
+ * "which one do I reach for?", see the
  * [Choosing a combinator](/reference/combinators) guide.
  *
+ * @typeParam T - the success value type.
+ * @typeParam E - the modeled error type (only anticipated domain failures).
+ *
  * @category Facade
+ *
+ * @example
+ * ```ts
+ * import { Ok, Err, type Result } from "unthrown";
+ *
+ * function half(n: number): Result<number, "odd"> {
+ *   return n % 2 === 0 ? Ok(n / 2) : Err("odd");
+ * }
+ *
+ * const message = half(10).match({
+ *   ok: (n) => `got ${n}`,
+ *   // every case of `E` named — here the one literal it holds
+ *   errCases: (matcher) => matcher.with("odd", () => "failed: odd"),
+ *   defect: (cause) => `bug: ${String(cause)}`,
+ * });
+ * ```
  */
-// Re-alias the Result type into this module so a single `export { Result }`
-// (from index.ts) carries BOTH the companion object above and the type — value
-// and type sharing one name, declaration-merged in one place.
-export type Result<T, E> = ResultType<T, E>;
+export type Result<T, E> = OkView<T, E> | ErrView<E, T> | DefectView<T, E>;
 
 /**
  * Companion object grouping the **`AsyncResult`-producing** entry points under
@@ -136,18 +171,30 @@ export const AsyncResult = {
 } as const;
 
 /**
- * `AsyncResult<T, E>` — the async counterpart of {@link Result}. Shares its name
- * with the {@link AsyncResult | companion object} above (value and type are one
- * name); this is the type half.
+ * The asynchronous counterpart of {@link Result}: an awaitable wrapper carrying
+ * the {@link AsyncResultMethods} surface, collapsing to a `Result<T, E>` when
+ * `await`-ed. Shares its name with the {@link AsyncResult | companion object}
+ * above (value and type are one name); this is the type half.
  *
  * @remarks
- * `AsyncResult` carries the async fluent surface; its combinators (`map`,
- * `flatMap`, `match`, `get`, …) are documented one per entry — with their
+ * **Combinator callbacks are synchronous.** A raw `Promise` may never enter an
+ * `AsyncResult` method — that would be an un-qualified async boundary, and its
+ * rejection would silently become a `Defect`, skipping the triage that
+ * {@link fromPromise} forces. To do further async work, re-enter through a
+ * qualified boundary and compose it: `ar.flatMap((v) => fromPromise(work(v),
+ * qualify))`. The eliminators (`get`, …) return promises; the binds
+ * (`flatMap`, `flatTap`, `flatMapErrCases`, `recoverDefect`) additionally accept an
+ * `AsyncResult`. Its combinators are documented one per entry — with their
  * async signatures — on {@link AsyncResultMethods}. For "which one do I reach
  * for?", see the [Choosing a combinator](/reference/combinators) guide.
  *
+ * To pattern-match an `AsyncResult`, `await` it first: `match(await ar)`.
+ *
+ * @typeParam T - the success value type.
+ * @typeParam E - the modeled error type.
+ *
  * @category Facade
  */
-// Re-alias the AsyncResult type into this module (same companion-object pattern
-// as Result above) so one `export { AsyncResult }` carries value + type.
-export type AsyncResult<T, E> = AsyncResultType<T, E>;
+// oxlint-disable-next-line typescript/consistent-type-definitions -- see OkView (types.ts): the variance annotations require an interface
+export interface AsyncResult<out T, out E>
+  extends Awaitable<Result<T, E>>, AsyncResultMethods<T, E> {}

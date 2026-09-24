@@ -92,15 +92,20 @@ export type NonExhaustive<Remaining> = {
 
 /**
  * The "no output type declared" sentinel for a builder's `Declared` parameter.
- * A `unique symbol` so no user type can collide with it. Declaration-only —
- * `tsc` emits it into the `.d.ts` without it needing to be exported.
+ *
+ * @remarks
+ * A string-keyed brand, **not** a `unique symbol`: every unpinned builder's
+ * type carries it (`Matcher<E, R, O, Unset>`), so a consumer's
+ * `export const m = match(x).with(…)` has to be able to print it under
+ * declaration emit. A non-exported `unique symbol` cannot be named there
+ * (TS2527), while an object literal type can always be written out. No user
+ * type collides with it in practice — the key is the explanation.
  *
  * @internal
  */
-declare const UNSET: unique symbol;
-
-/** @internal */
-type Unset = typeof UNSET;
+type Unset = {
+  readonly "unthrown: no output type declared — call .returnType<R>() to pin one": true;
+};
 
 /**
  * A branch handler's return position: free inference (`O2`) while the builder

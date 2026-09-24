@@ -18,8 +18,6 @@
     "*"
   ],
   "intentionallyNotExported": [
-    "Result",
-    "AsyncResult",
     "Defect",
     "Props",
     "AllOk",

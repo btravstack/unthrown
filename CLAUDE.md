@@ -560,9 +560,18 @@ fromExecutor<T, E>>[0]`) is the grotesque spelling that invites a hand-copied
   the `Result<T,E>` / `AsyncResult<T,E>` type share one name). The free functions
   remain the primary, tree-shakeable API; the companions are opt-in sugar (only
   code importing a companion value forgoes tree-shaking). One concept, two import
-  styles — not a second concept. (Each companion re-aliases its type in
-  `facade.ts`, so the `types.ts` `Result`/`AsyncResult` declarations both sit in
-  `docs/typedoc.core.json`'s `intentionallyNotExported`.)
+  styles — not a second concept. (Each companion's type is **declared once, in
+  `facade.ts`**, beside its value; `types.ts` only re-exports it. A second
+  declaration of the same name — the former `types.ts` original plus a re-alias
+  in `facade.ts` — made the d.ts bundler rename one to `Result$1` /
+  `AsyncResult$1` and never export it, so a consumer's
+  `export const x = OkAsync(1)` failed declaration emit with TS4023.
+  `dts-emit.spec.ts` guards this: it bundles the package into a throwaway
+  `node_modules/unthrown` and compiles an inferred `export const` of every
+  public factory against both the ESM and CJS types with `declaration: true`.
+  The same test is why the matcher's `Unset` sentinel is a string-keyed brand,
+  not a `unique symbol` — an unexported symbol in `Matcher<…, Unset>` is
+  unnameable downstream, TS2527.)
 - method surface: the fluent combinators live on two exported, **documentation-only**
   object-literal types — `ResultMethods<T, E>` (the sync surface every `Result`
   variant intersects) and `AsyncResultMethods<T, E>` (its async mirror, with
@@ -571,8 +580,8 @@ fromExecutor<T, E>>[0]`) is the grotesque spelling that invites a hand-copied
   surface by holding a `Result`/`AsyncResult`), but they **are** rendered so the
   API reference lists every combinator's signature and prose. `Result` /
   `AsyncResult` stay value+type companion pairs (value and type share one name,
-  declared together in `facade.ts`), so their public type is a re-alias TypeDoc
-  can't hang a method list on — that is _why_ the surface is factored out and
+  declared together in `facade.ts`), so their public type is a union / an
+  empty-bodied interface TypeDoc can't hang a method list on — that is _why_ the surface is factored out and
   documented on the separate `*Methods` types, which the `Result` / `AsyncResult`
   aliases and the `OkView`/`ErrView`/`DefectView` variants link to. The async
   method docs link back to their sync `ResultMethods` counterpart and state the
@@ -725,7 +734,7 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   `expect.extend` registration is a genuine import-time effect). A `bundle-size`
   CI job reports the per-package `dist` sizes to the run summary — it is
   informational (no threshold), not a hard gate. The `Result` companion
-  object is additive sugar (value + type share the name via a re-alias in
+  object is additive sugar (value + type share the name, both declared in
   `facade.ts`); it must stay a separate export so `import { Ok }` never pulls it
   in.
 - **`AsyncResult` is `Awaitable<Result<T,E>>`, not `PromiseLike`.** Its `then`
@@ -736,7 +745,8 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   (the `Defect` marker), `core.ts` (the `Res`/`AsyncRes` engine + `GetError`),
   `constructors.ts` (`Ok`/`Err` + guards), `do.ts` (the `Do()` do-notation entry
   — the `bind`/`let` steps themselves live on the method surface in `core.ts`),
-  `interop.ts` (`from*`/`qualify`/`all`), `facade.ts` (the `Result` object),
+  `interop.ts` (`from*`/`qualify`/`all`), `facade.ts` (the `Result` / `AsyncResult`
+  companions — value **and** type, the one declaration of each name),
   `tagged.ts` (`TaggedError`), `matcher.ts` (the built-in matcher —
   `match`/`P` (`P.tag` included)/`NonExhaustiveError` + the `Matcher` types),
   and `index.ts` (the
