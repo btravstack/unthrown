@@ -194,7 +194,7 @@ Eight functions in two families. Any `Defect` **dominates** in all of them; the 
 **Accumulating — every `Err`, merged into one domain error:**
 
 - `validateAll([r1, r2], merge)` → `Result<[A, B], E2>`. Same success channel as `all`; `merge: (errors) => E2` is **mandatory** — the errors fold into a named domain error, never an `E[]`.
-- `validateAllFromDict({ a: ra, b: rb }, merge)` → `Result<{ a: A; b: B }, E2>`. `merge` receives `[key, error]` **entries**, correlated per key (`["a", E1] | ["b", E2]`), in `Object.keys` order — so a `switch` on the key narrows the error.
+- `validateAllFromDict({ a: ra, b: rb }, merge)` → `Result<{ a: A; b: B }, E2>`. `merge` receives `[key, error]` **entries**, correlated per key (`["a", E1] | ["b", E2]`), in key order (`Object.keys` order, then enumerable symbol keys) — so a `switch` on the key narrows the error.
 - `validateAllAsync` / `validateAllFromDictAsync` — the `AsyncResult` twins. Facade: `AsyncResult.validateAll` / `AsyncResult.validateAllFromDict`.
 
 Rules for `merge`: it receives a **non-empty** list (so it is total, and is never called on an all-`Ok` input); a `Defect` dominates it, discarding the accumulated errors without calling it; a throw inside it becomes a `Defect`; and it must be **synchronous** — an `async` merge is a compile error.

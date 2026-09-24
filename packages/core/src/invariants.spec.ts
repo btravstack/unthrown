@@ -7,6 +7,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  all,
+  allAsync,
+  allFromDict,
+  allFromDictAsync,
   Do,
   Err,
   fromExecutor,
@@ -20,7 +24,7 @@ import {
   validateAllFromDict,
   validateAllFromDictAsync,
 } from "./index.js";
-import { adoptionProbe, boom, defectOf, flushMicrotasks } from "./test-helpers.js";
+import { adoptionProbe, boom, defectOf, expectDefect, flushMicrotasks } from "./test-helpers.js";
 
 describe("Invariant 1: throw inside any combinator becomes a Defect", () => {
   it("every catching combinator converts a thrown callback into a Defect", () => {
@@ -85,6 +89,35 @@ describe("Invariant 1: throw inside any combinator becomes a Defect", () => {
     expect(validateAllFromDict({ a: Err("e") }, t).isDefect()).toBe(true);
     expect((await validateAllAsync([Err("e").toAsync()], t)).isDefect()).toBe(true);
     expect((await validateAllFromDictAsync({ a: Err("e").toAsync() }, t)).isDefect()).toBe(true);
+  });
+
+  it("covers an out-of-contract aggregate CONTAINER too — never a raw (or synchronous) throw", async () => {
+    // Untyped callers: no container at all, or a record whose getter throws.
+    const hostile = Object.defineProperty({}, "a", {
+      enumerable: true,
+      get: () => {
+        throw boom;
+      },
+    });
+    const merge = () => "merged";
+    const sync = [
+      all(undefined as never),
+      allFromDict(null as never),
+      allFromDict(hostile),
+      validateAll(undefined as never, merge),
+      validateAllFromDict(hostile, merge),
+    ];
+    for (const r of sync) expect(r.isDefect()).toBe(true);
+    expectDefect(allFromDict(hostile), boom); // the thrown value is the cause
+    // The async forms must not throw synchronously, and must resolve to a Defect.
+    const pending = [
+      allAsync(undefined as never),
+      allFromDictAsync(null as never),
+      allFromDictAsync(hostile),
+      validateAllAsync(undefined as never, merge),
+      validateAllFromDictAsync(hostile, merge),
+    ];
+    for (const r of await Promise.all(pending)) expect(r.isDefect()).toBe(true);
   });
 });
 

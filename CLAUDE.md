@@ -150,7 +150,10 @@ was planned).
 - **An out-of-contract non-`Result` surfaces as a `Defect`, never a raw
   throw/rejection.** Reachable only from untyped/cast callers: the aggregates
   (`all` / `allFromDict` / `validateAll` / `validateAllFromDict` and their async
-  counterparts) turn a non-`Result` element into a `TypeError`-caused `Defect`, and every combinator whose callback is
+  counterparts) turn a non-`Result` element into a `TypeError`-caused `Defect` —
+  and an out-of-contract **container** (`all(undefined)`, `allFromDict(null)`, a
+  record whose getter throws) into a `Defect` carrying the thrown cause, the async
+  forms included (they never throw synchronously, and still never reject) — and every combinator whose callback is
   constrained to return a `Result` (`flatMap`, `flatTap`, `bind`, `flatMapErrCases`,
   `flatTapErrCases`, `recoverDefect` — both surfaces; the async ones check the
   **awaited** value, so a legitimately returned `AsyncResult` still passes)
@@ -521,7 +524,11 @@ fromExecutor<T, E>>[0]`) is the grotesque spelling that invites a hand-copied
   never reject. The record fold builds its object with `Object.fromEntries`, so a
   caller-supplied `"__proto__"` key can't pollute the prototype (`fromEntries`
   defines own properties rather than assigning — the guarantee is the built-in's,
-  not a hand-written `defineProperty` loop's).
+  not a hand-written `defineProperty` loop's). A record's keys are its own
+  **enumerable string and symbol** keys (`Reflect.ownKeys` filtered to the
+  enumerable ones — `Object.keys` order, then symbols), so a symbol-keyed `Err`
+  is folded like any other; the record constraint is `Record<PropertyKey, …>` so
+  the types agree.
 - **accumulating** aggregate: `validateAll` / `validateAllFromDict` and their
   async pair `validateAllAsync` / `validateAllFromDictAsync` — same four shapes,
   same success channel (positional tuple, collapsing array, record), but **every**
@@ -535,7 +542,7 @@ fromExecutor<T, E>>[0]`) is the grotesque spelling that invites a hand-copied
   record form hands it **`[key, error]` entries correlated per key**
   (`{ a: Result<A, E1>; b: Result<B, E2> }` → `["a", E1] | ["b", E2]`, so a
   `switch` on the key narrows the error and an impossible pairing does not
-  typecheck), in `Object.keys` order. A `Defect` still **dominates** and discards
+  typecheck), in key order (`Object.keys` order, then symbol keys). A `Defect` still **dominates** and discards
   the accumulated errors — `merge` is not called, because violations computed
   alongside an unmodeled failure aren't trustworthy — a throw in `merge` becomes
   a `Defect`, and `merge` must be **synchronous** (`NotThenable`): an `async` one

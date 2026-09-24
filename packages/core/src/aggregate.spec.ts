@@ -363,3 +363,40 @@ describe("validateAllFromDictAsync", () => {
     expect(({} as Record<string, unknown>)["polluted"]).toBeUndefined();
   });
 });
+
+// `Object.keys`/`Object.values` skip symbol keys, so a symbol-keyed `Err` used
+// to vanish from the record folds while `keyof R` (and so the types) kept it.
+describe("record aggregates fold symbol keys like string keys", () => {
+  const sym = Symbol("s");
+
+  it("allFromDict: a symbol-keyed Err is not dropped; a symbol-keyed Ok lands in the record", () => {
+    expectErr(allFromDict({ a: Ok(1), [sym]: Err("boom" as const) }), "boom");
+    expect(allFromDict({ a: Ok(1), [sym]: Ok(2) }).get()).toEqual({ a: 1, [sym]: 2 });
+  });
+
+  it("allFromDictAsync: the same, on the async surface", async () => {
+    expectErr(
+      await allFromDictAsync({ a: Ok(1).toAsync(), [sym]: Err("boom" as const).toAsync() }),
+      "boom",
+    );
+    expect((await allFromDictAsync({ a: Ok(1).toAsync(), [sym]: Ok(2).toAsync() })).get()).toEqual({
+      a: 1,
+      [sym]: 2,
+    });
+  });
+
+  it("validateAllFromDict(Async): the symbol key is named in merge's entries", async () => {
+    const keysOf = (entries: readonly (readonly [PropertyKey, unknown])[]) =>
+      entries.map(([key]) => key);
+    expectErr(validateAllFromDict({ a: Err("x"), [sym]: Err("y") }, keysOf), ["a", sym]);
+    expectErr(
+      await validateAllFromDictAsync({ a: Err("x").toAsync(), [sym]: Err("y").toAsync() }, keysOf),
+      ["a", sym],
+    );
+  });
+
+  it("a non-enumerable key is skipped, as Object.keys would", () => {
+    const record = Object.defineProperty({ a: Ok(1) }, sym, { value: Err("hidden") });
+    expect(allFromDict(record).get()).toEqual({ a: 1 });
+  });
+});
