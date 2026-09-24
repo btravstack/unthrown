@@ -5,10 +5,17 @@ theses, the load-bearing runtime invariants, the public surface and the
 internal design — live in the root [`CLAUDE.md`](../../CLAUDE.md) and apply
 here too.
 
-PeerDeps `drizzle-orm` `^1.0.0-rc`
+PeerDeps `drizzle-orm` `^1.0.0-rc.5-0`
 and `pg` `^8.16.0` — a **range, not a pin**: the range names the published
-contract a consumer must satisfy, and the internals were verified against
-`1.0.0-rc.4`, which the changeset records. Slaving the peer to an exact rc
+contract a consumer must satisfy. Its floor is rc.5 because the code imports
+`resolveNullableObjectPaths`, which `drizzle-orm/utils` only exports from rc.5
+(a `^1.0.0-rc` peer accepted an rc.4 that crashes on import). The odd `-0`
+is load-bearing: drizzle publishes `1.0.0-rc.N-<sha>`, and `4-fb12281` is an
+**alphanumeric** prerelease identifier, which semver ranks _above_ any
+numeric one — so `^1.0.0-rc.5` still admits every rc.4 build. Against
+`5-0` the comparison is lexical, which excludes rc.4 and admits rc.5–rc.9
+and every stable 1.x; an rc.10 would compare below it and need the floor
+raised. Slaving the peer to an exact rc
 would force a lockstep release on every upstream rc for a change that touched
 nothing. **Deliberately outside the fixed version group** — its majors track
 drizzle's cadence, not the family's. This package **replaces** the stock
@@ -42,7 +49,21 @@ agree, `prepare(name).execute()` included (reads hand back
 `PgUnthrownSafePreparedQuery`). `refreshMaterializedView` is a read **by
 explicit decision** even though `REFRESH … CONCURRENTLY` can raise a real
 23505 against the view's unique index — a duplicate-producing matview is a bug
-in the view definition, not a domain outcome. Writes (`insert`, `update`,
+in the view definition, not a domain outcome. **A select is a read only while
+its `WITH` list reads**: `db.with(db.$with("x").as(db.insert(t)…returning()))
+.select()` runs a real `INSERT`, so it carries `PgQueryError` and routes
+through `runQuery`, not the defect-only path (it used to turn a real 23505 into
+a `Defect` under `E = never`). The type half is the internal `PgUnthrownWithBuilder` (deliberately unexported and
+listed in `intentionallyNotExported`: TypeDoc on TypeScript 6 runs out of heap
+expanding it, and `build-api.ts` still printed a ✓ for the crashed run):
+`db.$with` stamps each CTE with a phantom `CteError` in drizzle's `_` type bag
+(the source select's own channel, `never` for drizzle's `QueryBuilder` select,
+`PgQueryError` for anything else — an insert/update/delete, and **raw SQL**,
+which cannot be inspected), and `db.with(...ctes)` threads `WithListError` into
+the select HKT's `TError` parameter, which every chained method carries. The
+runtime half is a `readOnlyCtes` `WeakSet` filled by the same rule; a CTE
+absent from it — including one a stock drizzle `$with` built — is treated as
+writing, matching `WithListError`'s default. Writes (`insert`, `update`,
 `delete`, ``db.execute(sql`…`)``, `transaction`) carry the **whole**
 `PgQueryError` union, unnarrowed: a `delete` still raises 23505 through an
 `ON DELETE SET DEFAULT`. **Transactions**: `Ok` commits; `Err` **and**
@@ -56,7 +77,20 @@ handle descended from one transaction** and claimed before anything is
 issued — **not** by nesting depth, which is drizzle's scheme and collides:
 two nested transactions started concurrently (which `allAsync` makes easy to
 write) would both be `sp1` on the one connection, and the first
-`rollback to savepoint sp1` would unwind the other's work. A callback that
+`rollback to savepoint sp1` would unwind the other's work. Distinct names
+are necessary but **not sufficient**: savepoints are a _stack_, so with two
+open at once rolling back to (or releasing) the older one also discards the
+newer one — the sibling's writes vanished while it still reported `Ok`, or
+its own `release` failed with 3B001. So nested transactions started on one
+handle are **serialised** by a promise-chain lock on that handle and run in
+start order; the cost is that a nested callback must start further nesting on
+the handle it _receives_ — starting one on the enclosing (busy) handle waits
+for itself and never settles. A **pooled** client is guarded for the length
+of its checkout: pg-pool detaches its own `error` listener on checkout, so a
+connection dropping mid-transaction emitted an unhandled `error` (fatal on
+Node); the session attaches one, and a client that reported an error **or**
+whose `ROLLBACK` failed is released with `release(true)` — destroyed rather
+than returned for the next borrower to inherit. A callback that
 hands back something that is **not a `Result`** at all — reachable only from
 JS or a cast, the `async (tx) => { await tx.insert(…) }` that forgot its
 `return` — takes the **undo** path too and surfaces as a `Defect` (core's
@@ -86,6 +120,14 @@ select-shape inference: reimplementing them would mean reimplementing
 the finished promise would put the qualification boundary _after_ the
 compilation throw. The cost is a real coupling to unpublished internals — the
 reason the peer range stays broad and the integration suite is not optional.
+`qualifyPgError` triages only an error the **server** reported — `code` **and**
+`severity` (PostgreSQL sends a severity with every error), directly or one
+`cause` level down — so a callback's own `throw` carrying `{ code: "23505" }`
+is a defect, not a modeled `Err`. The five error classes make `detail` (which
+quotes row values) and `cause` (the `DrizzleQueryError`, with the SQL and bound
+params) **non-enumerable** in their constructors: still readable, but skipped
+by `JSON.stringify`/spread, so an error serialised unmapped does not leak data.
+The docs still say never to send one to a client unmapped.
 `qualifyPgError` **is** a `qualify` — `(cause, defect)`, generic in the marker
 type — so it drops into a `fromPromise` at a boundary of your own; `db.$client`
 is the escape hatch (a stock `drizzle-orm/node-postgres` db over the same

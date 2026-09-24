@@ -118,7 +118,12 @@ db.user.tryFindMany();
   404). Only the **batch** mutations (`createMany` / `updateMany` and their
   `*AndReturn` twins) are free of `RecordNotFound` — they take no nested
   writes. `create` and `upsert` DO carry it: a nested `connect` can point at a
-  row that does not exist.
+  row that does not exist. `delete` / `deleteMany` carry
+  `UniqueConstraintViolation` (an `onDelete: SetDefault` rewrite can hit a
+  unique index).
+- A modeled error's `cause` (the Prisma error, which quotes the call and its
+  values) is non-enumerable, so `JSON.stringify` skips it — but still never send
+  a modeled error to a client unmapped; map each tag to a response.
 - **Everything infrastructural is a defect** — dropped connections, pool
   timeouts, deadlocks, unmapped P-codes, malformed queries, engine panics.
   There is no `DriverError` class. Nobody branches on those in domain code, so
@@ -135,14 +140,16 @@ db.user.tryFindMany();
   collapses to a list.
 - `tryPaginate(...).withCursor(...)` — cursor pagination; its `E` is
   `InvalidCursor` (the cursor is the only part of the query that came from
-  outside). `after` and `before` are mutually exclusive.
+  outside) — a throwing `parseCursor`, a validation error, or a P2023 / P2007
+  the database raises on the cursor value. `after` and `before` are mutually
+  exclusive. The default cursor escapes an all-digits **string** id as `~42`.
 - `qualifyPrismaError` — the exported qualify, for hand-rolled boundaries.
 - Raw methods remain the escape hatch for raw SQL, and are what a batch
   `$tryTransaction([...])` is composed from.
 
 ## Drizzle: @unthrown/drizzle
 
-Peers `drizzle-orm` ^1.0.0-rc and `pg` ^8.16.0. Unlike the Prisma extension this
+Peers `drizzle-orm` ^1.0.0-rc.5-0 and `pg` ^8.16.0. Unlike the Prisma extension this
 **replaces** the stock database rather than adding to it — every method already
 speaks `AsyncResult`, so there is **no `try*` prefix**, and migrating a call
 site is an import change:
@@ -166,7 +173,9 @@ const rows = (await db.select().from(users)).get();
   `refreshMaterializedView`, `prepare(name).execute()` included. Enforced at
   runtime (they route through `fromSafePromise`), so a stray `23xxx` on a read
   path becomes a `Defect`, never an `Err` the type denies. `never` does not mean
-  infallible: `get()` still panics on a defect.
+  infallible: `get()` still panics on a defect. Exception: a select built by
+  `db.with(cte)` over a **writing** CTE (`$with(…).as(db.insert(…).returning())`,
+  or raw SQL) carries `PgQueryError` — Postgres runs the write.
 - **Writes carry the whole `PgQueryError` union**, unnarrowed —
   `insert`, `update`, `delete`, ``db.execute(sql`…`)``, `transaction`:
   `UniqueConstraintViolation` (23505), `ForeignKeyViolation` (23503),
@@ -183,7 +192,12 @@ const rows = (await db.select().from(users)).get();
   `Err` re-surfaces typed. There is deliberately **no `tx.rollback()`**:
   rollback _is_ returning an `Err`. `PgQueryError` joins the result's channel
   whatever the callback's own `E` (a `DEFERRABLE` constraint is checked at
-  `COMMIT`), so `get()` never compiles on a transaction. Nesting is a savepoint.
+  `COMMIT`), so `get()` never compiles on a transaction. Nesting is a savepoint;
+  nested transactions on one handle run one after another (safe under
+  `allAsync`), so start deeper nesting on the handle a nested callback receives.
+- A modeled error's `detail` (row values) and `cause` (SQL + params) are
+  non-enumerable, so `JSON.stringify` skips them — but still never send a
+  modeled error to a client unmapped.
 - `qualifyPgError` — the exported qualify, for hand-rolled boundaries.
 - `db.$client` is the escape hatch: a stock `drizzle-orm/node-postgres` db over
   the same `Pool` is one line.

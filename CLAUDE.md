@@ -59,7 +59,8 @@ was planned).
    runs), and `stack` is `Error`'s trace (the constructor re-asserts the real
    one, so even an untyped payload can't clobber it). `cause` is deliberately
    **not** reserved — `Error.cause` is `unknown`, so a typed payload `cause`
-   (e.g. `@unthrown/prisma`'s `DriverError`) is a legitimate structured field.
+   (e.g. `@unthrown/drizzle`'s `UniqueConstraintViolation`, whose `cause` is
+   the `DrizzleQueryError`) is a legitimate structured field.
    Keeping `message` off the payload is deliberate — contextual detail
    lives in typed fields, defined per error type, never baked into a per-call
    string.
@@ -807,7 +808,7 @@ copies) — issue #256, observed live in btravstack/start#99.
   infrastructure failure is a `Defect`. **Outside the fixed version group**,
   and the one package on `node >=20.19`. Full spec:
   `packages/prisma/CLAUDE.md`.)
-- `packages/drizzle` → `@unthrown/drizzle` (peerDeps `drizzle-orm` `^1.0.0-rc`
+- `packages/drizzle` → `@unthrown/drizzle` (peerDeps `drizzle-orm` `^1.0.0-rc.5-0`
   and `pg` `^8.16.0`; **replaces** the stock `drizzle-orm/node-postgres`
   database rather than wrapping one, so every method already speaks
   `AsyncResult` and there is no `try*` prefix. Five integrity-constraint

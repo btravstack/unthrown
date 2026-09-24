@@ -90,6 +90,51 @@ describe("qualifyPgError", () => {
     expect(qualifyPgError(null, defect)).toEqual(defect(null));
   });
 
+  it("routes a thrown value with a SQLSTATE but no server severity to the defect channel", () => {
+    // A transaction callback's own `throw Object.assign(new Error(), { code:
+    // "23505" })` is not a constraint the server reported — it is a defect.
+    const forged = Object.assign(new Error("not from the server"), { code: "23505" });
+    expect(qualifyPgError(forged, defect)).toEqual(defect(forged));
+    const wrapped = Object.assign(new Error("Failed query"), { cause: forged });
+    expect(qualifyPgError(wrapped, defect)).toEqual(defect(wrapped));
+  });
+
+  it("keeps SQL, params and row values out of a serialised modeled error", () => {
+    // The driver's `detail` quotes the row; the DrizzleQueryError cause carries
+    // the statement and its bound params. None of it may reach a client through
+    // `JSON.stringify` (or a logger that spreads the error).
+    const driver = pgError({
+      code: "23505",
+      constraint: "users_email_key",
+      table: "users",
+      detail: "Key (email)=(a@b.c) already exists.",
+    });
+    const cause = Object.assign(new Error("Failed query"), {
+      query: 'insert into "users" ("email") values ($1)',
+      params: ["a@b.c"],
+      cause: driver,
+    });
+
+    const e = qualifyPgError(cause, defect) as UniqueConstraintViolation;
+    const json = JSON.stringify(e);
+
+    expect(JSON.parse(json)).toEqual({
+      _tag: "UniqueConstraintViolation",
+      name: "UniqueConstraintViolation",
+      constraint: "users_email_key",
+      table: "users",
+      message: "unique constraint violated",
+    });
+    expect(json).not.toContain("a@b.c");
+    expect({ ...e }).not.toHaveProperty("cause");
+    // Still readable, just not enumerable.
+    expect(e.detail).toBe("Key (email)=(a@b.c) already exists.");
+    expect(e.cause).toBe(cause);
+
+    const n = qualifyPgError(pgError({ code: "23502", column: "email", detail: "row" }), defect);
+    expect(JSON.stringify(n)).not.toContain("row");
+  });
+
   it("unwraps a DrizzleQueryError to qualify the underlying driver error", () => {
     const driver = pgError({ code: "23505", constraint: "users_email_key" });
     const wrapped = Object.assign(new Error("Failed query"), { cause: driver });

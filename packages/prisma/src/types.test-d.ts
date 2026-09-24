@@ -197,7 +197,14 @@ export type _Assertions = [
       RecordNotFound | UniqueConstraintViolation | ForeignKeyViolation
     >
   >,
-  Expect<Equal<AsyncErrOf<typeof deleted>, RecordNotFound | ForeignKeyViolation>>,
+  // delete: an `onDelete: SetDefault` rewrite of the referencing rows can hit a
+  // unique index, and P2002 is mapped whatever the operation
+  Expect<
+    Equal<
+      AsyncErrOf<typeof deleted>,
+      RecordNotFound | UniqueConstraintViolation | ForeignKeyViolation
+    >
+  >,
   // findFirst: selection narrows, a miss is `null`, and only OrThrow adds P2025
   Expect<Equal<AsyncOkOf<typeof first>, { id: number } | null>>,
   Expect<Equal<AsyncErrOf<typeof first>, never>>,
@@ -218,7 +225,7 @@ export type _Assertions = [
   Expect<Equal<AsyncErrOf<typeof createdRows>, UniqueConstraintViolation | ForeignKeyViolation>>,
   Expect<Equal<AsyncErrOf<typeof updatedMany>, UniqueConstraintViolation | ForeignKeyViolation>>,
   Expect<Equal<AsyncOkOf<typeof updatedRows>, { id: number }[]>>,
-  Expect<Equal<AsyncErrOf<typeof deletedMany>, ForeignKeyViolation>>,
+  Expect<Equal<AsyncErrOf<typeof deletedMany>, UniqueConstraintViolation | ForeignKeyViolation>>,
   // the aggregations are reads too
   Expect<Equal<AsyncErrOf<typeof aggregated>, never>>,
   Expect<Equal<AsyncErrOf<typeof grouped>, never>>,

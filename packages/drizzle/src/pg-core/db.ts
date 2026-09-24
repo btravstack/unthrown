@@ -1,4 +1,4 @@
-import { entityKind } from "drizzle-orm/entity";
+import { entityKind, is } from "drizzle-orm/entity";
 import type { PgColumn } from "drizzle-orm/pg-core/columns/common";
 import type { PgDialect } from "drizzle-orm/pg-core/dialect";
 import {
@@ -8,12 +8,14 @@ import {
   QueryBuilder,
 } from "drizzle-orm/pg-core/query-builders";
 import { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query";
+import { PgSelectBase } from "drizzle-orm/pg-core/query-builders/select";
 import type { SelectedFields } from "drizzle-orm/pg-core/query-builders/select.types";
 import type { PgQueryResultHKT, PgQueryResultKind } from "drizzle-orm/pg-core/session";
-import type { WithBuilder } from "drizzle-orm/pg-core/subquery";
+import type { WithSubqueryWithSelection } from "drizzle-orm/pg-core/subquery";
 import type { PgTable } from "drizzle-orm/pg-core/table";
 import type { PgMaterializedView } from "drizzle-orm/pg-core/view";
 import type { PgViewBase } from "drizzle-orm/pg-core/view-base";
+import type { TypedQueryBuilder } from "drizzle-orm/query-builders/query-builder";
 import type {
   AnyRelations,
   EmptyRelations,
@@ -21,9 +23,10 @@ import type {
   TablesRelationalConfig,
 } from "drizzle-orm/relations";
 import { SelectionProxyHandler } from "drizzle-orm/selection-proxy";
-import { type SQL, sql, type SQLWrapper } from "drizzle-orm/sql/sql";
-import { WithSubquery } from "drizzle-orm/subquery";
+import { type ColumnsSelection, type SQL, sql, type SQLWrapper } from "drizzle-orm/sql/sql";
+import { WithSubquery, type WithSubqueryWithoutSelection } from "drizzle-orm/subquery";
 
+import type { PgQueryError } from "../errors.js";
 import { PgUnthrownCountBuilder } from "./count.js";
 import { PgUnthrownDeleteBase } from "./delete.js";
 import type { PgUnthrownInsertHKT } from "./insert.js";
@@ -31,10 +34,100 @@ import { PgUnthrownInsertBase } from "./insert.js";
 import { PgUnthrownRelationalQuery, type PgUnthrownRelationalQueryHKT } from "./query.js";
 import { PgUnthrownRaw } from "./raw.js";
 import { PgUnthrownRefreshMaterializedView } from "./refresh-materialized-view.js";
-import { PgUnthrownSelectBase, type PgUnthrownSelectBuilder } from "./select.js";
+import {
+  PgUnthrownSelectBase,
+  type PgUnthrownSelectBuilder,
+  readOnlyCtes,
+  withListWrites,
+} from "./select.js";
 import type { PgUnthrownSession } from "./session.js";
 import type { PgUnthrownUpdateHKT } from "./update.js";
 import { PgUnthrownUpdateBase } from "./update.js";
+
+/**
+ * The modeled error channel a CTE contributes to the select that uses it —
+ * `never` for a CTE that only reads, {@link PgQueryError} for one that may
+ * write.
+ *
+ * @remarks
+ * A phantom in drizzle's own `_` type bag, where drizzle keeps its other
+ * compile-time-only fields; nothing sets it at runtime, which is why it is
+ * optional. The runtime half of the same decision is `readOnlyCtes`.
+ *
+ * @category Database
+ */
+export type CteError<TError> = { readonly _: { readonly unthrownError?: TError } };
+
+/**
+ * What a CTE built from `Q` may raise: one of this package's selects raises
+ * what it would raise on its own, any other select (drizzle's `QueryBuilder`)
+ * only reads, and anything else — an insert, update or delete — may write.
+ */
+type SourceError<Q> =
+  Q extends PgUnthrownSelectBase<
+    infer _TableName,
+    infer _Selection,
+    infer _SelectMode,
+    infer _NullabilityMap,
+    infer _Dynamic,
+    infer _Excluded,
+    infer _Result,
+    infer _Fields,
+    infer E
+  >
+    ? E
+    : Q extends { readonly _: { readonly selectMode: unknown } }
+      ? never
+      : PgQueryError;
+
+/**
+ * The error channel a `WITH` list adds to its select: the union of what its
+ * CTEs may raise. A CTE this package did not build (a stock drizzle `$with`)
+ * carries no {@link CteError} and is assumed to write — nothing says it
+ * cannot.
+ *
+ * @category Database
+ */
+export type WithListError<W> = W extends { readonly _: { readonly unthrownError?: infer E } }
+  ? unknown extends E
+    ? PgQueryError
+    : E
+  : PgQueryError;
+
+/**
+ * `db.$with`: drizzle's `WithBuilder`, with each CTE also carrying the
+ * {@link CteError} of its source — so `db.with(cte).select()` knows whether it
+ * may write.
+ *
+ * @remarks
+ * A CTE over **raw SQL** is taken to write: its text cannot be inspected, and
+ * over-stating the error channel is the sound direction — an `Err` that cannot
+ * happen costs a match arm, an `Err` the type omitted becomes a defect.
+ *
+ * @category Database
+ */
+type PgUnthrownWithBuilder = {
+  <TAlias extends string>(
+    alias: TAlias,
+  ): {
+    as: {
+      <Q extends TypedQueryBuilder<ColumnsSelection>>(
+        qb: Q | ((qb: QueryBuilder) => Q),
+      ): WithSubqueryWithSelection<Q["_"]["selectedFields"], TAlias> & CteError<SourceError<Q>>;
+      <Q extends TypedQueryBuilder<undefined>>(
+        qb: Q | ((qb: QueryBuilder) => Q),
+      ): WithSubqueryWithoutSelection<TAlias> & CteError<SourceError<Q>>;
+    };
+  };
+  <TAlias extends string, TSelection extends ColumnsSelection>(
+    alias: TAlias,
+    selection: TSelection,
+  ): {
+    as: (
+      qb: SQL | ((qb: QueryBuilder) => SQL),
+    ) => WithSubqueryWithSelection<TSelection, TAlias> & CteError<PgQueryError>;
+  };
+};
 
 /**
  * A Postgres database whose every query resolves to an `AsyncResult`.
@@ -170,7 +263,7 @@ export class PgUnthrownDatabase<
   // no implementation signature can carry, which is why drizzle declares the
   // property and writes the body untyped. The body below is drizzle's, and the
   // assertion is what lets the declared overloads stand in front of it.
-  readonly $with: WithBuilder = ((alias: string, selection?: Record<string, unknown>) => {
+  readonly $with: PgUnthrownWithBuilder = ((alias: string, selection?: Record<string, unknown>) => {
     const as = (qb: unknown) => {
       const built =
         typeof qb === "function"
@@ -194,7 +287,7 @@ export class PgUnthrownDatabase<
       // — it is how a query reports which tables it touched — so it is read
       // through the structural type it actually has.
       const usedTables = (fragment as { usedTables?: string[] }).usedTables ?? [];
-      return new Proxy(
+      const cte = new Proxy(
         new WithSubquery(fragment, fields, alias, true, usedTables),
         new SelectionProxyHandler({
           alias,
@@ -202,9 +295,19 @@ export class PgUnthrownDatabase<
           sqlBehavior: "error",
         }),
       );
+      // The runtime half of `PgUnthrownWithBuilder`'s `CteError`, by the same
+      // rule: one of this package's selects reads unless its own `WITH` list
+      // may write; any other select (drizzle's `QueryBuilder`) reads; anything
+      // else — an insert, update or delete, or raw SQL — may write.
+      const reads =
+        built instanceof PgUnthrownSelectBase
+          ? !withListWrites(built._.config.withList)
+          : is(built, PgSelectBase);
+      if (reads) readOnlyCtes.add(cte);
+      return cte;
     };
     return { as };
-  }) as unknown as WithBuilder;
+  }) as unknown as PgUnthrownWithBuilder;
 
   /**
    * Count the rows a table, view or subquery yields, optionally filtered.
@@ -248,21 +351,27 @@ export class PgUnthrownDatabase<
    * const rows = (await db.with(sq).select().from(sq)).get();
    * ```
    */
-  with(...queries: WithSubquery[]): {
+  with<Q extends WithSubquery[]>(
+    ...queries: Q
+  ): {
     select: {
-      (): PgUnthrownSelectBuilder<undefined>;
-      <TSelection extends SelectedFields>(fields: TSelection): PgUnthrownSelectBuilder<TSelection>;
+      (): PgUnthrownSelectBuilder<undefined, WithListError<Q[number]>>;
+      <TSelection extends SelectedFields>(
+        fields: TSelection,
+      ): PgUnthrownSelectBuilder<TSelection, WithListError<Q[number]>>;
     };
     selectDistinct: {
-      (): PgUnthrownSelectBuilder<undefined>;
-      <TSelection extends SelectedFields>(fields: TSelection): PgUnthrownSelectBuilder<TSelection>;
+      (): PgUnthrownSelectBuilder<undefined, WithListError<Q[number]>>;
+      <TSelection extends SelectedFields>(
+        fields: TSelection,
+      ): PgUnthrownSelectBuilder<TSelection, WithListError<Q[number]>>;
     };
     selectDistinctOn: {
-      (on: (PgColumn | SQLWrapper)[]): PgUnthrownSelectBuilder<undefined>;
+      (on: (PgColumn | SQLWrapper)[]): PgUnthrownSelectBuilder<undefined, WithListError<Q[number]>>;
       <TSelection extends SelectedFields>(
         on: (PgColumn | SQLWrapper)[],
         fields: TSelection,
-      ): PgUnthrownSelectBuilder<TSelection>;
+      ): PgUnthrownSelectBuilder<TSelection, WithListError<Q[number]>>;
     };
     update: <TTable extends PgTable>(
       table: TTable,
@@ -275,11 +384,13 @@ export class PgUnthrownDatabase<
     // oxlint-disable-next-line no-this-alias -- the returned members are `function` declarations, not arrows, because each carries overload signatures an arrow cannot; `this` inside them is the call site's, so the database has to be captured.
     const self = this;
 
-    function select(): PgUnthrownSelectBuilder<undefined>;
+    function select(): PgUnthrownSelectBuilder<undefined, WithListError<Q[number]>>;
     function select<TSelection extends SelectedFields>(
       fields: TSelection,
-    ): PgUnthrownSelectBuilder<TSelection>;
-    function select(fields?: SelectedFields): PgUnthrownSelectBuilder<SelectedFields | undefined> {
+    ): PgUnthrownSelectBuilder<TSelection, WithListError<Q[number]>>;
+    function select(
+      fields?: SelectedFields,
+    ): PgUnthrownSelectBuilder<SelectedFields | undefined, WithListError<Q[number]>> {
       return new PgSelectBuilder(
         {
           fields: fields ?? undefined,
@@ -292,13 +403,13 @@ export class PgUnthrownDatabase<
       );
     }
 
-    function selectDistinct(): PgUnthrownSelectBuilder<undefined>;
+    function selectDistinct(): PgUnthrownSelectBuilder<undefined, WithListError<Q[number]>>;
     function selectDistinct<TSelection extends SelectedFields>(
       fields: TSelection,
-    ): PgUnthrownSelectBuilder<TSelection>;
+    ): PgUnthrownSelectBuilder<TSelection, WithListError<Q[number]>>;
     function selectDistinct(
       fields?: SelectedFields,
-    ): PgUnthrownSelectBuilder<SelectedFields | undefined> {
+    ): PgUnthrownSelectBuilder<SelectedFields | undefined, WithListError<Q[number]>> {
       return new PgSelectBuilder(
         {
           fields: fields ?? undefined,
@@ -312,15 +423,17 @@ export class PgUnthrownDatabase<
       );
     }
 
-    function selectDistinctOn(on: (PgColumn | SQLWrapper)[]): PgUnthrownSelectBuilder<undefined>;
+    function selectDistinctOn(
+      on: (PgColumn | SQLWrapper)[],
+    ): PgUnthrownSelectBuilder<undefined, WithListError<Q[number]>>;
     function selectDistinctOn<TSelection extends SelectedFields>(
       on: (PgColumn | SQLWrapper)[],
       fields: TSelection,
-    ): PgUnthrownSelectBuilder<TSelection>;
+    ): PgUnthrownSelectBuilder<TSelection, WithListError<Q[number]>>;
     function selectDistinctOn(
       on: (PgColumn | SQLWrapper)[],
       fields?: SelectedFields,
-    ): PgUnthrownSelectBuilder<SelectedFields | undefined> {
+    ): PgUnthrownSelectBuilder<SelectedFields | undefined, WithListError<Q[number]>> {
       return new PgSelectBuilder(
         {
           fields: fields ?? undefined,

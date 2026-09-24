@@ -87,6 +87,17 @@ export const readSample = async () => {
   return rows;
 };
 
+// --- a select over a writing CTE is a write -----------------------------------
+export const writingCteSample = async () => {
+  const created = db.$with("created").as(db.insert(users).values({ id, email }).returning());
+
+  const rows = await db.with(created).select().from(created);
+  //    ^? Result<{ id: number; email: string }[], PgQueryError>
+  // @ts-expect-error — the channel is PgQueryError, so `get()` must not compile.
+  rows.get();
+  return rows;
+};
+
 // --- write with mapErrCases ---------------------------------------------------
 export const writeSample = async () =>
   await db

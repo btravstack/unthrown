@@ -40,16 +40,27 @@ that can't happen:
 | `tryFindMany` / `tryFindUnique` / `tryFindFirst` / `tryCount` / `tryAggregate` / `tryGroupBy` | `never`                                                              |
 | `tryFindUniqueOrThrow` / `tryFindFirstOrThrow`                                                | `RecordNotFound`                                                     |
 | `tryCreate` / `tryUpsert` / `tryUpdate`                                                       | `UniqueConstraintViolation \| ForeignKeyViolation \| RecordNotFound` |
-| `tryDelete`                                                                                   | `ForeignKeyViolation \| RecordNotFound`                              |
+| `tryDelete`                                                                                   | `ForeignKeyViolation \| RecordNotFound \| UniqueConstraintViolation` |
 | `tryCreateMany` / `tryCreateManyAndReturn`                                                    | `UniqueConstraintViolation \| ForeignKeyViolation`                   |
 | `tryUpdateMany` / `tryUpdateManyAndReturn`                                                    | `UniqueConstraintViolation \| ForeignKeyViolation`                   |
-| `tryDeleteMany`                                                                               | `ForeignKeyViolation`                                                |
+| `tryDeleteMany`                                                                               | `ForeignKeyViolation \| UniqueConstraintViolation`                   |
 | `tryPaginate(...).withCursor(...)`                                                            | `InvalidCursor`                                                      |
 
 `UniqueConstraintViolation` is `P2002` (a 409, and it carries the offending
 `fields`), `ForeignKeyViolation` is `P2003` (a 400), and `RecordNotFound` is
 `P2025` — plus `P2018`, which says the same thing from the to-many side of a
-nested write (a 404).
+nested write (a 404). A delete carries `UniqueConstraintViolation` because an
+`onDelete: SetDefault` rewrite of the referencing rows can collide with a unique
+index.
+
+::: warning Never send a modeled error to a client unmapped
+Each error's `cause` is the Prisma error, whose message quotes the failing call
+— arguments, and so row values, included. `cause` is **non-enumerable**, so
+`JSON.stringify(error)` and `{ ...error }` leave it out, but it is one property
+access away for anything that walks an error (a logger, an error reporter). Map
+each tag to the response you mean to send rather than returning the error
+itself.
+:::
 
 ::: danger Those four codes are the whole modeled set
 `P2002`, `P2003`, `P2018`, `P2025` — and nothing else. **Every other P-code
@@ -323,7 +334,8 @@ row doesn't skip the first element (folds in the fix for
 `after` and `before` are mutually exclusive (a page runs in one direction, and
 passing both used to silently drop `after`); `before` + `limit: null` is a compile
 error; and the default cursor preserves the id's type (all-digit → number/`bigint`,
-otherwise string). Provide `getCursor` / `parseCursor` for composite keys.
+otherwise string — an all-digit **string** id is escaped as `~123`, so it round-trips
+as a string). Provide `getCursor` / `parseCursor` for composite keys.
 
 A malformed cursor is a modeled `InvalidCursor` rather than a defect — the one
 place a Prisma validation error is treated as anticipated input, because the

@@ -12,8 +12,13 @@ import { Err, fromSafePromise, P, TaggedError } from "unthrown";
 import { describe, expect, test } from "vitest";
 
 import { PrismaClient } from "./generated/prisma/client.ts";
-import { qualifyPrismaError, unthrownPrisma } from "./index.js";
-import { paginateWithCursor } from "./pagination.js";
+import {
+  InvalidCursor,
+  qualifyPrismaError,
+  type UniqueConstraintViolation,
+  unthrownPrisma,
+} from "./index.js";
+import { CursorParseFailure, paginateWithCursor } from "./pagination.js";
 
 // The test schema's tables, created by hand (no Migrate): an in-memory database
 // is born empty, and DDL-by-hand keeps the suite free of any migration engine.
@@ -601,6 +606,71 @@ describe("tryPaginate / withCursor", () => {
     expect(seen[0]).toEqual({ id: big });
   });
 
+  it("the DEFAULT cursor keeps an all-digits STRING id a string", async () => {
+    // A string id like "42" used to serialize as "42" and parse back to the
+    // NUMBER 42 — which Prisma rejects for a String id, so every cursor on such
+    // a model came back InvalidCursor.
+    const seen: unknown[] = [];
+    const model = {
+      findMany: (args: object) => {
+        seen.push((args as { cursor?: unknown }).cursor);
+        return Promise.resolve([{ id: "41" }, { id: "42" }, { id: "~7" }]);
+      },
+    };
+
+    const [, meta] = await paginateWithCursor(model, undefined, { limit: 3 });
+    expect(meta).toMatchObject({ startCursor: "~41", endCursor: "~~7" });
+
+    await paginateWithCursor(model, undefined, { limit: 2, after: meta.endCursor ?? "" });
+    await paginateWithCursor(model, undefined, { limit: 2, after: "~41" });
+    // Escaped string ids come back as the exact strings; numeric and
+    // non-numeric cursors parse exactly as before.
+    await paginateWithCursor(model, undefined, { limit: 2, after: "41" });
+    await paginateWithCursor(model, undefined, { limit: 2, after: "abc" });
+    expect(seen.slice(1).filter((_, i) => i % 2 === 0)).toEqual([
+      { id: "~7" },
+      { id: "41" },
+      { id: 41 },
+      { id: "abc" },
+    ]);
+  });
+
+  // Not reproducible on SQLite (no uuid column type): on Postgres, garbage for
+  // a `@db.Uuid` id parses fine, then the DATABASE refuses the value with P2023
+  // (or P2007) — a known request error, which used to become a defect.
+  it.each(["P2023", "P2007"])(
+    "marks a %s raised by the cursor queries as a refused request cursor",
+    async (code) => {
+      const refusal = Object.assign(new Error("Inconsistent column data"), {
+        name: "PrismaClientKnownRequestError",
+        code,
+      });
+      const model = { findMany: () => Promise.reject(refusal) };
+
+      for (const direction of [{ after: "nope" }, { before: "nope" }]) {
+        const failure = await paginateWithCursor(model, undefined, {
+          limit: 2,
+          ...direction,
+        }).catch((error: unknown) => error);
+        expect(failure).toBeInstanceOf(CursorParseFailure);
+        expect((failure as CursorParseFailure).cause).toBe(refusal);
+      }
+      // The same code from a cursor-less query is not about a cursor at all.
+      await expect(paginateWithCursor(model, undefined, { limit: 2 })).rejects.toBe(refusal);
+    },
+  );
+
+  it("still defects on any other known request error from the cursor queries", async () => {
+    const timeout = Object.assign(new Error("pool timeout"), {
+      name: "PrismaClientKnownRequestError",
+      code: "P2024",
+    });
+    const model = { findMany: () => Promise.reject(timeout) };
+    await expect(paginateWithCursor(model, undefined, { limit: 2, after: "1" })).rejects.toBe(
+      timeout,
+    );
+  });
+
   it("compares cursors structurally — bigint ids survive the round-trip", async () => {
     // JSON.stringify-based comparison would throw on bigint cursor values.
     const model = {
@@ -707,6 +777,30 @@ describe("qualifyPrismaError", () => {
     expect(qualify(cause)).toEqual(
       expect.objectContaining({ _tag: "UniqueConstraintViolation", fields: ["email"], cause }),
     );
+  });
+
+  it("keeps the Prisma error out of a serialised modeled error", () => {
+    // The Prisma error's message quotes the failing call — row values included
+    // — so none of it may reach a client through `JSON.stringify`.
+    const cause = new PrismaClientKnownRequestError(
+      "Unique constraint failed: prisma.user.create({ data: { email: 'a@b.c' } })",
+      { code: "P2002", clientVersion: "7.0.0", meta: { target: ["email"] } },
+    );
+
+    const error = qualify(cause) as UniqueConstraintViolation;
+
+    expect(JSON.parse(JSON.stringify(error))).toEqual({
+      _tag: "UniqueConstraintViolation",
+      name: "UniqueConstraintViolation",
+      fields: ["email"],
+    });
+    expect(JSON.stringify(error)).not.toContain("a@b.c");
+    // Still readable, just not enumerable.
+    expect(error.cause).toBe(cause);
+    for (const other of [known("P2003"), known("P2025")]) {
+      expect(Object.keys(qualify(other))).not.toContain("cause");
+    }
+    expect(Object.keys(new InvalidCursor({ cause }))).not.toContain("cause");
   });
 
   it("maps P2002 in the driver-adapter shape (fields nested under driverAdapterError)", () => {

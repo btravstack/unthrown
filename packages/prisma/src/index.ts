@@ -49,6 +49,21 @@ import {
 export type { CursorPaginationMeta, CursorPaginationOptions } from "./pagination.js";
 
 /**
+ * Keep the Prisma error out of anything that enumerates a modeled error.
+ *
+ * @remarks
+ * `cause` is the `PrismaClientKnownRequestError`, whose `message` quotes the
+ * failing call (arguments, and so row values, included) and whose `meta`
+ * names driver internals. Left enumerable, `JSON.stringify(error)` — or a
+ * framework serialising an error it was handed — ships that to the client. It
+ * stays readable (`error.cause`); `JSON.stringify`, `Object.keys` and spread
+ * merely skip it.
+ */
+const concealCause = (error: object): void => {
+  Object.defineProperty(error, "cause", { enumerable: false });
+};
+
+/**
  * A unique constraint was violated (Prisma error `P2002`).
  *
  * @remarks
@@ -58,10 +73,20 @@ export type { CursorPaginationMeta, CursorPaginationOptions } from "./pagination
 export class UniqueConstraintViolation extends TaggedError("UniqueConstraintViolation")<{
   fields: readonly string[];
   cause: unknown;
-}> {}
+}> {
+  constructor(fields: { fields: readonly string[]; cause: unknown }) {
+    super(fields);
+    concealCause(this);
+  }
+}
 
 /** A foreign key constraint was violated (Prisma error `P2003`). */
-export class ForeignKeyViolation extends TaggedError("ForeignKeyViolation")<{ cause: unknown }> {}
+export class ForeignKeyViolation extends TaggedError("ForeignKeyViolation")<{ cause: unknown }> {
+  constructor(fields: { cause: unknown }) {
+    super(fields);
+    concealCause(this);
+  }
+}
 
 /**
  * A record required by the operation does not exist (Prisma errors `P2025` and
@@ -75,7 +100,12 @@ export class ForeignKeyViolation extends TaggedError("ForeignKeyViolation")<{ ca
  * `P2018` for the to-many side of the same mistake). Both codes say the same
  * thing — a record the write depended on was not found — so both map here.
  */
-export class RecordNotFound extends TaggedError("RecordNotFound")<{ cause: unknown }> {}
+export class RecordNotFound extends TaggedError("RecordNotFound")<{ cause: unknown }> {
+  constructor(fields: { cause: unknown }) {
+    super(fields);
+    concealCause(this);
+  }
+}
 
 /**
  * The cursor handed to `withCursor` could not be used — the caller's
@@ -88,7 +118,12 @@ export class RecordNotFound extends TaggedError("RecordNotFound")<{ cause: unkno
  * a bug in your code. Every other pagination failure is a defect, like any other
  * query.
  */
-export class InvalidCursor extends TaggedError("InvalidCursor")<{ cause: unknown }> {}
+export class InvalidCursor extends TaggedError("InvalidCursor")<{ cause: unknown }> {
+  constructor(fields: { cause: unknown }) {
+    super(fields);
+    concealCause(this);
+  }
+}
 
 /**
  * The full union of domain errors a Prisma **query** can surface.
@@ -204,13 +239,31 @@ export const qualifyPrismaError = <D>(
 // (to-one) or P2018 (to-many). The BATCH mutations are the ones genuinely free
 // of it — `createMany` / `updateMany` and their `*AndReturn` twins accept no
 // nested writes, and zero matches is `Ok({ count: 0 })`, never an error.
-type CreateError = UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound;
-type CreateManyError = UniqueConstraintViolation | ForeignKeyViolation;
-type UpdateError = RecordNotFound | UniqueConstraintViolation | ForeignKeyViolation;
-type DeleteError = RecordNotFound | ForeignKeyViolation;
-type UpsertError = UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound;
-type UpdateManyError = UniqueConstraintViolation | ForeignKeyViolation;
-type DeleteManyError = ForeignKeyViolation;
+//
+// A delete carries UniqueConstraintViolation too: `onDelete: SetDefault` (or
+// SetNull) rewrites the referencing rows, and that rewrite can collide with a
+// unique index. qualifyPrismaError maps P2002 whatever the operation, so an
+// `E` without it would let a real Err escape a type-exhaustive match as a
+// NonExhaustiveError defect — the trap `create`'s RecordNotFound once was.
+
+/** What `tryCreate` can fail with. */
+export type CreateError = UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound;
+/** What `tryCreateMany` / `tryCreateManyAndReturn` can fail with. */
+export type CreateManyError = UniqueConstraintViolation | ForeignKeyViolation;
+/** What `tryUpdate` can fail with. */
+export type UpdateError = RecordNotFound | UniqueConstraintViolation | ForeignKeyViolation;
+/**
+ * What `tryDelete` can fail with — `UniqueConstraintViolation` included, raised
+ * when an `onDelete: SetDefault` / `SetNull` rewrite of the referencing rows
+ * collides with a unique index.
+ */
+export type DeleteError = RecordNotFound | UniqueConstraintViolation | ForeignKeyViolation;
+/** What `tryUpsert` can fail with. */
+export type UpsertError = UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound;
+/** What `tryUpdateMany` / `tryUpdateManyAndReturn` can fail with. */
+export type UpdateManyError = UniqueConstraintViolation | ForeignKeyViolation;
+/** What `tryDeleteMany` can fail with — see {@link DeleteError}. */
+export type DeleteManyError = UniqueConstraintViolation | ForeignKeyViolation;
 
 // The untyped runtime call under the typed surface: `getExtensionContext`
 // resolves the concrete delegate and the promise is qualified at the boundary,
@@ -307,10 +360,14 @@ export type CursorPaginator<Results extends readonly unknown[], Cursor> = {
   ) => AsyncResult<[Results, CursorPaginationMeta], InvalidCursor>;
 };
 
-// Mirrors Prisma's `ITXClientDenyList` — what an interactive-transaction client
-// cannot do — plus `$tryTransaction` itself: nested transactions are not a
-// thing, and the itx client has no `$transaction` for the bridge to delegate to.
-type TxDenyList =
+/**
+ * What an interactive-transaction client cannot do: Prisma's own
+ * `ITXClientDenyList`, plus `$tryTransaction` itself — nested transactions are
+ * not a thing, and the itx client has no `$transaction` for the bridge to
+ * delegate to. Name a `tx` with {@link TransactionClient} rather than
+ * `Omit`-ing this by hand.
+ */
+export type TxDenyList =
   | "$connect"
   | "$disconnect"
   | "$on"
@@ -347,16 +404,25 @@ type TxDenyList =
  */
 export type TransactionClient<C> = Omit<C, TxDenyList>;
 
-// Prisma's own `UnwrapTuple` lives at `runtime.Types.Utils.UnwrapTuple`, behind a
-// runtime entry path this package deliberately never imports (it moved between
-// Prisma 6 and 7), so the mapping is written here. A fixed tuple keeps positional
-// types; a dynamic `PrismaPromise<T>[]` collapses to `T[]` — the same duality as
-// core's `all`.
-type UnwrapPrismaTuple<P extends readonly unknown[]> = {
+/**
+ * The results of a batch `$tryTransaction([...])`: each `PrismaPromise<T>`
+ * unwrapped to its `T`. A fixed tuple keeps positional types; a dynamic
+ * `PrismaPromise<T>[]` collapses to `T[]` — the same duality as core's `all`.
+ *
+ * @remarks
+ * Prisma's own `UnwrapTuple` lives at `runtime.Types.Utils.UnwrapTuple`, behind
+ * a runtime entry path this package deliberately never imports (it moved
+ * between Prisma 6 and 7), so the mapping is written here.
+ */
+export type UnwrapPrismaTuple<P extends readonly unknown[]> = {
   -readonly [K in keyof P]: P[K] extends Prisma.PrismaPromise<infer X> ? X : never;
 };
 
-type TryTransaction = {
+/**
+ * The type of `$tryTransaction`: overloaded exactly as Prisma's own
+ * `$transaction` is — an interactive callback, or a batch of raw operations.
+ */
+export type TryTransaction = {
   /**
    * An interactive transaction whose callback speaks `AsyncResult`: an `Err`
    * triggers a ROLLBACK and comes out as the same typed `Err`.

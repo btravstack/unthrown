@@ -90,7 +90,11 @@ const makeDb = (answer: () => Promise<unknown>) => {
 const rows = (value: unknown) => async () => value;
 
 const violation = () => {
-  const cause = Object.assign(new Error("dup"), { code: "23505", constraint: "users_pkey" });
+  const cause = Object.assign(new Error("dup"), {
+    severity: "ERROR",
+    code: "23505",
+    constraint: "users_pkey",
+  });
   return async () => {
     throw cause;
   };
@@ -330,6 +334,36 @@ describe("PgUnthrownDatabase — CTEs and relational queries", () => {
     ]);
     expect(session.asked[3]?.sql).toContain("select distinct");
     expect(session.asked[4]?.sql).toContain("select distinct on");
+  });
+
+  it("qualifies a select over a writing CTE like the write it runs", async () => {
+    // `with "w" as (insert … returning …) select …` is a real INSERT: its 23505
+    // is a modeled Err, not the defect a plain read would make of it.
+    const { db } = makeDb(violation());
+
+    const written = db.$with("w").as(db.insert(users).values({ id: 1, name: "ada" }).returning());
+
+    await expect(db.with(written).select().from(written)).toBeErr();
+    await expect(db.with(written).select().from(written).execute()).toBeErr();
+    await expect(db.with(written).select().from(written).prepare("p").execute()).toBeErr();
+    // Through a CTE built over it, and alongside a reading one.
+    const over = db.$with("o").as(db.with(written).select().from(written));
+    const adults = db.$with("adults").as(db.select().from(users));
+    await expect(db.with(over).select().from(over)).toBeErr();
+    await expect(db.with(adults, written).select().from(adults)).toBeErr();
+    // Raw SQL cannot be inspected, so it is qualified as a write too.
+    const raw = db.$with("r", { id: users.id }).as(sql`select "id" from "users"`);
+    await expect(db.with(raw).select().from(raw)).toBeErr();
+  });
+
+  it("keeps a select over reading CTEs on the defect-only path", async () => {
+    const { db } = makeDb(violation());
+
+    const adults = db.$with("adults").as(db.select().from(users));
+    const viaBuilder = db.$with("qb").as((qb) => qb.select().from(users));
+
+    await expect(db.with(adults).select().from(adults)).toBeDefect();
+    await expect(db.with(adults, viaBuilder).select().from(viaBuilder).execute()).toBeDefect();
   });
 
   it("builds a CTE from a raw SQL fragment and an explicit selection", async () => {

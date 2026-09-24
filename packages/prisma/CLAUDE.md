@@ -28,10 +28,19 @@ untouched and is folded at the edge like any other unmodeled failure.) So a
 a defect), and there is **no `DriverError` class** — it was removed
 2026-08 when the last of its contents moved to the defect channel. A retry
 wrapper for P2024/P2034 therefore uses `recoverDefect` and inspects the cause:
-one place in a codebase, versus an arm at every call site. Only the **batch**
+one place in a codebase, versus an arm at every call site. Every modeled error
+(the three above and `InvalidCursor`) makes its `cause` — the Prisma error,
+whose message quotes the failing call and its values — **non-enumerable** in
+its constructor: still readable, but skipped by `JSON.stringify`/spread, so an
+error serialised unmapped does not leak data. The docs still say never to
+send one to a client unmapped. Only the **batch**
 mutations (`createMany`/`updateMany` + their `*AndReturn` twins) are free of
 `RecordNotFound`: they accept no nested writes and zero matches is
-`Ok({ count: 0 })`. `create` and `upsert` **do** carry it — neither misses a
+`Ok({ count: 0 })`. The deletes (`delete`, `deleteMany`) carry
+`UniqueConstraintViolation` as well: an `onDelete: SetDefault` / `SetNull`
+rewrite of the referencing rows can collide with a unique index, and P2002 is
+mapped whatever the operation (they omitted it until 2026-09, the same unsound
+shape as `create`'s `RecordNotFound` below). `create` and `upsert` **do** carry `RecordNotFound` — neither misses a
 row of its own, but a nested `connect` to a non-existent record raises P2025
 (an unsound omission until 2026-08: the runtime produced a `RecordNotFound`
 the type excluded, so a type-exhaustive `mapErrCases` threw
@@ -43,9 +52,12 @@ was rejected for inventing a concept Prisma does not have). The
 **interactive** form takes a callback speaking `AsyncResult` — an `Err` rolls
 back and re-surfaces typed; a defect rolls back and stays a defect, a
 throwing callback included — and its `tx` is nameable from outside as the
-exported `TransactionClient<C>` (`Omit<C, TxDenyList>`; the deny list itself
-stays internal, because a hand-copied `Omit` drifts silently — `Omit` of a
-key that does not exist is not an error). The **batch** form takes an array
+exported `TransactionClient<C>` (`Omit<C, TxDenyList>`; name a `tx` with it rather
+than a hand-copied `Omit`, which drifts silently — `Omit` of a key that does
+not exist is not an error. `TxDenyList`, `TryTransaction`, `UnwrapPrismaTuple` and the seven
+per-operation error unions (`CreateError` … `DeleteManyError`) are exported
+because the public signatures reference them, and TypeDoc must document what a
+signature names). The **batch** form takes an array
 of unexecuted `Prisma.PrismaPromise`s, one round trip, all or nothing,
 qualified through the same `qualifyPrismaError`; two limits follow from
 Prisma's form and are documented rather than papered over: the array holds
@@ -61,9 +73,15 @@ in; `after`/`before` are mutually exclusive in the type — passing both used to
 drop `after` silently — and pagination carries the **one carve-out** to the
 defect routing above: its `E` is `InvalidCursor`, minted both from a Prisma
 validation error and from a throw out of the caller's `parseCursor` on a
-request cursor (marked by the internal `CursorParseFailure` sentinel), because
-a cursor is an opaque string from a client and garbage in it is a 400, not a
-bug. A throw out of `getCursor` — which reads rows _we_ fetched — is
+request cursor (marked by the internal `CursorParseFailure` sentinel) and
+from a `P2023` / `P2007` the database raises on the queries that carry the
+request cursor (garbage for a Postgres `@db.Uuid` id parses fine, then the
+column refuses the value; the same codes from a cursor-less query stay
+defects), because a cursor is an opaque string from a client and garbage in it
+is a 400, not a bug. The default cursor is `row.id`, parsed back to a number
+/ bigint when all digits; an all-digits **string** id is escaped as `~123` so
+it round-trips as a string (it used to parse to a number, making every cursor
+on such a model an `InvalidCursor`). A throw out of `getCursor` — which reads rows _we_ fetched — is
 deliberately NOT marked, so it stays a defect). Qualification happens once inside the extension via the exported
 `qualifyPrismaError`, which **is** a `qualify` — `(cause, defect)`, generic in
 the marker type so core's non-exported `Defect` need not be named — and so

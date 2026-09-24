@@ -7,5 +7,5 @@
   ],
   "tsconfig": "../packages/drizzle/tsconfig.json",
   "out": "api/drizzle",
-  "intentionallyNotExported": ["ConstraintFields"]
+  "intentionallyNotExported": ["ConstraintFields", "NotNullFields", "PgUnthrownWithBuilder"]
 }

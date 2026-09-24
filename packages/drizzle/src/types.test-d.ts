@@ -268,6 +268,48 @@ const preparedInsert = async () =>
   await db.insert(users).values({ id: 1, email: "a@b.c" }).prepare("p_insert").execute();
 type _preparedInsertErr = Expect<Equal<ErrChannel<typeof preparedInsert>, PgQueryError>>;
 
+// --- CTEs: a select is a write when its WITH list may write -------------------
+//
+// `db.with(db.$with("x").as(db.insert(…).returning())).select()` runs a real
+// INSERT, so its 23505 must be an `Err` the type admits — not the `never` of a
+// read, which would turn it into a defect.
+
+const readCte = db.$with("r").as(db.select().from(users));
+const cteRead = async () => await db.with(readCte).select().from(readCte);
+type _cteReadErr = Expect<Equal<ErrChannel<typeof cteRead>, never>>;
+
+const insertCte = db.$with("w").as(db.insert(users).values({ id: 1, email: "a@b.c" }).returning());
+const cteWrite = async () => await db.with(insertCte).select().from(insertCte);
+type _cteWriteErr = Expect<Equal<ErrChannel<typeof cteWrite>, PgQueryError>>;
+type _cteWriteOk = Expect<Equal<OkChannel<typeof cteWrite>, { id: number; email: string }[]>>;
+
+// Chained, executed and prepared: every route keeps the write's channel.
+const cteWriteExecute = async () =>
+  await db.with(insertCte).select().from(insertCte).where(eq(insertCte.id, 1)).execute();
+type _cteWriteExecuteErr = Expect<Equal<ErrChannel<typeof cteWriteExecute>, PgQueryError>>;
+const cteWritePrepared = async () =>
+  await db.with(insertCte).select().from(insertCte).prepare("p_cte").execute();
+type _cteWritePreparedErr = Expect<Equal<ErrChannel<typeof cteWritePrepared>, PgQueryError>>;
+
+// One writing CTE is enough, and it propagates through a CTE built over it.
+const cteMixed = async () => await db.with(readCte, insertCte).select().from(readCte);
+type _cteMixedErr = Expect<Equal<ErrChannel<typeof cteMixed>, PgQueryError>>;
+const nestedCte = db.$with("n").as(db.with(insertCte).select().from(insertCte));
+const cteNested = async () => await db.with(nestedCte).select().from(nestedCte);
+type _cteNestedErr = Expect<Equal<ErrChannel<typeof cteNested>, PgQueryError>>;
+
+// Raw SQL cannot be inspected, so it counts as writing.
+const rawCte = db.$with("s", { id: users.id }).as(sql`select id from users`);
+const cteRaw = async () => await db.with(rawCte).select().from(rawCte);
+type _cteRawErr = Expect<Equal<ErrChannel<typeof cteRaw>, PgQueryError>>;
+
+const cteWriteGet = async () => {
+  const r = await db.with(insertCte).select().from(insertCte);
+  // @ts-expect-error — a select over a writing CTE has a non-empty error channel.
+  r.get();
+  return r;
+};
+
 // --- the matcher: exhaustiveness is enforced ---------------------------------
 
 const missingArm = async () => {

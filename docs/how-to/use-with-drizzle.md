@@ -10,7 +10,7 @@
 pnpm add @unthrown/drizzle drizzle-orm pg unthrown
 ```
 
-`drizzle-orm` (`^1.0.0-rc`) and `pg` (`^8.16.0`) are peer dependencies — this
+`drizzle-orm` (`^1.0.0-rc.5-0`) and `pg` (`^8.16.0`) are peer dependencies — this
 package sits on drizzle's own Postgres builder tree, so you bring your own copy
 of it.
 
@@ -94,6 +94,24 @@ Four builders are reads, and all three routes into them agree — `await`,
 | ``db.execute(sql`…`)``            | `PgQueryError`                              |
 | `db.transaction(fn)`              | the callback's own `E`, plus `PgQueryError` |
 
+::: info A select over a writing CTE is a write
+`db.with(cte).select()` is a read only while every CTE in its `WITH` list is.
+A CTE over an insert, update or delete is a real write — Postgres runs it — so
+the select that uses it carries `PgQueryError` and is qualified like the write:
+
+```ts
+const created = db
+  .$with("created")
+  .as(db.insert(users).values({ id, email }).returning());
+
+const rows = await db.with(created).select().from(created);
+//    ^? Result<{ id: number; email: string }[], PgQueryError>
+```
+
+A CTE over raw SQL counts as writing too, since its text cannot be inspected; a
+CTE over a plain select stays a read, so `get()` still compiles on it.
+:::
+
 ::: warning `refreshMaterializedView` is a read by decision
 `REFRESH MATERIALIZED VIEW … CONCURRENTLY` genuinely _can_ raise a `23505`
 against the view's unique index. It is classified as a read anyway: a matview
@@ -119,6 +137,16 @@ foreign key — so every write carries the same five:
 names the offending column and has no constraint name of its own. Nothing parses
 `detail` for a column list — PostgreSQL localizes message text, so only
 `constraint` / `table` / `column` are read.
+
+::: danger Never send a modeled error to a client unmapped
+`detail` quotes the offending row (`Key (email)=(a@b.c) already exists.`) and
+`cause` is the `DrizzleQueryError` carrying the SQL and its bound params. Both
+are **non-enumerable**, so `JSON.stringify(error)` and `{ ...error }` leave them
+out, but they are still one property access away — and anything that walks an
+error's own properties (a logger, an error reporter) can still find them. Map
+each tag to the response you mean to send, as the `mapErrCases` example below
+does, rather than returning the error object itself.
+:::
 
 A query builder is a **thenable**, not an `AsyncResult`. To reach the
 combinators, either `await` it into a `Result` first, or end the chain in
@@ -313,6 +341,14 @@ const r = await db.transaction((tx) =>
 );
 // The savepoint rolled back; the outer transaction still commits.
 ```
+
+Nested transactions started on the same handle **run one after another**, in
+the order they were started — savepoints are a stack, so two open at once would
+unwind each other. `allAsync([tx.transaction(a), tx.transaction(b)])` is
+therefore safe and keeps each outcome, but inside a nested callback start any
+further nesting on the handle that callback receives: the enclosing handle is
+busy until the callback finishes, so a transaction started on it from inside
+waits for itself and never settles.
 
 `tx.setTransaction({ isolationLevel: "serializable" })` sets the characteristics
 of a transaction already in progress; the `db.transaction(fn, config)` second
