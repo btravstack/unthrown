@@ -248,21 +248,43 @@ export class NonExhaustiveError extends Error {
   /** The value no arm matched. */
   readonly input: unknown;
   constructor(input: unknown) {
-    let printed: string | undefined;
-    try {
-      // `JSON.stringify` RETURNS undefined (it does not throw) for a function, a
-      // symbol, or `undefined` — so `?? String(input)` is load-bearing, not
-      // belt-and-braces: without it the message reads "the value undefined" for
-      // exactly the rogue inputs this error exists to describe. The `catch` is
-      // for the inputs that genuinely throw (a bigint, a circular object).
-      printed = JSON.stringify(input) ?? String(input);
-    } catch {
-      printed = String(input);
-    }
-    super(`unthrown: no pattern matched the value ${printed}`);
+    super(`unthrown: no pattern matched the value ${printValue(input)}`);
     this.name = "NonExhaustiveError";
     this.input = input;
     Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Render a rogue value for {@link NonExhaustiveError}'s message — **total**,
+ * because the error is constructed inside the throw → defect net and a throw
+ * here would replace the diagnostic with an unrelated one (or escape `match`).
+ *
+ * @remarks
+ * Each step can fail for a different input, so each is guarded: `JSON.stringify`
+ * RETURNS undefined for a function, a symbol or `undefined` and throws for a
+ * bigint or a circular object; `String()` throws for a null-prototype object or
+ * a hostile `toString` / `Symbol.toPrimitive`; `Object.prototype.toString`
+ * throws only for a Proxy whose `get` trap does. The last resort is a constant.
+ *
+ * @internal
+ */
+function printValue(input: unknown): string {
+  try {
+    const json = JSON.stringify(input);
+    if (json !== undefined) return json;
+  } catch {
+    // fall through
+  }
+  try {
+    return String(input);
+  } catch {
+    // fall through
+  }
+  try {
+    return Object.prototype.toString.call(input);
+  } catch {
+    return "<unprintable value>";
   }
 }
 
@@ -420,7 +442,9 @@ const universal = pattern<unknown>(() => true) as UniversalPattern;
  */
 export const P = Object.freeze({
   _: universal,
-  tag: <const Tag extends string>(value: Tag): { _tag: Tag } => ({ _tag: value }),
+  // Frozen like every other `P.*` pattern: a pattern object mutated after
+  // construction would silently change which arm a value takes.
+  tag: <const Tag extends string>(value: Tag): { _tag: Tag } => Object.freeze({ _tag: value }),
   instanceOf: <C extends abstract new (...args: never[]) => unknown>(
     cls: C,
   ): PatternMatcher<InstanceType<C>> => pattern((value) => value instanceof cls),

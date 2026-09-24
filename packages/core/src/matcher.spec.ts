@@ -181,6 +181,66 @@ describe("the built-in matcher engine", () => {
     }
   });
 
+  // Building the message must be total: it runs inside the combinators'
+  // throw → defect net, and at the `match` edge a throw from the constructor
+  // would replace the diagnostic with an unrelated TypeError.
+  it.each([
+    [
+      "a circular null-prototype object",
+      (() => {
+        const o = Object.create(null) as Record<string, unknown>;
+        o["self"] = o;
+        return o;
+      })(),
+      "[object Object]",
+    ],
+    [
+      "a hostile toString / Symbol.toPrimitive",
+      {
+        toJSON: () => {
+          throw new Error("json");
+        },
+        toString: () => {
+          throw new Error("toString");
+        },
+        [Symbol.toPrimitive]: () => {
+          throw new Error("toPrimitive");
+        },
+      },
+      "[object Object]",
+    ],
+    [
+      "a Proxy whose every trap throws",
+      new Proxy(
+        {},
+        {
+          get: () => {
+            throw new Error("get");
+          },
+          getPrototypeOf: () => {
+            throw new Error("proto");
+          },
+        },
+      ),
+      "<unprintable value>",
+    ],
+  ])("NonExhaustiveError's constructor never throws — %s", (_label, input, expected) => {
+    const error = new NonExhaustiveError(input);
+    expect(error.message).toContain(expected);
+    expect(error.input).toBe(input);
+    expect(() =>
+      match(input as unknown as "a")
+        .with("a", () => 1)
+        .run(),
+    ).toThrow(NonExhaustiveError);
+  });
+
+  it("P.tag() returns a frozen pattern, like every other P.* pattern", () => {
+    const pattern = P.tag("A");
+    expect(Object.isFrozen(pattern)).toBe(true);
+    expect(Object.isFrozen(P.instanceOf(Error))).toBe(true);
+  });
+
   it("a non-plain object pattern never matches structurally — identity only", () => {
     // A keyless class instance (Date, Error) or a foreign symbol-keyed pattern
     // object (e.g. a real ts-pattern matcher) must NOT vacuously match every
