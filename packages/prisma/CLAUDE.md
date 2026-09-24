@@ -31,7 +31,11 @@ wrapper for P2024/P2034 therefore uses `recoverDefect` and inspects the cause:
 one place in a codebase, versus an arm at every call site. Only the **batch**
 mutations (`createMany`/`updateMany` + their `*AndReturn` twins) are free of
 `RecordNotFound`: they accept no nested writes and zero matches is
-`Ok({ count: 0 })`. `create` and `upsert` **do** carry it — neither misses a
+`Ok({ count: 0 })`. The deletes (`delete`, `deleteMany`) carry
+`UniqueConstraintViolation` as well: an `onDelete: SetDefault` / `SetNull`
+rewrite of the referencing rows can collide with a unique index, and P2002 is
+mapped whatever the operation (they omitted it until 2026-09, the same unsound
+shape as `create`'s `RecordNotFound` below). `create` and `upsert` **do** carry `RecordNotFound` — neither misses a
 row of its own, but a nested `connect` to a non-existent record raises P2025
 (an unsound omission until 2026-08: the runtime produced a `RecordNotFound`
 the type excluded, so a type-exhaustive `mapErrCases` threw
@@ -43,9 +47,12 @@ was rejected for inventing a concept Prisma does not have). The
 **interactive** form takes a callback speaking `AsyncResult` — an `Err` rolls
 back and re-surfaces typed; a defect rolls back and stays a defect, a
 throwing callback included — and its `tx` is nameable from outside as the
-exported `TransactionClient<C>` (`Omit<C, TxDenyList>`; the deny list itself
-stays internal, because a hand-copied `Omit` drifts silently — `Omit` of a
-key that does not exist is not an error). The **batch** form takes an array
+exported `TransactionClient<C>` (`Omit<C, TxDenyList>`; name a `tx` with it rather
+than a hand-copied `Omit`, which drifts silently — `Omit` of a key that does
+not exist is not an error. `TxDenyList`, `TryTransaction` and the seven
+per-operation error unions (`CreateError` … `DeleteManyError`) are exported
+because the public signatures reference them, and TypeDoc must document what a
+signature names). The **batch** form takes an array
 of unexecuted `Prisma.PrismaPromise`s, one round trip, all or nothing,
 qualified through the same `qualifyPrismaError`; two limits follow from
 Prisma's form and are documented rather than papered over: the array holds

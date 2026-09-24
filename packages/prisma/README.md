@@ -53,9 +53,9 @@ await db.user.tryCreate({ data }).match({
   | `tryFindMany` / `tryFindUnique` / `tryFindFirst` / `tryCount` / `tryAggregate` / `tryGroupBy` | `never`                                                              |
   | `tryFindUniqueOrThrow` / `tryFindFirstOrThrow`                                                | `RecordNotFound`                                                     |
   | `tryCreate` / `tryUpsert` / `tryUpdate`                                                       | `UniqueConstraintViolation \| ForeignKeyViolation \| RecordNotFound` |
-  | `tryDelete`                                                                                   | `ForeignKeyViolation \| RecordNotFound`                              |
+  | `tryDelete`                                                                                   | `ForeignKeyViolation \| RecordNotFound \| UniqueConstraintViolation` |
   | `tryCreateMany` / `tryCreateManyAndReturn` / `tryUpdateMany` / `tryUpdateManyAndReturn`       | `UniqueConstraintViolation \| ForeignKeyViolation`                   |
-  | `tryDeleteMany`                                                                               | `ForeignKeyViolation`                                                |
+  | `tryDeleteMany`                                                                               | `ForeignKeyViolation \| UniqueConstraintViolation`                   |
   | `tryPaginate(...).withCursor(...)`                                                            | `InvalidCursor`                                                      |
 
   `UniqueConstraintViolation` is P2002 (409, and carries the offending

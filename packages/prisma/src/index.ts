@@ -204,13 +204,31 @@ export const qualifyPrismaError = <D>(
 // (to-one) or P2018 (to-many). The BATCH mutations are the ones genuinely free
 // of it — `createMany` / `updateMany` and their `*AndReturn` twins accept no
 // nested writes, and zero matches is `Ok({ count: 0 })`, never an error.
-type CreateError = UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound;
-type CreateManyError = UniqueConstraintViolation | ForeignKeyViolation;
-type UpdateError = RecordNotFound | UniqueConstraintViolation | ForeignKeyViolation;
-type DeleteError = RecordNotFound | ForeignKeyViolation;
-type UpsertError = UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound;
-type UpdateManyError = UniqueConstraintViolation | ForeignKeyViolation;
-type DeleteManyError = ForeignKeyViolation;
+//
+// A delete carries UniqueConstraintViolation too: `onDelete: SetDefault` (or
+// SetNull) rewrites the referencing rows, and that rewrite can collide with a
+// unique index. qualifyPrismaError maps P2002 whatever the operation, so an
+// `E` without it would let a real Err escape a type-exhaustive match as a
+// NonExhaustiveError defect — the trap `create`'s RecordNotFound once was.
+
+/** What `tryCreate` can fail with. */
+export type CreateError = UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound;
+/** What `tryCreateMany` / `tryCreateManyAndReturn` can fail with. */
+export type CreateManyError = UniqueConstraintViolation | ForeignKeyViolation;
+/** What `tryUpdate` can fail with. */
+export type UpdateError = RecordNotFound | UniqueConstraintViolation | ForeignKeyViolation;
+/**
+ * What `tryDelete` can fail with — `UniqueConstraintViolation` included, raised
+ * when an `onDelete: SetDefault` / `SetNull` rewrite of the referencing rows
+ * collides with a unique index.
+ */
+export type DeleteError = RecordNotFound | UniqueConstraintViolation | ForeignKeyViolation;
+/** What `tryUpsert` can fail with. */
+export type UpsertError = UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound;
+/** What `tryUpdateMany` / `tryUpdateManyAndReturn` can fail with. */
+export type UpdateManyError = UniqueConstraintViolation | ForeignKeyViolation;
+/** What `tryDeleteMany` can fail with — see {@link DeleteError}. */
+export type DeleteManyError = UniqueConstraintViolation | ForeignKeyViolation;
 
 // The untyped runtime call under the typed surface: `getExtensionContext`
 // resolves the concrete delegate and the promise is qualified at the boundary,
@@ -307,10 +325,14 @@ export type CursorPaginator<Results extends readonly unknown[], Cursor> = {
   ) => AsyncResult<[Results, CursorPaginationMeta], InvalidCursor>;
 };
 
-// Mirrors Prisma's `ITXClientDenyList` — what an interactive-transaction client
-// cannot do — plus `$tryTransaction` itself: nested transactions are not a
-// thing, and the itx client has no `$transaction` for the bridge to delegate to.
-type TxDenyList =
+/**
+ * What an interactive-transaction client cannot do: Prisma's own
+ * `ITXClientDenyList`, plus `$tryTransaction` itself — nested transactions are
+ * not a thing, and the itx client has no `$transaction` for the bridge to
+ * delegate to. Name a `tx` with {@link TransactionClient} rather than
+ * `Omit`-ing this by hand.
+ */
+export type TxDenyList =
   | "$connect"
   | "$disconnect"
   | "$on"
@@ -356,7 +378,11 @@ type UnwrapPrismaTuple<P extends readonly unknown[]> = {
   -readonly [K in keyof P]: P[K] extends Prisma.PrismaPromise<infer X> ? X : never;
 };
 
-type TryTransaction = {
+/**
+ * The type of `$tryTransaction`: overloaded exactly as Prisma's own
+ * `$transaction` is — an interactive callback, or a batch of raw operations.
+ */
+export type TryTransaction = {
   /**
    * An interactive transaction whose callback speaks `AsyncResult`: an `Err`
    * triggers a ROLLBACK and comes out as the same typed `Err`.
