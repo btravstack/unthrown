@@ -12,7 +12,12 @@ import { Err, fromSafePromise, P, TaggedError } from "unthrown";
 import { describe, expect, test } from "vitest";
 
 import { PrismaClient } from "./generated/prisma/client.ts";
-import { qualifyPrismaError, unthrownPrisma } from "./index.js";
+import {
+  InvalidCursor,
+  qualifyPrismaError,
+  type UniqueConstraintViolation,
+  unthrownPrisma,
+} from "./index.js";
 import { CursorParseFailure, paginateWithCursor } from "./pagination.js";
 
 // The test schema's tables, created by hand (no Migrate): an in-memory database
@@ -772,6 +777,30 @@ describe("qualifyPrismaError", () => {
     expect(qualify(cause)).toEqual(
       expect.objectContaining({ _tag: "UniqueConstraintViolation", fields: ["email"], cause }),
     );
+  });
+
+  it("keeps the Prisma error out of a serialised modeled error", () => {
+    // The Prisma error's message quotes the failing call — row values included
+    // — so none of it may reach a client through `JSON.stringify`.
+    const cause = new PrismaClientKnownRequestError(
+      "Unique constraint failed: prisma.user.create({ data: { email: 'a@b.c' } })",
+      { code: "P2002", clientVersion: "7.0.0", meta: { target: ["email"] } },
+    );
+
+    const error = qualify(cause) as UniqueConstraintViolation;
+
+    expect(JSON.parse(JSON.stringify(error))).toEqual({
+      _tag: "UniqueConstraintViolation",
+      name: "UniqueConstraintViolation",
+      fields: ["email"],
+    });
+    expect(JSON.stringify(error)).not.toContain("a@b.c");
+    // Still readable, just not enumerable.
+    expect(error.cause).toBe(cause);
+    for (const other of [known("P2003"), known("P2025")]) {
+      expect(Object.keys(qualify(other))).not.toContain("cause");
+    }
+    expect(Object.keys(new InvalidCursor({ cause }))).not.toContain("cause");
   });
 
   it("maps P2002 in the driver-adapter shape (fields nested under driverAdapterError)", () => {

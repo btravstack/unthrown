@@ -49,6 +49,21 @@ import {
 export type { CursorPaginationMeta, CursorPaginationOptions } from "./pagination.js";
 
 /**
+ * Keep the Prisma error out of anything that enumerates a modeled error.
+ *
+ * @remarks
+ * `cause` is the `PrismaClientKnownRequestError`, whose `message` quotes the
+ * failing call (arguments, and so row values, included) and whose `meta`
+ * names driver internals. Left enumerable, `JSON.stringify(error)` — or a
+ * framework serialising an error it was handed — ships that to the client. It
+ * stays readable (`error.cause`); `JSON.stringify`, `Object.keys` and spread
+ * merely skip it.
+ */
+const concealCause = (error: object): void => {
+  Object.defineProperty(error, "cause", { enumerable: false });
+};
+
+/**
  * A unique constraint was violated (Prisma error `P2002`).
  *
  * @remarks
@@ -58,10 +73,20 @@ export type { CursorPaginationMeta, CursorPaginationOptions } from "./pagination
 export class UniqueConstraintViolation extends TaggedError("UniqueConstraintViolation")<{
   fields: readonly string[];
   cause: unknown;
-}> {}
+}> {
+  constructor(fields: { fields: readonly string[]; cause: unknown }) {
+    super(fields);
+    concealCause(this);
+  }
+}
 
 /** A foreign key constraint was violated (Prisma error `P2003`). */
-export class ForeignKeyViolation extends TaggedError("ForeignKeyViolation")<{ cause: unknown }> {}
+export class ForeignKeyViolation extends TaggedError("ForeignKeyViolation")<{ cause: unknown }> {
+  constructor(fields: { cause: unknown }) {
+    super(fields);
+    concealCause(this);
+  }
+}
 
 /**
  * A record required by the operation does not exist (Prisma errors `P2025` and
@@ -75,7 +100,12 @@ export class ForeignKeyViolation extends TaggedError("ForeignKeyViolation")<{ ca
  * `P2018` for the to-many side of the same mistake). Both codes say the same
  * thing — a record the write depended on was not found — so both map here.
  */
-export class RecordNotFound extends TaggedError("RecordNotFound")<{ cause: unknown }> {}
+export class RecordNotFound extends TaggedError("RecordNotFound")<{ cause: unknown }> {
+  constructor(fields: { cause: unknown }) {
+    super(fields);
+    concealCause(this);
+  }
+}
 
 /**
  * The cursor handed to `withCursor` could not be used — the caller's
@@ -88,7 +118,12 @@ export class RecordNotFound extends TaggedError("RecordNotFound")<{ cause: unkno
  * a bug in your code. Every other pagination failure is a defect, like any other
  * query.
  */
-export class InvalidCursor extends TaggedError("InvalidCursor")<{ cause: unknown }> {}
+export class InvalidCursor extends TaggedError("InvalidCursor")<{ cause: unknown }> {
+  constructor(fields: { cause: unknown }) {
+    super(fields);
+    concealCause(this);
+  }
+}
 
 /**
  * The full union of domain errors a Prisma **query** can surface.

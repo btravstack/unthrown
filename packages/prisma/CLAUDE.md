@@ -28,7 +28,12 @@ untouched and is folded at the edge like any other unmodeled failure.) So a
 a defect), and there is **no `DriverError` class** — it was removed
 2026-08 when the last of its contents moved to the defect channel. A retry
 wrapper for P2024/P2034 therefore uses `recoverDefect` and inspects the cause:
-one place in a codebase, versus an arm at every call site. Only the **batch**
+one place in a codebase, versus an arm at every call site. Every modeled error
+(the three above and `InvalidCursor`) makes its `cause` — the Prisma error,
+whose message quotes the failing call and its values — **non-enumerable** in
+its constructor: still readable, but skipped by `JSON.stringify`/spread, so an
+error serialised unmapped does not leak data. The docs still say never to
+send one to a client unmapped. Only the **batch**
 mutations (`createMany`/`updateMany` + their `*AndReturn` twins) are free of
 `RecordNotFound`: they accept no nested writes and zero matches is
 `Ok({ count: 0 })`. The deletes (`delete`, `deleteMany`) carry

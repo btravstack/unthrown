@@ -64,6 +64,9 @@ await db.user.tryCreate({ data }).match({
   they take no nested writes, and zero matches is `Ok({ count: 0 })`.
   `tryCreate` and `tryUpsert` carry it because a nested `connect` can point at a
   row that does not exist.
+  Never send a modeled error to a client unmapped: its `cause` is the Prisma
+  error, whose message quotes the failing call and its values. `cause` is
+  non-enumerable, so `JSON.stringify` skips it, but it is still readable.
 
 - **Everything infrastructural is a defect** — a dropped connection, a pool
   timeout, a deadlock, an unmapped P-code, a malformed query, an engine panic.

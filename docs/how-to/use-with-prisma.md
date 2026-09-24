@@ -53,6 +53,15 @@ nested write (a 404). A delete carries `UniqueConstraintViolation` because an
 `onDelete: SetDefault` rewrite of the referencing rows can collide with a unique
 index.
 
+::: warning Never send a modeled error to a client unmapped
+Each error's `cause` is the Prisma error, whose message quotes the failing call
+— arguments, and so row values, included. `cause` is **non-enumerable**, so
+`JSON.stringify(error)` and `{ ...error }` leave it out, but it is one property
+access away for anything that walks an error (a logger, an error reporter). Map
+each tag to the response you mean to send rather than returning the error
+itself.
+:::
+
 ::: danger Those four codes are the whole modeled set
 `P2002`, `P2003`, `P2018`, `P2025` — and nothing else. **Every other P-code
 becomes a [`Defect`](../explanation/the-defect-channel)**, including ones that
