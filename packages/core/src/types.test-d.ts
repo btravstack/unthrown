@@ -1404,6 +1404,19 @@ type _unhandled = Expect<Equal<Matcher<"a" | "b", "b", number>["exhaustive"], Un
   r.mapErrCases((m) => m.with({}, () => 1));
   // @ts-expect-error — not even grouped with a real one
   r.mapErrCases((m) => m.with({ code: "A" }, {}, () => 1));
+  // Nested too: `{}` accepts a primitive at the type level, but the runtime
+  // rejects a non-object there — "exhaustive" at compile time, a throw at run.
+  const nested = Ok(1) as Result<number, { tag: "A"; data: number } | { tag: "B" }>;
+  nested.mapErrCases((m) =>
+    // @ts-expect-error — a nested `{}` is not a pattern either
+    m.with({ tag: "A", data: {} }, () => 1).with({ tag: "B" }, () => 2),
+  );
+  const deep = nested.mapErrCases((m) =>
+    m
+      .with({ tag: "A", data: P.when((d): d is number => typeof d === "number") }, () => 1)
+      .with({ tag: "B" }, () => 2),
+  );
+  type _Deep = Expect<Equal<typeof deep, Result<number, number>>>;
   // Keyed patterns, `null` / `undefined` literals and every P.* pattern are fine.
   const named = r.mapErrCases((m) => m.with({ code: "A" }, { code: "B" }, (e) => e.code));
   type _Named = Expect<Equal<typeof named, Result<number, "A" | "B">>>;

@@ -89,15 +89,22 @@ export type MatchedOf<Pt> =
  * `@unthrown/oxlint`'s `no-catch-all-pattern`. Mapping it to a branded string
  * makes the argument unassignable, with the reason in the error. `null` /
  * `undefined` (also keyless) stay legal literal patterns, and every `P.*`
- * pattern carries a symbol key.
+ * pattern carries a symbol key. The check recurses into structural patterns:
+ * a nested `{ data: {} }` is rejected too, since the type level treats `{}` as
+ * matching a primitive `data` while the runtime rejects a non-object there — a
+ * match that compiles as exhaustive and then throws.
  *
  * @internal
  */
 export type NoEmptyPattern<Pt> = [Pt] extends [null | undefined]
   ? Pt
-  : [keyof Pt] extends [never]
-    ? "unthrown: an empty object pattern `{}` matches every object — name the case (a key to match on), or use P._ deliberately"
-    : Pt;
+  : [Pt] extends [PatternMatcher<unknown>]
+    ? Pt
+    : [keyof Pt] extends [never]
+      ? "unthrown: an empty object pattern `{}` matches every object — name the case (a key to match on), or use P._ deliberately"
+      : Pt extends object
+        ? { [K in keyof Pt]: NoEmptyPattern<Pt[K]> }
+        : Pt;
 
 /**
  * The diagnostic type of `.exhaustive` on a builder that has NOT covered every
@@ -536,7 +543,8 @@ export const P = Object.freeze({
   _: universal,
   // Frozen like every other `P.*` pattern: a pattern object mutated after
   // construction would silently change which arm a value takes.
-  tag: <const Tag extends string>(value: Tag): { _tag: Tag } => Object.freeze({ _tag: value }),
+  tag: <const Tag extends string>(value: Tag): { readonly _tag: Tag } =>
+    Object.freeze({ _tag: value }),
   instanceOf: <C extends abstract new (...args: never[]) => unknown>(
     cls: C,
   ): PatternMatcher<InstanceType<C>> => pattern((value) => value instanceof cls),
