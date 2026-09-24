@@ -80,8 +80,21 @@ class FakeClient {
     return answer === undefined ? Promise.resolve({ rows: [] }) : answer();
   }
 
-  release(): void {
+  /** What each `release` was passed — `true` is pg-pool's "destroy it". */
+  readonly releasedWith: unknown[] = [];
+  readonly errorListeners = new Set<(error: unknown) => void>();
+
+  release(destroy?: unknown): void {
     this.released += 1;
+    this.releasedWith.push(destroy);
+  }
+
+  on(_event: "error", listener: (error: unknown) => void): void {
+    this.errorListeners.add(listener);
+  }
+
+  off(_event: "error", listener: (error: unknown) => void): void {
+    this.errorListeners.delete(listener);
   }
 }
 
@@ -573,6 +586,44 @@ describe("NodePgUnthrownSession — pooling", () => {
     expect(pool.client.released).toBe(1);
   });
 
+  it("returns a healthy client to the pool, not destroying it", async () => {
+    const pool = new FakePool();
+
+    await sessionOn(pool).transaction(() => ErrAsync("rolled back"));
+
+    expect(pool.client.releasedWith).toEqual([false]);
+  });
+
+  it("destroys the client when its ROLLBACK fails, instead of pooling it", async () => {
+    // A failed ROLLBACK leaves the transaction's state unknown; handed back to
+    // the pool, the next borrower could run inside it.
+    const pool = new FakePool({ rollback: () => Promise.reject(pgError("08006")) });
+
+    const result = await sessionOn(pool).transaction(() => ErrAsync("rolled back"));
+
+    expect(result).toBeDefect();
+    expect(pool.client.releasedWith).toEqual([true]);
+  });
+
+  it("listens for connection errors while checked out, and destroys a broken client", async () => {
+    // pg-pool detaches its own listener on checkout, so an `error` emitted by a
+    // connection dropping mid-transaction had no listener and crashed the
+    // process.
+    const pool = new FakePool();
+    let listenersInside = 0;
+
+    await sessionOn(pool).transaction(() => {
+      listenersInside = pool.client.errorListeners.size;
+      for (const listener of pool.client.errorListeners) listener(new Error("terminated"));
+      return OkAsync(1);
+    });
+
+    expect(listenersInside).toBe(1);
+    // Detached again once the client is handed back, and the client destroyed.
+    expect(pool.client.errorListeners.size).toBe(0);
+    expect(pool.client.releasedWith).toEqual([true]);
+  });
+
   it("defects when the pool cannot hand out a client, with nothing to release", async () => {
     const failure = new Error("pool exhausted");
     const pool = new FakePool({}, failure);
@@ -784,16 +835,55 @@ describe("NodePgUnthrownTransaction — nested transactions", () => {
     const savepoints = statements(client).filter((s) => s.startsWith("savepoint "));
     expect(savepoints).toHaveLength(2);
     expect(new Set(savepoints).size).toBe(2);
-    // Each one is released under its own name, and both are live at once.
+    // Serialised, not interleaved: savepoints are a stack, so with both open at
+    // once releasing (or rolling back to) sp1 would also discard sp2.
     expect(statements(client)).toEqual([
       "begin",
       "savepoint sp1",
-      "savepoint sp2",
       "release savepoint sp1",
+      "savepoint sp2",
       "release savepoint sp2",
       "commit",
     ]);
     expect(result).toBeOkWith([1, 2]);
+  });
+
+  it("keeps a concurrent sibling's savepoint intact when the other rolls back", async () => {
+    const client = new FakeClient();
+    const clash = new UniqueConstraintViolation({
+      constraint: "users_pkey",
+      table: "users",
+      detail: undefined,
+      cause: undefined,
+    });
+
+    const result = await sessionOn(client).transaction((tx) =>
+      allAsync([
+        tx.transaction(() => ErrAsync(clash)),
+        tx.transaction(() => OkAsync(2)),
+      ]).recoverErrCases((m) =>
+        m.with(
+          P.tag("UniqueConstraintViolation"),
+          P.tag("ForeignKeyViolation"),
+          P.tag("CheckViolation"),
+          P.tag("ExclusionViolation"),
+          P.tag("NotNullViolation"),
+          () => "recovered" as const,
+        ),
+      ),
+    );
+
+    // sp1 is rolled back BEFORE sp2 opens, so sp2's work is not swept away by
+    // it; interleaved, `rollback to savepoint sp1` would have discarded sp2.
+    expect(statements(client)).toEqual([
+      "begin",
+      "savepoint sp1",
+      "rollback to savepoint sp1",
+      "savepoint sp2",
+      "release savepoint sp2",
+      "commit",
+    ]);
+    expect(result).toBeOkWith("recovered");
   });
 });
 

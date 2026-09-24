@@ -56,7 +56,20 @@ handle descended from one transaction** and claimed before anything is
 issued — **not** by nesting depth, which is drizzle's scheme and collides:
 two nested transactions started concurrently (which `allAsync` makes easy to
 write) would both be `sp1` on the one connection, and the first
-`rollback to savepoint sp1` would unwind the other's work. A callback that
+`rollback to savepoint sp1` would unwind the other's work. Distinct names
+are necessary but **not sufficient**: savepoints are a _stack_, so with two
+open at once rolling back to (or releasing) the older one also discards the
+newer one — the sibling's writes vanished while it still reported `Ok`, or
+its own `release` failed with 3B001. So nested transactions started on one
+handle are **serialised** by a promise-chain lock on that handle and run in
+start order; the cost is that a nested callback must start further nesting on
+the handle it _receives_ — starting one on the enclosing (busy) handle waits
+for itself and never settles. A **pooled** client is guarded for the length
+of its checkout: pg-pool detaches its own `error` listener on checkout, so a
+connection dropping mid-transaction emitted an unhandled `error` (fatal on
+Node); the session attaches one, and a client that reported an error **or**
+whose `ROLLBACK` failed is released with `release(true)` — destroyed rather
+than returned for the next borrower to inherit. A callback that
 hands back something that is **not a `Result`** at all — reachable only from
 JS or a cast, the `async (tx) => { await tx.insert(…) }` that forgot its
 `return` — takes the **undo** path too and surfaces as a `Defect` (core's

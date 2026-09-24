@@ -3,7 +3,16 @@ import type { EmptyRelations } from "drizzle-orm/relations";
 import { eq, inArray } from "drizzle-orm/sql/expressions/conditions";
 import { sql } from "drizzle-orm/sql/sql";
 import pg from "pg";
-import { type AsyncResult, DoAsync, isDefect, isErr, isOk, P, type Result } from "unthrown";
+import {
+  allAsync,
+  type AsyncResult,
+  DoAsync,
+  isDefect,
+  isErr,
+  isOk,
+  P,
+  type Result,
+} from "unthrown";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 // Registers the Result matchers used below (`toBeOk`, `toBeOkWith`, …).
 import "@unthrown/vitest";
@@ -605,6 +614,59 @@ describe("transactions on a connection pool", () => {
           .orderBy(users.id),
       ),
     ).toEqual([15]);
+  });
+
+  it("keeps a concurrent nested transaction's writes when its sibling rolls back", async () => {
+    // Savepoints are a stack on the one connection. Interleaved, the failing
+    // sibling's `rollback to savepoint` also discarded the one opened after it:
+    // its row vanished while it still reported Ok (or its `release` hit 3B001).
+    let clash: unknown;
+    let kept = false;
+    const result = await db.transaction((tx) =>
+      allAsync([
+        tx
+          .transaction((nested) =>
+            nested
+              .insert(users)
+              .values({ id: 30, email: "c30@x.y" })
+              .execute()
+              .flatMap(() => nested.insert(users).values({ id: 31, email: "a@b.c" }).execute()),
+          )
+          .tapFailure((failure) => {
+            clash = failure.tag === "Err" ? failure.error : failure.cause;
+          }),
+        tx
+          .transaction((nested) =>
+            nested.insert(users).values({ id: 32, email: "c32@x.y" }).execute(),
+          )
+          .tap(() => {
+            kept = true;
+          }),
+      ]).recoverErrCases((matcher) =>
+        matcher.with(
+          P.tag("UniqueConstraintViolation"),
+          P.tag("ForeignKeyViolation"),
+          P.tag("CheckViolation"),
+          P.tag("ExclusionViolation"),
+          P.tag("NotNullViolation"),
+          () => undefined,
+        ),
+      ),
+    );
+
+    expect(isOk(result)).toBe(true);
+    expect(clash).toBeInstanceOf(UniqueConstraintViolation);
+    expect(kept).toBe(true);
+    // The failing sibling's rows are gone; the other sibling's row committed.
+    expect(
+      await survivorsOf(
+        db
+          .select({ id: users.id })
+          .from(users)
+          .where(inArray(users.id, [30, 31, 32]))
+          .orderBy(users.id),
+      ),
+    ).toEqual([32]);
   });
 
   it("renders the transaction config into the BEGIN", async () => {
