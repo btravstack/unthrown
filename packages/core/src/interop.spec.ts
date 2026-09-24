@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   type AsyncResult,
@@ -19,6 +19,7 @@ import {
   expectErr,
   expectOk,
   flushMicrotasks,
+  lazyThenable,
 } from "./test-helpers.js";
 
 describe("fromNullable", () => {
@@ -212,10 +213,9 @@ describe("qualify must be synchronous (runtime belt-and-braces)", () => {
     if (r.isDefect()) expect(r.cause).toBeInstanceOf(TypeError);
   });
 
-  it("an async qualify's orphaned thenable is ADOPTED, not left to float", async () => {
-    // Positive and deterministic: `Promise.resolve(x)` calls
-    // `x.then(onFulfilled, onRejected)`, so an `onRejected` reaching the fixture
-    // proves the orphan was adopted. The previous shape asserted the *absence*
+  it("an async qualify's orphaned promise is SILENCED, not left to float", async () => {
+    // Positive and deterministic: the net calls `x.then(undefined, onRejected)`,
+    // so an `onRejected` reaching the fixture proves the orphan was held. The previous shape asserted the *absence*
     // of a global `unhandledRejection` after two `setTimeout(0)`s — a negative
     // assertion on a timing window, which cannot distinguish "never fires" from
     // "fires later than we waited".
@@ -225,6 +225,14 @@ describe("qualify must be synchronous (runtime belt-and-braces)", () => {
     await flushMicrotasks();
     expect(adoptions).toHaveLength(1);
     expect(typeof adoptions[0]?.onRejected).toBe("function");
+  });
+
+  it("a qualify returning a LAZY thenable is a Defect, and the thenable is never started", async () => {
+    const { thenable, calls } = lazyThenable();
+    const r = await fromPromise(Promise.reject(boom), (() => thenable) as never);
+    expect(r.isDefect()).toBe(true);
+    await flushMicrotasks();
+    expect(calls()).toBe(0);
   });
 });
 
@@ -268,12 +276,46 @@ describe("the SYNC boundaries reject an async fn", () => {
         )(),
     ],
     ["fromSafeThrowable", (t: PromiseLike<never>) => fromSafeThrowable(() => t)()],
-  ])("%s ADOPTS the orphaned thenable rather than dropping it", async (_label, run) => {
+  ])("%s SILENCES the orphaned promise rather than dropping it", async (_label, run) => {
     const { thenable, adoptions } = adoptionProbe();
     run(thenable);
     await flushMicrotasks();
     expect(adoptions).toHaveLength(1);
     expect(typeof adoptions[0]?.onRejected).toBe("function");
+  });
+
+  it.each([
+    [
+      "fromThrowable",
+      (t: PromiseLike<never>) =>
+        fromThrowable(
+          () => t,
+          (cause, defect) => defect(cause),
+        )(),
+    ],
+    ["fromSafeThrowable", (t: PromiseLike<never>) => fromSafeThrowable(() => t)()],
+  ])(
+    "%s: a LAZY thenable (a PrismaPromise, a query builder) is a Defect and is never started",
+    async (_label, run) => {
+      // `fromSafeThrowable(() => prisma.user.deleteMany())` used to return a
+      // Defect AND run the delete — adopting the thenable called its `then`.
+      const { thenable, calls } = lazyThenable();
+      expect(run(thenable).isDefect()).toBe(true);
+      await flushMicrotasks();
+      expect(calls()).toBe(0);
+    },
+  );
+
+  it("fromThrowable: a hostile `then` getter on the return is a Defect, never routed to qualify", () => {
+    const qualify = vi.fn(() => "modeled" as const);
+    const hostile = Object.defineProperty({}, "then", {
+      get() {
+        throw boom;
+      },
+    });
+    const r = fromThrowable(() => hostile, qualify)();
+    expectDefect(r, boom);
+    expect(qualify).not.toHaveBeenCalled();
   });
 
   it("a RESOLVING async fn is a Defect too — the hazard is the shape, not the outcome", async () => {

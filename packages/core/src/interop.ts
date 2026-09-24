@@ -112,13 +112,21 @@ export function fromThrowable<A extends unknown[], T, R>(
   type E = Exclude<R, Defect>;
   const triage = qualify as (cause: unknown, defect: (cause: unknown) => Defect) => E | Defect;
   return (...args: A): Result<T, E> => {
+    let value: T;
     try {
-      const value = fn(...args);
+      value = fn(...args);
+    } catch (cause) {
+      return qualifyToResult<T, E>(cause, triage);
+    }
+    // Probed OUTSIDE the try that feeds `qualify`: a hostile `then` getter on
+    // the return value is not a throw from `fn`, so it must never be triaged
+    // into the modeled channel — it is an unmodeled failure, a Defect.
+    try {
       return isThenable(value)
         ? thenableReturnDefect<T, E>(value, SYNC_FN_THENABLE)
         : (Ok(value) as Result<T, E>);
     } catch (cause) {
-      return qualifyToResult<T, E>(cause, triage);
+      return defectRes<T, E>(cause);
     }
   };
 }
@@ -355,7 +363,7 @@ export function fromExecutor<T = never, E = never>(
     }
     if (!isResult(result)) {
       // A smuggled thenable (a raw-JS/cast caller passing a Promise instead of
-      // a Result) would otherwise be dropped mid-flight; adopt-and-silence so
+      // a Result) would otherwise be dropped mid-flight; silence a Promise so
       // its later rejection can't float — the sibling of qualifyToResult's and
       // thenableReturnDefect's nets.
       //
@@ -378,8 +386,11 @@ export function fromExecutor<T = never, E = never>(
 
   try {
     const returned: unknown = executor(settle, defect);
-    if (isThenable(returned)) {
-      void Promise.resolve(returned).then(undefined, (cause: unknown) => settle(defect(cause)));
+    // Only a genuine Promise (an `async` executor) is observed: calling `then`
+    // on any other thenable could START a lazy one (a query builder returned by
+    // an arrow's implicit return), and an unstarted thenable cannot reject.
+    if (returned instanceof Promise) {
+      void returned.then(undefined, (cause: unknown) => settle(defect(cause)));
     }
   } catch (cause) {
     settle(defect(cause));
@@ -399,9 +410,10 @@ function qualifyToResult<T, E>(
       // An async `qualify` slipped past the compile-time NotThenable ban
       // (untyped/JS caller). Its Promise must never become the modeled error —
       // the boundary would be un-triaged — so surface a Defect instead. Also
-      // adopt-and-silence the orphaned thenable: if the async qualify later
-      // rejects, that rejection must not float as an unhandled rejection.
-      void Promise.resolve(q).then(undefined, () => undefined);
+      // silence the orphaned promise: if the async qualify later
+      // rejects, that rejection must not float as an unhandled rejection — and
+      // a non-Promise (possibly lazy) thenable is never started.
+      silenceIfThenable(q);
       return defectRes<T, E>(
         new TypeError(
           "unthrown: qualify must be synchronous — it returned a thenable; triage the cause without awaiting",
@@ -452,7 +464,7 @@ const MERGE_THENABLE =
  * collapses to `unknown`. (The phantom rest-tuple guard `fromPromise` uses fares
  * worse.) `merge` *is* `NotThenable`-constrained, but a cast or an untyped
  * caller still reaches here. Either way the runtime answer is the same, and it
- * costs nothing: a Defect, plus adopt-and-silence so the orphaned rejection
+ * costs nothing: a Defect, plus a no-op rejection handler so an orphaned Promise
  * cannot float.
  *
  * @internal

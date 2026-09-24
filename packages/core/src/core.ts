@@ -567,9 +567,9 @@ function passThrough<T, E>(self: Result<unknown, unknown>): Result<T, E> {
  * - inside a `try` that routes the throw to a `Defect` (the boundaries in
  *   `interop.ts`, where a hostile value arriving at a triage point *is* an
  *   unmodeled failure and should surface as one); or
- * - through {@link silenceIfThenable}, for a value being **discarded**, where
- *   there is no Defect channel to route to and the only correct answer is to
- *   drop it without throwing.
+ * - to classify a value that is then **discarded** (a `Defect` minted, the
+ *   value handed to {@link silenceIfThenable}), where the only correct answer
+ *   is to drop it without throwing — and without starting a lazy thenable.
  *
  * Calling it bare, outside both, is a bug: the throw escapes into whatever
  * context invoked it.
@@ -585,29 +585,39 @@ export function isThenable(x: unknown): boolean {
 }
 
 /**
- * Adopt-and-silence a thenable a combinator is about to **discard**.
+ * Silence a **genuine `Promise`** a combinator or boundary is about to
+ * **discard** — and leave every other thenable untouched.
  *
  * @remarks
  * The observers (`tap`, `tapErrCases`, `tapDefect`, `tapFailure`) throw their
  * callback's return value away, and the `Result`-returning combinators reject a
- * non-`Result` one. Either way, a thenable that slipped past `NotThenable` (a
+ * non-`Result` one. Either way, a promise that slipped past `NotThenable` (a
  * cast, a raw-JS caller) is dropped while still in flight — and if it later
  * rejects, nothing is holding it, so the rejection floats unhandled and takes
  * the process down on Node by default. Worse for an observer: its whole job is
  * to make a failure visible, and this is the one path where the failure is
- * invisible.
+ * invisible. Attaching a no-op rejection handler costs nothing and changes no
+ * outcome.
  *
- * Adopting it costs one microtask and makes the rejection a no-op. The
- * boundaries already do exactly this for a thenable `qualify` and a thenable
- * `fn` (see `interop.ts`); this is the same net on the combinator side.
+ * Only a `Promise` **instance** is touched. A promise is already running, so
+ * handling its rejection starts nothing; a non-`Promise` thenable may be
+ * **lazy** — a `PrismaPromise`, a query builder — whose work begins only when
+ * `then` is called. Adopting one (`Promise.resolve(x)` calls `x.then`) would
+ * *run* the effect the caller is being told was refused: `fromSafeThrowable(()
+ * => prisma.user.deleteMany())` returned a `Defect` and deleted the rows
+ * anyway. A lazy thenable that is never started cannot reject, so there is
+ * nothing to silence. Callers still *classify* any thenable (a `Defect` where
+ * the spec says so) via {@link isThenable}; this only decides what to adopt.
+ *
+ * Total: a hostile `then` getter or `Symbol.hasInstance` path is swallowed.
  *
  * @internal
  */
 export function silenceIfThenable(value: unknown): void {
   try {
-    if (isThenable(value)) void Promise.resolve(value).then(undefined, () => undefined);
+    if (value instanceof Promise) void value.then(undefined, () => undefined);
   } catch {
-    // A hostile `then` getter threw — there is nothing adoptable here.
+    // A hostile `then` threw — there is nothing to hold on to.
   }
 }
 

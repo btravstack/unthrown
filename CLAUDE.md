@@ -34,8 +34,9 @@ was planned).
    with no `qualify` to write. `qualify` is **synchronous**: its return intersects `NotThenable`, so an
    `async` qualify does not compile (its `Promise` would land in `E`
    un-triaged); a thenable slipped past the types at runtime becomes a `Defect`
-   (never `Err(Promise)`), and the orphaned thenable is adopted-and-silenced so
-   its later rejection can't float unhandled. There
+   (never `Err(Promise)`), and an orphaned `Promise` is silenced so its later
+   rejection can't float unhandled (a non-`Promise` thenable is never started —
+   see the discarded-thenable invariant). There
    is no path that produces `unknown` in `E`. The boundary forces a triage
    decision. The
    modeled error type is inferred as **`Exclude<R, Defect>`** (where `R` is
@@ -261,9 +262,11 @@ was planned).
   the boundary has returned, and its rejection can never reach `qualify`. Left
   alone that produced `Ok(<Promise>)` — un-triaged — whose rejection then floated
   as an unhandled rejection (process-fatal on Node by default). Both helpers now
-  probe the return value and mint a **`Defect`** for a thenable, adopting and
-  silencing the orphan — the sibling of `qualifyToResult`'s thenable-`qualify`
-  net. Deliberately **not** a compile error, unlike every other thenable ban:
+  probe the return value and mint a **`Defect`** for a thenable, silencing an
+  orphaned `Promise` (and never starting a lazy thenable) — the sibling of
+  `qualifyToResult`'s thenable-`qualify` net. The probe sits **outside** the
+  `try` that feeds `qualify`: a hostile `then` getter on the return value is not
+  a throw from `fn`, so it becomes a `Defect`, never a triaged `Err`. Deliberately **not** a compile error, unlike every other thenable ban:
   `T & NotThenable<T>` on `fn`'s return makes a _generic_ function unassignable,
   so `fromSafeThrowable(structuredClone)` would stop compiling with `T` collapsed
   to `unknown` (the `fromPromise` phantom rest-tuple guard fares worse still).
@@ -277,12 +280,15 @@ was planned).
   the primary call form `TS2558: Expected 3 type arguments, but got 2` (there is
   no partial type-argument inference), and defaulting `R = void` to fix that
   pins `R` to the default instead of inferring `Promise<void>`, so the ban never
-  fires. So the returned thenable is adopted and its rejection **settles a
+  fires. So a returned `Promise` is observed and its rejection **settles a
   `Defect`** unless the executor already settled — strictly better than
-  `new Promise`, which drops the same throw as a floating rejection. Guarded in
+  `new Promise`, which drops the same throw as a floating rejection. (A returned
+  non-`Promise` thenable is left alone — calling its `then` could start it, and
+  an unstarted thenable cannot reject.) Guarded in
   `interop.spec.ts` and `invariants.spec.ts`; the `TS2558` regression is guarded
   in `types.test-d.ts`.
-- **A DISCARDED thenable is adopted, so its rejection never floats.** The
+- **A DISCARDED promise is silenced, so its rejection never floats — and a lazy
+  thenable is never started.** The
   observers (`tap`, `tapErrCases`, `tapDefect`, `tapFailure`) throw their
   callback's return away, and the `Result`-returning combinators reject a
   non-`Result` one — so a thenable that slipped past `NotThenable` (a cast, a
@@ -292,8 +298,20 @@ was planned).
   invisible. Every such site now routes the discarded value through
   `silenceIfThenable`, the combinator-side sibling of the boundary nets in
   `interop.ts`. Silencing changes no outcome — the observed result passes through
-  unchanged. Guarded in `invariants.spec.ts` (each case verified to fail without
-  the net).
+  unchanged. It touches **only a `Promise` instance** (`x instanceof Promise`,
+  then `x.then(undefined, noop)`): a promise is already running, so handling its
+  rejection starts nothing, whereas a non-`Promise` thenable may be **lazy** — a
+  `PrismaPromise`, a query builder — whose work begins when `then` is called.
+  Adopting one (`Promise.resolve(x)`) ran the very effect being refused:
+  `fromSafeThrowable(() => prisma.user.deleteMany())` returned a `Defect` and
+  deleted the rows anyway. Such a thenable is still _classified_ (a `Defect`
+  wherever a thenable is out of contract) but its `then` is never invoked; it
+  cannot reject unstarted, so nothing floats. The one deliberate adoption left
+  is the aggregates' `settleAll`, whose inputs are typed `AsyncResult` (a
+  cross-copy `AsyncResult` carries no brand to tell it from a lazy thenable).
+  Guarded in `invariants.spec.ts` / `interop.spec.ts` (each case verified to
+  fail without the net), with `lazyThenable()` asserting `then` is never
+  called.
 - **Result instances are frozen — and so is the machinery around them.**
   `okRes`/`errRes`/`defectRes` return `Object.freeze`d objects, so a variant
   cannot be forged by mutation; the `readonly` types are real at runtime.
@@ -1003,11 +1021,12 @@ channel?**
   **No test asserts the absence of a global `unhandledRejection` after a
   `setTimeout`**: a negative assertion on a timing window cannot distinguish
   "never fires" from "fires later than we waited", so it can silently stop
-  protecting. Adoption is asserted **positively** instead, via
-  `adoptionProbe()` — `Promise.resolve(x)` calls `x.then(onFulfilled,
-onRejected)`, so the fixture records the handler _and invokes it_, proving both
-  that it was installed and that it swallows the rejection, in one microtask
-  with no timer.
+  protecting. Silencing is asserted **positively** instead, via
+  `adoptionProbe()` — a `Promise` instance (`Promise.prototype` in its chain)
+  whose own `then` records the `onRejected` the net passes _and invokes it_,
+  proving both that it was installed and that it swallows the rejection, in one
+  microtask with no timer. Its counterpart `lazyThenable()` is a non-`Promise`
+  thenable that counts `then` calls, which must stay at zero.
 - **`@unthrown/drizzle` is the one suite that needs Docker.** Every other
   package's tests are self-contained (`@unthrown/prisma` runs against in-memory
   SQLite for exactly that reason), but drizzle's assert PostgreSQL's own
