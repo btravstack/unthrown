@@ -41,8 +41,7 @@ callback is a compile error (see [Utility types](#utility-types)).
 `ensure` with a type-guard predicate narrows `T` to `U`. A `flatMap` whose
 callback is just a predicate wearing a bind costume
 (`flatMap((x) => c ? Ok(x) : Err(e))`) should be `ensure(c, () => e)` — it
-names the intent and passes the same `Ok` through (the opt-in `prefer-ensure`
-lint rule flags this).
+names the intent and passes the same `Ok` through.
 
 There is deliberately **no** `recoverFailure` and no channel-moving operators
 (`Err`→`Defect` erases the modeled type; `Defect`→`Err` would put `unknown` in
@@ -100,10 +99,13 @@ parameter — return it **un-terminated**. Standalone (e.g. matching a whole
 | a literal (`"negative"`, `404`)     | itself                                              |
 | an object (`{ code: "NOT_FOUND" }`) | shallow structural match                            |
 | `P.instanceOf(Cls)`                 | `instanceof`                                        |
-| `P.when((x) => boolean)`            | guard (a type guard narrows)                        |
-| `P.union(a, b)`                     | any of the sub-patterns                             |
-| `P.string` / `P.number`             | any string / number                                 |
-| `P._` (alias `P.any`)               | everything — escape hatch only (see SKILL.md)       |
+| `P.when((x): x is X => …)`          | a **type-guard** predicate — narrows to `X`         |
+| `P._`                               | everything — escape hatch only (see SKILL.md)       |
+
+`P` carries exactly `_`, `tag`, `instanceOf` and `when` — there is no
+`P.union`, `P.string`/`P.number` or `P.any`. A primitive-type wildcard is a
+guard: `P.when((v): v is string => typeof v === "string")`. Alternatives
+sharing a handler are just several patterns in one arm (below).
 
 - Group cases sharing a handler: `.with(P.tag("A"), P.tag("B"), handler)`.
 - `matcher.returnType<R>()` — call directly after receiving the matcher; pins

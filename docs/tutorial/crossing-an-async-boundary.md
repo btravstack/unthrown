@@ -13,7 +13,13 @@ the extra step it asks of you is worth it.
 Say you have a function that fetches a user and **rejects** on a 404:
 
 ```ts
+type User = { id: string; name: string };
+
+class NotFoundError extends Error {} // what the HTTP client rejects with on a 404
+
 declare function fetchUser(id: string): Promise<User>; // rejects with NotFoundError on a 404
+
+const id = "42";
 ```
 
 Bring it into `unthrown` with `fromPromise`. It asks for a second argument,
@@ -68,7 +74,7 @@ const settled = await user; // Result<User, NotFound>
 ## Step 4 — One `match` at the edge
 
 Put it together into a request handler. There is **no `try`/`catch`** anywhere: a
-modeled `NotFound` lands in `err`, and anything unexpected — a network failure, a
+modeled `NotFound` lands in `errCases`, and anything unexpected — a network failure, a
 bug in a `.map` — lands in `defect`:
 
 ```ts
@@ -76,7 +82,7 @@ const status = await user.match({
   ok: () => 200,
   errCases: (matcher) => matcher.with({ _tag: "NotFound" }, () => 404),
   defect: (cause) => {
-    logger.error(cause);
+    console.error(cause);
     return 500; // everything unexpected
   },
 });
@@ -94,9 +100,19 @@ just did. Instead you re-enter through another boundary and compose with
 `flatMap`:
 
 ```ts
-const order = await fromPromise(loadCart(id), qualify).flatMap((cart) =>
-  fromPromise(checkout(cart), qualify),
+type Cart = { items: string[] };
+type Order = { id: string };
+
+declare function loadCart(userId: string): Promise<Cart>; // rejects with NotFoundError when there is none
+declare function checkout(cart: Cart): Promise<Order>;
+
+const order = await fromPromise(loadCart(id), (cause, defect) =>
+  cause instanceof NotFoundError ? new NotFound() : defect(cause),
+).flatMap((cart) =>
+  // a failed checkout is a bug here — nothing to model
+  fromPromise(checkout(cart), (cause, defect) => defect(cause)),
 );
+// order: Result<Order, NotFound>
 ```
 
 The extra `fromPromise` isn't ceremony — it's the same forced decision as Step 1,

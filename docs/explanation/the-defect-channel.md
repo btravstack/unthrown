@@ -121,9 +121,10 @@ wrapped in library noise.
 
 ```ts
 try {
-  d.get();
+  recovered.get(); // compiles: the error channel is `never`
 } catch (e) {
-  e === boom; // true — same instance, original stack
+  // e is the very `Error("bug")` thrown in the `map` above — same instance,
+  // original stack
 }
 ```
 
@@ -131,8 +132,8 @@ try {
 
 When you genuinely need to handle a defect — say, to convert a third-party
 library's thrown error back into a modeled one — use `recoverDefect`. It is the
-only combinator that can observe a defect, and it re-enters the modeled world by
-returning a `Result`:
+only combinator that can _consume_ a defect (the observers below only look at
+it), and it re-enters the modeled world by returning a `Result`:
 
 ```ts
 d.recoverDefect((cause) =>

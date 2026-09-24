@@ -33,6 +33,10 @@ pnpm build            # tsdown dual CJS/ESM + d.ts
 
 Run `pnpm format` (no `--check`) to auto-fix formatting.
 
+`@unthrown/drizzle`'s suite needs a running Docker daemon. Without one, run
+everything else with `pnpm turbo run test --filter='!@unthrown/drizzle'` (CI
+still runs the full set).
+
 ### Coverage and invariants
 
 The core package holds **100% line/function coverage**, enforced by thresholds in
@@ -70,7 +74,7 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org/) and 
 checked by **commitlint** via a **lefthook** `commit-msg` hook. Examples:
 
 ```
-feat(core): add flatTapErr combinator
+feat(core): add a tapFailure combinator
 fix(interop): let a Defect dominate in allFromDictAsync
 docs: clarify the qualify boundary
 chore(deps): bump vitest

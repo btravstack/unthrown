@@ -35,7 +35,7 @@ the migration's actual payoff; the reasoning is in
 [Exhaustive error matching](../explanation/exhaustive-error-matching). The rest
 of the table is where the libraries genuinely differ.
 
-## Delta 1 — the defect channel
+## Delta 1 — the defect channel {#delta-1}
 
 In neverthrow, a throw inside `.map` (or a bug that slips past `mapErr`) escapes as
 a real exception — and an async one rejects the underlying `ResultAsync`. In
