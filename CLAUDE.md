@@ -721,8 +721,11 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   producing one requires deliberately minting the shared symbol.
 - **Builders are free functions** (`Ok`, `Err`, …) because they tree-shake — and
   every shipped package sets `"sideEffects": false` so bundlers can prune between
-  modules (the sole exception is `@unthrown/vitest`, whose top-level
-  `expect.extend` registration is a genuine import-time effect). A `bundle-size`
+  modules. Two exceptions: `@unthrown/vitest` omits the field (its top-level
+  `expect.extend` registration is a genuine import-time effect), and
+  `@unthrown/orpc` sets a `sideEffects` **array** naming only its
+  `./extensions/result` build output (the prototype patches), so its other
+  entry points still prune. A `bundle-size`
   CI job reports the per-package `dist` sizes to the run summary — it is
   informational (no threshold), not a hard gate. The `Result` companion
   object is additive sugar (value + type share the name via a re-alias in
@@ -950,8 +953,11 @@ channel?**
   human**: when a package's public surface changes, update the skill in the same
   PR as the docs site.
 - **The repo dogfoods `@unthrown/oxlint`.** `.oxlintrc.json` enables the plugin
-  (via the `@unthrown/oxlint` workspace devDependency) with the five
-  `recommended` rules, so the library is held to the conventions it ships. The
+  (via the `@unthrown/oxlint` workspace devDependency) with all six
+  `recommended` rules plus the opt-in `prefer-pre-lifted` (the other opt-ins,
+  `no-throw` and `no-get-or-throw`, stay off: the library's own boundaries
+  throw by design, and its tests use `getOrThrow()`), so the library is held
+  to the conventions it ships. The
   plugin is loaded from its **build output**, so the root `lint` script builds it
   first (`turbo run build --filter=@unthrown/oxlint && oxlint .`) — turbo-cached,
   and pointing the specifier at `src/` does not work (oxlint cannot resolve the

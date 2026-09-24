@@ -18,9 +18,9 @@ library's theses into automated checks.
 | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `unthrown/no-ambiguous-error-type` | The `E` in `Result<T, E>` / `AsyncResult<T, E>` must name a concrete domain error — no `unknown`, `any`, `Error`, `object`, bare `{}`, `void`, or primitives. (`never` is allowed.) This is [Thesis #1](https://btravstack.github.io/unthrown/explanation/why-unthrown): `E` is only the _anticipated_ failures. Covers the matcher's `returnType<R>()` pin too, but only in `mapErrCases`, where the pin _is_ the new `E`.                                                                                                                                                                                                                                                                          |
 | `unthrown/prefer-async-result`     | Prefer `AsyncResult<T, E>` over `Promise<Result<T, E>>` — a raw `Promise<Result>` can still reject. Autofixable, and the fix **adds the `AsyncResult` specifier** to an existing `unthrown` import when the name is not already in scope. Withheld on an `async` function's own return annotation and on a function _type_'s return position (the implementer may be `async`, so the rewrite would not compile), when the name `AsyncResult` is already bound to something else, and when there is no specifier list to extend (a namespace import).                                                                                                                                                 |
-| `unthrown/no-unhandled-result`     | A `Result` / `AsyncResult` returned by a bare call (awaited or not) must not be dropped on the floor — it carries the error channel; dropping it silently discards failures. Bind it, return it, or eliminate it with `match` / a `get*` extractor.                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `unthrown/no-unhandled-result`     | A `Result` / `AsyncResult` returned by a bare call (awaited or not) must not be dropped on the floor — it carries the error channel; dropping it silently discards failures. Bind it, return it, or eliminate it with `match` / a `get*` extractor. **Syntactic**: it sees unthrown's producers and functions annotated `Result`/`AsyncResult` _in the same file_; it misses a result returned by a function imported from another of your modules, and a dropped method chain (`r.map(f);`). No type-aware rule backs it up — typescript-eslint's `no-floating-promises` ignores `AsyncResult`, whose `then` has no rejection callback.                                                             |
 | `unthrown/no-async-result-race`    | No sibling `AsyncResult` construction while an earlier one is still unconsumed. An `AsyncResult` is **eager** — constructing it starts the work — so the readable spelling of a sequence, each step in its own `const` and then chained, is a silent **race**: it type-checks, it returns a `Result`, and it runs the steps concurrently. Sequence with `flatTap` (a later step needs only the earlier one's success) or `DoAsync().bind(...)` (it needs the value).                                                                                                                                                                                                                                 |
-| `unthrown/no-catch-all-pattern`    | No `P._` catch-all in a matcher (nor ts-pattern's `P.any` alias) — enumerate every error case by name (`.with(P.tag("A"), P.tag("B"), …, handler)`, grouping cases that share a handler), so a new error can't be silently absorbed. This is unthrown's default position; `P._` is an escape hatch — a helper generic in `E`, or an `E` that is a single type rather than a union — and carries a targeted `oxlint-disable`. See [below](#the-catch-all-escape-hatch).                                                                                                                                                                                                                               |
+| `unthrown/no-catch-all-pattern`    | No `P._` catch-all in a matcher (nor ts-pattern's `P.any` alias, nor the empty object pattern `.with({}, …)`, which matches every object) — enumerate every error case by name (`.with(P.tag("A"), P.tag("B"), …, handler)`, grouping cases that share a handler), so a new error can't be silently absorbed. This is unthrown's default position; `P._` is an escape hatch — a helper generic in `E`, or an `E` that is a single type rather than a union — and carries a targeted `oxlint-disable`. See [below](#the-catch-all-escape-hatch).                                                                                                                                                      |
 | `unthrown/no-unused-matcher`       | A `…Cases` callback (the five error combinators, and `match`'s `errCases` handler) must use the matcher it was handed. The injected matcher is the only builder bound to the actual error — a builder sourced elsewhere satisfies the structural `ExhaustiveMatch` constraint but picks its branch from whatever value _it_ closed over: the wrong case is recovered silently, or nothing matches and the modeled error becomes a Defect. Also flags a second `match(...)` built inside the callback's own body (branch handlers are free to match their payload).                                                                                                                                   |
 | `unthrown/no-throw`                | **Opt-in** (not in `recommended`): no raw `throw` statements — errors are returned (`Err(...)`), only a true defect ever throws. A modeled failure → `return Err(...)`; a failure genuinely unmodeled here → `recoverErrCases` + `get` (routing the case to the injected `defect(...)`); a known-technical precondition throw → a plain helper wrapped once with `fromSafeThrowable`; a deliberate throw site carries a targeted `oxlint-disable`. oxlint ships no `no-restricted-syntax`, so this rule is the only way to enforce the ban.                                                                                                                                                          |
 | `unthrown/prefer-pre-lifted`       | **Opt-in** (not in `recommended`): no `.toAsync()` on a freshly constructed `Ok(...)` / `Err(...)` — `OkAsync(value)` and `ErrAsync(error)` are what unthrown ships for that, and the fresh literal is built only to be thrown away. The **receiver** is the whole test, which is what makes it safe where the removed `prefer-ensure` was not: `.toAsync()` on a `Result` that already exists (a variable, a call's return, a ternary, `fromNullable(...)`) is the combinator doing its job and is never reported. Autofixable — the pre-lifted name with the arguments untouched, `Ok()` and `Ok(undefined)` collapsing to `OkAsync()`, and the specifier added to the existing `unthrown` import. |
@@ -74,6 +74,38 @@ import unthrown from "@unthrown/oxlint";
 ```
 
 `oxlint` is a peer dependency. JS plugins require a recent oxlint (≥ 1.69).
+
+### ESLint
+
+The plugin is also a regular ESLint plugin (its rules are wrapped with
+`@oxlint/plugins`' `eslintCompatPlugin`). Register it in a flat config with
+the `typescript-eslint` parser — the rules read type annotations, but need no
+type information:
+
+```js
+// eslint.config.js
+import unthrown from "@unthrown/oxlint";
+import tseslint from "typescript-eslint";
+
+export default [
+  {
+    files: ["**/*.ts"],
+    languageOptions: { parser: tseslint.parser },
+    plugins: { unthrown },
+    rules: {
+      "unthrown/no-ambiguous-error-type": "error",
+      "unthrown/no-async-result-race": "error",
+      "unthrown/no-catch-all-pattern": "error",
+      "unthrown/no-unhandled-result": "error",
+      "unthrown/no-unused-matcher": "error",
+      "unthrown/prefer-async-result": "error",
+    },
+  },
+];
+```
+
+`unthrown.recommended` is an **oxlint** config, not an ESLint one — list the
+rules yourself as above.
 
 ## The catch-all escape hatch
 

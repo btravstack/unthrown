@@ -36,7 +36,7 @@ wiring exports: the seven raw matcher functions, `failOnForgottenAwait`, and the
 
 ## Linting: @unthrown/oxlint
 
-An oxlint JS plugin (peer `oxlint`). Eight rules. The type-shaped ones
+An oxlint JS plugin (peer `oxlint`). Nine rules. The type-shaped ones
 (`no-ambiguous-error-type`, `prefer-async-result`, `no-unhandled-result`,
 `no-async-result-race`, `no-catch-all-pattern`) resolve bindings by scope analysis, so they only fire
 on unthrown's own `Result` — another library's is left alone. Three are keyed
@@ -54,14 +54,20 @@ statement itself — it reports every `throw`, in any file).
   existing `unthrown` import when needed (no autofix on `async` function return annotations or
   function-type return positions — those must stay `Promise`).
 - `no-unhandled-result` — flags a bare expression statement dropping a
-  `Result` (syntactic; a dropped method chain is out of scope).
+  `Result` from an unthrown producer or an in-file function annotated
+  `Result`/`AsyncResult`. Syntactic: it misses a result returned by an
+  **imported** user function and a dropped method chain (`r.map(f);`). No
+  type-aware rule backs it up: typescript-eslint's `no-floating-promises`
+  ignores `AsyncResult` (its `then` has no rejection callback), so bind or
+  return every call you cannot see resolved.
 - `no-async-result-race` — flags a sibling `AsyncResult` construction while an
   earlier binding in the same statement list is still unconsumed: construction
   is eager, so the sibling-`const` sequence races. Chaining and the one-statement
   join (`allAsync([a, b])`) are exempt; manual start-both-await-both is
   reported — its sanctioned spelling is `allAsync`, and a deliberate site
   carries a targeted `oxlint-disable` with a reason.
-- `no-catch-all-pattern` — reports `P._` (and ts-pattern's `P.any`); self-exempts
+- `no-catch-all-pattern` — reports `P._` (and ts-pattern's `P.any`, and the
+  empty object pattern `.with({}, …)`, which matches every object); self-exempts `P._`
   when an in-file `Result` annotation proves `E` is a single non-union type or
   an unresolved generic; unprovable keep-the-wildcard sites carry a targeted
   `oxlint-disable` with a reason.
@@ -200,7 +206,10 @@ Peers `@orpc/client` + `@orpc/contract` + optional `@orpc/server`
 - `@unthrown/orpc/client` — `fromCall(promise)` lifts one call;
   `createResultClient(client, { contract })` wraps a whole router; the
   `contract` reconciles each rejection against the client's own `.errors()`, so
-  a code only a newer server declares is a `Defect`. `E` is the raw defined
+  a code only a newer server declares (or declared-code `data` failing its
+  schema) is a `Defect`. Without a `contract` — and always with `fromCall` —
+  the server's `defined` flag decides and `error.data` is **unvalidated**:
+  pass the contract against an untrusted server. `E` is the raw defined
   `ORPCError` union discriminated by `code` — match with
   `.with({ code: "NOT_FOUND" }, …)`, not `P.tag`.
 - Event-iterator (streaming) procedures are out of scope — use the raw client.
