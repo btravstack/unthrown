@@ -101,10 +101,11 @@ was planned).
    (`flatMapErrCases`/`flatTapErrCases`, via the builder-output constraint) **and** in
    `tapErrCases` (its branch results are discarded — bar the `defect(…)` marker,
    which is a control-flow signal, not a value — so a rejected `Promise` would
-   float unobserved; its builder output is `NotThenable`-constrained) — only
-   the non-awaiting transformers `mapErrCases`/`recoverErrCases` run the branch
-   synchronously with an async branch remaining a visible Promise-valued
-   result, not a rejection bypass. `tapDefect` / `tapFailure` keep single callbacks — their payloads
+   float unobserved; its builder output is `NotThenable`-constrained) **and** in
+   the non-awaiting transformers `mapErrCases`/`recoverErrCases` (an async
+   branch there put `Err(<Promise>)` / `Ok(<Promise>)` in the channel — a
+   `Promise` in `E` is un-triaged — and let its rejection float; see the
+   thenable invariant for how the ban stays generic-safe). `tapDefect` / `tapFailure` keep single callbacks — their payloads
    carry no discriminant to match (a defect's cause is `unknown`; `tapFailure`
    splits on channel, not tag). The one eliminator that still handles the error
    channel, **`match`**, applies the **same exhaustive matcher** to its
@@ -243,10 +244,24 @@ was planned).
   **discarded** — bar the `defect(…)` marker — so a rejected `Promise` would
   float unobserved; same
   builder-output `NotThenable` constraint). The **non-awaiting** transformers
-  `mapErrCases` / `recoverErrCases` run
-  the matched branch **synchronously with no await**, so an async branch is
-  merely a visible `Promise`-valued result, not a rejection bypass — they do
-  not ban it. The boundary `qualify` is constrained the same way, with a
+  `mapErrCases` / `recoverErrCases` ban it too — an async branch put
+  `Err(<Promise>)` / `Ok(<Promise>)` in the channel (a `Promise` in `E` is the
+  un-triaged value Thesis #3 forbids) and its rejection floated unobserved —
+  but through a **trailing phantom rest guard** (`SyncBranches`, the
+  `fromPromise` shape; its parameter is named
+  `_asyncBranchBanned_liftWithFromPromiseThenFlatMapErrCases`, which is what the
+  "Arguments for the rest parameter … were not provided" diagnostic prints)
+  rather than `M & NotThenable<…>`. The reason is the generic-`E` helper: no
+  conditional type can decide "is not thenable" for an unresolved `E`, so the
+  `NotThenable` spelling rejected the sanctioned `P._` re-emit
+  (`r.mapErrCases((m) => m.with(P._, (e) => e))` inside a helper generic in
+  `E`). The guard's first test, `[O] extends [Pass | Defect]` with `Pass` the
+  receiver's own channels (`E`, or `T | E` for recover), resolves eagerly even
+  for a type parameter, so output already in the receiver's channels passes
+  and only a new thenable is caught. A `this` gate would print the message
+  more directly but breaks the verified `out T, out E` annotations. A
+  thenable slipped past the types (a cast, an untyped caller) becomes a
+  `TypeError`-caused `Defect`, never `Err`/`Ok(<Promise>)`. The boundary `qualify` is constrained the same way, with a
   runtime belt-and-braces: a thenable slipped past the types becomes a
   `Defect` and its orphaned rejection is silenced (see Thesis #3). `match`
   handlers are deliberately exempt (edge elimination). `NotThenable` is spelled

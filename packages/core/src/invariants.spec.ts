@@ -417,6 +417,18 @@ describe("Invariant 6: a DISCARDED promise is silenced, and a lazy thenable is n
           .toAsync()
           .tap((() => t) as never),
     ],
+    [
+      "mapErrCases",
+      (t: PromiseLike<never>) =>
+        Err("e" as const).mapErrCases(((m: never) =>
+          (m as { with: (p: string, h: () => unknown) => unknown }).with("e", () => t)) as never),
+    ],
+    [
+      "recoverErrCases",
+      (t: PromiseLike<never>) =>
+        Err("e" as const).recoverErrCases(((m: never) =>
+          (m as { with: (p: string, h: () => unknown) => unknown }).with("e", () => t)) as never),
+    ],
   ];
 
   it.each(nets)("%s silences a smuggled promise rather than dropping it", async (_label, run) => {
@@ -462,6 +474,20 @@ describe("Invariant 6: a DISCARDED promise is silenced, and a lazy thenable is n
     const async = (() => thenable) as never;
     expect(validateAll([Err("e" as const)], async).isDefect()).toBe(true);
     expect(validateAllFromDict({ a: Err("e" as const) }, async).isDefect()).toBe(true);
+  });
+
+  it("an async mapErrCases / recoverErrCases branch yields a Defect, never Err/Ok(<Promise>)", () => {
+    // Banned at compile time; a cast or an untyped caller still reaches here.
+    const { thenable } = lazyThenable();
+    const branch = ((m: never) =>
+      (m as { with: (p: string, h: () => unknown) => unknown }).with("e", () => thenable)) as never;
+    for (const r of [
+      Err("e" as const).mapErrCases(branch),
+      Err("e" as const).recoverErrCases(branch),
+    ]) {
+      expect(r.isDefect()).toBe(true);
+      if (r.isDefect()) expect(r.cause).toBeInstanceOf(TypeError);
+    }
   });
 
   it("the observer still passes the original result through unchanged", () => {

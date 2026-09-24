@@ -192,6 +192,7 @@ class Res<T, E> {
     try {
       const out = runMatch(f, this.error);
       if (isDefectMarker(out)) return defectRes(out.cause);
+      if (isThenable(out)) return asyncBranchDefect(out);
       return errRes(out as MatchErrOut<M>);
     } catch (cause) {
       return defectRes(cause);
@@ -221,6 +222,7 @@ class Res<T, E> {
     try {
       const out = runMatch(f, this.error);
       if (isDefectMarker(out)) return defectRes(out.cause);
+      if (isThenable(out)) return asyncBranchDefect(out);
       return okRes(out as MatchErrOut<M>);
     } catch (cause) {
       return defectRes(cause);
@@ -639,6 +641,24 @@ function nonResultCallbackDefect<T, E>(returned?: unknown): Result<T, E> {
 }
 
 /**
+ * The Defect minted when a non-awaiting error transformer (`mapErrCases` /
+ * `recoverErrCases`) gets a thenable branch output past the compile-time ban
+ * (a cast, an untyped caller): never `Err(<Promise>)` / `Ok(<Promise>)` — a
+ * Promise in the channel is un-triaged — and a genuine Promise is silenced so
+ * its rejection cannot float. The sibling of the aggregates' async-`merge` net.
+ *
+ * @internal
+ */
+function asyncBranchDefect<T, E>(out: unknown): Result<T, E> {
+  silenceIfThenable(out);
+  return defectRes(
+    new TypeError(
+      "unthrown: mapErrCases/recoverErrCases branches must be SYNCHRONOUS, but one returned a thenable — lift async work with fromPromise and use flatMapErrCases",
+    ),
+  );
+}
+
+/**
  * Drive an error-combinator callback: build `match(error)`, hand it (plus the
  * injected `defect`) to the callback, and `.run()` the returned exhaustive
  * builder to its output. `.run()` executes `.exhaustive()` — type-forced
@@ -857,6 +877,9 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
   // gate is re-imposed in `types.ts`.
   mapErrCases(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
+    // The public signature's phantom async-branch guard (`SyncBranches`) —
+    // compile-time only, never passed.
+    ..._guard: readonly unknown[]
   ): AsyncResult<T, never> {
     return this.#lift((r) => r.mapErrCases(f) as Result<T, never>);
   }
@@ -885,6 +908,8 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
 
   recoverErrCases(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => ExhaustiveMatch<unknown>,
+    // The public signature's phantom async-branch guard — never passed.
+    ..._guard: readonly unknown[]
   ): AsyncResult<T, never> {
     return this.#lift((r) => r.recoverErrCases(f) as Result<T, never>);
   }

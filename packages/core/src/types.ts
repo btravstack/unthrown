@@ -105,6 +105,44 @@ export type MatchOut<M> = M extends ExhaustiveMatch<infer O> ? O : never;
 export type MatchErrOut<M> = Exclude<MatchOut<M>, Defect>;
 
 /**
+ * The phantom rest-tuple guard that bans an **async branch** in the
+ * non-awaiting error transformers (`mapErrCases` / `recoverErrCases`): empty
+ * for a synchronous builder output, an impossible extra argument (labelled
+ * with the explanation) when any branch returns a thenable.
+ *
+ * @remarks
+ * Those two run the matched branch without awaiting it, so an `async` branch
+ * put `Err(<Promise>)` / `Ok(<Promise>)` in the channel — a `Promise` in `E` is
+ * the un-triaged value Thesis #3 forbids — and its rejection floated
+ * unobserved.
+ *
+ * The first test, `[O] extends [Pass]`, is the **generic escape**: `Pass` is
+ * what the receiver's own channels already hold (`E` for `mapErrCases`,
+ * `T | E` for `recoverErrCases`), so re-emitting the error — the sanctioned
+ * `P._` use inside a helper generic in `E` — resolves to `[]` even while `E` is
+ * an unresolved type parameter. No `NotThenable`-style check can: TypeScript
+ * cannot decide "is not thenable" for an unresolved `E`, so `M &
+ * NotThenable<…>` (the `tapErrCases` spelling) rejected that helper outright.
+ * A thenable already in `E` is no new hole. Encoded as a trailing phantom
+ * (the `fromPromise` shape) rather than on the callback's return, which keeps
+ * the inference-bearing callback free of conditional types. A `this` gate
+ * would print the message more directly but breaks the verified `out T, out E`
+ * variance annotations (`Pass` mentions both). An `any` output (a mocked
+ * branch) is let through, as `U & NotThenable<U>` does.
+ *
+ * @internal
+ */
+export type SyncBranches<O, Pass> = [O] extends [Pass | Defect]
+  ? []
+  : 0 extends 1 & O
+    ? []
+    : [Extract<O, PromiseLike<unknown>>] extends [never]
+      ? []
+      : [
+          unthrown_errorMatcherBranchesAreSynchronous: "an async branch would put a Promise in the channel — lift async work with fromPromise and use flatMapErrCases",
+        ];
+
+/**
  * The fluent method surface every {@link Result} variant carries — the
  * combinators (`map`, `flatMap`, `mapErrCases`, `match`, `get`, …), documented one
  * per entry below. Factored out so the three variants ({@link OkView},
@@ -296,7 +334,10 @@ export type ResultMethods<out T, out E> = {
    * the union of the branch returns with the `Defect` arm subtracted
    * (`Exclude<O, Defect>`) — a branch returning `defect(cause)` converts that case
    * to a `Defect` and drops it from `E`. Runs only on `Err`; `Ok` and `Defect`
-   * pass through. A branch that throws also becomes a `Defect`.
+   * pass through. A branch that throws also becomes a `Defect`. Branches are
+   * **synchronous**: an `async` branch is a compile error (its `Promise` would
+   * land in `E` un-triaged), and a thenable slipped past the types becomes a
+   * `Defect`.
    *
    * **Name every case.** Match on anything the matcher supports — `_tag`,
    * `code`, structural shape, guards — and group the cases that share a handler
@@ -310,9 +351,15 @@ export type ResultMethods<out T, out E> = {
    *
    * @typeParam M - the exhaustive builder the callback returns.
    * @param f - builds the match over the error (returns the un-terminated builder).
+   * @param _asyncBranchBanned_liftWithFromPromiseThenFlatMapErrCases - compile-time
+   * only; never pass it. Empty for synchronous branches; an **async** branch
+   * demands this impossible argument, so the call fails to compile (its name is
+   * the fix).
    */
   mapErrCases<M extends ExhaustiveMatch<unknown>>(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+    // phantom async-branch ban, never passed — see SyncBranches
+    ..._asyncBranchBanned_liftWithFromPromiseThenFlatMapErrCases: SyncBranches<MatchOut<M>, E>
   ): Result<T, MatchErrOut<M>>;
 
   /**
@@ -340,13 +387,21 @@ export type ResultMethods<out T, out E> = {
    * The result type is `Result<T | U, never>`, but `never` describes only the
    * **error** channel — a `Defect` can still be present at runtime. A branch may
    * return `defect(cause)` (which stays a `Defect`, not a recovery). Runs only on
-   * `Err`; `Ok` and `Defect` pass through.
+   * `Err`; `Ok` and `Defect` pass through. Branches are **synchronous**: an
+   * `async` branch is a compile error, and a thenable slipped past the types
+   * becomes a `Defect`.
    *
    * @typeParam M - the exhaustive builder the callback returns.
    * @param f - builds the match; each branch produces a success value.
+   * @param _asyncBranchBanned_liftWithFromPromiseThenFlatMapErrCases - compile-time
+   * only; never pass it. Empty for synchronous branches; an **async** branch
+   * demands this impossible argument, so the call fails to compile (its name is
+   * the fix).
    */
   recoverErrCases<M extends ExhaustiveMatch<unknown>>(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+    // phantom async-branch ban, never passed — see SyncBranches
+    ..._asyncBranchBanned_liftWithFromPromiseThenFlatMapErrCases: SyncBranches<MatchOut<M>, T | E>
   ): Result<T | MatchErrOut<M>, never>;
 
   /**
@@ -813,10 +868,13 @@ export type AsyncResultMethods<out T, out E> = {
 
   /**
    * Asynchronous {@link ResultMethods.mapErrCases | mapErrCases} — the same exhaustive
-   * {@link ErrMatcher} form; the combinator calls `.exhaustive()`.
+   * {@link ErrMatcher} form; the combinator calls `.exhaustive()`. Branches are
+   * synchronous — an `async` branch is a compile error, as on the sync surface.
    */
   mapErrCases<M extends ExhaustiveMatch<unknown>>(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+    // phantom async-branch ban, never passed — see SyncBranches
+    ..._asyncBranchBanned_liftWithFromPromiseThenFlatMapErrCases: SyncBranches<MatchOut<M>, E>
   ): AsyncResult<T, MatchErrOut<M>>;
 
   /**
@@ -840,6 +898,8 @@ export type AsyncResultMethods<out T, out E> = {
    */
   recoverErrCases<M extends ExhaustiveMatch<unknown>>(
     f: (matcher: ErrMatcher<E>, defect: (cause: unknown) => Defect) => M,
+    // phantom async-branch ban, never passed — see SyncBranches
+    ..._asyncBranchBanned_liftWithFromPromiseThenFlatMapErrCases: SyncBranches<MatchOut<M>, T | E>
   ): AsyncResult<T | MatchErrOut<M>, never>;
 
   /**

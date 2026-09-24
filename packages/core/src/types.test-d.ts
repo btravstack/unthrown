@@ -653,10 +653,21 @@ declare function sometimesWork(): Promise<number>;
   // A raw Promise / async branch would bypass qualification where the
   // combinator awaits it — flatMapErrCases / flatTapErrCases — so those reject it via
   // their builder-output constraint; tapErrCases rejects it too, because its branch
-  // results are DISCARDED (a rejected Promise would float unobserved). Only
-  // the non-awaiting transformers mapErrCases / recoverErrCases run the handler
-  // synchronously with no await, so an async branch there is merely a visible
-  // Promise-valued result, not a rejection bypass.
+  // results are DISCARDED (a rejected Promise would float unobserved). The
+  // non-awaiting transformers mapErrCases / recoverErrCases reject it as well:
+  // an async branch put `Err(<Promise>)` / `Ok(<Promise>)` in the channel — a
+  // Promise in `E` is exactly the un-triaged value Thesis #3 forbids — and its
+  // rejection floated unobserved.
+  // @ts-expect-error — an async mapErrCases branch is banned
+  r.mapErrCases((matcher) => matcher.with(P._, async () => "x"));
+  // @ts-expect-error — an async recoverErrCases branch is banned
+  r.recoverErrCases((matcher) => matcher.with(P._, async () => 1));
+  // @ts-expect-error — a sometimes-async mapErrCases branch is banned
+  r.mapErrCases((matcher) => matcher.with(P._, () => (sometimesFlag ? 1 : sometimesWork())));
+  // @ts-expect-error — an async mapErrCases branch is banned (async surface)
+  ar.mapErrCases((matcher) => matcher.with(P._, async () => "x"));
+  // @ts-expect-error — an async recoverErrCases branch is banned (async surface)
+  ar.recoverErrCases((matcher) => matcher.with(P._, async () => 1));
   // @ts-expect-error — an async flatMapErrCases branch is banned
   r.flatMapErrCases((matcher) => matcher.with(P._, async () => Ok(1)));
   // @ts-expect-error — an async flatTapErrCases branch is banned
