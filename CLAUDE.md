@@ -372,8 +372,10 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   `Result`-returning step, binding its value under `name` in an accumulating
   **readonly** object scope; errors union `E | E2`) and `let(name, f)` (bind a
   pure value). On `AsyncResult`, `bind`'s `f` may return a `Result` or an
-  `AsyncResult`. A throw in either becomes a `Defect`; `Err`/`Defect`
-  short-circuits/passes through. To go async, lift with `toAsync()`.
+  `AsyncResult`. A throw in either becomes a `Defect`, and so does a scope that
+  is not a **plain object** (a primitive, an array, a class instance — the
+  merging spread would silently drop its getters/prototype while the type kept
+  them); `Err`/`Defect` short-circuits/passes through. To go async, lift with `toAsync()`.
 - error: `mapErrCases`, `flatMapErrCases`, `recoverErrCases`, `tapErrCases`, `flatTapErrCases` all take
   the Thesis-#5 **matcher callback** `(m: ErrMatcher<E>, defect) => M`
   where `M extends ExhaustiveMatch<…>` (the callback returns the un-terminated

@@ -189,8 +189,9 @@ export type ResultMethods<out T, out E> = {
    * step. `f` receives the scope accumulated so far and returns a `Result`; on
    * `Ok` the value is added as `{ ...scope, [name]: value }`, on `Err`/`Defect`
    * the chain short-circuits. Errors union (`E | E2`). A throw becomes a
-   * `Defect` — as does calling `bind` on a non-object scope (e.g. `Ok(5).bind`),
-   * which is misuse: the scope is always an object inside a real `Do()` chain.
+   * `Defect` — as does calling `bind` on a non-object or non-plain scope (e.g.
+   * `Ok(5).bind`, or a class instance whose getters the merge would drop), which
+   * is misuse: the scope is always a plain object inside a real `Do()` chain.
    * (`let` is the pure-value counterpart.)
    *
    * @typeParam K - the key the bound value is stored under.

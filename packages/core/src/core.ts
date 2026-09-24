@@ -687,10 +687,24 @@ function observerThrowToDefect<T, E>(thrown: unknown, original: unknown): Result
  * @internal
  */
 function scopeOf(value: unknown): object {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new TypeError("bind/let requires an object scope — start a do-chain with Do()");
+  if (typeof value !== "object" || value === null || !isPlainScope(value)) {
+    throw new TypeError("bind/let requires a plain object scope — start a do-chain with Do()");
   }
   return value;
+}
+
+/**
+ * A *plain* object: its prototype is `null` or an `Object.prototype` (any
+ * realm's — recognised by having no prototype of its own). The spread that
+ * merges a `bind`/`let` key copies only own enumerable data, so a class
+ * instance's getters and prototype methods — and an array's identity — would
+ * silently vanish while the type still claimed them.
+ *
+ * @internal
+ */
+function isPlainScope(value: object): boolean {
+  const proto: unknown = Object.getPrototypeOf(value);
+  return proto === null || Object.getPrototypeOf(proto) === null;
 }
 
 /**

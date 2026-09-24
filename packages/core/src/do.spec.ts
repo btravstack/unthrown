@@ -78,6 +78,26 @@ describe("Do / bind / let", () => {
     expect(r.tag).toBe("Defect");
   });
 
+  it("bind/let on a class-instance scope is misuse and becomes a Defect (not a silent getter drop)", () => {
+    // The merge spreads own enumerable data only: `x` (a getter on the
+    // prototype) would vanish from `{ ...scope, y }` while the type kept it.
+    class Scope {
+      get x(): number {
+        return 1;
+      }
+    }
+    for (const r of [Ok(new Scope()).bind("y", () => Ok(2)), Ok(new Scope()).let("y", () => 2)]) {
+      expect(r.isDefect()).toBe(true);
+      if (r.isDefect()) expect(r.cause).toBeInstanceOf(TypeError);
+    }
+    // A null-prototype record is still a plain scope.
+    expect(
+      Ok(Object.create(null) as object)
+        .let("y", () => 2)
+        .getOrNull(),
+    ).toEqual({ y: 2 });
+  });
+
   it('bind("__proto__", …) stores an own property and never pollutes Object.prototype', () => {
     const r = Do().bind("__proto__", () => Ok({ polluted: true }));
     expect(r.tag).toBe("Ok");
