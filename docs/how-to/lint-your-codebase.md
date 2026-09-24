@@ -47,6 +47,39 @@ that build their config programmatically
 
 `oxlint` is a peer dependency; JS plugins require oxlint ≥ 1.69.
 
+### With ESLint
+
+The same package is an ESLint plugin too — its rules are wrapped with
+`@oxlint/plugins`' `eslintCompatPlugin`. Register it in a flat config with the
+`typescript-eslint` parser (the rules read type annotations, but need no type
+information):
+
+```js
+// eslint.config.js
+import unthrown from "@unthrown/oxlint";
+import tseslint from "typescript-eslint";
+
+export default [
+  {
+    files: ["**/*.ts"],
+    languageOptions: { parser: tseslint.parser },
+    plugins: { unthrown },
+    rules: {
+      "unthrown/no-ambiguous-error-type": "error",
+      "unthrown/no-async-result-race": "error",
+      "unthrown/no-catch-all-pattern": "error",
+      "unthrown/no-unhandled-result": "error",
+      "unthrown/no-unused-matcher": "error",
+      "unthrown/prefer-async-result": "error",
+    },
+  },
+];
+```
+
+`unthrown.recommended` is an oxlint config, so ESLint needs the rules listed
+by hand, as above. The opt-ins (`no-throw`, `no-get-or-throw`,
+`prefer-pre-lifted`) enable the same way.
+
 ## The rules
 
 ### `unthrown/no-ambiguous-error-type` {#no-ambiguous-error-type}
@@ -179,9 +212,15 @@ It recognises, purely syntactically: the unthrown-imported producers (`Ok`, `Err
 `OkAsync`, `ErrAsync`, `Do`, the `from*` boundaries, the `all*` aggregates, renamed
 imports included); the facade companions (`Result.Ok(...)`); and a
 **locally-declared** function whose return annotation is unthrown's `Result` /
-`AsyncResult`. A dropped method _chain_ (`r.map(f);`) or a function whose
-`Result`-ness lives behind an imported declaration needs the type checker and is
-out of scope — no false positives is the design priority.
+`AsyncResult`. It is **syntactic**, and that has a price: it misses a result
+returned by a function **imported** from another of your modules (its return
+annotation lives in a file the rule never sees), and a dropped method _chain_
+(`r.map(f);`). Both need the type checker — no false positives is the design
+priority. Don't count on a type-aware rule as the backstop either:
+typescript-eslint's `no-floating-promises` ignores an `AsyncResult`, even with
+`checkThenables`, because it only counts a thenable whose `then` takes a
+rejection callback, and `AsyncResult`'s success-only `then` deliberately has
+none.
 
 ### `unthrown/no-async-result-race` {#no-async-result-race}
 
@@ -388,6 +427,17 @@ result.mapErrCases((m) => m.with(P._, (e) => e)); // ✗ — the catch-all
 result.mapErrCases((m) =>
   m.with(P.tag("NotFound"), P.tag("Forbidden"), (e) => e),
 );
+```
+
+The empty object pattern is the same catch-all without `P`: `{}` has no keys to
+check, so it matches every object at runtime and covers every object member of
+`E` at the type level. It is reported wherever it is a pattern on a matcher —
+the injected matcher of an error combinator or `errCases`, or a `match(…)`
+imported from `unthrown` / `ts-pattern` — and never exempted (where a
+catch-all is genuinely needed, write `P._`):
+
+```ts
+result.mapErrCases((m) => m.with({}, (e) => e)); // ✗ — `P._` in disguise
 ```
 
 Because a matched builder must still be exhaustive, removing `P._` makes the

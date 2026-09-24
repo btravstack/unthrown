@@ -416,6 +416,20 @@ describe("createResultClient with the client's own contract", () => {
     expect(result).toBeDefect();
   });
 
+  test("a contract lookup failure keeps the original ORPCError in the Defect", async () => {
+    // A contract that lacks the called path: the lookup throws, and its
+    // TypeError must not REPLACE the rejection it was reconciling.
+    const result = await createResultClient(client, { contract: {} }).lookup({ answer: "gone" });
+    expect(result).toBeDefect();
+    if (result.isDefect()) {
+      expect(result.cause).toBeInstanceOf(AggregateError);
+      const [lookupError, original] = (result.cause as AggregateError).errors;
+      expect(lookupError).toBeInstanceOf(Error);
+      expect(original).toBeInstanceOf(ORPCError);
+      expect((original as ORPCError<string, unknown>).code).toBe("GONE");
+    }
+  });
+
   test("without the contract, the server's `defined` flag decides", async () => {
     // The unguarded default: `GONE` lands in an `E` typed as NOT_FOUND only.
     const result = await createResultClient(client).lookup({ answer: "gone" });

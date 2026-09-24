@@ -104,12 +104,20 @@ Every procedure returns `AsyncResult<Output, DefinedErrors>`: the defined
 undeclared throw, a malformed response) is a `Defect`. `fromCall(promise)` is
 the one-shot form — it also lifts oRPC's server-side `call(procedure, input)`.
 
-Pass the `contract` the client was built from whenever client and server deploy
-independently. Every rejection is then reconciled against the client's own
-`.errors({...})` (oRPC's `reconcileORPCError`: a declared code, with `data`
-passing its schema), so a code only a newer server declares is a `Defect`
-instead of an `Err` your `errCases` has no arm for. Without it, the `defined`
-flag the server sent decides.
+**Pass the `contract` the client was built from** — always when the server is
+not fully trusted, and whenever client and server deploy independently. Every
+rejection is then reconciled against the client's own `.errors({...})` (oRPC's
+`reconcileORPCError`: a declared code, with `data` **validated against its
+schema**), so a code only a newer server declares, or a declared code carrying
+malformed `data`, is a `Defect` instead of an `Err` your `errCases` has no arm
+for.
+
+> [!WARNING]
+> Without a `contract` (and always with `fromCall`, which takes none), the
+> `defined` flag **the server sent** decides the channel, and `error.data` is
+> **not validated** — it is whatever the wire carried, typed as your declared
+> schema's output only by trust. Against a server you do not control, that is
+> an unvalidated payload in `E`.
 
 Event-iterator (streaming) procedures are out of scope: a stream does not
 collapse to one `Result`. Keep calling those on the raw client.

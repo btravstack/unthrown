@@ -57,6 +57,18 @@ ruleTester.run("no-catch-all-pattern", noCatchAllPattern, {
     {
       code: `import { P, type AsyncResult } from "unthrown";\nimport type { Issues } from "./issues.js";\ndeclare const r: AsyncResult<number, Issues>;\nasync () => (await r).mapErrCases((m) => m.with(P._, (e) => e));`,
     },
+    // ---- The empty object pattern `{}` (a catch-all in disguise).
+    // A non-empty object pattern is a specific matcher.
+    {
+      code: `import { P } from "unthrown";\nresult.mapErrCases((m) => m.with({ code: "A" }, (e) => e));`,
+    },
+    // `{}` as the HANDLER's position is not a pattern (nor is a nested `{}`).
+    {
+      code: `result.mapErrCases((m) => m.with({ code: "A", data: {} }, () => ({})));`,
+    },
+    // A `.with({}, …)` on something that is not a matcher is none of our business.
+    { code: `builder.with({}, (x) => x);` },
+    { code: `import { match } from "other-lib";\nmatch(x).with({}, () => 0);` },
   ],
   invalid: [
     // `P._` from unthrown — the catch-all.
@@ -112,6 +124,32 @@ ruleTester.run("no-catch-all-pattern", noCatchAllPattern, {
     {
       code: `import { P, type Result } from "unthrown";\nimport { readEnv } from "./env.js";\nreadEnv().match({ ok: (v) => v, errCases: (m) => m.with(P._, (e) => e), defect: (c) => c });`,
       errors: [{ messageId: "noCatchAll" }],
+    },
+    // `{}` matches every object at runtime and exhausts the builder at the type
+    // level — the same catch-all, spelled without `P`.
+    {
+      code: `result.mapErrCases((m) => m.with({}, (e) => e));`,
+      errors: [{ messageId: "emptyObjectPattern" }],
+    },
+    // Grouped with named cases, after a `returnType` pin, in `errCases`.
+    {
+      code: `import { P } from "unthrown";\nresult.match({ ok: (v) => v, errCases: (m) => m.returnType<number>().with(P.tag("A"), {}, () => 0), defect: () => 1 });`,
+      errors: [{ messageId: "emptyObjectPattern" }],
+    },
+    // On a free `match(value)` builder imported from unthrown or ts-pattern.
+    {
+      code: `import { match } from "unthrown";\nmatch(result).with({ tag: "Ok" }, () => 0).with({}, () => 1).exhaustive();`,
+      errors: [{ messageId: "emptyObjectPattern" }],
+    },
+    {
+      code: `import { match } from "ts-pattern";\nmatch(x).with({}, () => 1).exhaustive();`,
+      errors: [{ messageId: "emptyObjectPattern" }],
+    },
+    // A provable single-type `E` does not exempt `{}`: the sanctioned spelling
+    // there is `P._`, the only arm that also closes a generic `E`.
+    {
+      code: `import { type Result } from "unthrown";\nconst f = <T, E>(r: Result<T, E>) => r.mapErrCases((m) => m.with({}, (e) => e));`,
+      errors: [{ messageId: "emptyObjectPattern" }],
     },
   ],
 });

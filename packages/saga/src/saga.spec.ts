@@ -1,4 +1,6 @@
 import "@unthrown/vitest";
+import { readFileSync } from "node:fs";
+
 import { Err, ErrAsync, Ok, OkAsync } from "unthrown";
 import { describe, expect, it, vi } from "vitest";
 
@@ -184,5 +186,12 @@ describe("SagaAsync", () => {
     expect(step).not.toHaveBeenCalled();
     await saga.run();
     expect(step).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("packaging", () => {
+  it("declares itself side-effect-free, so bundlers can prune it", () => {
+    const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+    expect(pkg.sideEffects).toBe(false);
   });
 });

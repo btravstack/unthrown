@@ -6,7 +6,8 @@ internal design — live in the root [`CLAUDE.md`](../../CLAUDE.md) and apply
 here too.
 
 An oxlint **JS plugin**, peerDep
-`oxlint`, dep `@oxlint/plugins`; ships **eight rules**: `no-ambiguous-error-type`
+`oxlint`, dep `@oxlint/plugins`; ships **nine rules** (the ninth, the opt-in
+`prefer-pre-lifted`, is specified in its own TSDoc): `no-ambiguous-error-type`
 — enforces Thesis #1 against `unknown`/`any`/`Error`/`{}` **and the primitive
 keywords** (`void` included) in `E`, both in a `Result`/`AsyncResult` type
 **annotation** and in the matcher's `returnType<R>()` **pin** — the latter only
@@ -37,8 +38,13 @@ rule in the first place); `no-unhandled-result` (in the
 recommended preset — flags a bare `ExpressionStatement` dropping a `Result`:
 a call to an unthrown-imported producer or facade-companion member, or to a
 locally-declared function whose return annotation is unthrown's
-`Result`/`AsyncResult`, awaited or not; deliberately syntactic — a dropped
-method _chain_ like `r.map(f);` is type-dependent and out of scope);
+`Result`/`AsyncResult`, awaited or not; deliberately syntactic — a result
+returned by a function imported from another user module, and a dropped
+method _chain_ like `r.map(f);`, are type-dependent and missed, and the docs
+say so plainly. There is no type-aware backstop to point at: typescript-eslint's
+`no-floating-promises` ignores `AsyncResult` even with `checkThenables`,
+because it only counts a `then` taking a rejection callback — verified, so do
+not re-add that recommendation);
 `no-async-result-race` (**in the recommended preset** — flags a sibling
 `AsyncResult` construction in one statement list while an earlier binding is
 still unconsumed: construction is eager, so the sibling-`const` sequence
@@ -62,7 +68,12 @@ and an un-annotated service call are documented misses); and
 `no-catch-all-pattern` (**in the recommended preset** — reports the catch-all
 `P._` — plus ts-pattern's `P.any` alias, kept because the rule also covers a
 `P` imported straight from there — where `P` is imported from `unthrown` or
-`ts-pattern`, so every error case must be enumerated by name; this **states
+`ts-pattern` — and the empty object pattern `.with({}, …)`, which matches
+every object at runtime and covers every object member of `E` (its own
+`emptyObjectPattern` message; reported only on a real matcher chain — the
+injected matcher of an error-matcher callback, or an imported `match(…)` — and
+never exempted by the single-type proof, since `P._` is the spelling that
+proof recognises), so every error case must be enumerated by name; this **states
 the library's own default** (Thesis #5: `P._` is an escape hatch, not the
 sanctioned catch-all), and the sites that must keep the wildcard — a helper
 generic in `E`, or an `E` that is a single type rather than a union of
@@ -112,7 +123,15 @@ unthrown's own coinage rather than an import:
 `returnType<R>()` pin (inside `no-ambiguous-error-type`) is anchored on that
 call on a `mapErrCases` callback's own matcher parameter. No TypeDoc API
 page; documented in the Linting guide.
-Tested with oxlint's `RuleTester` from `oxlint/plugins-dev`.
+Tested with oxlint's `RuleTester` from `oxlint/plugins-dev`. The producer
+names `no-unhandled-result` and `no-async-result-race` recognise live in ONE
+module, `src/helpers/producers.ts`; `producers.test.ts` diffs it against core's
+real runtime exports (core is a `workspace:^` devDependency for that), so a new
+core export fails the suite until it is classified producer or non-producer.
+The plugin is wrapped with `@oxlint/plugins`' `eslintCompatPlugin`, so it also
+loads as an ESLint flat-config plugin (verified on ESLint 10 with the
+`typescript-eslint` parser, no type information); `recommended` is an oxlint
+config, so ESLint users list the rules by hand — both documented.
 The **`oxlint` peer floor (`^1.69.0`) is deliberately decoupled from the
 `@oxlint/plugins` dependency** — it names the oldest _host_ the rules were
 verified to run on, not the plugin-utils version the package happens to build

@@ -47,7 +47,14 @@ answered by the target, never wrapped). With `contract`, every rejected
 (`reconcileORPCError`: declared code AND `data` passing its schema) before
 triage, so the channel follows the contract the caller compiled against, not
 the server's `defined` flag — the rolling-deploy case, where a newer server
-declares a code the client's `E` has no arm for. Either way: `E` is the raw
+declares a code the client's `E` has no arm for. If the reconciliation itself
+throws (a contract that lacks the called path), the Defect's cause is an
+`AggregateError([thatFailure, originalRejection])` — the core's
+observer-aggregation shape — so the lookup's `TypeError` never replaces the
+rejection. WITHOUT a contract (and always for `fromCall`, which takes none),
+the server's `defined` flag decides and `error.data` is **unvalidated** —
+there is no schema to check it against, so this is documented (README, guide,
+TSDoc) rather than fixed: passing `contract` is the validation. Either way: `E` is the raw
 defined `ORPCError` union discriminated by `code` — deliberately NOT
 re-wrapped into `TaggedError` (match it on `code`, e.g.
 `.mapErrCases((matcher) => matcher.with({ code: "NOT_FOUND" }, …))`); the

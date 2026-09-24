@@ -1,30 +1,6 @@
+import { FREE_PRODUCERS } from "../helpers/producers.js";
 import { ruleTester } from "../tester.js";
 import { noUnhandledResult } from "./no-unhandled-result.js";
-
-// Every Result/AsyncResult-producing free function core exports — each one,
-// dropped as a bare statement, must be flagged.
-const FREE_PRODUCERS = [
-  "Ok",
-  "Err",
-  "OkAsync",
-  "ErrAsync",
-  "Do",
-  "DoAsync",
-  "fromNullable",
-  "fromThrowable",
-  "fromSafeThrowable",
-  "fromPromise",
-  "fromSafePromise",
-  "fromExecutor",
-  "all",
-  "allAsync",
-  "allFromDict",
-  "allFromDictAsync",
-  "validateAll",
-  "validateAllAsync",
-  "validateAllFromDict",
-  "validateAllFromDictAsync",
-] as const;
 
 ruleTester.run("no-unhandled-result", noUnhandledResult, {
   valid: [
@@ -60,7 +36,7 @@ ruleTester.run("no-unhandled-result", noUnhandledResult, {
   ],
   invalid: [
     // Every producing free function, dropped bare.
-    ...FREE_PRODUCERS.map((name) => ({
+    ...[...FREE_PRODUCERS].map((name) => ({
       code: `import { ${name} } from "unthrown";\n${name}();`,
       errors: [{ messageId: "noUnhandledResult" }],
     })),

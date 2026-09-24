@@ -681,6 +681,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
+      unthrown:
+        specifier: workspace:^
+        version: link:../core
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@types/node@26.5.1)(@vitest/coverage-v8@4.1.11)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)

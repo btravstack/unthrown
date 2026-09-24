@@ -177,6 +177,14 @@ against the client's own declaration instead (oRPC's `reconcileORPCError`: the
 code must be declared **and** its `data` must pass the declared schema) — what
 the client did not compile against is a `Defect`.
 
+::: warning Without a contract, `data` is trusted, not validated
+With no `contract` — and always with `fromCall`, which takes none — the
+`defined` flag the server sent decides the channel, and `error.data` is
+whatever the wire carried: typed as your declared schema's output, but never
+checked against it. Pass the `contract` whenever the server is not fully
+trusted; it is what validates `data` before it reaches `E`.
+:::
+
 `fromCall` is the one-shot form, and also lifts oRPC's server-side
 `call(procedure, input)`:
 
