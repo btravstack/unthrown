@@ -1,5 +1,11 @@
 # @unthrown/saga
 
+## 5.10.0
+
+### Patch Changes
+
+- c3fdcf7: Declare `"sideEffects": false`, so bundlers can prune the package like every other side-effect-free unthrown package.
+
 ## 5.9.0
 
 ## 5.8.0

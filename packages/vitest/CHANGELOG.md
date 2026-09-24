@@ -1,5 +1,11 @@
 # @unthrown/vitest
 
+## 5.10.0
+
+### Patch Changes
+
+- c3fdcf7: Export the `HookContext` and `TaskLike` types that `failOnForgottenAwait` accepts, so manual wiring can name its parameter.
+
 ## 5.9.0
 
 ## 5.8.0
