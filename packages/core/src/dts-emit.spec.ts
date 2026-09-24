@@ -108,7 +108,9 @@ it("inferred public values are nameable under declaration emit (ESM and CJS type
     }),
   );
 
-  let output = "";
+  // A clean emit exits 0, so any failure fails the test — including one that
+  // printed no `TS` diagnostic (a crash, a bad config), with its whole output.
+  let failure: string | undefined;
   try {
     execFileSync(process.execPath, [TSC, "-p", "tsconfig.json"], {
       cwd: workdir,
@@ -116,8 +118,12 @@ it("inferred public values are nameable under declaration emit (ESM and CJS type
       stdio: ["ignore", "pipe", "pipe"],
     });
   } catch (error) {
-    output = String((error as { stdout?: string }).stdout ?? "");
+    const { status, stdout, stderr } = error as {
+      status?: number;
+      stdout?: string;
+      stderr?: string;
+    };
+    failure = `tsc exited ${String(status)}\n${stdout ?? ""}${stderr ?? ""}`;
   }
-  const errors = output.split("\n").filter((line) => /error TS\d+:/.test(line));
-  expect(errors, `\n${errors.join("\n")}\n`).toEqual([]);
+  expect(failure).toBeUndefined();
 }, 60_000);
