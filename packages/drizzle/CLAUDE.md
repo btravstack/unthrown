@@ -5,10 +5,17 @@ theses, the load-bearing runtime invariants, the public surface and the
 internal design — live in the root [`CLAUDE.md`](../../CLAUDE.md) and apply
 here too.
 
-PeerDeps `drizzle-orm` `^1.0.0-rc`
+PeerDeps `drizzle-orm` `^1.0.0-rc.5-0`
 and `pg` `^8.16.0` — a **range, not a pin**: the range names the published
-contract a consumer must satisfy, and the internals were verified against
-`1.0.0-rc.4`, which the changeset records. Slaving the peer to an exact rc
+contract a consumer must satisfy. Its floor is rc.5 because the code imports
+`resolveNullableObjectPaths`, which `drizzle-orm/utils` only exports from rc.5
+(a `^1.0.0-rc` peer accepted an rc.4 that crashes on import). The odd `-0`
+is load-bearing: drizzle publishes `1.0.0-rc.N-<sha>`, and `4-fb12281` is an
+**alphanumeric** prerelease identifier, which semver ranks _above_ any
+numeric one — so `^1.0.0-rc.5` still admits every rc.4 build. Against
+`5-0` the comparison is lexical, which excludes rc.4 and admits rc.5–rc.9
+and every stable 1.x; an rc.10 would compare below it and need the floor
+raised. Slaving the peer to an exact rc
 would force a lockstep release on every upstream rc for a change that touched
 nothing. **Deliberately outside the fixed version group** — its majors track
 drizzle's cadence, not the family's. This package **replaces** the stock

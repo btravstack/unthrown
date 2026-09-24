@@ -10,7 +10,7 @@
 pnpm add @unthrown/drizzle drizzle-orm pg unthrown
 ```
 
-`drizzle-orm` (`^1.0.0-rc`) and `pg` (`^8.16.0`) are peer dependencies — this
+`drizzle-orm` (`^1.0.0-rc.5-0`) and `pg` (`^8.16.0`) are peer dependencies — this
 package sits on drizzle's own Postgres builder tree, so you bring your own copy
 of it.
 

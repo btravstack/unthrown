@@ -136,7 +136,7 @@ db.user.tryFindMany();
 
 ## Drizzle: @unthrown/drizzle
 
-Peers `drizzle-orm` ^1.0.0-rc and `pg` ^8.16.0. Unlike the Prisma extension this
+Peers `drizzle-orm` ^1.0.0-rc.5-0 and `pg` ^8.16.0. Unlike the Prisma extension this
 **replaces** the stock database rather than adding to it — every method already
 speaks `AsyncResult`, so there is **no `try*` prefix**, and migrating a call
 site is an import change:

@@ -74,7 +74,7 @@
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "drizzle-orm": "^1.0.0-rc",
+    "drizzle-orm": "^1.0.0-rc.5-0",
     "pg": "^8.16.0",
     "unthrown": "workspace:^"
   },

@@ -804,7 +804,7 @@ copies) — issue #256, observed live in btravstack/start#99.
   infrastructure failure is a `Defect`. **Outside the fixed version group**,
   and the one package on `node >=20.19`. Full spec:
   `packages/prisma/CLAUDE.md`.)
-- `packages/drizzle` → `@unthrown/drizzle` (peerDeps `drizzle-orm` `^1.0.0-rc`
+- `packages/drizzle` → `@unthrown/drizzle` (peerDeps `drizzle-orm` `^1.0.0-rc.5-0`
   and `pg` `^8.16.0`; **replaces** the stock `drizzle-orm/node-postgres`
   database rather than wrapping one, so every method already speaks
   `AsyncResult` and there is no `try*` prefix. Five integrity-constraint

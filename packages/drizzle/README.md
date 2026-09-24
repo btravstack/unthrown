@@ -72,7 +72,7 @@ const r = await db.transaction((tx) =>
 // Ok → COMMIT; Err → ROLLBACK (error re-surfaces typed); Defect → ROLLBACK
 ```
 
-`drizzle-orm` (`^1.0.0-rc`) and `pg` (`^8.16.0`) are peer dependencies.
+`drizzle-orm` (`^1.0.0-rc.5-0`) and `pg` (`^8.16.0`) are peer dependencies.
 
 ## Contributing
 
