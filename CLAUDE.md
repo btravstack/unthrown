@@ -1045,7 +1045,8 @@ onRejected)`, so the fixture records the handler _and invokes it_, proving both
 - Public API carries full **TSDoc**; `pnpm --filter @unthrown/docs build` must
   stay typedoc-warning-free (it runs TypeDoc for all ten documented packages —
   four with their own `typedoc.<name>.json`, six on the shared
-  `typedoc.base.json` — and prints every warning).
+  `typedoc.base.json` — and **fails** on any TypeDoc warning or error, or on a
+  run that exits 0 without producing its `api/<name>/`).
 - One concept = one name. Resist convenience aliases.
 - **The error-matcher combinators carry a `*Cases` suffix** (`mapErrCases`,
   `flatMapErrCases`, `recoverErrCases`, `tapErrCases`, `flatTapErrCases`) —

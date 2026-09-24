@@ -127,8 +127,10 @@ function callSiteFrame(error: Error): string | undefined {
 // to rebuild the full test name (`"outer suite > inner suite > test"` — the
 // same shape `MatcherState.currentTestName` carries), without importing
 // vitest's runner types.
-type TaskLike = { name: string; suite?: TaskLike | undefined };
-type HookContext = { task?: TaskLike | undefined };
+/** The slice of a vitest task {@link failOnForgottenAwait} reads: a name and its parent suite. */
+export type TaskLike = { name: string; suite?: TaskLike | undefined };
+/** The slice of vitest's `TestContext` {@link failOnForgottenAwait} accepts, for manual wiring. */
+export type HookContext = { task?: TaskLike | undefined };
 
 function fullTestName(task: TaskLike | undefined): string | undefined {
   if (task === undefined) return undefined;

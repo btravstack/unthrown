@@ -2,7 +2,7 @@
 // per package, concurrently. TypeDoc lives here rather than in each package
 // because it needs its own TypeScript — see CLAUDE.md.
 import { execFile } from "node:child_process";
-import { readdirSync, rmSync } from "node:fs";
+import { existsSync, readdirSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -87,12 +87,22 @@ let failed = false;
 for (const [index, result] of results.entries()) {
   const name = packages[index];
   if (result.status === "fulfilled") {
-    console.log(`✓ generated API docs for ${name} → api/${name}/`);
-    // A successful run's output is otherwise swallowed; surface its warnings
-    // (an unexported referenced type, a broken `{@link}`) so they get fixed.
-    for (const line of result.value.split("\n")) {
-      if (line.includes("[warning]")) console.warn(`  ${line}`);
+    // A zero exit is not proof of output (a TypeDoc that ran out of memory has
+    // exited 0 here), and a warning is a defect in the reference (an
+    // unexported referenced type, a broken `{@link}`) — both fail the build.
+    const problems = result.value
+      .split("\n")
+      .filter((line) => line.includes("[warning]") || line.includes("[error]"));
+    const missing = !existsSync(join(apiDir, name));
+    if (problems.length === 0 && !missing) {
+      console.log(`✓ generated API docs for ${name} → api/${name}/`);
+      continue;
     }
+    failed = true;
+    console.error(
+      `✗ TypeDoc for ${name}${missing ? ` produced no api/${name}/` : " reported problems"}`,
+    );
+    for (const line of problems) console.error(`  ${line}`);
   } else {
     failed = true;
     const { stdout, stderr } = result.reason as { stdout?: string; stderr?: string };
