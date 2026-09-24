@@ -80,13 +80,36 @@ export type MatchedOf<Pt> =
       : Pt;
 
 /**
- * The diagnostic type of `.exhaustive` on a builder that has NOT covered every
- * case: not callable (so it fails the `ExhaustiveMatch` constraint at the call
- * site), and it names the remaining cases so the error reads as a to-do list.
+ * Reject a **keyless object pattern** (`{}`) where it is written.
+ *
+ * @remarks
+ * At runtime an empty object pattern matches *every* object (no key to
+ * disagree on), and at the type level `MatchedOf<{}>` is `{}`, so `Exclude`
+ * removes every non-nullish case — an unflagged catch-all, invisible to
+ * `@unthrown/oxlint`'s `no-catch-all-pattern`. Mapping it to a branded string
+ * makes the argument unassignable, with the reason in the error. `null` /
+ * `undefined` (also keyless) stay legal literal patterns, and every `P.*`
+ * pattern carries a symbol key.
  *
  * @internal
  */
-export type NonExhaustive<Remaining> = {
+export type NoEmptyPattern<Pt> = [Pt] extends [null | undefined]
+  ? Pt
+  : [keyof Pt] extends [never]
+    ? "unthrown: an empty object pattern `{}` matches every object — name the case (a key to match on), or use P._ deliberately"
+    : Pt;
+
+/**
+ * The diagnostic type of `.exhaustive` on a builder that has NOT covered every
+ * case: not callable (so it fails the `ExhaustiveMatch` constraint at the call
+ * site), and it names the remaining cases so the error reads as a to-do list.
+ * The alias NAME is the diagnostic: the compiler prints "Type
+ * 'UnhandledCases<NotFound>' provides no match for the signature …", so it
+ * says what is wrong and lists what is left (it was `NonExhaustive<…>`).
+ *
+ * @internal
+ */
+export type UnhandledCases<Remaining> = {
   readonly "unthrown: this match is not exhaustive — add a `.with(…)` for the remaining cases": Remaining;
 };
 
@@ -180,7 +203,7 @@ export type Matcher<E, Remaining, O, Declared = Unset> = {
    */
   with<const Pts extends readonly [unknown, ...unknown[]], O2>(
     ...args: [
-      ...patterns: Pts,
+      ...patterns: { [I in keyof Pts]: NoEmptyPattern<Pts[I]> },
       handler: (value: Extract<Remaining, MatchedOf<Pts[number]>>) => BranchReturn<Declared, O2>,
     ]
   ): Matcher<E, Exclude<Remaining, MatchedOf<Pts[number]>>, O | O2, Declared>;
@@ -224,7 +247,9 @@ export type Matcher<E, Remaining, O, Declared = Unset> = {
    * naming the remaining cases, and the builder fails the `ExhaustiveMatch`
    * constraint at the combinator call site.
    */
-  exhaustive: [Remaining] extends [never] ? () => PinnedOut<Declared, O> : NonExhaustive<Remaining>;
+  exhaustive: [Remaining] extends [never]
+    ? () => PinnedOut<Declared, O>
+    : UnhandledCases<Remaining>;
 
   /**
    * Execute the match (the combinators call this; it runs `.exhaustive()`).
@@ -243,6 +268,23 @@ export type Matcher<E, Remaining, O, Declared = Unset> = {
  * is a bug).
  *
  * @category Errors
+ *
+ * @example
+ * ```ts
+ * import { match, NonExhaustiveError } from "unthrown";
+ *
+ * // A value typed "a" | "b" that is really "c" (a cast, a raw-JS caller):
+ * const rogue = "c" as "a" | "b";
+ * try {
+ *   match(rogue)
+ *     .with("a", () => 1)
+ *     .with("b", () => 2)
+ *     .exhaustive();
+ * } catch (error) {
+ *   error instanceof NonExhaustiveError; // => true
+ *   (error as NonExhaustiveError).input; // => "c"
+ * }
+ * ```
  */
 export class NonExhaustiveError extends Error {
   /** The value no arm matched. */
@@ -393,6 +435,24 @@ Object.freeze(MatcherImpl.prototype);
  * {@link P}).
  *
  * @category Constructors
+ *
+ * @example
+ * ```ts
+ * import { match, type Result } from "unthrown";
+ *
+ * // Matching a whole Result natively — every variant named, `.exhaustive()` last:
+ * declare const r: Result<number, "odd" | "negative">;
+ * const label = match(r)
+ *   .with({ tag: "Ok" }, (ok) => `got ${ok.value}`)
+ *   .with({ tag: "Err" }, (err) => `failed: ${err.error}`)
+ *   .with({ tag: "Defect" }, () => "bug")
+ *   .exhaustive();
+ *
+ * // Inside a combinator, return the un-terminated builder — it runs `.exhaustive()`:
+ * const reason = r.mapErrCases((matcher) =>
+ *   matcher.with("odd", () => "not even" as const).with("negative", () => "below zero" as const),
+ * ); // Result<number, "not even" | "below zero">
+ * ```
  */
 export function match<const E>(value: E): Matcher<E, E, never> {
   return new MatcherImpl(value) as unknown as Matcher<E, E, never>;
@@ -432,13 +492,45 @@ const universal = pattern<unknown>(() => true) as UniversalPattern;
  *   (`.with(P.tag("A"), P.tag("B"), handler)`).
  * - `P.instanceOf(Cls)` — an `instanceof` check, narrowing to the class
  *   instance type (for union members that are not tagged, e.g. a third-party
- *   error class).
+ *   error class). **Exhaustiveness here is structural, the check is not:**
+ *   two classes with the same shape (`class A extends Error {}`,
+ *   `class B extends Error {}`) are one type to the compiler, so a match
+ *   naming only `A` compiles as exhaustive while a `B` fails `instanceof A`
+ *   at runtime and becomes a `Defect`. Give each class a distinguishing field
+ *   (a `readonly kind = "A"` literal) or use `TaggedError`, and the missing
+ *   arm is a compile error again.
  * - `P.when(guard)` — an arbitrary type-guard predicate. Also the way to match
  *   a primitive shape (`P.when((v): v is string => typeof v === "string")`),
  *   and grouping patterns under one handler is what a `.with(a, b, handler)`
  *   arm already does.
  *
  * @category Constructors
+ *
+ * @example
+ * ```ts
+ * import { P, TaggedError, type Result } from "unthrown";
+ *
+ * class NotFound extends TaggedError("NotFound")<{ id: string }> {}
+ * class Conflict extends TaggedError("Conflict") {}
+ * class VendorTimeout extends Error {
+ *   readonly afterMs = 30_000;
+ * }
+ *
+ * declare const r: Result<string, NotFound | Conflict | VendorTimeout | "rate_limited">;
+ * const status = r.match({
+ *   ok: () => 200,
+ *   errCases: (matcher) =>
+ *     matcher
+ *       .with(P.tag("NotFound"), () => 404) // a TaggedError, narrowed with its payload
+ *       .with(P.tag("Conflict"), () => 409)
+ *       .with(P.instanceOf(VendorTimeout), (e) => (e.afterMs > 10_000 ? 504 : 503))
+ *       .with(
+ *         P.when((v): v is "rate_limited" => v === "rate_limited"),
+ *         () => 429,
+ *       ),
+ *   defect: () => 500,
+ * });
+ * ```
  */
 export const P = Object.freeze({
   _: universal,

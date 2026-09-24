@@ -131,6 +131,13 @@ result.mapErrCases((matcher) =>
 );
 ```
 
+This is exhaustive only because the two classes differ in **shape** (`at` vs
+`afterMs`). Exhaustiveness is checked structurally, so two identical-shaped
+classes would count as one case: naming either would compile, and the other
+would become a `Defect` at runtime. When a vendor's classes are
+interchangeable in shape, tag them yourself in `qualify` rather than matching
+them with `P.instanceOf`.
+
 `P.when(guard)` covers whatever neither an object pattern nor `instanceof` can
 express.
 

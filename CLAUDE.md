@@ -138,7 +138,23 @@ was planned).
    exported from core — first-class in one import,
    dual-copy-safe (patterns carry a `Symbol.for` brand). Deliberately **not**
    supported: deep structural inversion, `P.select`, array patterns — the
-   complexity (and cross-version instability) the replacement removed.
+   complexity (and cross-version instability) the replacement removed. Two
+   pattern-level rules close structural holes. An **empty object pattern
+   `{}`** is a compile error at the pattern (`NoEmptyPattern`): it matched every
+   object at runtime and `Exclude<E, {}>` erased every case — an unflagged
+   catch-all. And one limitation is **accepted and pinned** in
+   `types.test-d.ts`: `P.instanceOf` exhaustiveness is `Exclude` over
+   structural types, so **structurally identical classes**
+   (`class A extends Error {}` / `class B extends Error {}`) are one case to
+   the compiler — naming only `A` compiles as exhaustive and a `B` becomes a
+   `Defect` at runtime. The remedy is a distinguishing field (a `readonly kind`
+   literal) or `TaggedError`; it is documented on `P.instanceOf` and in the
+   model-errors guide. The builder's `.with(P.tag("Typo"), …)` for a tag no
+   remaining case carries is **not** rejected: an "overlaps `Remaining`" check
+   cannot resolve over an unresolved `E`, so it would break the generic-`E`
+   helpers that name one arm and end in `P._`. (`P.when` gets no contextual
+   parameter type for the same reason it is standalone — it is built before
+   the builder it joins.)
 
 ## Load-bearing runtime invariants (tests must guard these)
 
@@ -176,7 +192,7 @@ was planned).
   return an `ExhaustiveMatch` — `.exhaustive` is typed callable only when the
   builder's tracked `Remaining` parameter has been excluded down to `never`
   (all cases covered); a non-exhaustive builder types `.exhaustive` as the
-  branded `NonExhaustive<Remaining>` diagnostic (naming the unhandled cases)
+  branded `UnhandledCases<Remaining>` diagnostic (naming the unhandled cases)
   and fails the constraint at the call site. For code that builds the match through the
   provided matcher there is no path where a case slips past an error combinator
   uncovered without a compile error, and no `.exhaustive()` / `.otherwise()`
@@ -358,8 +374,12 @@ was planned).
   `isDefect` guards — the simplest shape when no per-case branching is needed.
   Concrete application code uses `match` normally.
 - **`get()` / `getErr()` are type-gated.** `get()` compiles only when the
-  error channel is empty (`this: Result<T, never>`); `getErr()` only when the
-  success channel is empty (`this: Result<never, E>`). Eliminate the opposite
+  error channel is empty; `getErr()` only when the success channel is empty.
+  The gate is `getOrThrow`'s shape — `this: [E] extends [never] ? Result<T,
+never> : "unthrown: get() needs an empty error channel …"` (and `[T] extends
+[never]` for `getErr`) — so the compile error prints the fix rather than a
+  `DefectView` mismatch; the `Result<T, never>` semantics (and a generic `T`
+  with an empty `E`) are unchanged. Eliminate the opposite
   channel first (`match` / `recoverErrCases` / `flatMapErrCases`), or use the `getOr` /
   `getOrElse` / `getOrNull` / `getOrUndefined` family (which recover an `Err`).
   On a `Defect` they still **rethrow the original `cause`** (they _panic_) with its
@@ -504,7 +524,7 @@ fromExecutor<T, E>>[0]`) is the grotesque spelling that invites a hand-copied
   The supporting `ExhaustiveMatch`/`MatchOut`/`MatchErrOut` are exported for the
   d.ts but not re-exported from `index.ts`. `ExhaustiveMatch<O>` requires
   `.exhaustive` to be _callable_ (the builder types it as the branded
-  `NonExhaustive<Remaining>` diagnostic while cases remain) and carries the
+  `UnhandledCases<Remaining>` diagnostic while cases remain) and carries the
   output via `run: () => O`, from which `MatchOut`/`MatchErrOut` extract. Note
   `ErrMatcher<E>` should still appear only as a callback **parameter** type,
   never combined with the class `E` in a covariant return — the historical
@@ -734,10 +754,18 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   through an `AsyncResult<U, E2>` union member in the callback-return position
   collapsed them to `unknown` when the callback returned a value typed as the
   opaque `AsyncResult` alias. So their async branch is spelled
-  `Awaitable<Result<U, E2>> & { flatMap: unknown }` — inference runs through the
-  `Awaitable` then-channel (junk-free), and the `{ flatMap: unknown }` marker
-  keeps a bare `Promise<Result>` out (a Promise has no `flatMap`, so a raw
-  rejection still can't bypass qualification). The error channel stays a **plain**
+  `Awaitable<Result<U, E2>> & ReturnAnAsyncResultNotAPromise` — inference runs
+  through the `Awaitable` then-channel (junk-free), and the marker (structurally
+  `{ flatMap: unknown }`) keeps a bare `Promise<Result>` out (a Promise has no
+  `flatMap`, so a raw rejection still can't bypass qualification). The marker is
+  a named alias because its **name is the diagnostic**: an `async` callback
+  fails with "Property 'flatMap' is missing in type 'Promise<…>' but required in
+  type 'ReturnAnAsyncResultNotAPromise'". The awaiting error combinators
+  (`flatMapErrCases` / `flatTapErrCases`, async surface) accept the same
+  `Awaitable<Result<…>> & ReturnAnAsyncResultNotAPromise` in place of
+  `AsyncResult<…>` in their builder-output constraint — so an async branch gets
+  the same message instead of 25 missing `AsyncResult` methods, and
+  `flatTapErrCases`' `E2` now infers through the then-channel too. The error channel stays a **plain**
   `E | E2` — deriving it as `E | ErrOf<R> | AsyncErrOf<R>` re-invaded `E`'s
   variance (the same `out E` collapse `flatTapErrCases` avoids), so `flatMap` keeps
   the plain `E2`. Keeping the `<U, E2>` shape (rather than inferring a whole

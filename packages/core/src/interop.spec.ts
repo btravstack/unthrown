@@ -308,6 +308,7 @@ describe("the SYNC boundaries reject an async fn", () => {
 
   it("fromThrowable: a hostile `then` getter on the return is a Defect, never routed to qualify", () => {
     const qualify = vi.fn(() => "modeled" as const);
+    // oxlint-disable-next-line no-thenable -- the point of the test: a `then` getter that throws
     const hostile = Object.defineProperty({}, "then", {
       get() {
         throw boom;

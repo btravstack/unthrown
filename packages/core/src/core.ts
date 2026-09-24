@@ -18,6 +18,7 @@ import { type Defect, defect, isDefectMarker } from "./defect.js";
 import { match } from "./matcher.js";
 import type {
   AsyncResult,
+  Awaitable,
   Bound,
   DefectView,
   ErrMatcher,
@@ -31,7 +32,11 @@ import type {
   OkOf,
   OkView,
   Result,
+  ReturnAnAsyncResultNotAPromise,
 } from "./types.js";
+
+/** What an awaiting combinator accepts in place of an `AsyncResult`. @internal */
+type AwaitableResult<T, E> = Awaitable<Result<T, E>> & ReturnAnAsyncResultNotAPromise;
 
 /**
  * Thrown by a {@link Result}'s `get` / `getErr` when the assertion is
@@ -888,7 +893,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     f: (
       matcher: ErrMatcher<E>,
       defect: (cause: unknown) => Defect,
-    ) => ExhaustiveMatch<Result<unknown, unknown> | AsyncResult<unknown, unknown> | Defect>,
+    ) => ExhaustiveMatch<Result<unknown, unknown> | AwaitableResult<unknown, unknown> | Defect>,
   ): AsyncResult<T, never> {
     return new AsyncRes<T, never>(
       this.#promise.then(async (r) => {
@@ -896,7 +901,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
         try {
           const out = runMatch(f, r.error);
           if (isDefectMarker(out)) return defectRes<T, never>(out.cause);
-          const inner = await (out as Result<unknown, unknown> | AsyncResult<unknown, unknown>);
+          const inner = await (out as Result<unknown, unknown> | AwaitableResult<unknown, unknown>);
           if (!isResult(inner)) return nonResultCallbackDefect<T, never>(inner);
           return inner as Result<T, never>;
         } catch (cause) {
@@ -924,7 +929,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
     f: (
       matcher: ErrMatcher<E>,
       defect: (cause: unknown) => Defect,
-    ) => ExhaustiveMatch<Result<unknown, unknown> | AsyncResult<unknown, unknown>>,
+    ) => ExhaustiveMatch<Result<unknown, unknown> | AwaitableResult<unknown, unknown>>,
   ): AsyncResult<T, E> {
     return new AsyncRes<T, E>(
       this.#promise.then(async (r) => {
@@ -936,7 +941,7 @@ export class AsyncRes<T, E> implements AsyncResult<T, E> {
           // Same observer treatment as the sync surface — the observed error
           // survives alongside the caller's cause.
           if (isDefectMarker(out)) return observerThrowToDefect(out.cause, r.error);
-          const inner = await (out as Result<unknown, unknown> | AsyncResult<unknown, unknown>);
+          const inner = await (out as Result<unknown, unknown> | AwaitableResult<unknown, unknown>);
           if (!isResult(inner)) return nonResultCallbackDefect(inner);
           // Keep the original error on success; an Err/Defect from the effect wins.
           return inner.tag === "Ok" ? passThrough(r) : passThrough(inner);
