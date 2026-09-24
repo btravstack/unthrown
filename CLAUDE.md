@@ -59,7 +59,8 @@ was planned).
    runs), and `stack` is `Error`'s trace (the constructor re-asserts the real
    one, so even an untyped payload can't clobber it). `cause` is deliberately
    **not** reserved — `Error.cause` is `unknown`, so a typed payload `cause`
-   (e.g. `@unthrown/prisma`'s `DriverError`) is a legitimate structured field.
+   (e.g. `@unthrown/drizzle`'s `UniqueConstraintViolation`, whose `cause` is
+   the `DrizzleQueryError`) is a legitimate structured field.
    Keeping `message` off the payload is deliberate — contextual detail
    lives in typed fields, defined per error type, never baked into a per-call
    string.
