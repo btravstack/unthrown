@@ -54,7 +54,7 @@ back and re-surfaces typed; a defect rolls back and stays a defect, a
 throwing callback included — and its `tx` is nameable from outside as the
 exported `TransactionClient<C>` (`Omit<C, TxDenyList>`; name a `tx` with it rather
 than a hand-copied `Omit`, which drifts silently — `Omit` of a key that does
-not exist is not an error. `TxDenyList`, `TryTransaction` and the seven
+not exist is not an error. `TxDenyList`, `TryTransaction`, `UnwrapPrismaTuple` and the seven
 per-operation error unions (`CreateError` … `DeleteManyError`) are exported
 because the public signatures reference them, and TypeDoc must document what a
 signature names). The **batch** form takes an array

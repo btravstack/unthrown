@@ -21,7 +21,7 @@ Transaction, CTE and error-serialisation fixes.
   now carries `PgQueryError`. A CTE over raw SQL counts as writing too; a CTE over
   a plain select stays a read. `PgUnthrownSelectBase`, `PgUnthrownSelectHKT` and
   `PgUnthrownSelectBuilder` gain a trailing `TError` parameter (default `never`),
-  and `db.$with` is typed as the new `PgUnthrownWithBuilder`.
+  and `CteError` and `WithListError` are exported.
 - **Modeled errors no longer serialise driver detail.** `detail` (which quotes
   row values) and `cause` (the `DrizzleQueryError`, with SQL and bound params)
   are non-enumerable, so `JSON.stringify(error)` leaves them out. They are still

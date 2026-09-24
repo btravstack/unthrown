@@ -404,12 +404,17 @@ export type TxDenyList =
  */
 export type TransactionClient<C> = Omit<C, TxDenyList>;
 
-// Prisma's own `UnwrapTuple` lives at `runtime.Types.Utils.UnwrapTuple`, behind a
-// runtime entry path this package deliberately never imports (it moved between
-// Prisma 6 and 7), so the mapping is written here. A fixed tuple keeps positional
-// types; a dynamic `PrismaPromise<T>[]` collapses to `T[]` — the same duality as
-// core's `all`.
-type UnwrapPrismaTuple<P extends readonly unknown[]> = {
+/**
+ * The results of a batch `$tryTransaction([...])`: each `PrismaPromise<T>`
+ * unwrapped to its `T`. A fixed tuple keeps positional types; a dynamic
+ * `PrismaPromise<T>[]` collapses to `T[]` — the same duality as core's `all`.
+ *
+ * @remarks
+ * Prisma's own `UnwrapTuple` lives at `runtime.Types.Utils.UnwrapTuple`, behind
+ * a runtime entry path this package deliberately never imports (it moved
+ * between Prisma 6 and 7), so the mapping is written here.
+ */
+export type UnwrapPrismaTuple<P extends readonly unknown[]> = {
   -readonly [K in keyof P]: P[K] extends Prisma.PrismaPromise<infer X> ? X : never;
 };
 

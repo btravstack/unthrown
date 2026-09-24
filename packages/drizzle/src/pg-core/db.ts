@@ -106,7 +106,7 @@ export type WithListError<W> = W extends { readonly _: { readonly unthrownError?
  *
  * @category Database
  */
-export type PgUnthrownWithBuilder = {
+type PgUnthrownWithBuilder = {
   <TAlias extends string>(
     alias: TAlias,
   ): {

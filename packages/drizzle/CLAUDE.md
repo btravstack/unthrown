@@ -53,7 +53,9 @@ in the view definition, not a domain outcome. **A select is a read only while
 its `WITH` list reads**: `db.with(db.$with("x").as(db.insert(t)…returning()))
 .select()` runs a real `INSERT`, so it carries `PgQueryError` and routes
 through `runQuery`, not the defect-only path (it used to turn a real 23505 into
-a `Defect` under `E = never`). The type half is `PgUnthrownWithBuilder`:
+a `Defect` under `E = never`). The type half is the internal `PgUnthrownWithBuilder` (deliberately unexported and
+listed in `intentionallyNotExported`: TypeDoc on TypeScript 6 runs out of heap
+expanding it, and `build-api.ts` still printed a ✓ for the crashed run):
 `db.$with` stamps each CTE with a phantom `CteError` in drizzle's `_` type bag
 (the source select's own channel, `never` for drizzle's `QueryBuilder` select,
 `PgQueryError` for anything else — an insert/update/delete, and **raw SQL**,

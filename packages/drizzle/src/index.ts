@@ -9,12 +9,7 @@ export {
 } from "./errors.js";
 export type { ResultThen } from "./pg-core/awaitable.js";
 export { PgUnthrownCountBuilder } from "./pg-core/count.js";
-export {
-  type CteError,
-  PgUnthrownDatabase,
-  type PgUnthrownWithBuilder,
-  type WithListError,
-} from "./pg-core/db.js";
+export { type CteError, PgUnthrownDatabase, type WithListError } from "./pg-core/db.js";
 export {
   type DeleteResult,
   PgUnthrownDeleteBase,

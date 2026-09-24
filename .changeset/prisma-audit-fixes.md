@@ -23,5 +23,5 @@ Error-channel, pagination and error-serialisation fixes.
   `JSON.stringify(error)` leaves it out. It is still readable. Never send a
   modeled error to a client unmapped.
 - `CreateError`, `CreateManyError`, `UpdateError`, `UpdateManyError`,
-  `UpsertError`, `DeleteError`, `DeleteManyError`, `TxDenyList` and
-  `TryTransaction` are exported, since the public signatures name them.
+  `UpsertError`, `DeleteError`, `DeleteManyError`, `TxDenyList`,
+  `TryTransaction` and `UnwrapPrismaTuple` are exported, since the public signatures name them.
