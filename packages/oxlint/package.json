@@ -59,6 +59,7 @@
     "oxlint": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
+    "unthrown": "workspace:^",
     "vitest": "catalog:"
   },
   "peerDependencies": {

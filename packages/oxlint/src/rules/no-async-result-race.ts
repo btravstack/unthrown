@@ -3,39 +3,10 @@ import type { ESTree, Scope, Variable } from "@oxlint/plugins";
 
 import { declaredReturnType } from "../helpers/declared-return-type.js";
 import { getImportBinding } from "../helpers/get-import-binding.js";
+import { ASYNC_FREE_PRODUCERS, COMPANION_PRODUCERS } from "../helpers/producers.js";
 import { resolveResultType } from "../helpers/resolve-result-type.js";
 
 const MODULE = "unthrown";
-
-// The `AsyncResult`-producing free functions core exports — the sync producers
-// are deliberately absent: a `Result` holds a settled value, so two sibling
-// `Ok(...)`s cannot race.
-const ASYNC_FREE_PRODUCERS: ReadonlySet<string> = new Set([
-  "OkAsync",
-  "ErrAsync",
-  "DoAsync",
-  "fromPromise",
-  "fromSafePromise",
-  "fromExecutor",
-  "allAsync",
-  "allFromDictAsync",
-  "validateAllAsync",
-  "validateAllFromDictAsync",
-]);
-
-// The producing members of the `AsyncResult` facade companion.
-const COMPANION_PRODUCERS: ReadonlySet<string> = new Set([
-  "Ok",
-  "Err",
-  "Do",
-  "fromExecutor",
-  "fromPromise",
-  "fromSafePromise",
-  "all",
-  "allFromDict",
-  "validateAll",
-  "validateAllFromDict",
-]);
 
 /**
  * Whether `callee` resolves to a locally-declared function whose declared
@@ -72,6 +43,8 @@ const isConstruction = (
   const { callee } = node;
   if (callee.type === "Identifier") {
     const binding = getImportBinding(scope, callee);
+    // Async producers only: a sync `Result` holds a settled value, so two
+    // sibling `Ok(...)`s cannot race.
     if (binding) return binding.source === MODULE && ASYNC_FREE_PRODUCERS.has(binding.imported);
     return isLocalAsyncResultFunction(scope, callee, getScope);
   }
@@ -79,7 +52,7 @@ const isConstruction = (
     if (callee.object.type === "Identifier" && callee.property.type === "Identifier") {
       const binding = getImportBinding(scope, callee.object);
       if (binding?.source === MODULE && binding.imported === "AsyncResult") {
-        return COMPANION_PRODUCERS.has(callee.property.name);
+        return COMPANION_PRODUCERS.get("AsyncResult")?.has(callee.property.name) === true;
       }
     }
     // A combinator chain: root the check on what the chain hangs off.

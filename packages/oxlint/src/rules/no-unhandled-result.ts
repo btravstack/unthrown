@@ -3,64 +3,10 @@ import type { ESTree, Scope } from "@oxlint/plugins";
 
 import { declaredReturnType } from "../helpers/declared-return-type.js";
 import { getImportBinding } from "../helpers/get-import-binding.js";
+import { COMPANION_PRODUCERS, FREE_PRODUCERS } from "../helpers/producers.js";
 import { resolveResultType } from "../helpers/resolve-result-type.js";
 
 const MODULE = "unthrown";
-
-// The `Result` / `AsyncResult`-producing free functions core exports. Dropping
-// any of their return values discards an error channel.
-const FREE_PRODUCERS: ReadonlySet<string> = new Set([
-  "Ok",
-  "Err",
-  "OkAsync",
-  "ErrAsync",
-  "Do",
-  "DoAsync",
-  "fromNullable",
-  "fromThrowable",
-  "fromSafeThrowable",
-  "fromPromise",
-  "fromSafePromise",
-  "fromExecutor",
-  "all",
-  "allAsync",
-  "allFromDict",
-  "allFromDictAsync",
-  "validateAll",
-  "validateAllAsync",
-  "validateAllFromDict",
-  "validateAllFromDictAsync",
-]);
-
-// The producing members of the facade companions (`Result.Ok(...)`,
-// `AsyncResult.fromPromise(...)`). The guards (`Result.isOk` …) return
-// booleans, not Results, so they are deliberately absent.
-const COMPANION_PRODUCERS: Readonly<Record<string, ReadonlySet<string>>> = {
-  Result: new Set([
-    "Ok",
-    "Err",
-    "Do",
-    "fromNullable",
-    "fromThrowable",
-    "fromSafeThrowable",
-    "all",
-    "allFromDict",
-    "validateAll",
-    "validateAllFromDict",
-  ]),
-  AsyncResult: new Set([
-    "Ok",
-    "Err",
-    "Do",
-    "fromExecutor",
-    "fromPromise",
-    "fromSafePromise",
-    "all",
-    "allFromDict",
-    "validateAll",
-    "validateAllFromDict",
-  ]),
-};
 
 /**
  * Whether `callee` resolves to a locally-declared function whose declared
@@ -91,15 +37,22 @@ const isLocalResultFunction = (
  * `match` / a `get*` extractor. (`await tryFn();` is still a drop: awaiting an
  * `AsyncResult` yields a `Result`, which is then discarded.)
  *
- * Best-effort and purely syntactic by design: a dropped *method chain*
- * (`r.map(f);`) or a call whose Result-ness only the type system knows is out
- * of scope — see the Linting guide for the deliberate limits.
+ * Best-effort and purely syntactic by design, so it MISSES two common drops: a
+ * call to a function **imported** from another module of your own (its return
+ * annotation lives in a file this rule never sees), and a dropped *method
+ * chain* (`r.map(f);`). Both need the type checker, and no off-the-shelf
+ * type-aware rule covers them: typescript-eslint's `no-floating-promises`
+ * ignores an `AsyncResult` even with `checkThenables` (it only counts a
+ * thenable whose `then` takes a rejection callback, which `AsyncResult`'s
+ * success-only `then` deliberately lacks), and a sync `Result` is no
+ * thenable at all. See the Linting guide for the deliberate limits.
  */
 export const noUnhandledResult = defineRule({
   meta: {
     type: "problem",
     docs: {
-      description: "Disallow dropping a `Result` / `AsyncResult` returned by a bare call",
+      description:
+        "Disallow dropping a `Result` / `AsyncResult` returned by a bare call to an unthrown producer or an in-file function annotated `Result` / `AsyncResult`. Syntactic: misses results returned by functions imported from your own modules, and dropped method chains (`r.map(f);`) — both need type information this rule does not have",
       recommended: true,
     },
     messages: {
@@ -142,7 +95,7 @@ export const noUnhandledResult = defineRule({
         ) {
           const binding = getImportBinding(scope, callee.object);
           if (binding?.source !== MODULE) return;
-          if (!COMPANION_PRODUCERS[binding.imported]?.has(callee.property.name)) return;
+          if (!COMPANION_PRODUCERS.get(binding.imported)?.has(callee.property.name)) return;
           context.report({
             node: expression,
             messageId: "noUnhandledResult",
