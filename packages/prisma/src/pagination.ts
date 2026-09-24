@@ -125,12 +125,6 @@ const defaultParseCursor = (cursor: string): unknown => {
  * throw out of `getCursor` (which reads rows the query just returned, so a
  * failure there is a bug). Only the two request cursors — `after` / `before` —
  * are wrapped; the round-trip parse inside `sameCursor` is not.
- *
- * It also marks a cursor the **database** refused: a string that parsed fine
- * but is not a valid value for the id column (garbage for a `@db.Uuid` id is
- * `P2023` / `P2007` on Postgres, not a validation error). Those codes are
- * wrapped only on the queries that carry the request cursor, so the same code
- * raised by a cursor-less query stays a defect.
  */
 export class CursorParseFailure extends Error {
   constructor(
@@ -209,19 +203,6 @@ export const paginateWithCursor = async (
   const sameCursor = (row: unknown, cursor: unknown): boolean =>
     cursorEquals(parseCursor(getCursor(row)), cursor);
 
-  // The database rejecting the request cursor's VALUE (`P2023` inconsistent
-  // column data, `P2007` data validation — e.g. garbage for a uuid column) is
-  // the same bad input as a `parseCursor` throw. Checked by `name` + `code`
-  // for the reason `qualifyPrismaError` is: the runtime class moves between
-  // Prisma versions.
-  const refusedCursor = (cursor: string) => (cause: unknown) => {
-    const refused =
-      cause instanceof Error &&
-      cause.name === "PrismaClientKnownRequestError" &&
-      ["P2007", "P2023"].includes((cause as { code?: unknown }).code as string);
-    throw refused ? new CursorParseFailure(cursor, cause) : cause;
-  };
-
   let results: unknown[];
   let hasPreviousPage = false;
   let hasNextPage = false;
@@ -235,7 +216,7 @@ export const paginateWithCursor = async (
     const [rows, nextProbe] = await Promise.all([
       model.findMany({ ...query, cursor, take: limit === null ? undefined : -limit - 2 }),
       model.findMany({ ...query, ...resetSelection, cursor, take: 1 }),
-    ]).catch(refusedCursor(before));
+    ]);
     results = rows;
     if (results.length > 0 && sameCursor(results[results.length - 1]!, cursor)) {
       results.pop(); // the cursor row itself — exclusive pagination
@@ -253,7 +234,7 @@ export const paginateWithCursor = async (
     const [rows, previousProbe] = await Promise.all([
       model.findMany({ ...query, cursor, take: limit === null ? undefined : limit + 2 }),
       model.findMany({ ...query, ...resetSelection, cursor, take: -1 }),
-    ]).catch(refusedCursor(after));
+    ]);
     results = rows;
     if (results.length > 0 && sameCursor(results[0]!, cursor)) {
       results.shift();

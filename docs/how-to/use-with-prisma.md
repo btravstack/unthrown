@@ -341,7 +341,22 @@ A malformed cursor is a modeled `InvalidCursor` rather than a defect — the one
 place a Prisma validation error is treated as anticipated input, because the
 cursor comes from the client rather than from your code. A throw out of
 `getCursor`, which reads rows the query just returned, is a bug and stays a
-defect.
+defect. So is a cursor that parses but that the **database** refuses — garbage
+for a `@db.Uuid` id fails with `P2023` / `P2007`, codes that name no column and
+so can't be told apart from a bad value in your own `where`. Validate the format
+in `parseCursor`; a throw there is an `InvalidCursor`:
+
+```ts
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const page = await db.user.tryPaginate({ orderBy: { id: "asc" } }).withCursor({
+  limit: 20,
+  after: req.query.cursor,
+  parseCursor: (cursor) => {
+    if (!UUID.test(cursor)) throw new TypeError("not a uuid");
+    return { id: cursor };
+  },
+});
+```
 
 ## Raw methods and raw SQL
 

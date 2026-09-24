@@ -18,7 +18,7 @@ import {
   type UniqueConstraintViolation,
   unthrownPrisma,
 } from "./index.js";
-import { CursorParseFailure, paginateWithCursor } from "./pagination.js";
+import { paginateWithCursor } from "./pagination.js";
 
 // The test schema's tables, created by hand (no Migrate): an in-memory database
 // is born empty, and DDL-by-hand keeps the suite free of any migration engine.
@@ -635,41 +635,22 @@ describe("tryPaginate / withCursor", () => {
     ]);
   });
 
-  // Not reproducible on SQLite (no uuid column type): on Postgres, garbage for
-  // a `@db.Uuid` id parses fine, then the DATABASE refuses the value with P2023
-  // (or P2007) — a known request error, which used to become a defect.
-  it.each(["P2023", "P2007"])(
-    "marks a %s raised by the cursor queries as a refused request cursor",
+  // P2023 / P2007 name no column, so the same code from the caller's own
+  // `where` would be indistinguishable from a refused cursor value: a known
+  // request error from the cursor queries stays a defect, whatever its code.
+  it.each(["P2024", "P2023", "P2007"])(
+    "still defects on a %s from the cursor queries",
     async (code) => {
-      const refusal = Object.assign(new Error("Inconsistent column data"), {
+      const timeout = Object.assign(new Error("refused"), {
         name: "PrismaClientKnownRequestError",
         code,
       });
-      const model = { findMany: () => Promise.reject(refusal) };
-
-      for (const direction of [{ after: "nope" }, { before: "nope" }]) {
-        const failure = await paginateWithCursor(model, undefined, {
-          limit: 2,
-          ...direction,
-        }).catch((error: unknown) => error);
-        expect(failure).toBeInstanceOf(CursorParseFailure);
-        expect((failure as CursorParseFailure).cause).toBe(refusal);
-      }
-      // The same code from a cursor-less query is not about a cursor at all.
-      await expect(paginateWithCursor(model, undefined, { limit: 2 })).rejects.toBe(refusal);
+      const model = { findMany: () => Promise.reject(timeout) };
+      await expect(paginateWithCursor(model, undefined, { limit: 2, after: "1" })).rejects.toBe(
+        timeout,
+      );
     },
   );
-
-  it("still defects on any other known request error from the cursor queries", async () => {
-    const timeout = Object.assign(new Error("pool timeout"), {
-      name: "PrismaClientKnownRequestError",
-      code: "P2024",
-    });
-    const model = { findMany: () => Promise.reject(timeout) };
-    await expect(paginateWithCursor(model, undefined, { limit: 2, after: "1" })).rejects.toBe(
-      timeout,
-    );
-  });
 
   it("compares cursors structurally — bigint ids survive the round-trip", async () => {
     // JSON.stringify-based comparison would throw on bigint cursor values.

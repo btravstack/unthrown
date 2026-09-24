@@ -141,8 +141,9 @@ db.user.tryFindMany();
   collapses to a list.
 - `tryPaginate(...).withCursor(...)` — cursor pagination; its `E` is
   `InvalidCursor` (the cursor is the only part of the query that came from
-  outside) — a throwing `parseCursor`, a validation error, or a P2023 / P2007
-  the database raises on the cursor value. `after` and `before` are mutually
+  outside) — a throwing `parseCursor` or a validation error. A value the
+  database refuses (P2023 / P2007 on a uuid id) stays a defect: validate the
+  format in `parseCursor` to make it an `InvalidCursor`. `after` and `before` are mutually
   exclusive. The default cursor escapes an all-digits **string** id as `~42`.
 - `qualifyPrismaError` — the exported qualify, for hand-rolled boundaries.
 - Raw methods remain the escape hatch for raw SQL, and are what a batch

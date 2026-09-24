@@ -14,10 +14,6 @@ Error-channel, pagination and error-serialisation fixes.
   to parse `"42"` back to the number `42`, so every cursor on a model with such
   ids came back `InvalidCursor`. A string id that looks numeric is now serialised
   as `~42`; every other id serialises as before.
-- **A cursor value the database refuses is an `InvalidCursor`.** Garbage for a
-  Postgres `@db.Uuid` id parses fine and is then refused with P2023 / P2007; on
-  the queries that carry the request cursor that is now `InvalidCursor` instead
-  of a defect.
 - **Modeled errors no longer serialise the Prisma error.** `cause`, whose message
   quotes the failing call and its values, is non-enumerable, so
   `JSON.stringify(error)` leaves it out. It is still readable. Never send a
