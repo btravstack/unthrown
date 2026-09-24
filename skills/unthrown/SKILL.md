@@ -24,7 +24,8 @@ Full docs: https://btravstack.github.io/unthrown/
 - `{ tag: "Defect", cause: unknown }` — an **unmodeled** failure (a bug, an
   unqualified throw). A defect **never appears in `E`** — it travels in its own
   channel, flows through almost every combinator untouched, and is handled only
-  at the edge (`match`'s `defect` arm) or by `recoverDefect`.
+  at the edge (`match`'s `defect` arm) or by `recoverDefect`. The observers
+  `tapDefect` / `tapFailure` see it too (to log it) without consuming it.
 
 Three rules that follow:
 
@@ -131,7 +132,7 @@ import { P } from "unthrown";
 result.mapErrCases(
   (matcher, defect) =>
     matcher
-      .with(P.tag("RecordNotFound"), () => new ReadingNotFound(id)) // transform a case
+      .with(P.tag("RecordNotFound"), () => new ReadingNotFound({ id })) // transform a case
       .with(P.tag("Unavailable"), (e) => defect(e.cause)), // deliberately defect a case
 );
 ```
@@ -269,5 +270,6 @@ what `no-ambiguous-error-type` flags.
   satellite packages: vitest matchers (`toBeOk`/`toBeErrTagged`/…), the nine
   oxlint rules, Prisma extension (`try*` delegates), Drizzle database
   (replaces the stock one — no `try*`), oRPC bridge,
-  standard-schema validation, and the effect/neverthrow/boxed interop bridges.
+  standard-schema validation, the saga builder (compensating undos), and the
+  effect/neverthrow/boxed interop bridges.
   Read when tests, lint config, or one of those integrations is involved.

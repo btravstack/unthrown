@@ -14,7 +14,7 @@
 
 [**Documentation**](https://btravstack.github.io/unthrown/) · [**Get Started**](https://btravstack.github.io/unthrown/tutorial/getting-started) · [**Why unthrown?**](https://btravstack.github.io/unthrown/explanation/why-unthrown)
 
-[**LLM documentation index**](https://btravstack.github.io/unthrown/llms.txt) · [**Agent skill**](https://github.com/btravstack/unthrown/tree/main/skills/unthrown)
+[**LLM documentation index**](https://btravstack.github.io/unthrown/llms.txt) · [**Agent skill**](https://github.com/btravstack/unthrown/tree/main/skills/unthrown) · [**Migration skill**](https://github.com/btravstack/unthrown/tree/main/skills/migrating-to-unthrown)
 
 </div>
 
@@ -88,24 +88,27 @@ defect, so the edge of your program needs a single `match` and no `try`/`catch`.
 
 ## Packages
 
-| Package                                                   | Description                                                                                                                                             |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`unthrown`](./packages/core)                             | The core `Result` / `AsyncResult`, interop, `TaggedError`, built-in exhaustive error matching.                                                          |
-| [`@unthrown/vitest`](./packages/vitest)                   | Vitest matchers: `toBeOk`, `toBeOkWith`, `toBeErr`, `toBeErrWith`, `toBeErrTagged`, `toBeDefect`.                                                       |
-| [`@unthrown/effect`](./packages/effect)                   | Effect interop: `Result ↔ Exit` (bijection), `Either`, `Effect`.                                                                                        |
-| [`@unthrown/neverthrow`](./packages/neverthrow)           | neverthrow interop: `Result ↔ Result`, `AsyncResult ↔ ResultAsync`.                                                                                     |
-| [`@unthrown/boxed`](./packages/boxed)                     | Boxed interop: `Result ↔ Result`, `AsyncResult ↔ Future<Result>`.                                                                                       |
-| [`@unthrown/prisma`](./packages/prisma)                   | Prisma Client extension: `try*` query methods returning `AsyncResult`, per-operation errors.                                                            |
-| [`@unthrown/drizzle`](./packages/drizzle)                 | Drizzle ORM Postgres database: every query an `AsyncResult`, tagged constraint violations, `Result` transactions.                                       |
-| [`@unthrown/orpc`](./packages/orpc)                       | oRPC (v2) bridge: `Result`-returning handlers, `AsyncResult` client, typed errors end-to-end.                                                           |
-| [`@unthrown/standard-schema`](./packages/standard-schema) | `fromSchema` / `fromSchemaAsync`: any Standard Schema validator into a `Result`.                                                                        |
-| [`@unthrown/oxlint`](./packages/oxlint)                   | oxlint plugin: `no-ambiguous-error-type`, `no-catch-all-pattern`, `no-unhandled-result`, `no-unused-matcher`, `prefer-async-result`, `no-get-or-throw`. |
+| Package                                                   | Description                                                                                                                                                                                                                                    |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`unthrown`](./packages/core)                             | The core `Result` / `AsyncResult`, interop, `TaggedError`, built-in exhaustive error matching.                                                                                                                                                 |
+| [`@unthrown/vitest`](./packages/vitest)                   | Vitest matchers: `toBeOk`, `toBeOkWith`, `toBeErr`, `toBeErrWith`, `toBeErrTagged`, `toBeDefect`, `toBeDefectWith`.                                                                                                                            |
+| [`@unthrown/saga`](./packages/saga)                       | `SagaAsync()`: a sequence of steps with compensating undos, unwound LIFO on the first failure.                                                                                                                                                 |
+| [`@unthrown/effect`](./packages/effect)                   | Effect interop: `Result ↔ Exit` (bijection), `Either`, `Effect`.                                                                                                                                                                               |
+| [`@unthrown/neverthrow`](./packages/neverthrow)           | neverthrow interop: `Result ↔ Result`, `AsyncResult ↔ ResultAsync`.                                                                                                                                                                            |
+| [`@unthrown/boxed`](./packages/boxed)                     | Boxed interop: `Result ↔ Result`, `AsyncResult ↔ Future<Result>`.                                                                                                                                                                              |
+| [`@unthrown/prisma`](./packages/prisma)                   | Prisma Client extension: `try*` query methods returning `AsyncResult`, per-operation errors.                                                                                                                                                   |
+| [`@unthrown/drizzle`](./packages/drizzle)                 | Drizzle ORM Postgres database: every query an `AsyncResult`, tagged constraint violations, `Result` transactions.                                                                                                                              |
+| [`@unthrown/orpc`](./packages/orpc)                       | oRPC (v2) bridge: `Result`-returning handlers, `AsyncResult` client, typed errors end-to-end.                                                                                                                                                  |
+| [`@unthrown/standard-schema`](./packages/standard-schema) | `fromSchema` / `fromSchemaAsync`: any Standard Schema validator into a `Result`.                                                                                                                                                               |
+| [`@unthrown/oxlint`](./packages/oxlint)                   | oxlint plugin. `recommended` preset: `no-ambiguous-error-type`, `no-async-result-race`, `no-catch-all-pattern`, `no-unhandled-result`, `no-unused-matcher`, `prefer-async-result`. Opt-in: `no-get-or-throw`, `no-throw`, `prefer-pre-lifted`. |
 
 ## Examples
 
-Three small runnable packages under [`./examples`](./examples) model one
-checkout end to end — the domain, `@unthrown/prisma` persistence, and an oRPC
-edge — each compiled and covered by tests, unlike the snippets above. See the
+Four small runnable packages live under [`./examples`](./examples): three model
+one checkout end to end — the domain, `@unthrown/prisma` persistence, and an
+oRPC edge — and the fourth adopts unthrown over existing error types with no
+`TaggedError` at all. Each is compiled and covered by tests, unlike the snippets
+above. See the
 [annotated walkthroughs](https://btravstack.github.io/unthrown/examples/).
 
 ## Contributing
@@ -125,14 +128,16 @@ pnpm format       # oxfmt
 [testcontainers](https://testcontainers.com), so **`pnpm test` needs a running
 Docker daemon**. Every other package's tests are self-contained.
 
-### Using the agent skill
+### Using the agent skills
 
-The repository publishes an agent skill with the same error-modeling and
-boundary rules as the documentation. Install it into a supported coding agent
-with:
+The repository publishes two agent skills: `unthrown`, with the same
+error-modeling and boundary rules as the documentation, and
+`migrating-to-unthrown`, for porting a codebase from neverthrow or Boxed.
+Install them into a supported coding agent with:
 
 ```sh
 npx skills add btravstack/unthrown --skill unthrown
+npx skills add btravstack/unthrown --skill migrating-to-unthrown
 ```
 
 The documentation build also publishes [`llms.txt`](https://btravstack.github.io/unthrown/llms.txt)

@@ -5,6 +5,7 @@ Contents: [Testing: @unthrown/vitest](#testing-unthrownvitest) ·
 [Prisma](#prisma-unthrownprisma) · [Drizzle](#drizzle-unthrowndrizzle) ·
 [oRPC](#orpc-unthrownorpc) ·
 [Validation: @unthrown/standard-schema](#validation-unthrownstandard-schema) ·
+[Sagas: @unthrown/saga](#sagas-unthrownsaga) ·
 [Interop bridges](#interop-bridges-effect-neverthrow-boxed)
 
 Every satellite takes core (`unthrown`) as a peer/`workspace:^` dependency —
@@ -36,9 +37,9 @@ wiring exports: the seven raw matcher functions, `failOnForgottenAwait`, and the
 
 ## Linting: @unthrown/oxlint
 
-An oxlint JS plugin (peer `oxlint`). Eight rules. The type-shaped ones
+An oxlint JS plugin (peer `oxlint`). Nine rules. The type-shaped ones
 (`no-ambiguous-error-type`, `prefer-async-result`, `no-unhandled-result`,
-`no-async-result-race`, `no-catch-all-pattern`) resolve bindings by scope analysis, so they only fire
+`no-async-result-race`, `no-catch-all-pattern`, `prefer-pre-lifted`) resolve bindings by scope analysis, so they only fire
 on unthrown's own `Result` — another library's is left alone. Three are keyed
 on a name or shape instead, and need no import to resolve:
 `no-unused-matcher` (the `…Cases` method names), `no-get-or-throw` (a
@@ -223,6 +224,20 @@ parseUser(input); // Result<User, SchemaIssues>
 asynchronously — use `fromSchemaAsync` for those.
 
 The validation issues are the modeled `E` — no throwing parse.
+
+## Sagas: @unthrown/saga
+
+Peer `unthrown`. Two exports: `SagaAsync()` and its `SagaAsyncBuilder` type.
+`step(run, undo?)` records a compensating undo; the first failing step unwinds
+the recorded undos **LIFO**, then the failure comes back **unchanged**, so the
+caller triages exactly what it would have without the saga. `run()` answers the
+last step's value. Both arguments are **thunks** (an `AsyncResult` starts on
+construction, so an eagerly-built undo would run whether or not it was
+needed); `undo` receives its own step's value. An undo may not add a modeled
+error (`never` in its Err channel); a **defect** in an undo wins over the
+triggering failure, after the remaining undos run. Pure control flow — no
+timers or clock — so it replays deterministically in a workflow sandbox.
+Example: [api.md § Saga](api.md#saga).
 
 ## Interop bridges (effect, neverthrow, boxed)
 

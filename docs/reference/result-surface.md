@@ -38,7 +38,8 @@ Every `Result` shares one method surface, grouped by the channel it touches:
   [Sequence dependent steps](../how-to/sequence-dependent-steps)
 - **error** (runs on `Err`): `mapErrCases`, `flatMapErrCases`, `recoverErrCases`, `tapErrCases`,
   `flatTapErrCases` — all take an **exhaustive matcher** over the error
-- **defect** (the only door to a `Defect`): `recoverDefect`, `tapDefect`
+- **defect** (runs on `Defect`): `recoverDefect` (the only way to _consume_
+  one), `tapDefect` (observe it) — `tapFailure` and `match` see it too
 - **failure** (runs on `Err` **or** `Defect`): `tapFailure` — observe either
   failing channel without consuming it
 - **eliminate**: `match`, `get`, `getErr`, `getOr`, `getOrElse`, `getOrNull`,

@@ -21,23 +21,26 @@ channel to a status code.
 
 `fetch` only _rejects_ on a network error — a 404/403 resolves normally — so the
 modeled statuses are mapped in a `flatMap` (a `throw` there, like an unexpected
-status or malformed JSON, becomes a `Defect`):
+status or malformed JSON, becomes a `Defect`). The callback returns `Err`s and an
+`AsyncResult` from different branches, which TypeScript will not unify on its
+own, so the `flatMap` names its success and error types once:
 
 ```ts
 import { fromPromise, Err, P } from "unthrown";
 
 const loadProfile = (id: string) =>
   // A network error (a rejected fetch) is unexpected → defect.
-  fromPromise(fetch(`/api/users/${id}`), (c, defect) => defect(c)).flatMap(
-    (res) => {
-      if (res.status === 404) return Err(new NotFound({ id }));
-      if (res.status === 403) return Err(new Forbidden());
-      if (!res.ok) throw new Error(`unexpected status ${res.status}`); // → Defect
-      return fromPromise(res.json() as Promise<Profile>, (c, defect) =>
-        defect(c),
-      ); // malformed JSON → Defect
-    },
-  );
+  fromPromise(fetch(`/api/users/${id}`), (c, defect) => defect(c)).flatMap<
+    Profile,
+    ProfileError
+  >((res) => {
+    if (res.status === 404) return Err(new NotFound({ id }));
+    if (res.status === 403) return Err(new Forbidden());
+    if (!res.ok) throw new Error(`unexpected status ${res.status}`); // → Defect
+    return fromPromise(res.json() as Promise<Profile>, (c, defect) =>
+      defect(c),
+    ); // malformed JSON → Defect
+  });
 // AsyncResult<Profile, NotFound | Forbidden>
 
 async function handler(id: string): Promise<HttpResponse> {
@@ -56,7 +59,7 @@ async function handler(id: string): Promise<HttpResponse> {
 ```
 
 A network failure or malformed response lands in `defect` → 500. The modeled
-`NotFound` / `Forbidden` land in `err` → 404 / 403. The type told you which is
+`NotFound` / `Forbidden` land in `errCases` → 404 / 403. The type told you which is
 which.
 
 ::: warning Keep `match` handlers trivial
