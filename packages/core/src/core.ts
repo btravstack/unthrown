@@ -467,7 +467,8 @@ export function defectRes<T, E>(cause: unknown): Result<T, E> {
  * brand the prototype carries — so a `Result` built by **another copy** of
  * unthrown, e.g. the CJS and ESM builds loaded side by side, is still
  * recognised). A look-alike plain object (`{ tag: "Ok" }`) carries neither and
- * is **not** matched. An `AsyncResult` is not a `Result` and returns `false`.
+ * is **not** matched; nor is a forgery built on the real prototype whose `tag` or
+ * payload is a getter (both must be own data properties). An `AsyncResult` is not a `Result` and returns `false`.
  *
  * @returns `true` when `x` is a `Result` produced by this library.
  *
@@ -494,23 +495,50 @@ export function defectRes<T, E>(cause: unknown): Result<T, E> {
  * @category Guards
  */
 export function isResult(x: unknown): x is Result<unknown, unknown> {
-  if (x instanceof Res) return true;
-  // Dual-copy / cross-realm fallback: another copy of unthrown has its own
-  // `Res`, so `instanceof` fails — but its prototype carries the shared
-  // `Symbol.for` brand. Reading the brand off the prototype chain keeps the
-  // guarantee that a structural look-alike (no unthrown prototype) still fails.
   // Fail-closed: this guard exists for untyped boundaries, so a hostile input
-  // (a Proxy `get` trap or a throwing getter at the brand key) is `false`,
-  // never a throw.
+  // (a Proxy trap or a throwing getter) is `false`, never a throw.
   try {
-    return (
-      (typeof x === "object" || typeof x === "function") &&
-      x !== null &&
-      Reflect.get(x, RESULT_BRAND) === true
-    );
+    // `instanceof` first; the dual-copy / cross-realm fallback reads the shared
+    // `Symbol.for` brand off the prototype chain (another copy of unthrown has
+    // its own `Res`, so `instanceof` fails), which keeps a structural look-alike
+    // with no unthrown prototype out.
+    const branded =
+      x instanceof Res ||
+      ((typeof x === "object" || typeof x === "function") &&
+        x !== null &&
+        Reflect.get(x, RESULT_BRAND) === true);
+    return branded && hasOwnVariantShape(x);
   } catch {
     return false;
   }
+}
+
+/** Each variant's payload key. @internal */
+const PAYLOAD_KEY = { Ok: "value", Err: "error", Defect: "cause" } as const;
+
+/**
+ * Does `x` carry a variant's shape as own **data** properties — `tag` one of
+ * the three variants, plus that variant's payload key?
+ *
+ * @remarks
+ * A brand is not enough: the prototype (and so the brand) is reachable from any
+ * genuine `Result`, so `Object.create(protoOf(Ok(1)))` with a throwing `tag` or
+ * payload getter passed the guard and then threw — raw out of `all`, or as a
+ * rejection out of an `AsyncResult` that must never reject. Every genuine
+ * `Result`, from any copy of the library, is a frozen object literal whose `tag`
+ * and payload are own data properties, so reading their descriptors (which
+ * never runs a getter) accepts all of them and no getter-bearing forgery.
+ *
+ * @internal
+ */
+function hasOwnVariantShape(x: object): boolean {
+  const tag = Object.getOwnPropertyDescriptor(x, "tag");
+  if (tag === undefined || !("value" in tag)) return false;
+  const variant: unknown = tag.value;
+  if (variant !== "Ok" && variant !== "Err" && variant !== "Defect") return false;
+  const key = PAYLOAD_KEY[variant];
+  const payload = Object.getOwnPropertyDescriptor(x, key);
+  return payload !== undefined && "value" in payload;
 }
 
 /**

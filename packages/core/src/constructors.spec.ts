@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  all,
   AsyncResult,
   Err,
   ErrAsync,
@@ -164,6 +165,37 @@ describe("isResult narrows an unknown value to a Result", () => {
       },
     });
     expect(isResult(throwingGetter)).toBe(false);
+  });
+
+  it("rejects a branded forgery whose tag or payload is a getter — the brand alone is reachable", async () => {
+    // The real prototype (and so its brand) is one `getPrototypeOf` away from
+    // any Result. A forgery built on it with a throwing `tag` getter used to
+    // pass, then throw raw out of `all` and reject an AsyncResult.
+    const throwing = {
+      get() {
+        throw boom;
+      },
+    };
+    const forgedTag = Object.defineProperty(Object.create(Object.getPrototypeOf(Ok(1))), "tag", {
+      ...throwing,
+      enumerable: true,
+    });
+    const forgedValue = Object.defineProperties(Object.create(Object.getPrototypeOf(Ok(1))), {
+      tag: { value: "Ok", enumerable: true },
+      value: { ...throwing, enumerable: true },
+    });
+    const forgedVariant = Object.assign(Object.create(Object.getPrototypeOf(Ok(1))), {
+      tag: "Nope",
+      value: 1,
+    });
+    for (const forged of [forgedTag, forgedValue, forgedVariant]) {
+      expect(isResult(forged)).toBe(false);
+      expect(all([forged]).isDefect()).toBe(true);
+      const r = await Ok(1)
+        .toAsync()
+        .flatMap(() => forged);
+      expect(r.isDefect()).toBe(true);
+    }
   });
 });
 

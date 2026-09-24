@@ -734,7 +734,14 @@ AsyncResult<infer T, …>` — structural inference over the whole method surfac
   `Symbol.for("unthrown.Result")` brand (defined before the prototype is
   frozen) and `isResult` falls back to reading it off the prototype chain.
   Accidental forgery stays excluded — a structural look-alike has no brand;
-  producing one requires deliberately minting the shared symbol.
+  producing one requires deliberately minting the shared symbol. The brand (or
+  `instanceof`) is **necessary, not sufficient**: the prototype is one
+  `getPrototypeOf` away from any `Result`, so `isResult` also requires `tag`
+  (one of the three variants) and that variant's payload key to be **own data
+  properties**, read by descriptor so no getter ever runs. Every genuine
+  `Result` — any copy — is a frozen literal that passes; a forgery with a
+  throwing `tag`/payload getter would otherwise pass the guard and then throw
+  raw out of `all`, or reject an `AsyncResult`.
 - **Builders are free functions** (`Ok`, `Err`, …) because they tree-shake — and
   every shipped package sets `"sideEffects": false` so bundlers can prune between
   modules (the sole exception is `@unthrown/vitest`, whose top-level
