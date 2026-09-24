@@ -325,7 +325,8 @@ row doesn't skip the first element (folds in the fix for
 `after` and `before` are mutually exclusive (a page runs in one direction, and
 passing both used to silently drop `after`); `before` + `limit: null` is a compile
 error; and the default cursor preserves the id's type (all-digit → number/`bigint`,
-otherwise string). Provide `getCursor` / `parseCursor` for composite keys.
+otherwise string — an all-digit **string** id is escaped as `~123`, so it round-trips
+as a string). Provide `getCursor` / `parseCursor` for composite keys.
 
 A malformed cursor is a modeled `InvalidCursor` rather than a defect — the one
 place a Prisma validation error is treated as anticipated input, because the

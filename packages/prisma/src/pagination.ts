@@ -37,7 +37,9 @@ export type CursorPaginationMeta = {
  * The default cursor is the record's `id` field, serialized with `String` and
  * parsed back to a number when it is all digits (autoincrement ids) — a bigint
  * once it exceeds `Number.MAX_SAFE_INTEGER`, so `BigInt` ids never lose
- * precision — or kept as a string otherwise (uuid / cuid ids). Provide
+ * precision — or kept as a string otherwise (uuid / cuid ids). A **string** id
+ * that is itself all digits is serialized with a leading `~` (`"~123"`), so it
+ * parses back to the string rather than to a number. Provide
  * `getCursor` / `parseCursor` for composite keys, or when the selection omits
  * `id`.
  *
@@ -45,7 +47,7 @@ export type CursorPaginationMeta = {
  * @typeParam Cursor - the model's `cursor` input (its unique-where shape).
  */
 export type CursorPaginationOptions<Row, Cursor> = {
-  /** Serialize a row into an opaque cursor. Defaults to `String(row.id)`. */
+  /** Serialize a row into an opaque cursor. Defaults to `row.id`, as described above. */
   getCursor?: (row: Row) => string;
   /** Parse an opaque cursor back into the model's `cursor` input. */
   parseCursor?: (cursor: string) => Cursor;
@@ -93,14 +95,21 @@ const defaultGetCursor = (row: unknown): string => {
         "(composite key, or a selection omitting `id`?). Provide getCursor/parseCursor.",
     );
   }
-  return String(id);
+  // A STRING id that looks numeric ("123", or one already carrying the escape)
+  // is escaped with a leading `~`, so the parser below can tell it from a
+  // numeric id. Without it an all-digits string id parsed back to a number and
+  // every cursor on that model came back InvalidCursor. Every other id
+  // serializes exactly as it always did.
+  return typeof id === "string" && /^~*\d+$/.test(id) ? `~${id}` : String(id);
 };
 
 // Preserve the id's type through the round-trip: an all-digits cursor parses
 // back to a number (autoincrement ids) — or a bigint once it exceeds
-// Number.MAX_SAFE_INTEGER, so a BigInt id never loses precision — and anything
-// else stays a string (uuid / cuid).
+// Number.MAX_SAFE_INTEGER, so a BigInt id never loses precision — an escaped
+// one (`~123`) back to the string it was, and anything else stays a string
+// (uuid / cuid).
 const defaultParseCursor = (cursor: string): unknown => {
+  if (/^~+\d+$/.test(cursor)) return { id: cursor.slice(1) };
   if (!/^\d+$/.test(cursor)) return { id: cursor };
   const n = Number(cursor);
   return { id: Number.isSafeInteger(n) ? n : BigInt(cursor) };
@@ -116,6 +125,12 @@ const defaultParseCursor = (cursor: string): unknown => {
  * throw out of `getCursor` (which reads rows the query just returned, so a
  * failure there is a bug). Only the two request cursors — `after` / `before` —
  * are wrapped; the round-trip parse inside `sameCursor` is not.
+ *
+ * It also marks a cursor the **database** refused: a string that parsed fine
+ * but is not a valid value for the id column (garbage for a `@db.Uuid` id is
+ * `P2023` / `P2007` on Postgres, not a validation error). Those codes are
+ * wrapped only on the queries that carry the request cursor, so the same code
+ * raised by a cursor-less query stays a defect.
  */
 export class CursorParseFailure extends Error {
   constructor(
@@ -194,6 +209,19 @@ export const paginateWithCursor = async (
   const sameCursor = (row: unknown, cursor: unknown): boolean =>
     cursorEquals(parseCursor(getCursor(row)), cursor);
 
+  // The database rejecting the request cursor's VALUE (`P2023` inconsistent
+  // column data, `P2007` data validation — e.g. garbage for a uuid column) is
+  // the same bad input as a `parseCursor` throw. Checked by `name` + `code`
+  // for the reason `qualifyPrismaError` is: the runtime class moves between
+  // Prisma versions.
+  const refusedCursor = (cursor: string) => (cause: unknown) => {
+    const refused =
+      cause instanceof Error &&
+      cause.name === "PrismaClientKnownRequestError" &&
+      ["P2007", "P2023"].includes((cause as { code?: unknown }).code as string);
+    throw refused ? new CursorParseFailure(cursor, cause) : cause;
+  };
+
   let results: unknown[];
   let hasPreviousPage = false;
   let hasNextPage = false;
@@ -207,7 +235,7 @@ export const paginateWithCursor = async (
     const [rows, nextProbe] = await Promise.all([
       model.findMany({ ...query, cursor, take: limit === null ? undefined : -limit - 2 }),
       model.findMany({ ...query, ...resetSelection, cursor, take: 1 }),
-    ]);
+    ]).catch(refusedCursor(before));
     results = rows;
     if (results.length > 0 && sameCursor(results[results.length - 1]!, cursor)) {
       results.pop(); // the cursor row itself — exclusive pagination
@@ -225,7 +253,7 @@ export const paginateWithCursor = async (
     const [rows, previousProbe] = await Promise.all([
       model.findMany({ ...query, cursor, take: limit === null ? undefined : limit + 2 }),
       model.findMany({ ...query, ...resetSelection, cursor, take: -1 }),
-    ]);
+    ]).catch(refusedCursor(after));
     results = rows;
     if (results.length > 0 && sameCursor(results[0]!, cursor)) {
       results.shift();

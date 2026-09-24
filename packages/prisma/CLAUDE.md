@@ -68,9 +68,15 @@ in; `after`/`before` are mutually exclusive in the type — passing both used to
 drop `after` silently — and pagination carries the **one carve-out** to the
 defect routing above: its `E` is `InvalidCursor`, minted both from a Prisma
 validation error and from a throw out of the caller's `parseCursor` on a
-request cursor (marked by the internal `CursorParseFailure` sentinel), because
-a cursor is an opaque string from a client and garbage in it is a 400, not a
-bug. A throw out of `getCursor` — which reads rows _we_ fetched — is
+request cursor (marked by the internal `CursorParseFailure` sentinel) and
+from a `P2023` / `P2007` the database raises on the queries that carry the
+request cursor (garbage for a Postgres `@db.Uuid` id parses fine, then the
+column refuses the value; the same codes from a cursor-less query stay
+defects), because a cursor is an opaque string from a client and garbage in it
+is a 400, not a bug. The default cursor is `row.id`, parsed back to a number
+/ bigint when all digits; an all-digits **string** id is escaped as `~123` so
+it round-trips as a string (it used to parse to a number, making every cursor
+on such a model an `InvalidCursor`). A throw out of `getCursor` — which reads rows _we_ fetched — is
 deliberately NOT marked, so it stays a defect). Qualification happens once inside the extension via the exported
 `qualifyPrismaError`, which **is** a `qualify` — `(cause, defect)`, generic in
 the marker type so core's non-exported `Defect` need not be named — and so
