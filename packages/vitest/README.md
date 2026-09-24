@@ -38,7 +38,16 @@ Matchers: `toBeOk`, `toBeOkWith`, `toBeErr`, `toBeErrWith`, `toBeErrTagged(tag, 
 
 > [!WARNING]
 > For an `AsyncResult` the matcher is asynchronous — you **must** `await` the
-> assertion, or it passes silently.
+> assertion. A forgotten `await` does not pass silently: importing the package
+> also registers an `afterEach` hook (`failOnForgottenAwait`) that **fails** the
+> test, naming the pending matchers and the line that created them.
+
+The registration is automatic, but the pieces are exported for wiring them
+elsewhere (a custom `expect` instance, your own `afterEach`): the seven raw
+matcher functions (`toBeOk`, `toBeOkWith`, `toBeErr`, `toBeErrWith`,
+`toBeErrTagged`, `toBeDefect`, `toBeDefectWith`) for `expect.extend`,
+`failOnForgottenAwait` for the hook, and the `UnthrownMatchers<R>` type for
+augmenting an assertion interface.
 
 `vitest` is a peer dependency.
 

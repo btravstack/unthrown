@@ -126,7 +126,8 @@ pnpm format       # oxfmt
 
 `@unthrown/drizzle`'s suite runs against a real PostgreSQL started by
 [testcontainers](https://testcontainers.com), so **`pnpm test` needs a running
-Docker daemon**. Every other package's tests are self-contained.
+Docker daemon**. Every other package's tests are self-contained:
+`pnpm turbo run test --filter='!@unthrown/drizzle'` runs them without it.
 
 ### Using the agent skills
 

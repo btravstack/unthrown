@@ -2,6 +2,7 @@
 // per package, concurrently. TypeDoc lives here rather than in each package
 // because it needs its own TypeScript — see CLAUDE.md.
 import { execFile } from "node:child_process";
+import { readdirSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,10 +22,10 @@ const TYPEDOC = join(
   "typedoc",
 );
 
-// Every documented package. `core`, `drizzle` and `orpc` keep an options file of
-// their own because they carry settings nothing else needs (a `categoryOrder`,
-// `intentionallyNotExported`, or several entry points — `orpc` has no root
-// export at all); the rest differ only in the four values derived below, so they
+// Every documented package. `core`, `drizzle`, `orpc` and `saga` keep an options
+// file of their own because they carry settings nothing else needs (a
+// `categoryOrder`, `intentionallyNotExported`, or several entry points — `orpc`
+// has no root export at all); the rest differ only in the four values derived below, so they
 // share `typedoc.base.json` and get those four on the command line — CLI
 // arguments take precedence over the options file.
 //
@@ -33,6 +34,7 @@ const TYPEDOC = join(
 const packages: readonly string[] = [
   "core",
   "vitest",
+  "saga",
   "effect",
   "neverthrow",
   "boxed",
@@ -43,7 +45,7 @@ const packages: readonly string[] = [
 ];
 
 // Packages whose settings do not fit the shared base.
-const OWN_OPTIONS: ReadonlySet<string> = new Set(["core", "drizzle", "orpc"]);
+const OWN_OPTIONS: ReadonlySet<string> = new Set(["core", "drizzle", "orpc", "saga"]);
 
 // `unthrown` is published unscoped; every satellite is `@unthrown/<dir>`.
 const displayName = (name: string): string => (name === "core" ? "unthrown" : `@unthrown/${name}`);
@@ -64,10 +66,19 @@ const argsFor = (name: string): string[] =>
         `api/${name}`,
       ];
 
+// Every `api/<name>/` directory is generated (gitignored), so wipe them all
+// first: a removed package's leftovers would otherwise keep rendering.
+const apiDir = join(docsDir, "api");
+for (const entry of readdirSync(apiDir, { withFileTypes: true })) {
+  if (entry.isDirectory()) rmSync(join(apiDir, entry.name), { recursive: true, force: true });
+}
+
 const results = await Promise.allSettled(
   packages.map(async (name) => {
-    await run(process.execPath, [TYPEDOC, ...argsFor(name)], { cwd: docsDir });
-    return name;
+    const { stdout, stderr } = await run(process.execPath, [TYPEDOC, ...argsFor(name)], {
+      cwd: docsDir,
+    });
+    return `${stdout}\n${stderr}`;
   }),
 );
 
@@ -77,6 +88,11 @@ for (const [index, result] of results.entries()) {
   const name = packages[index];
   if (result.status === "fulfilled") {
     console.log(`✓ generated API docs for ${name} → api/${name}/`);
+    // A successful run's output is otherwise swallowed; surface its warnings
+    // (an unexported referenced type, a broken `{@link}`) so they get fixed.
+    for (const line of result.value.split("\n")) {
+      if (line.includes("[warning]")) console.warn(`  ${line}`);
+    }
   } else {
     failed = true;
     const { stdout, stderr } = result.reason as { stdout?: string; stderr?: string };

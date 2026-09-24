@@ -83,7 +83,7 @@ may not do is keep `E = Error`: the
 holds the line, and everything that was "whatever, stick it in `Error`" now
 belongs to [the defect channel](../explanation/the-defect-channel).
 
-The payoff mirrors the [neverthrow migration](./migrate-from-neverthrow#delta-1--the-defect-channel):
+The payoff mirrors the [neverthrow migration](./migrate-from-neverthrow#delta-1):
 a throw inside any combinator becomes a `Defect` and flows to `match`'s
 mandatory `defect` arm, so the defensive `try`/`catch` around pipelines goes
 away.
