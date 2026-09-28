@@ -62,10 +62,21 @@ const seat = parseAge(input)
 // Result<Seat, AgeError | "underage" | SeatError> — ensure and flatMap union the error channels
 ```
 
-A guard is an `ensure`: the predicate keeps the value (a type-guard predicate
-narrows it for the rest of the chain), `onFail` receives it and names the error,
-and the same `Ok` flows through. `flatMap((x) => c ? Ok(x) : Err(e))` is that
-guard wearing a bind costume — spell it `ensure(c, () => e)`.
+A guard is an `ensure`: the predicate keeps the value, `onFail` receives it and
+names the error, and the same `Ok` flows through.
+`flatMap((x) => c ? Ok(x) : Err(e))` is that guard wearing a bind costume —
+spell it `ensure(c, () => e)`.
+
+A type-guard predicate also narrows what passes — here it turns a lookup that
+models absence as `null` into one that fails with a modeled error:
+
+```ts
+const user = findById(id) // Result<User | null, never>
+  .ensure(
+    (found): found is User => found !== null, // narrows Ok: User | null → User
+    () => new NotFound(), // fills the empty E: never → NotFound
+  ); // Result<User, NotFound>
+```
 
 `Ok(v)` / `Err(e)` are plain functions (not classes — never `new`). `Ok()` with
 no argument makes a `Result<void, never>`. There is deliberately **no `Defect`

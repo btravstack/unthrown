@@ -68,9 +68,25 @@ function parseAge(text: string): Result<number, AgeError> {
   return Ok(n);
 }
 
-const adult = parseAge(input)
-  .map((n) => n + 1)
-  .flatMap((n) => (n >= 18 ? Ok(n) : Err("underage" as const)));
+type Seat = { row: number };
+type SeatError = "sold_out";
+declare function reserveSeat(guest: { age: number }): Result<Seat, SeatError>;
+
+const seat = parseAge(input)
+  .ensure(
+    (n) => n >= 18,
+    () => "underage" as const,
+  )
+  .map((n) => ({ age: n }))
+  .flatMap((guest) => reserveSeat(guest));
+
+type User = { id: string };
+declare function findById(userId: string): Result<User | null, never>;
+
+const present = findById(id).ensure(
+  (found): found is User => found !== null,
+  () => new NotFound(),
+);
 
 // `Ok()` with no argument is a `Result<void, never>`, as the skill states.
 const voidOk = Ok();
@@ -273,8 +289,10 @@ export type _SkillSurface = [
   Expect<Equal<ErrOf<ReturnType<typeof producer>>, AgeError>>,
   Expect<Equal<AsyncOkOf<ReturnType<typeof asyncProducer>>, number>>,
   Expect<Equal<AsyncErrOf<ReturnType<typeof asyncProducer>>, AgeError>>,
-  // `flatMap` unions the error channels — SKILL.md says so explicitly
-  Expect<Equal<ErrOf<typeof adult>, AgeError | "underage">>,
+  // `ensure` and `flatMap` union the error channels — SKILL.md says so explicitly
+  Expect<Equal<typeof seat, Result<Seat, AgeError | "underage" | SeatError>>>,
+  // a type-guard `ensure` narrows the success type and fills the empty E
+  Expect<Equal<typeof present, Result<User, NotFound>>>,
   // a defect branch is subtracted from the outgoing E
   Expect<Equal<ErrOf<typeof mapped>, string>>,
   // recoverErrCases empties the error channel
