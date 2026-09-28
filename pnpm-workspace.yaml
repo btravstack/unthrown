@@ -39,7 +39,7 @@ catalog:
   # (`_prepare`, the `entityKind` brand), so bumps are deliberate.
   drizzle-orm: 1.0.0-rc.5-5935859
   effect: 3.22.2
-  knip: 6.35.1
+  knip: 6.37.0
   lefthook: 2.1.14
   neverthrow: 8.2.0
   oxfmt: 0.68.0
