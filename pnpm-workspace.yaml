@@ -40,7 +40,7 @@ catalog:
   drizzle-orm: 1.0.0-rc.5-5935859
   effect: 3.22.2
   knip: 6.35.1
-  lefthook: 2.1.12
+  lefthook: 2.1.14
   neverthrow: 8.2.0
   oxfmt: 0.68.0
   oxlint: 1.83.0
