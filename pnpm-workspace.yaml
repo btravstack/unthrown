@@ -50,7 +50,7 @@ catalog:
   tsx: 4.23.13
   turbo: 2.10.12
   typedoc: 0.28.20
-  typedoc-plugin-markdown: 4.13.0
+  typedoc-plugin-markdown: 4.13.1
   typescript: 7.0.2
   vitepress: 1.6.4
   vitepress-plugin-llms: 1.14.0
