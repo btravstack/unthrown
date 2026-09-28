@@ -52,10 +52,30 @@ function parseAge(input: string): Result<number, AgeError> {
   return Ok(n);
 }
 
-const adult = parseAge(input)
-  .map((n) => n + 1) // callback returns a value
-  .flatMap((n) => (n >= 18 ? Ok(n) : Err("underage"))); // callback returns a Result
-// Result<number, AgeError | "underage"> — flatMap unions the error channels
+const seat = parseAge(input)
+  .ensure(
+    (n) => n >= 18,
+    () => "underage" as const,
+  ) // a guard: keeps n, names the error
+  .map((n) => ({ age: n })) // callback returns a value
+  .flatMap((guest) => reserveSeat(guest)); // callback returns a Result<Seat, SeatError>
+// Result<Seat, AgeError | "underage" | SeatError> — ensure and flatMap union the error channels
+```
+
+A guard is an `ensure`: the predicate keeps the value, `onFail` receives it and
+names the error, and the same `Ok` flows through.
+`flatMap((x) => c ? Ok(x) : Err(e))` is that guard wearing a bind costume —
+spell it `ensure(c, () => e)`.
+
+A type-guard predicate also narrows what passes — here it turns a lookup that
+models absence as `null` into one that fails with a modeled error:
+
+```ts
+const user = findById(id) // Result<User | null, never>
+  .ensure(
+    (found): found is User => found !== null, // narrows Ok: User | null → User
+    () => new NotFound(), // fills the empty E: never → NotFound
+  ); // Result<User, NotFound>
 ```
 
 `Ok(v)` / `Err(e)` are plain functions (not classes — never `new`). `Ok()` with
@@ -252,6 +272,7 @@ what `no-ambiguous-error-type` flags.
 | `try { pipeline } catch`                                                       | Never needed — throws become Defects; `match`'s `defect` arm is the catch.                                                                                                                      |
 | `Result<T, unknown>` / `Result<T, Error>`                                      | Banned (lint: `no-ambiguous-error-type`). Model concrete cases.                                                                                                                                 |
 | `async (v) => …` inside `map`/`flatMap`/matcher branches                       | Compile error by design. Use `fromPromise` + `flatMap`.                                                                                                                                         |
+| `flatMap((x) => c ? Ok(x) : Err(e))` as a guard                                | A predicate in a bind costume. `ensure(c, () => e)` names the intent, narrows with a type-guard predicate and passes the same `Ok` through.                                                     |
 | `.with(P._, …)` as a default fallback                                          | Enumerate or group cases; `P._` only for generic-`E` helpers or single-type `E` (the lint rule self-exempts when an in-file annotation proves it; otherwise lint-disable + reason).             |
 | Constructing a Defect (`Defect(x)`)                                            | No constructor. `throw` (the net catches it) or the injected `defect` helper at triage sites.                                                                                                   |
 | `message` in a TaggedError payload                                             | Reserved. `override message = …` on the class; context goes in typed fields.                                                                                                                    |
