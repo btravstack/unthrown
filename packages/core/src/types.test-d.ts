@@ -1427,6 +1427,92 @@ type _unhandled = Expect<Equal<Matcher<"a" | "b", "b", number>["exhaustive"], Un
   type _Lit = Expect<Equal<typeof lit, Result<number, "null" | "undef">>>;
 }
 
+// --- a widened value pattern is not proof that every possible value matches ---
+
+{
+  type E = { _tag: "A" } | { _tag: "B" };
+  const r = Err<E>({ _tag: "B" });
+  const pattern = { _tag: "A" }; // { _tag: string }, not a literal pattern
+  // @ts-expect-error — this pattern only tests one runtime tag, not every string
+  r.mapErrCases((m) => m.with(pattern, () => "mapped"));
+  // @ts-expect-error — the async surface must enforce the same exhaustiveness
+  r.toAsync().mapErrCases((m) => m.with(pattern, () => "mapped"));
+  const partial = match<E>({ _tag: "B" }).with(pattern, (e) => {
+    type _StillBoth = Expect<Equal<typeof e, E>>;
+    return "dynamic" as const;
+  });
+  // @ts-expect-error — standalone termination must also require the missing cases
+  partial.exhaustive();
+  const complete = partial
+    .with(P.tag("A"), (e) => {
+      type _StillA = Expect<Equal<typeof e, { _tag: "A" }>>;
+      return "a" as const;
+    })
+    .with(P.tag("B"), () => "b" as const)
+    .exhaustive();
+  type _Complete = Expect<Equal<typeof complete, "dynamic" | "a" | "b">>;
+
+  const literal = { _tag: "A" } as const;
+  const named = r.mapErrCases((m) => m.with(literal, P.tag("B"), (e) => e._tag));
+  type _Named = Expect<Equal<typeof named, Result<never, "A" | "B">>>;
+}
+
+function widenedValuePatterns(
+  text: string,
+  number: number,
+  bigint: bigint,
+  boolean: boolean,
+  symbol: symbol,
+  union: "a" | "b",
+) {
+  // A value is an equality test, unlike P.when's predicate over an entire type.
+  match<string>("other")
+    .with(text, () => 1)
+    // @ts-expect-error — one string cannot cover every string
+    .exhaustive();
+  match<number>(2)
+    .with(number, () => 1)
+    // @ts-expect-error — one number cannot cover every number
+    .exhaustive();
+  match<bigint>(2n)
+    .with(bigint, () => 1)
+    // @ts-expect-error — one bigint cannot cover every bigint
+    .exhaustive();
+  match<boolean>(true)
+    .with(boolean, () => 1)
+    // @ts-expect-error — one boolean cannot cover both values
+    .exhaustive();
+  match<symbol>(Symbol())
+    .with(symbol, () => 1)
+    // @ts-expect-error — one symbol cannot cover every symbol
+    .exhaustive();
+  match<"a" | "b">("b")
+    .with(union, () => 1)
+    // @ts-expect-error — a union-typed value is still only one runtime value
+    .exhaustive();
+  const nested = match<{ data: { code: string } }>({ data: { code: "b" } }).with(
+    { data: { code: text } },
+    () => 1,
+  );
+  // @ts-expect-error — nested widened fields cannot prove coverage either
+  nested.exhaustive();
+  match<"a" | "b">("b")
+    .with(text, "a", () => 1)
+    // @ts-expect-error — grouping a dynamic value with a literal leaves "b" open
+    .exhaustive();
+  const grouped = match<"a" | "b">("b")
+    .with("a", "b", () => 1)
+    .exhaustive();
+  type _Grouped = Expect<Equal<typeof grouped, number>>;
+  const predicate = match<string>("b")
+    .with(
+      P.when((v): v is string => typeof v === "string"),
+      () => 1,
+    )
+    .exhaustive();
+  type _Predicate = Expect<Equal<typeof predicate, number>>;
+}
+
 // --- P.instanceOf over structurally identical classes: a KNOWN limitation -----
 
 // TypeScript is structural: two classes with the same shape are the same type,

@@ -141,8 +141,15 @@ was planned).
    exported from core — first-class in one import,
    dual-copy-safe (patterns carry a `Symbol.for` brand). Deliberately **not**
    supported: deep structural inversion, `P.select`, array patterns — the
-   matcher stays shallow. Two
-   pattern-level rules close structural holes. An **empty object pattern
+   matcher stays shallow. The
+   pattern-level rules close structural holes. **A widened value pattern does
+   not prove exhaustive coverage:** `{ _tag: string }` can match one runtime
+   tag, not every tag; a union-typed value likewise represents one alternative.
+   `MatchedOf` computes the possible handler input, while `CoveredBy` computes
+   the cases safe to subtract from `Remaining`, recursively through fields and
+   separately for each grouped pattern. Literal patterns and branded `P.*`
+   predicates retain their coverage. Preserve literals with `as const` or
+   `P.tag`; a dynamic pattern requires additional arms. An **empty object pattern
    `{}`** is a compile error at the pattern (`NoEmptyPattern`): it matched every
    object at runtime and `Exclude<E, {}>` erased every case — an unflagged
    catch-all. And one limitation is **accepted and pinned** in

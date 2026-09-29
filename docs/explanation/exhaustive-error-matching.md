@@ -55,6 +55,28 @@ same helper [`qualify`](./qualification) gets — so converting a case into a
 defect (`defect(e.cause)`) is a sanctioned, in-line move, and its `Defect` arm is
 subtracted from the outgoing `E` just like at a boundary.
 
+## Value patterns must preserve their literals
+
+A pattern tests its runtime value, not every value its TypeScript type permits.
+For example, `const pattern = { _tag: "A" }` is inferred as `{ _tag: string }`:
+it matches only `"A"`, not every tagged error. Such a pattern remains usable,
+but it does not discharge cases from the exhaustiveness check. The same applies
+to a value typed `string`, `number`, or a union such as `"A" | "B"`, including
+inside a nested pattern.
+
+Preserve the literal with `as const`, write the object inline, or use `P.tag`:
+
+```ts
+const pattern = { _tag: "A" } as const;
+result.mapErrCases((m) =>
+  m.with(pattern, () => "a").with(P.tag("B"), () => "b"),
+);
+```
+
+Grouped literal patterns still cover every named case. A predicate such as
+`P.when((v): v is string => typeof v === "string")` also covers its declared
+type, because it tests that type rather than comparing against one string.
+
 ## No identity on the error channel
 
 A natural first instinct is that returning the matcher untouched must be a no-op:
