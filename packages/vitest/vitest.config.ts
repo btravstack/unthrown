@@ -12,10 +12,10 @@ export default defineConfig({
       enabled: true,
       provider: "v8",
       include: ["src/**"],
-      // Lock in the matcher suite at full statement/line/function coverage. The
-      // one uncovered branch is the defensive `typeof x === "function"` arm of
-      // `isThenable` (a value that is callable *and* thenable never reaches the
-      // matchers), so `branches` sits just below 100.
+      // Lock in the matcher suite at full statement/line/function coverage. Two
+      // defensive branches stay uncovered — `callSiteFrame`'s `stack ?? ""`
+      // (V8 always populates `stack`) and the no-qualifying-frame arm of the
+      // forgotten-await message — so `branches` sits just below 100.
       thresholds: {
         statements: 100,
         branches: 95,

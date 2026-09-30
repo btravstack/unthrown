@@ -440,7 +440,7 @@ export { toBeDefect, toBeDefectWith, toBeErr, toBeErrTagged, toBeErrWith, toBeOk
  * on import, see {@link failOnForgottenAwait}) fails the test with an explicit
  * message naming the matchers still pending when the test ended.
  *
- * @typeParam R - the assertion's chaining return type.
+ * @typeParam R - the matcher's return type (`void`, or `Promise<void>` under `.resolves` / `.rejects`).
  *
  * @example
  * ```ts
@@ -495,6 +495,9 @@ export type UnthrownMatchers<R = unknown> = {
 };
 
 declare module "vitest" {
-  // oxlint-disable-next-line typescript/consistent-type-definitions, typescript/no-explicit-any -- a module augmentation must mirror Vitest's `interface Matchers<T = any>` exactly
-  interface Matchers<T = any> extends UnthrownMatchers<T> {}
+  // oxlint-disable-next-line typescript/consistent-type-definitions -- a module augmentation must mirror Vitest's `interface Matchers<R, T>` exactly (Vitest 5; `R` is the matcher return, `void` or `Promise<void>` under `.resolves`)
+  interface Matchers<
+    R extends void | Promise<void> = void | Promise<void>,
+    T = unknown,
+  > extends UnthrownMatchers<R> {}
 }

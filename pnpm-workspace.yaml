@@ -19,9 +19,9 @@ catalog:
   "@btravstack/typedoc": 0.1.0
   "@changesets/cli": 3.0.3
   "@commitlint/cli": 21.2.3
-  "@orpc/client": 2.0.0-beta.37
-  "@orpc/contract": 2.0.0-beta.37
-  "@orpc/server": 2.0.0-beta.37
+  "@orpc/client": 2.0.0-beta.38
+  "@orpc/contract": 2.0.0-beta.38
+  "@orpc/server": 2.0.0-beta.38
   "@prisma/adapter-better-sqlite3": 7.10.0
   "@prisma/client": 7.10.0
   # Ranged, not pinned: published as a regular dependency of
@@ -33,7 +33,7 @@ catalog:
   # 8.20.1/8.20.2/8.20.3 are all within the minimumReleaseAge window as of
   # pinning; 8.20.0 is the newest release past it.
   "@types/pg": 8.23.1
-  "@vitest/coverage-v8": 4.1.11
+  "@vitest/coverage-v8": 5.0.1
   better-sqlite3: 13.0.3
   # Ranged peer, exact catalog pin: we subclass drizzle internals
   # (`_prepare`, the `entityKind` brand), so bumps are deliberate.
@@ -42,19 +42,19 @@ catalog:
   knip: 6.37.0
   lefthook: 2.1.14
   neverthrow: 8.2.0
-  oxfmt: 0.68.0
-  oxlint: 1.83.0
+  oxfmt: 0.70.0
+  oxlint: 1.85.0
   pg: 8.23.0
   prisma: 7.10.0
   tsdown: 0.23.0
   tsx: 4.23.15
-  turbo: 2.11.2
+  turbo: 2.11.3
   typedoc: 0.28.20
   typedoc-plugin-markdown: 4.13.1
   typescript: 7.0.2
   vitepress: 1.6.4
   vitepress-plugin-llms: 1.14.0
-  vitest: 4.1.11
+  vitest: 5.0.1
   zod: 4.6.5
 
 catalogs:
