@@ -49,7 +49,7 @@ matcher functions (`toBeOk`, `toBeOkWith`, `toBeErr`, `toBeErrWith`,
 `failOnForgottenAwait` for the hook, and the `UnthrownMatchers<R>` type for
 augmenting an assertion interface.
 
-`vitest` is a peer dependency.
+`vitest` (`^5`) is a peer dependency.
 
 ## License
 

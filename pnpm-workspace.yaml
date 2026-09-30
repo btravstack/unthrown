@@ -19,9 +19,9 @@ catalog:
   "@btravstack/typedoc": 0.1.0
   "@changesets/cli": 3.0.3
   "@commitlint/cli": 21.2.3
-  "@orpc/client": 2.0.0-beta.37
-  "@orpc/contract": 2.0.0-beta.37
-  "@orpc/server": 2.0.0-beta.37
+  "@orpc/client": 2.0.0-beta.38
+  "@orpc/contract": 2.0.0-beta.38
+  "@orpc/server": 2.0.0-beta.38
   "@prisma/adapter-better-sqlite3": 7.10.0
   "@prisma/client": 7.10.0
   # Ranged, not pinned: published as a regular dependency of
@@ -33,7 +33,7 @@ catalog:
   # 8.20.1/8.20.2/8.20.3 are all within the minimumReleaseAge window as of
   # pinning; 8.20.0 is the newest release past it.
   "@types/pg": 8.23.1
-  "@vitest/coverage-v8": 4.1.11
+  "@vitest/coverage-v8": 5.0.1
   better-sqlite3: 13.0.3
   # Ranged peer, exact catalog pin: we subclass drizzle internals
   # (`_prepare`, the `entityKind` brand), so bumps are deliberate.
@@ -42,19 +42,19 @@ catalog:
   knip: 6.37.0
   lefthook: 2.1.14
   neverthrow: 8.2.0
-  oxfmt: 0.68.0
-  oxlint: 1.83.0
+  oxfmt: 0.70.0
+  oxlint: 1.85.0
   pg: 8.23.0
   prisma: 7.10.0
   tsdown: 0.23.0
   tsx: 4.23.15
-  turbo: 2.11.2
+  turbo: 2.11.3
   typedoc: 0.28.20
   typedoc-plugin-markdown: 4.13.1
   typescript: 7.0.2
   vitepress: 1.6.4
   vitepress-plugin-llms: 1.14.0
-  vitest: 4.1.11
+  vitest: 5.0.1
   zod: 4.6.5
 
 catalogs:
@@ -72,14 +72,16 @@ overrides:
   # GHSA-3jxr-9vmj-r5cp (ReDoS) + GHSA-mh99-v99m-4gvg (DoS via unbounded
   # expansion length) + the later DoS via unbounded intermediate arrays, which
   # bypasses the CVE-2026-14257 mitigation and so is NOT fixed by 5.0.8.
-  # Reaches us via typedoc > minimatch. 5.0.9 is the first release patched for
-  # all three.
-  "brace-expansion@5": "5.0.9"
+  # Reaches us via typedoc > minimatch. 5.0.9 was the first release patched for
+  # all three; GHSA-6j4f-fj2g-mc7p, GHSA-qhr7-859c-m2p7 (stack exhaustion on
+  # nested groups) and GHSA-q2hr-2g5m-vwhr then moved the floor to 5.0.12.
+  "brace-expansion@5": "5.0.12"
   # The same unbounded-intermediate-arrays DoS in the 2.x line, plus the
   # unbounded-expansion-length one. New in this tree: @testcontainers/postgresql
-  # > testcontainers > archiver pulls an old glob/minimatch. 2.1.4 is the first
-  # 2.x release patched for both.
-  "brace-expansion@2": "2.1.4"
+  # > testcontainers > archiver pulls an old glob/minimatch. 2.1.4 was the first
+  # 2.x release patched for both; the same three later advisories as the 5.x
+  # line moved the floor to 2.1.7.
+  "brace-expansion@2": "2.1.7"
   # GHSA-3f6p-5ww8-9rcr: mysql2 accepts a server's downgrade to the
   # `mysql_clear_password` auth plugin without the client asking for it, which
   # sends the password in plaintext (<3.22.0). Reaches us through drizzle-orm's
@@ -116,10 +118,12 @@ overrides:
   # GHSA-f65p-4m7j-42xc, GHSA-fph4-wmhf-6fwf and GHSA-jqff-g426-hqxp. Only the
   # 3.x line is present (via ajv, under commitlint's config loading and the
   # `prisma` CLI). The floor has moved twice as the advisories widened —
-  # 3.1.4, then 3.1.5 — and 3.1.6 is the first release patched for all five.
-  # Scoped to the vulnerable range so future patched 3.x releases resolve
-  # normally.
-  "fast-uri@<3.1.6": "3.1.6"
+  # 3.1.4, then 3.1.5, then 3.1.6. GHSA-qw65-cvwx-89v3 (authority injection via
+  # an unvalidated port), GHSA-58mr-gqgx-xq4g (unclosed-bracket host confusion,
+  # a regression in 3.1.6) and GHSA-hrr3-gc8f-f4qj then moved it to 3.1.8, the
+  # first release patched for all eight. Scoped to the vulnerable range so
+  # future patched 3.x releases resolve normally.
+  "fast-uri@<3.1.8": "3.1.8"
   # GHSA-c96f-x56v-gq3h: find-my-way HTTP/2 DDoS (<=9.6.0), pulled in through
   # Prisma 7's @prisma/dev dependency chain. 9.7.0 is the first published
   # patched release.

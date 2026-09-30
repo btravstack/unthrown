@@ -844,10 +844,15 @@ copies) — issue #256, observed live in btravstack/start#99.
 - `packages/core` → `unthrown` (**zero runtime dependencies** — the exhaustive
   error matcher is built-in (`matcher.ts`, exported as `match`/`P`/
   `NonExhaustiveError`) — see the zero-dependency rule under Toolchain)
-- `packages/vitest` → `@unthrown/vitest` (peerDep `vitest`; besides the
+- `packages/vitest` → `@unthrown/vitest` (peerDep `vitest` `^5`; besides the
   `expect.extend` registration it also exports the seven raw matcher functions,
   `failOnForgottenAwait`, and the `UnthrownMatchers` type — for manual
-  `expect.extend` wiring)
+  `expect.extend` wiring). Vitest 5 declares `Matchers<R, T>` inside `vitest`
+  itself (v4 had `Matchers<T>` in the shared `@vitest/expect`), so one
+  augmentation cannot serve both majors — and a workspace consumer whose
+  `vitest` resolves to a different **peer variant** (differing optional peers
+  such as `@types/node`) gets its own `Matchers` and loses the matchers. That is
+  why every example declares `@types/node`: it keeps one `vitest` copy.
 - `packages/saga` → `@unthrown/saga` (peerDep `unthrown`; two exports, the
   builder entry point `SagaAsync()` and its `SagaAsyncBuilder` type — a
   sequence whose steps carry compensating undos, unwound

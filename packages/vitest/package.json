@@ -59,7 +59,7 @@
   },
   "peerDependencies": {
     "unthrown": "workspace:^",
-    "vitest": "^4"
+    "vitest": "^5"
   },
   "engines": {
     "node": ">=20"

@@ -8,7 +8,7 @@
 pnpm add -D @unthrown/vitest
 ```
 
-`vitest` is a peer dependency.
+`vitest` (`^5`) is a peer dependency.
 
 ## Register the matchers
 
