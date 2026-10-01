@@ -79,6 +79,43 @@ export type MatchedOf<Pt> =
       ? { [K in keyof Pt]: MatchedOf<Pt[K]> }
       : Pt;
 
+/** Whether a value's type describes multiple alternatives, not one literal. */
+type IsUnion<T, Whole = T> = T extends Whole ? ([Whole] extends [T] ? false : true) : never;
+
+/**
+ * What a pattern is guaranteed to cover, rather than merely able to match.
+ *
+ * A value typed `string` (or `"a" | "b"`) tests ONE runtime value, so it
+ * cannot discharge every string (or both literals). Keep `MatchedOf` for
+ * handler narrowing, but subtract only this conservative coverage. Recurse
+ * into object fields so a variable inferred as `{ _tag: string }` cannot
+ * make an entire tagged union exhaustive. Branded predicate patterns still
+ * cover their declared type: unlike a value, they test the whole type.
+ *
+ * @internal
+ */
+type CoveredBy<Pt> = [Pt] extends [PatternMatcher<infer M>]
+  ? M
+  : true extends IsUnion<Pt>
+    ? never
+    : string extends Pt
+      ? never
+      : number extends Pt
+        ? never
+        : bigint extends Pt
+          ? never
+          : symbol extends Pt
+            ? never
+            : Pt extends object
+              ? { [K in keyof Pt]: CoveredBy<Pt[K]> }
+              : Pt;
+
+// Compute each grouped pattern separately: a tuple of two literal patterns
+// covers both, while ONE union-typed pattern does not.
+type CoveredByPatterns<Pts extends readonly unknown[]> = {
+  [I in keyof Pts]: CoveredBy<Pts[I]>;
+}[number];
+
 /**
  * Reject a **keyless object pattern** (`{}`) where it is written.
  *
@@ -206,14 +243,16 @@ export type Matcher<E, Remaining, O, Declared = Unset> = {
    * patterns — `matcher.with(P.tag("A"), P.tag("B"), handler)`). The handler
    * receives the input narrowed to what the patterns match (computed against
    * `Remaining`, so cases already handled by earlier arms are excluded); the
-   * matched cases are subtracted from `Remaining`.
+   * guaranteed covered cases are subtracted from `Remaining`. A widened value
+   * pattern (e.g. `{ _tag: string }`) can match but proves no coverage: use
+   * literal patterns / `P.tag` to discharge the remaining cases.
    */
   with<const Pts extends readonly [unknown, ...unknown[]], O2>(
     ...args: [
       ...patterns: { [I in keyof Pts]: NoEmptyPattern<Pts[I]> },
       handler: (value: Extract<Remaining, MatchedOf<Pts[number]>>) => BranchReturn<Declared, O2>,
     ]
-  ): Matcher<E, Exclude<Remaining, MatchedOf<Pts[number]>>, O | O2, Declared>;
+  ): Matcher<E, Exclude<Remaining, CoveredByPatterns<Pts>>, O | O2, Declared>;
 
   /**
    * Declare the match's output type up front: every subsequent branch handler
