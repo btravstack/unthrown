@@ -61,8 +61,13 @@ A pattern tests its runtime value, not every value its TypeScript type permits.
 For example, `const pattern = { _tag: "A" }` is inferred as `{ _tag: string }`:
 it matches only `"A"`, not every tagged error. Such a pattern remains usable,
 but it does not discharge cases from the exhaustiveness check. The same applies
-to a value typed `string`, `number`, or a union such as `"A" | "B"`, including
-inside a nested pattern.
+to a value typed `string`, `number`, a template literal such as `` `E_${string}` ``,
+a union such as `"A" | "B"`, or a union of `P.*` patterns
+(`cond ? P.when(isA) : P.when(isB)` is one predicate at runtime), including
+inside a nested pattern. A class instance used as a pattern is compared by
+identity at runtime, so it too covers one value — but TypeScript sees only its
+shape, so this one case is not caught at compile time: write the pattern as an
+object literal, or use `P.instanceOf`.
 
 Preserve the literal with `as const`, write the object inline, or use `P.tag`:
 

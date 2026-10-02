@@ -85,30 +85,53 @@ type IsUnion<T, Whole = T> = T extends Whole ? ([Whole] extends [T] ? false : tr
 /**
  * What a pattern is guaranteed to cover, rather than merely able to match.
  *
- * A value typed `string` (or `"a" | "b"`) tests ONE runtime value, so it
- * cannot discharge every string (or both literals). Keep `MatchedOf` for
- * handler narrowing, but subtract only this conservative coverage. Recurse
- * into object fields so a variable inferred as `{ _tag: string }` cannot
- * make an entire tagged union exhaustive. Branded predicate patterns still
- * cover their declared type: unlike a value, they test the whole type.
+ * A value pattern is an equality test, so it discharges a case only when its
+ * type is a **unit type** — one inhabitant: a string / number / bigint /
+ * boolean literal, `null`, `undefined`, a `unique symbol` — or a plain object
+ * of such fields, recursively (so a variable inferred as `{ _tag: string }`
+ * cannot make an entire tagged union exhaustive). Everything else covers
+ * nothing: a widened `string`, a template literal (`` `E_${string}` `` is as
+ * wide as `string`), a union (one runtime value however many alternatives its
+ * type lists — a union of `P.*` patterns included, which is why the union test
+ * runs before the predicate one), an array or a function (compared by identity
+ * at runtime). Keep `MatchedOf` for handler narrowing; subtract only this
+ * coverage. Branded predicate patterns still cover their declared type: unlike
+ * a value, they test the whole type. An allow-list rather than a deny-list of
+ * wide types, so a shape it did not anticipate fails closed. One gap is
+ * accepted: a class instance is structurally an object type, so it recurses
+ * like a plain object while the runtime compares it by identity — pinned in
+ * `types.test-d.ts`.
  *
  * @internal
  */
-type CoveredBy<Pt> = [Pt] extends [PatternMatcher<infer M>]
-  ? M
-  : true extends IsUnion<Pt>
+type CoveredBy<Pt> =
+  true extends IsUnion<Pt>
     ? never
-    : string extends Pt
-      ? never
-      : number extends Pt
-        ? never
-        : bigint extends Pt
+    : [Pt] extends [PatternMatcher<infer M>]
+      ? M
+      : Pt extends string
+        ? {} extends Record<Pt, never>
           ? never
-          : symbol extends Pt
+          : Pt
+        : Pt extends number
+          ? number extends Pt
             ? never
-            : Pt extends object
-              ? { [K in keyof Pt]: CoveredBy<Pt[K]> }
-              : Pt;
+            : Pt
+          : Pt extends bigint
+            ? bigint extends Pt
+              ? never
+              : Pt
+            : Pt extends symbol
+              ? symbol extends Pt
+                ? never
+                : Pt
+              : Pt extends boolean | null | undefined
+                ? Pt
+                : Pt extends readonly unknown[] | ((...args: never) => unknown)
+                  ? never
+                  : Pt extends object
+                    ? { [K in keyof Pt]: CoveredBy<Pt[K]> }
+                    : never;
 
 // Compute each grouped pattern separately: a tuple of two literal patterns
 // covers both, while ONE union-typed pattern does not.

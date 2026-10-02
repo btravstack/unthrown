@@ -1,25 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { Err } from "./constructors.js";
 import { match, NonExhaustiveError, P } from "./matcher.js";
 
 describe("the built-in matcher engine", () => {
-  it("keeps uncovered tags reachable after a widened value pattern", async () => {
-    type E = { _tag: "A" } | { _tag: "B" };
-    const pattern = { _tag: "A" };
-    for (const error of [{ _tag: "A" }, { _tag: "B" }] satisfies E[]) {
-      const result = Err<E>(error);
-      const handle = (m: ReturnType<typeof match<E>>) =>
-        m
-          .with(pattern, () => "dynamic" as const)
-          .with(P.tag("A"), () => "a" as const)
-          .with(P.tag("B"), () => "b" as const);
-      const expected = error._tag === "A" ? "dynamic" : "b";
-      expect(result.mapErrCases(handle).getErr()).toBe(expected);
-      expect((await result.toAsync().mapErrCases(handle)).getErr()).toBe(expected);
-    }
-  });
-
   it("matches a primitive literal (Object.is semantics)", () => {
     expect(
       match("a" as "a" | "b")

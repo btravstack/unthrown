@@ -1513,6 +1513,88 @@ function widenedValuePatterns(
   type _Predicate = Expect<Equal<typeof predicate, number>>;
 }
 
+// --- widened patterns a deny-list of wide types would miss -------------------
+
+// `CoveredBy` is an allow-list of unit types, not a deny-list of `string` /
+// `number` / `bigint` / `symbol`: each case below compiled under that deny-list
+// yet throws `NonExhaustiveError` at runtime. A template-literal string
+// (`E_${string}`, `${number}`, `Lowercase<string>`) is as wide as `string`; a
+// union of `P.*` patterns is ONE predicate at runtime (`[Pt] extends
+// [PatternMatcher<infer M>]` is non-distributive, so `M` would infer the union
+// — hence the union test runs first).
+
+function residualWidenedPatterns(
+  cond: boolean,
+  prefixed: `E_${string}`,
+  numeric: `${number}`,
+  lower: Lowercase<string>,
+) {
+  type Coded = { code: `E_${string}` } | { code: "OTHER" };
+  match<Coded>({ code: "E_DISK" })
+    .with({ code: prefixed }, () => 1)
+    .with({ code: "OTHER" }, () => 2)
+    // @ts-expect-error — one `E_${string}` value cannot cover every prefixed code
+    .exhaustive();
+  match<`${number}`>("2")
+    .with(numeric, () => 1)
+    // @ts-expect-error — one `${number}` string cannot cover every numeric string
+    .exhaustive();
+  match<Lowercase<string>>("b")
+    .with(lower, () => 1)
+    // @ts-expect-error — one lowercase string cannot cover every lowercase string
+    .exhaustive();
+
+  type A = { _tag: "A" };
+  type B = { _tag: "B" };
+  const isA = (v: unknown): v is A => (v as A)._tag === "A";
+  const isB = (v: unknown): v is B => (v as B)._tag === "B";
+  const eitherWhen = cond ? P.when(isA) : P.when(isB);
+  match<A | B>({ _tag: "B" })
+    .with(eitherWhen, () => 1)
+    // @ts-expect-error — a union of predicates is ONE predicate at runtime
+    .exhaustive();
+  class X {
+    readonly kind = "x" as const;
+  }
+  class Y {
+    readonly kind = "y" as const;
+  }
+  const eitherInstanceOf = cond ? P.instanceOf(X) : P.instanceOf(Y);
+  match<X | Y>(new Y())
+    .with(eitherInstanceOf, () => 1)
+    // @ts-expect-error — a union of instanceOf patterns is ONE class at runtime
+    .exhaustive();
+}
+
+// --- a class instance as a value pattern: a KNOWN limitation ------------------
+
+// TypeScript is structural: an instance of `Lit` is the object type
+// `{ readonly kind: "lit" }`, so `CoveredBy` recurses into it like a plain
+// object and credits it with every `Lit` — while `matches()` only walks plain
+// objects and compares an instance with `Object.is`, so it covers ONE value and
+// a different `Lit` becomes a NonExhaustiveError (→ Defect in the combinators).
+// Pinned so a change in either direction is noticed; the remedy is below.
+{
+  class Lit {
+    readonly kind = "lit" as const;
+  }
+  type Other = { kind: "other" };
+  // Compiles although only one instance is tested — the limitation.
+  const unsound = match<Lit | Other>(new Lit())
+    .with(new Lit(), () => 1)
+    .with({ kind: "other" }, () => 2)
+    .exhaustive();
+  type _Unsound = Expect<Equal<typeof unsound, number>>;
+
+  // The remedy: a plain-object pattern is matched structurally at runtime (or
+  // name the class with `P.instanceOf`).
+  const sound = match<Lit | Other>(new Lit())
+    .with({ kind: "lit" }, () => 1)
+    .with({ kind: "other" }, () => 2)
+    .exhaustive();
+  type _Sound = Expect<Equal<typeof sound, number>>;
+}
+
 // --- P.instanceOf over structurally identical classes: a KNOWN limitation -----
 
 // TypeScript is structural: two classes with the same shape are the same type,

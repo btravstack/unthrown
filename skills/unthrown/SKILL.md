@@ -262,6 +262,12 @@ with `P.when`. The requirement is a **discriminable** `E`, not a tagged one; a
 widened `Error` / `string` / `unknown` is what breaks exhaustiveness, which is
 what `no-ambiguous-error-type` flags.
 
+A widened **pattern** breaks it too: a value pattern discharges a case only
+when its type is a literal (or a plain object of literals). `const p = { _tag:
+"NotFound" }` infers `{ _tag: string }`, matches one tag at runtime and leaves
+`UnhandledCases<{ _tag: "NotFound" }>` — keep the literal with `as const`, write
+the object inline, or use `P.tag("NotFound")`.
+
 ## Mistakes agents make (habits from neverthrow/Effect/fp-ts)
 
 | Habit                                                                          | In unthrown                                                                                                                                                                                     |
