@@ -30,6 +30,7 @@
     "SyncBranches",
     "ReturnAnAsyncResultNotAPromise",
     "MatchedOf",
+    "CoveredByPatterns",
     "Unset",
     "BranchReturn",
     "PinnedOut",

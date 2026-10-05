@@ -1427,6 +1427,174 @@ type _unhandled = Expect<Equal<Matcher<"a" | "b", "b", number>["exhaustive"], Un
   type _Lit = Expect<Equal<typeof lit, Result<number, "null" | "undef">>>;
 }
 
+// --- a widened value pattern is not proof that every possible value matches ---
+
+{
+  type E = { _tag: "A" } | { _tag: "B" };
+  const r = Err<E>({ _tag: "B" });
+  const pattern = { _tag: "A" }; // { _tag: string }, not a literal pattern
+  // @ts-expect-error — this pattern only tests one runtime tag, not every string
+  r.mapErrCases((m) => m.with(pattern, () => "mapped"));
+  // @ts-expect-error — the async surface must enforce the same exhaustiveness
+  r.toAsync().mapErrCases((m) => m.with(pattern, () => "mapped"));
+  const partial = match<E>({ _tag: "B" }).with(pattern, (e) => {
+    type _StillBoth = Expect<Equal<typeof e, E>>;
+    return "dynamic" as const;
+  });
+  // @ts-expect-error — standalone termination must also require the missing cases
+  partial.exhaustive();
+  const complete = partial
+    .with(P.tag("A"), (e) => {
+      type _StillA = Expect<Equal<typeof e, { _tag: "A" }>>;
+      return "a" as const;
+    })
+    .with(P.tag("B"), () => "b" as const)
+    .exhaustive();
+  type _Complete = Expect<Equal<typeof complete, "dynamic" | "a" | "b">>;
+
+  const literal = { _tag: "A" } as const;
+  const named = r.mapErrCases((m) => m.with(literal, P.tag("B"), (e) => e._tag));
+  type _Named = Expect<Equal<typeof named, Result<never, "A" | "B">>>;
+}
+
+function widenedValuePatterns(
+  text: string,
+  number: number,
+  bigint: bigint,
+  boolean: boolean,
+  symbol: symbol,
+  union: "a" | "b",
+) {
+  // A value is an equality test, unlike P.when's predicate over an entire type.
+  match<string>("other")
+    .with(text, () => 1)
+    // @ts-expect-error — one string cannot cover every string
+    .exhaustive();
+  match<number>(2)
+    .with(number, () => 1)
+    // @ts-expect-error — one number cannot cover every number
+    .exhaustive();
+  match<bigint>(2n)
+    .with(bigint, () => 1)
+    // @ts-expect-error — one bigint cannot cover every bigint
+    .exhaustive();
+  match<boolean>(true)
+    .with(boolean, () => 1)
+    // @ts-expect-error — one boolean cannot cover both values
+    .exhaustive();
+  match<symbol>(Symbol())
+    .with(symbol, () => 1)
+    // @ts-expect-error — one symbol cannot cover every symbol
+    .exhaustive();
+  match<"a" | "b">("b")
+    .with(union, () => 1)
+    // @ts-expect-error — a union-typed value is still only one runtime value
+    .exhaustive();
+  const nested = match<{ data: { code: string } }>({ data: { code: "b" } }).with(
+    { data: { code: text } },
+    () => 1,
+  );
+  // @ts-expect-error — nested widened fields cannot prove coverage either
+  nested.exhaustive();
+  match<"a" | "b">("b")
+    .with(text, "a", () => 1)
+    // @ts-expect-error — grouping a dynamic value with a literal leaves "b" open
+    .exhaustive();
+  const grouped = match<"a" | "b">("b")
+    .with("a", "b", () => 1)
+    .exhaustive();
+  type _Grouped = Expect<Equal<typeof grouped, number>>;
+  const predicate = match<string>("b")
+    .with(
+      P.when((v): v is string => typeof v === "string"),
+      () => 1,
+    )
+    .exhaustive();
+  type _Predicate = Expect<Equal<typeof predicate, number>>;
+}
+
+// --- widened patterns a deny-list of wide types would miss -------------------
+
+// `CoveredBy` is an allow-list of unit types, not a deny-list of `string` /
+// `number` / `bigint` / `symbol`: each case below compiled under that deny-list
+// yet throws `NonExhaustiveError` at runtime. A template-literal string
+// (`E_${string}`, `${number}`, `Lowercase<string>`) is as wide as `string`; a
+// union of `P.*` patterns is ONE predicate at runtime (`[Pt] extends
+// [PatternMatcher<infer M>]` is non-distributive, so `M` would infer the union
+// — hence the union test runs first).
+
+function residualWidenedPatterns(
+  cond: boolean,
+  prefixed: `E_${string}`,
+  numeric: `${number}`,
+  lower: Lowercase<string>,
+) {
+  type Coded = { code: `E_${string}` } | { code: "OTHER" };
+  match<Coded>({ code: "E_DISK" })
+    .with({ code: prefixed }, () => 1)
+    .with({ code: "OTHER" }, () => 2)
+    // @ts-expect-error — one `E_${string}` value cannot cover every prefixed code
+    .exhaustive();
+  match<`${number}`>("2")
+    .with(numeric, () => 1)
+    // @ts-expect-error — one `${number}` string cannot cover every numeric string
+    .exhaustive();
+  match<Lowercase<string>>("b")
+    .with(lower, () => 1)
+    // @ts-expect-error — one lowercase string cannot cover every lowercase string
+    .exhaustive();
+
+  type A = { _tag: "A" };
+  type B = { _tag: "B" };
+  const isA = (v: unknown): v is A => (v as A)._tag === "A";
+  const isB = (v: unknown): v is B => (v as B)._tag === "B";
+  const eitherWhen = cond ? P.when(isA) : P.when(isB);
+  match<A | B>({ _tag: "B" })
+    .with(eitherWhen, () => 1)
+    // @ts-expect-error — a union of predicates is ONE predicate at runtime
+    .exhaustive();
+  class X {
+    readonly kind = "x" as const;
+  }
+  class Y {
+    readonly kind = "y" as const;
+  }
+  const eitherInstanceOf = cond ? P.instanceOf(X) : P.instanceOf(Y);
+  match<X | Y>(new Y())
+    .with(eitherInstanceOf, () => 1)
+    // @ts-expect-error — a union of instanceOf patterns is ONE class at runtime
+    .exhaustive();
+}
+
+// --- a class instance as a value pattern: a KNOWN limitation ------------------
+
+// TypeScript is structural: an instance of `Lit` is the object type
+// `{ readonly kind: "lit" }`, so `CoveredBy` recurses into it like a plain
+// object and credits it with every `Lit` — while `matches()` only walks plain
+// objects and compares an instance with `Object.is`, so it covers ONE value and
+// a different `Lit` becomes a NonExhaustiveError (→ Defect in the combinators).
+// Pinned so a change in either direction is noticed; the remedy is below.
+{
+  class Lit {
+    readonly kind = "lit" as const;
+  }
+  type Other = { kind: "other" };
+  // Compiles although only one instance is tested — the limitation.
+  const unsound = match<Lit | Other>(new Lit())
+    .with(new Lit(), () => 1)
+    .with({ kind: "other" }, () => 2)
+    .exhaustive();
+  type _Unsound = Expect<Equal<typeof unsound, number>>;
+
+  // The remedy: a plain-object pattern is matched structurally at runtime (or
+  // name the class with `P.instanceOf`).
+  const sound = match<Lit | Other>(new Lit())
+    .with({ kind: "lit" }, () => 1)
+    .with({ kind: "other" }, () => 2)
+    .exhaustive();
+  type _Sound = Expect<Equal<typeof sound, number>>;
+}
+
 // --- P.instanceOf over structurally identical classes: a KNOWN limitation -----
 
 // TypeScript is structural: two classes with the same shape are the same type,

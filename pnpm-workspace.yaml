@@ -134,6 +134,13 @@ overrides:
   # GHSA-ggr8-5vv4-36mx: deepmerge-ts stack exhaustion when merging recursive
   # object graphs (<8.0.0), via @prisma/config. Lift to the first fixed release.
   "deepmerge-ts@<8.0.0": "8.0.1"
+  # GHSA-m9gg-hp2v-232j (getAuthContext can report unauthorized client
+  # certificates as authorized) + GHSA-f596-whhp-79r4 (handler error messages
+  # leaked to the client in status messages): @grpc/grpc-js 1.14.x <1.14.5,
+  # via testcontainers' Docker transport (dockerode) under @unthrown/drizzle's
+  # test setup. 1.14.5 is the first patched release and satisfies dockerode's
+  # `^1.11.1`. Scoped to the vulnerable range so later releases resolve normally.
+  "@grpc/grpc-js@<1.14.5": "1.14.5"
 
 peerDependencyRules:
   ignoreMissing:

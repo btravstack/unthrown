@@ -141,8 +141,27 @@ was planned).
    exported from core — first-class in one import,
    dual-copy-safe (patterns carry a `Symbol.for` brand). Deliberately **not**
    supported: deep structural inversion, `P.select`, array patterns — the
-   matcher stays shallow. Two
-   pattern-level rules close structural holes. An **empty object pattern
+   matcher stays shallow. The
+   pattern-level rules close structural holes. **A widened value pattern does
+   not prove exhaustive coverage:** `{ _tag: string }` can match one runtime
+   tag, not every tag; a union-typed value likewise represents one alternative.
+   `MatchedOf` computes the possible handler input, while `CoveredBy` computes
+   the cases safe to subtract from `Remaining`, recursively through fields and
+   separately for each grouped pattern. `CoveredBy` is an **allow-list of unit
+   types**, not a deny-list of wide ones: a value pattern covers only when its
+   type has one inhabitant (a string / number / bigint / boolean literal,
+   `null`, `undefined`, a `unique symbol`) or is a plain object of such fields;
+   anything else — `string`, a template literal (`` `E_${string}` ``), a union
+   (a union of `P.*` patterns included, which is why the union test runs
+   before the predicate one), an array, a function — covers `never`, so a wide
+   shape it did not anticipate fails closed. Branded `P.*` predicates retain
+   their declared coverage (they test the whole type). Preserve literals with
+   `as const` or `P.tag`; a dynamic pattern requires additional arms. One gap
+   is **accepted and pinned** in `types.test-d.ts`, beside the `P.instanceOf`
+   one below: a **class instance** used as a value pattern is structurally an
+   object type, so `CoveredBy` recurses into it like a plain object, while
+   `matches()` compares it by identity — the remedy is an object-literal
+   pattern or `P.instanceOf`. An **empty object pattern
    `{}`** is a compile error at the pattern (`NoEmptyPattern`): it matched every
    object at runtime and `Exclude<E, {}>` erased every case — an unflagged
    catch-all. And one limitation is **accepted and pinned** in
