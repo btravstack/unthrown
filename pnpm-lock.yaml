@@ -278,6 +278,10 @@ catalogs:
     zod:
       specifier: 4.6.5
       version: 4.6.5
+  runtime:
+    '@standard-schema/spec':
+      specifier: ^1.1.0
+      version: 1.1.0
   typedoc:
     typescript:
       specifier: 6.0.3
@@ -763,7 +767,7 @@ importers:
   packages/standard-schema:
     dependencies:
       '@standard-schema/spec':
-        specifier: ^1.1.0
+        specifier: catalog:runtime
         version: 1.1.0
     devDependencies:
       '@btravstack/tsconfig':
