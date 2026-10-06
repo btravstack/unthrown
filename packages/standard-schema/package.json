@@ -52,7 +52,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@standard-schema/spec": "catalog:"
+    "@standard-schema/spec": "^1.1.0"
   },
   "devDependencies": {
     "@btravstack/tsconfig": "catalog:",

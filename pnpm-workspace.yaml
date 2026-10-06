@@ -24,26 +24,22 @@ catalog:
   "@orpc/server": 2.0.0-beta.40
   "@prisma/adapter-better-sqlite3": 7.10.0
   "@prisma/client": 7.10.0
-  # Ranged, not pinned: published as a regular dependency of
-  # @unthrown/standard-schema — an exact pin would block dedupe with a
-  # consumer's own copy of the (types-only) spec package.
-  "@standard-schema/spec": ^1.1.0
-  "@testcontainers/postgresql": 12.1.0
-  "@types/node": 26.6.2
+  "@testcontainers/postgresql": 12.2.0
+  "@types/node": 26.6.3
   # 8.20.1/8.20.2/8.20.3 are all within the minimumReleaseAge window as of
   # pinning; 8.20.0 is the newest release past it.
   "@types/pg": 8.23.1
-  "@vitest/coverage-v8": 5.0.1
+  "@vitest/coverage-v8": 5.0.2
   better-sqlite3: 13.0.3
   # Ranged peer, exact catalog pin: we subclass drizzle internals
   # (`_prepare`, the `entityKind` brand), so bumps are deliberate.
   drizzle-orm: 1.0.0-rc.5-5935859
   effect: 3.22.2
-  knip: 6.37.0
+  knip: 6.38.0
   lefthook: 2.1.14
   neverthrow: 8.2.0
-  oxfmt: 0.70.0
-  oxlint: 1.85.0
+  oxfmt: 0.71.0
+  oxlint: 1.86.0
   pg: 8.23.0
   prisma: 7.10.0
   tsdown: 0.23.0
@@ -54,7 +50,7 @@ catalog:
   typescript: 7.0.2
   vitepress: 1.6.4
   vitepress-plugin-llms: 1.14.0
-  vitest: 5.0.1
+  vitest: 5.0.2
   zod: 4.6.5
 
 catalogs:
@@ -141,6 +137,13 @@ overrides:
   # test setup. 1.14.5 is the first patched release and satisfies dockerode's
   # `^1.11.1`. Scoped to the vulnerable range so later releases resolve normally.
   "@grpc/grpc-js@<1.14.5": "1.14.5"
+  # GHSA-68fv-2mgg-jv7q: source-map-js event-loop DoS through indexed
+  # source-map section offsets (<1.2.2), via vite > postcss, magicast and the
+  # Vue compiler (vitest, coverage, docs). 1.2.2 is the first patched release.
+  "source-map-js@<1.2.2": "1.2.2"
+  # GHSA-r4xh-jqrq-34v2: smol-toml quadratic-time parse() (<=1.8.0), via knip.
+  # 1.9.0 is the first patched release.
+  "smol-toml@<1.9.0": "1.9.0"
 
 peerDependencyRules:
   ignoreMissing:
@@ -184,3 +187,6 @@ minimumReleaseAgeExclude:
   - "@btravstack/theme"
   - "@btravstack/tsconfig"
   - "@btravstack/typedoc"
+  # Security fix for GHSA-68fv-2mgg-jv7q, published 2026-09-30 — inside the
+  # delay window. Pinned to the exact version so the exemption cannot widen.
+  - "source-map-js@1.2.2"
