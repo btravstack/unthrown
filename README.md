@@ -1,6 +1,9 @@
 <div align="center">
 
-<img src="docs/public/logo.svg" alt="unthrown" width="128" height="128" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/public/logo-dark.svg">
+  <img src="docs/public/logo-light.svg" alt="unthrown logo" width="128" height="128" />
+</picture>
 
 # unthrown
 
