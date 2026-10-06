@@ -59,6 +59,11 @@ catalogs:
   # resolves this catalog.
   typedoc:
     typescript: 6.0.3
+  # Ranged, not pinned: published runtime dependencies. pnpm writes the catalog
+  # value into the published manifest, and an exact pin would block dedupe with
+  # a consumer's own copy. Everything else in the catalogs is pinned.
+  runtime:
+    "@standard-schema/spec": ^1.1.0
 
 # Force patched versions of vulnerable transitive dependencies. Every advisory
 # below reaches us only through dev/build tooling (never a published package's
