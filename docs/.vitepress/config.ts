@@ -185,7 +185,7 @@ export default defineConfig({
   },
 
   themeConfig: {
-    logo: { light: "/logo-light.svg", dark: "/logo-dark.svg" },
+    logo: { light: "/logo-light.svg", dark: "/logo-dark.svg", alt: "unthrown logo" },
 
     nav: [
       // The guide is organised by the four Diátaxis modes; the dropdown links
@@ -259,7 +259,7 @@ export default defineConfig({
   },
 
   head: [
-    ["link", { rel: "icon", type: "image/svg+xml", href: `${BASE}logo.svg` }],
+    ["link", { rel: "icon", type: "image/svg+xml", href: `${BASE}favicon.svg` }],
     ["meta", { name: "author", content: "Benoit TRAVERS" }],
     ["meta", { name: "robots", content: "index, follow" }],
     ["meta", { name: "application-name", content: "unthrown" }],
@@ -275,10 +275,7 @@ export default defineConfig({
     ["meta", { property: "og:type", content: "website" }],
     ["meta", { property: "og:site_name", content: "unthrown" }],
     ["meta", { property: "og:locale", content: "en_US" }],
-    [
-      "meta",
-      { property: "og:image", content: "https://btravstack.github.io/unthrown/og-unthrown.png" },
-    ],
+    ["meta", { property: "og:image", content: `${SITE_URL}og-unthrown.png` }],
     ["meta", { property: "og:image:type", content: "image/png" }],
     ["meta", { property: "og:image:width", content: "1200" }],
     ["meta", { property: "og:image:height", content: "630" }],
@@ -291,10 +288,7 @@ export default defineConfig({
     ],
     // Twitter Card
     ["meta", { name: "twitter:card", content: "summary_large_image" }],
-    [
-      "meta",
-      { name: "twitter:image", content: "https://btravstack.github.io/unthrown/og-unthrown.png" },
-    ],
+    ["meta", { name: "twitter:image", content: `${SITE_URL}og-unthrown.png` }],
     [
       "meta",
       {
