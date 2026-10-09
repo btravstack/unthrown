@@ -41,6 +41,14 @@ builder.queryType({
       refusals: { Closed: ShelfClosedError },
       resolve: (_root, { open }) => (open ? OkAsync(SHELF) : ErrAsync(new Closed())),
     }),
+    counted: t.resultConnection(
+      { type: "Book", refusals: {}, resolve: () => OkAsync(SHELF) },
+      {
+        fields: (c) => ({
+          totalCount: c.int({ resolve: () => 1 }),
+        }),
+      },
+    ),
     nothing: t.resultConnection({
       type: "Book",
       nullable: true,
@@ -83,5 +91,16 @@ describe("resultConnection", () => {
     const answer = await graphql({ schema, source: "{ nothing(first: 1) { __typename } }" });
 
     expect(answer).toEqual({ data: { nothing: null } });
+  });
+
+  it("forwards the connection's own options", async () => {
+    const answer = await graphql({
+      schema,
+      source: "{ counted(first: 1) { __typename ... on QueryCountedConnection { totalCount } } }",
+    });
+
+    expect(answer).toEqual({
+      data: { counted: { __typename: "QueryCountedConnection", totalCount: 1 } },
+    });
   });
 });

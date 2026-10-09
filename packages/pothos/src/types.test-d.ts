@@ -36,6 +36,27 @@ class ClosedError extends Error {
 
 declare const find: () => AsyncResult<{ readonly title: string }, Missing | Locked>;
 
+class LockedError extends Error {
+  constructor(failure: { readonly code: "LOCKED" }) {
+    super(failure.code);
+  }
+}
+
+declare const findOptionalTag: () => AsyncResult<
+  { readonly title: string },
+  { readonly _tag?: "Draft"; readonly code: "LOCKED" }
+>;
+
+type Split = { readonly code: "LOST" | "BURNT"; readonly shelf: string };
+
+class SplitError extends Error {
+  constructor(failure: Split) {
+    super(failure.shelf);
+  }
+}
+
+declare const findSplit: () => AsyncResult<{ readonly title: string }, Split>;
+
 declare const findOrUnnamed: () => AsyncResult<
   { readonly title: string },
   Missing | { readonly reason: string }
@@ -43,6 +64,12 @@ declare const findOrUnnamed: () => AsyncResult<
 
 // --- a failure names its case by `_tag`, else by `code` ------------------------
 
+type OptionalTagAddsItsCase = Expect<
+  Equal<CaseOf<{ readonly _tag?: "Draft"; readonly code: "LOCKED" }>, "Draft" | "LOCKED">
+>;
+type NumericTagFallsBackToCode = Expect<
+  Equal<CaseOf<{ readonly _tag: 7; readonly code: "LOCKED" }>, "LOCKED">
+>;
 type CaseIsTagOrCode = Expect<Equal<CaseOf<Missing | Locked>, "Missing" | "LOCKED">>;
 type UnnamedHasNoCase = Expect<Equal<CaseOf<{ readonly reason: string }>, never>>;
 type RefusalsAreKeyedByCase = Expect<Equal<keyof Refusals<Missing | Locked>, "Missing" | "LOCKED">>;
@@ -96,6 +123,28 @@ builder.queryFields((t) => ({
     // @ts-expect-error -- one member of the failure names no case
     resolve: findOrUnnamed,
   }),
+  optionalTag: t.resultField({
+    type: "Book",
+    refusals: { Draft: LockedError, LOCKED: LockedError },
+    resolve: findOptionalTag,
+  }),
+  optionalTagCodeOnly: t.resultField({
+    type: "Book",
+    // @ts-expect-error -- the optional _tag names the Draft case whenever it is present
+    refusals: { LOCKED: LockedError },
+    resolve: findOptionalTag,
+  }),
+  split: t.resultField({
+    type: "Book",
+    refusals: { LOST: SplitError, BURNT: SplitError },
+    resolve: findSplit,
+  }),
+  splitMismatch: t.resultField({
+    type: "Book",
+    // @ts-expect-error -- NotFoundError is built from a Missing, not a Split
+    refusals: { LOST: NotFoundError, BURNT: SplitError },
+    resolve: findSplit,
+  }),
   nullableConnection: t.resultConnection({
     type: "Book",
     nullable: true,
@@ -110,4 +159,10 @@ builder.queryFields((t) => ({
   }),
 }));
 
-export type _Assertions = [CaseIsTagOrCode, UnnamedHasNoCase, RefusalsAreKeyedByCase];
+export type _Assertions = [
+  OptionalTagAddsItsCase,
+  NumericTagFallsBackToCode,
+  CaseIsTagOrCode,
+  UnnamedHasNoCase,
+  RefusalsAreKeyedByCase,
+];

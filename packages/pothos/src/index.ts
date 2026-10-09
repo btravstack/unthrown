@@ -41,7 +41,14 @@ import type { ErrorFieldOptions } from "@pothos/plugin-errors";
 import type { GraphQLResolveInfo } from "graphql";
 import type { AsyncResult, Result } from "unthrown";
 
-import { handledTypes, settle, typesOf, type Caseable, type Refusals } from "./refusals.js";
+import {
+  attempt,
+  handledTypes,
+  settle,
+  typesOf,
+  type Caseable,
+  type Refusals,
+} from "./refusals.js";
 
 export {
   outcomeOf,
@@ -149,7 +156,7 @@ fieldBuilder.resultField = function resultField({ refusals, resolve, errors, ...
     errors: { ...errors, types: typesOf(refusals) },
     resolve: async (parent: unknown, args: object, context: object, info: GraphQLResolveInfo) =>
       settle(
-        resolve(parent, args as never, context, info),
+        attempt(() => resolve(parent, args as never, context, info)),
         refusals,
         handledTypes(refusals, this.builder.options.errors?.defaultTypes),
       ),

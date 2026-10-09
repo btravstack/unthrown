@@ -12,15 +12,24 @@ import {
   type InputFieldMap,
   type InputFieldsFromShape,
   type InputShapeFromFields,
+  type InterfaceParam,
   type OutputType,
   type SchemaTypes,
+  type ShapeFromTypeParam,
 } from "@pothos/core";
 import type { ErrorFieldOptions } from "@pothos/plugin-errors";
 import type { ConnectionShapeForType, DefaultConnectionArguments } from "@pothos/plugin-relay";
 import type { GraphQLResolveInfo } from "graphql";
 import type { AsyncResult, Result } from "unthrown";
 
-import { handledTypes, settle, typesOf, type Caseable, type Refusals } from "./refusals.js";
+import {
+  attempt,
+  handledTypes,
+  settle,
+  typesOf,
+  type Caseable,
+  type Refusals,
+} from "./refusals.js";
 
 type ConnectionArgs<Types extends SchemaTypes, Args extends InputFieldMap> = InputFieldsFromShape<
   Types,
@@ -124,6 +133,8 @@ declare global {
         Args extends InputFieldMap = {},
         EdgeNullability extends FieldNullability<[unknown]> = Types["DefaultEdgesNullability"],
         NodeNullability extends boolean = Types["DefaultNodeNullability"],
+        const ConnectionInterfaces extends InterfaceParam<Types>[] = [],
+        const EdgeInterfaces extends InterfaceParam<Types>[] = [],
       >(
         options: ResultConnectionOptions<
           Types,
@@ -136,6 +147,34 @@ declare global {
           Kind,
           Failure
         >,
+        connectionOptions?:
+          | ObjectRef<
+              Types,
+              ConnectionShapeForType<Types, Type, false, EdgeNullability, NodeNullability>
+            >
+          | Omit<
+              ConnectionObjectOptions<
+                Types,
+                Type,
+                EdgeNullability,
+                NodeNullability,
+                ConnectionShapeForType<Types, Type, false, EdgeNullability, NodeNullability>,
+                ConnectionInterfaces
+              >,
+              "edgesNullable"
+            >,
+        edgeOptions?:
+          | ConnectionEdgeObjectOptions<
+              Types,
+              Type,
+              NodeNullability,
+              ConnectionShapeForType<Types, Type, false, EdgeNullability, NodeNullability>,
+              EdgeInterfaces
+            >
+          | ObjectRef<
+              Types,
+              { cursor: string; node?: ShapeFromTypeParam<Types, Type, NodeNullability> }
+            >,
       ) => FieldRef<
         Types,
         ConnectionShapeForType<Types, Type, Nullable, EdgeNullability, NodeNullability>
@@ -150,20 +189,23 @@ const fieldBuilder = RootFieldBuilder.prototype as PothosSchemaTypes.RootFieldBu
   unknown
 >;
 
-fieldBuilder.resultConnection = function resultConnection({
-  refusals,
-  resolve,
-  errors,
-  ...options
-}) {
-  return this.connection({
-    ...options,
-    errors: { ...errors, types: typesOf(refusals) },
-    resolve: async (parent: unknown, args: object, context: object, info: GraphQLResolveInfo) =>
-      settle(
-        resolve(parent, args as never, context, info),
-        refusals,
-        handledTypes(refusals, this.builder.options.errors?.defaultTypes),
-      ),
-  } as never);
+fieldBuilder.resultConnection = function resultConnection(
+  { refusals, resolve, errors, ...options },
+  connectionOptions,
+  edgeOptions,
+) {
+  return this.connection(
+    {
+      ...options,
+      errors: { ...errors, types: typesOf(refusals) },
+      resolve: async (parent: unknown, args: object, context: object, info: GraphQLResolveInfo) =>
+        settle(
+          attempt(() => resolve(parent, args as never, context, info)),
+          refusals,
+          handledTypes(refusals, this.builder.options.errors?.defaultTypes),
+        ),
+    } as never,
+    connectionOptions as never,
+    edgeOptions as never,
+  );
 };

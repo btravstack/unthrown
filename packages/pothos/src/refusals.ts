@@ -2,7 +2,7 @@
 // the `Refusals` record a field declares, and the two ways a `Result` is
 // handed to Pothos — `settle` for a resolver, `outcomeOf` for a DataLoader.
 
-import type { AsyncResult, Result } from "unthrown";
+import { fromSafePromise, fromSafeThrowable, Ok, type AsyncResult, type Result } from "unthrown";
 
 /**
  * The name of a failure's case: its `_tag` (a `TaggedError`), else its `code`
@@ -13,7 +13,8 @@ import type { AsyncResult, Result } from "unthrown";
 export type CaseOf<Failure> = Failure extends { readonly _tag: infer Tag extends string }
   ? Tag
   : Failure extends { readonly code: infer Code extends string }
-    ? Code
+    ? // An optional string `_tag` names the case whenever it is present.
+      ("_tag" extends keyof Failure ? Extract<Failure["_tag"], string> : never) | Code
     : never;
 
 /**
@@ -24,7 +25,13 @@ export type CaseOf<Failure> = Failure extends { readonly _tag: infer Tag extends
  */
 export type Caseable = { readonly _tag: string } | { readonly code: string };
 
-type FailureOf<Failure, Case> = Extract<Failure, { readonly _tag: Case } | { readonly code: Case }>;
+// The members of `Failure` that can name `Case` — every member whose cases
+// include it, so a union-valued discriminant (`code: "A" | "B"`) keeps its type.
+type FailureOf<Failure, Case> = Failure extends unknown
+  ? Case extends CaseOf<Failure>
+    ? Failure
+    : never
+  : never;
 
 /**
  * One GraphQL error class per case of `Failure`, each constructed from the
@@ -92,12 +99,52 @@ export const outcomeOf = async <Value, Failure>(
       refusals as unknown as Readonly<Record<string, new (failure: Failure) => Error>>
     )[caseOf(settled.error) ?? ""];
     if (Refusal !== undefined) {
-      return new Refusal(settled.error);
+      const { error } = settled;
+      // A refusal constructor that throws is a bug: it is answered as a defect, never a rejection.
+      return fromSafeThrowable(() => new Refusal(error))()
+        .recoverDefect((cause) => Ok(defectOf(cause)))
+        .get();
     }
   }
-  const cause = settled.isDefect() ? settled.cause : settled;
-  return cause instanceof Error ? cause : new Error("Defect", { cause });
+  return defectOf(settled.isDefect() ? settled.cause : settled);
 };
+
+const defectOf = (cause: unknown): Error =>
+  cause instanceof Error ? cause : new Error("Defect", { cause });
+
+/**
+ * A defect no class of the errors plugin can claim. When even a plain `Error`
+ * would be claimed (`defaultTypes: [Error]`), it travels as this signal, which
+ * GraphQL turns into an error of its own and masks.
+ */
+class DefectSignal {
+  readonly message = "Defect";
+
+  constructor(readonly cause: unknown) {}
+}
+
+const unclaimed = (
+  cause: unknown,
+  handled: readonly (new (...args: never[]) => unknown)[],
+): unknown => {
+  const claimedBy = (value: unknown) => handled.some((Handled) => value instanceof Handled);
+  if (!claimedBy(cause)) {
+    return cause;
+  }
+  const wrapped = new Error("Defect", { cause });
+  return claimedBy(wrapped) ? new DefectSignal(cause) : wrapped;
+};
+
+/**
+ * A resolver called for its `Result`: a synchronous throw becomes a `Defect`,
+ * so it is settled like any other and never reaches the errors plugin raw.
+ */
+export const attempt = <Value, Failure>(
+  resolve: () => Result<Value, Failure> | AsyncResult<Value, Failure>,
+): AsyncResult<Value, Failure> =>
+  // Called inside a promise: a throw becomes its rejection, and an `AsyncResult`
+  // settles to its `Result`; `fromSafeThrowable` refuses a thenable-returning function.
+  fromSafePromise(Promise.resolve().then(resolve)).flatMap((result) => result);
 
 /**
  * A `Result` as a resolver answers it: the value, or the refusal its failure
@@ -117,9 +164,7 @@ export const settle = async <Value, Failure>(
   if (settled.isDefect()) {
     const { cause } = settled;
     // The elimination edge: a defect reaches GraphQL as a thrown error, which masks it.
-    throw handled.some((Handled) => cause instanceof Handled)
-      ? new Error("Defect", { cause })
-      : cause;
+    throw unclaimed(cause, handled);
   }
   return outcomeOf(settled, refusals);
 };

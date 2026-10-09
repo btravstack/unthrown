@@ -23,7 +23,12 @@ runtime as a defect. The constraint lives where `Failure` is inferred: an
 intersection into the options, or a constraint on the type parameter, is
 evaluated before a context-sensitive `resolve` is inferred, and rejects every
 field. At runtime `caseOf` reads a string `_tag`, else a string `code`, and
-answers no case for anything else, a primitive included, without throwing.
+answers no case for anything else, a primitive included, without throwing. An
+optional string `_tag` beside a `code` (`{ _tag?: "Draft"; code: "LOCKED" }`)
+contributes its values to `CaseOf` — the tag names the case whenever it is
+present — so the record must refuse both. `FailureOf` takes every member whose
+cases include the case, so a union-valued discriminant (`code: "A" | "B"`)
+keeps its type in each constructor slot rather than collapsing to `never`.
 `Refusals<Failure>` is a
 mapped type over the cases, so it is exhaustive the way the error combinators'
 matcher is (Thesis #5): a missing case, an extra one, or a class whose
@@ -43,8 +48,15 @@ edge), so GraphQL masks it like any resolver error. A cause that is an
 instance of a class the errors plugin answers on the field — one of its
 refusals, or one of the plugin's `defaultTypes` — is wrapped first
 (`new Error("Defect", { cause })`): thrown raw, the plugin would answer the bug
-as a modeled refusal. Any other cause, a `GraphQLError` included, is rethrown
-as it is. A nullable `resultConnection` may answer `Ok(null)`. `outcomeOf` is the
+as a modeled refusal. When even that wrapper would be claimed
+(`defaultTypes: [Error]`), the defect travels as a non-`Error` signal, which
+GraphQL turns into an error of its own and masks. Any other cause, a
+`GraphQLError` included, is rethrown as it is. The resolver itself is called
+through `attempt`, inside a promise, so a synchronous throw becomes a `Defect`
+and takes the same path; and a refusal constructor that throws is answered as a
+defect by `outcomeOf`, never a rejection. A nullable `resultConnection` may
+answer `Ok(null)`, and it forwards relay's connection and edge options (its
+second and third arguments) to `connection`. `outcomeOf` is the
 DataLoader twin: the same mapping, but a `Defect` — or a failure no refusal
 maps, which only an unchecked cast can produce — is **returned** as an `Error`
 (the cause itself when it is one, else `new Error("Defect", { cause })`), so
