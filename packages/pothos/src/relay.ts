@@ -20,7 +20,7 @@ import type { ConnectionShapeForType, DefaultConnectionArguments } from "@pothos
 import type { GraphQLResolveInfo } from "graphql";
 import type { AsyncResult, Result } from "unthrown";
 
-import { settle, typesOf, type Refusals } from "./refusals.js";
+import { handledTypes, settle, typesOf, type Caseable, type Refusals } from "./refusals.js";
 
 type ConnectionArgs<Types extends SchemaTypes, Args extends InputFieldMap> = InputFieldsFromShape<
   Types,
@@ -93,8 +93,14 @@ export type ResultConnectionOptions<
     context: Types["Context"],
     info: GraphQLResolveInfo,
   ) =>
-    | Result<ConnectionOf<Types, Type, EdgeNullability, NodeNullability>, Failure>
-    | AsyncResult<ConnectionOf<Types, Type, EdgeNullability, NodeNullability>, Failure>;
+    | Result<
+        ConnectionShapeForType<Types, Type, Nullable, EdgeNullability, NodeNullability>,
+        Failure & Caseable
+      >
+    | AsyncResult<
+        ConnectionShapeForType<Types, Type, Nullable, EdgeNullability, NodeNullability>,
+        Failure & Caseable
+      >;
 };
 
 // oxlint-disable typescript/consistent-type-definitions, typescript/no-namespace -- declaration merging into Pothos' global types requires a namespace of interfaces; a `type` cannot merge.
@@ -154,6 +160,10 @@ fieldBuilder.resultConnection = function resultConnection({
     ...options,
     errors: { ...errors, types: typesOf(refusals) },
     resolve: async (parent: unknown, args: object, context: object, info: GraphQLResolveInfo) =>
-      settle(resolve(parent, args as never, context, info), refusals),
+      settle(
+        resolve(parent, args as never, context, info),
+        refusals,
+        handledTypes(refusals, this.builder.options.errors?.defaultTypes),
+      ),
   } as never);
 };

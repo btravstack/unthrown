@@ -15,7 +15,16 @@ A Pothos plugin (`unthrown`) whose fields are resolved by a `Result`. The
 resolver's failure is mapped to GraphQL error classes by a `refusals` record
 keyed by **case** — the failure's `_tag` (a `TaggedError`), else its `code` (an
 `ORPCError`, or any `code`-discriminated value); a failure naming neither has
-no case (`CaseOf` is `never`) and cannot be refused. `Refusals<Failure>` is a
+no case (`CaseOf` is `never`) and cannot be refused. So a field's resolver
+answers `Result<Shape, Failure & Caseable>`: a failure with any member that is
+neither a string `_tag` nor a string `code` — a primitive, an untagged object —
+fails right at `resolve`, rather than vanishing from `CaseOf` and reaching the
+runtime as a defect. The constraint lives where `Failure` is inferred: an
+intersection into the options, or a constraint on the type parameter, is
+evaluated before a context-sensitive `resolve` is inferred, and rejects every
+field. At runtime `caseOf` reads a string `_tag`, else a string `code`, and
+answers no case for anything else, a primitive included, without throwing.
+`Refusals<Failure>` is a
 mapped type over the cases, so it is exhaustive the way the error combinators'
 matcher is (Thesis #5): a missing case, an extra one, or a class whose
 constructor takes another case's failure does not compile. The record — not a
@@ -30,7 +39,12 @@ Variants map as: `Ok` → the field's value; `Err` → `new Refusal(error)`,
 of a declared type as its union member (its `wrapResolve` checks
 `result instanceof Error` before its `catch`), so no throw is needed to reach
 the union; `Defect` → the cause is **thrown** by `settle` (the elimination
-edge), so GraphQL masks it like any resolver error. `outcomeOf` is the
+edge), so GraphQL masks it like any resolver error. A cause that is an
+instance of a class the errors plugin answers on the field — one of its
+refusals, or one of the plugin's `defaultTypes` — is wrapped first
+(`new Error("Defect", { cause })`): thrown raw, the plugin would answer the bug
+as a modeled refusal. Any other cause, a `GraphQLError` included, is rethrown
+as it is. A nullable `resultConnection` may answer `Ok(null)`. `outcomeOf` is the
 DataLoader twin: the same mapping, but a `Defect` — or a failure no refusal
 maps, which only an unchecked cast can produce — is **returned** as an `Error`
 (the cause itself when it is one, else `new Error("Defect", { cause })`), so

@@ -36,6 +36,11 @@ class ClosedError extends Error {
 
 declare const find: () => AsyncResult<{ readonly title: string }, Missing | Locked>;
 
+declare const findOrUnnamed: () => AsyncResult<
+  { readonly title: string },
+  Missing | { readonly reason: string }
+>;
+
 // --- a failure names its case by `_tag`, else by `code` ------------------------
 
 type CaseIsTagOrCode = Expect<Equal<CaseOf<Missing | Locked>, "Missing" | "LOCKED">>;
@@ -78,6 +83,24 @@ builder.queryFields((t) => ({
     refusals: {},
     // @ts-expect-error -- the Ok value is the field's shape
     resolve: () => OkAsync({ pages: 3 }),
+  }),
+  primitive: t.resultField({
+    type: "Book",
+    refusals: {},
+    // @ts-expect-error -- a string failure names no case
+    resolve: () => ErrAsync("not_found"),
+  }),
+  unnamedMember: t.resultField({
+    type: "Book",
+    refusals: { Missing: NotFoundError },
+    // @ts-expect-error -- one member of the failure names no case
+    resolve: findOrUnnamed,
+  }),
+  nullableConnection: t.resultConnection({
+    type: "Book",
+    nullable: true,
+    refusals: {},
+    resolve: () => OkAsync(null),
   }),
   connection: t.resultConnection({
     type: "Book",

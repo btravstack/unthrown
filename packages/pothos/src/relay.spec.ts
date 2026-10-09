@@ -41,6 +41,12 @@ builder.queryType({
       refusals: { Closed: ShelfClosedError },
       resolve: (_root, { open }) => (open ? OkAsync(SHELF) : ErrAsync(new Closed())),
     }),
+    nothing: t.resultConnection({
+      type: "Book",
+      nullable: true,
+      refusals: {},
+      resolve: () => OkAsync(null),
+    }),
   }),
 });
 const schema = builder.toSchema();
@@ -71,5 +77,11 @@ describe("resultConnection", () => {
     expect(await booksWhen(false)).toEqual({
       data: { books: { __typename: "ShelfClosed", message: "The shelf is closed" } },
     });
+  });
+
+  it("answers null for a nullable connection", async () => {
+    const answer = await graphql({ schema, source: "{ nothing(first: 1) { __typename } }" });
+
+    expect(answer).toEqual({ data: { nothing: null } });
   });
 });

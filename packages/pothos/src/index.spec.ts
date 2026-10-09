@@ -49,7 +49,7 @@ const find = (title: string): AsyncResult<Book, Missing | Locked> => {
 
 const builder = new SchemaBuilder<{ Objects: { Book: Book } }>({
   plugins: [ErrorsPlugin, UnthrownPlugin],
-  errors: { directResult: true },
+  errors: { directResult: true, defaultTypes: [ClosedError] },
 });
 const Failure = builder.interfaceRef<Error>("Failure").implement({
   fields: (t) => ({ message: t.exposeString("message") }),
@@ -64,6 +64,20 @@ builder.queryType({
       args: { title: t.arg.string({ required: true }) },
       refusals: { Missing: NotFoundError, LOCKED: ClosedError },
       resolve: (_root, { title }) => find(title),
+    }),
+    // Defects whose cause the errors plugin would answer as a refusal: one of the
+    // field's refusal classes, and one of the plugin's default types.
+    misfiled: t.resultField({
+      type: "Book",
+      refusals: { Missing: NotFoundError },
+      resolve: (): AsyncResult<Book, Missing> =>
+        fromSafePromise(Promise.reject(new NotFoundError(new Missing({ title: "lost" })))),
+    }),
+    jammed: t.resultField({
+      type: "Book",
+      refusals: {},
+      resolve: (): AsyncResult<Book, never> =>
+        fromSafePromise(Promise.reject(new ClosedError({ code: "LOCKED", until: "2027-01-01" }))),
     }),
     shelf: t.resultField({
       type: "Book",
@@ -105,6 +119,24 @@ describe("resultField", () => {
     expect(answer.errors?.map(({ message }) => message)).toEqual(["Disk failure"]);
   });
 
+  it("keeps a Defect whose cause is one of its refusal classes out of the union", async () => {
+    const answer = await graphql({ schema, source: "{ misfiled { __typename } }" });
+
+    expect(answer).toEqual({
+      data: { misfiled: null },
+      errors: [expect.objectContaining({ message: "Defect" })],
+    });
+  });
+
+  it("keeps a Defect whose cause is a default error type out of the union", async () => {
+    const answer = await graphql({ schema, source: "{ jammed { __typename } }" });
+
+    expect(answer).toEqual({
+      data: { jammed: null },
+      errors: [expect.objectContaining({ message: "Defect" })],
+    });
+  });
+
   it("takes a synchronous Result", async () => {
     expect(await graphql({ schema, source: "{ shelf { ... on Book { title } } }" })).toEqual({
       data: { shelf: { title: "Shelf" } },
@@ -143,8 +175,22 @@ describe("outcomeOf", () => {
   });
 
   it("answers a failure naming no case as a defect", async () => {
-    const outcome = await outcomeOf(Err({ reason: "unnamed" }), {} as never);
+    const outcome = await outcomeOf(Err({ reason: "unnamed" }) as never, {} as never);
 
     expect(outcome).toBeInstanceOf(Error);
+  });
+
+  it("answers a primitive failure as a defect, without rejecting", async () => {
+    const outcome = await outcomeOf(Err("not_found") as never, {} as never);
+
+    expect(outcome).toBeInstanceOf(Error);
+  });
+
+  it("reads the code of a failure whose tag is no string", async () => {
+    const failure = { _tag: 7, code: "LOCKED", until: "2027-01-01" } as const;
+
+    const outcome = await outcomeOf(Err(failure), { LOCKED: ClosedError });
+
+    expect(outcome).toEqual(new ClosedError(failure));
   });
 });

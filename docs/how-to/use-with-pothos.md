@@ -85,10 +85,23 @@ breaks every field that resolves it until the case has its refusal.
 ## Connections
 
 `@unthrown/pothos/relay` adds `t.resultConnection`, the same for
-`@pothos/plugin-relay`'s connections — the `Ok` value is the connection:
+`@pothos/plugin-relay`'s connections — the `Ok` value is the connection. The
+relay plugin is an optional peer: install it and list it in the builder's
+plugins, then import the entry:
+
+```sh
+pnpm add @pothos/plugin-relay
+```
 
 ```ts
+import RelayPlugin from "@pothos/plugin-relay";
 import "@unthrown/pothos/relay";
+
+const builder = new SchemaBuilder<{ Objects: { Book: Book } }>({
+  plugins: [ErrorsPlugin, RelayPlugin, UnthrownPlugin],
+  errors: { directResult: true },
+  relay: {},
+});
 
 builder.queryField("books", (t) =>
   t.resultConnection({
