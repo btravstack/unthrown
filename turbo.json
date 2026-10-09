@@ -33,7 +33,8 @@
         "@unthrown/standard-schema#build",
         "@unthrown/prisma#build",
         "@unthrown/drizzle#build",
-        "@unthrown/orpc#build"
+        "@unthrown/orpc#build",
+        "@unthrown/pothos#build"
       ],
       "inputs": ["$TURBO_DEFAULT$", "../packages/*/src/**"],
       "outputs": [".vitepress/dist/**", "api/*/**"],

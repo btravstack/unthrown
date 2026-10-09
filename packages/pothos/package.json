@@ -1,0 +1,91 @@
+{
+  "name": "@unthrown/pothos",
+  "version": "0.0.0",
+  "description": "Pothos integration for unthrown: GraphQL fields resolved by a Result, each failure answered as a typed error of the field's union",
+  "keywords": [
+    "errors-as-values",
+    "graphql",
+    "pothos",
+    "result",
+    "typescript",
+    "unthrown"
+  ],
+  "homepage": "https://github.com/btravstack/unthrown#readme",
+  "bugs": {
+    "url": "https://github.com/btravstack/unthrown/issues"
+  },
+  "license": "MIT",
+  "author": "Benoit TRAVERS <benoit.travers.fr@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/btravstack/unthrown.git",
+    "directory": "packages/pothos"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "./dist/index.mjs",
+    "./dist/index.cjs",
+    "./dist/relay.mjs",
+    "./dist/relay.cjs"
+  ],
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./relay": {
+      "import": {
+        "types": "./dist/relay.d.mts",
+        "default": "./dist/relay.mjs"
+      },
+      "require": {
+        "types": "./dist/relay.d.cts",
+        "default": "./dist/relay.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown src/index.ts src/relay.ts --format cjs,esm --dts --clean",
+    "dev": "tsdown src/index.ts src/relay.ts --format cjs,esm --dts --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@btravstack/tsconfig": "catalog:",
+    "@pothos/core": "catalog:",
+    "@pothos/plugin-errors": "catalog:",
+    "@pothos/plugin-relay": "catalog:",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "graphql": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "unthrown": "workspace:^",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@pothos/core": "^4.15.0",
+    "@pothos/plugin-errors": "^4.9.0",
+    "@pothos/plugin-relay": "^4.8.0",
+    "graphql": "^16.10.0 || ^17.0.0",
+    "unthrown": "workspace:^"
+  },
+  "peerDependenciesMeta": {
+    "@pothos/plugin-relay": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

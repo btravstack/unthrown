@@ -931,6 +931,15 @@ copies) — issue #256, observed live in btravstack/start#99.
   the procedure declared via `.errors({...})`, `Defect` ↔ everything else
   (including an undeclared `ORPCError`). Three entry points, no root export.
   **Outside the fixed version group.** Full spec: `packages/orpc/CLAUDE.md`.)
+- `packages/pothos` → `@unthrown/pothos` (peerDeps `@pothos/core` `^4.15.0`,
+  `@pothos/plugin-errors` `^4.9.0`, `graphql` `^16.10.0 || ^17.0.0`, and
+  `@pothos/plugin-relay` `^4.8.0`, optional; a Pothos plugin whose
+  `resultField` / `resultConnection` are resolved by a `Result` — `Ok` → the
+  field's value, `Err` → the refusal its case (`_tag` or `code`) maps to,
+  returned as a member of the errors plugin's result union, `Defect` → thrown
+  for GraphQL to mask; the `refusals` record is exhaustive over the failure's
+  cases. Two side-effectful entry points, `.` and `./relay`. **Outside the
+  fixed version group.** Full spec: `packages/pothos/CLAUDE.md`.)
 - shared config is **external**, not a workspace package: the tsconfig and
   typedoc bases come from the catalog dependencies `@btravstack/tsconfig` and
   `@btravstack/typedoc` (alongside `@btravstack/oxlint`, `@btravstack/commitlint`,
