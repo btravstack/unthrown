@@ -59,16 +59,29 @@ export type Refusals<Failure> = [Failure] extends [never]
   : [CaseOf<Failure>] extends [never]
     ? // No case named yet (a failure still being inferred, or one `resolve` refuses).
       { readonly [Case in CaseOf<Failure>]: never }
-    : // oxlint-disable-next-line typescript/no-empty-object-type -- `{}` tests whether the cases form an index signature
-      {} extends Record<CaseOf<Failure>, unknown>
-      ? // A non-finite case (`code: string`, `` code: `E_${string}` ``) cannot be enumerated.
-        { readonly "every failure needs a literal _tag or code": CaseOf<Failure> }
-      : "__proto__" extends CaseOf<Failure>
-        ? // An object literal's `__proto__` sets its prototype: it can name no refusal.
-          { readonly "__proto__ cannot name a refusal": never }
-        : {
-            readonly [Case in CaseOf<Failure>]: new (failure: FailureOf<Failure, Case>) => Error;
-          };
+    : [NonFiniteOf<CaseOf<Failure>>] extends [never]
+      ? RefusalsOfFinite<Failure>
+      : // A non-finite case (`code: string`, `` code: `E_${string}` ``) cannot be enumerated,
+        // alone or beside literal cases.
+        { readonly "every failure needs a literal _tag or code": NonFiniteOf<CaseOf<Failure>> };
+
+// The members of a case set that are patterns rather than literals: each is
+// tested on its own, since a literal beside a pattern makes the whole record
+// look finite.
+type NonFiniteOf<Case extends PropertyKey> = Case extends unknown
+  ? // oxlint-disable-next-line typescript/no-empty-object-type -- `{}` tests whether one case forms an index signature
+    {} extends Record<Case, unknown>
+    ? Case
+    : never
+  : never;
+
+type RefusalsOfFinite<Failure> =
+  "__proto__" extends CaseOf<Failure>
+    ? // An object literal's `__proto__` sets its prototype: it can name no refusal.
+      { readonly "__proto__ cannot name a refusal": never }
+    : {
+        readonly [Case in CaseOf<Failure>]: new (failure: FailureOf<Failure, Case>) => Error;
+      };
 
 type ErrorClass = new (...args: never[]) => Error;
 

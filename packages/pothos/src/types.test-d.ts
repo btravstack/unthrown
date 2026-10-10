@@ -82,6 +82,15 @@ declare const findBroadTag: () => AsyncResult<
   { readonly _tag: unknown; readonly code: "LOCKED" }
 >;
 
+class RejectionError extends Error {}
+
+declare const pairGenerator: Generator<number>;
+
+declare const findMixed: () => AsyncResult<
+  { readonly title: string },
+  Missing | { readonly code: `E_${string}` }
+>;
+
 declare const findOrUnnamed: () => AsyncResult<
   { readonly title: string },
   Missing | { readonly reason: string }
@@ -101,10 +110,19 @@ type RefusalsAreKeyedByCase = Expect<Equal<keyof Refusals<Missing | Locked>, "Mi
 
 // --- a field's refusals are exhaustive over its resolver's failure -------------
 
-const builder = new SchemaBuilder<{ Objects: { Book: { readonly title: string } } }>({
+type Pair = readonly [number, number];
+
+const builder = new SchemaBuilder<{
+  Objects: { Book: { readonly title: string } };
+  Scalars: { Pair: { Input: Pair; Output: Pair } };
+}>({
   plugins: [ErrorsPlugin, RelayPlugin, UnthrownPlugin],
   relay: {},
 });
+
+const Rejection = builder.objectRef<RejectionError>("Rejection");
+
+builder.scalarType("Pair", { serialize: (pair) => pair, parseValue: () => [0, 0] });
 
 builder.queryFields((t) => ({
   every: t.resultField({
@@ -222,6 +240,29 @@ builder.queryFields((t) => ({
     // @ts-expect-error -- a tag that may hold any string makes the cases non-finite
     refusals: { LOCKED: LockedError },
     resolve: findBroadTag,
+  }),
+  mixed: t.resultField({
+    type: "Book",
+    // @ts-expect-error -- a pattern case beside a literal one still cannot be enumerated
+    refusals: { Missing: NotFoundError },
+    resolve: findMixed,
+  }),
+  pair: t.resultField({
+    type: "Pair",
+    refusals: {},
+    resolve: () => OkAsync([1, 2] as const),
+  }),
+  pairFromGenerator: t.resultField({
+    type: "Pair",
+    refusals: {},
+    // @ts-expect-error -- an array-shaped scalar is no GraphQL list: it takes its array
+    resolve: () => OkAsync(pairGenerator),
+  }),
+  errorValued: t.resultField({
+    type: Rejection,
+    refusals: {},
+    // @ts-expect-error -- an Error cannot be a field's value: the errors plugin would take it for a refusal
+    resolve: () => OkAsync(new RejectionError()),
   }),
   nullableConnection: t.resultConnection({
     type: "Book",

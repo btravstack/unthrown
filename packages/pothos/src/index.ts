@@ -64,13 +64,19 @@ export {
  * field's shape as the `Ok` value and `Failure` as the error channel.
  */
 /**
- * A field's value as its `Ok` may carry it: a list as any iterable of its
- * items — an array, a generator, an async iterable — as Pothos' own list
- * resolvers take it; any other shape as it is.
+ * A field's value as its `Ok` may carry it. A GraphQL list (`[Type]`, a
+ * `ListRef`) takes any iterable of its items — an array, a generator, an async
+ * iterable — as Pothos' own list resolvers do; any other field takes its shape
+ * as it is, an array-shaped scalar included. An `Error` cannot be a field's
+ * value: `@pothos/plugin-errors` would take it for a refusal.
  */
-export type ResolvedShape<Shape> = Shape extends readonly (infer Item)[]
-  ? Iterable<Item> | AsyncIterable<Item>
-  : Shape;
+export type ResolvedShape<Type, Shape> = Shape extends Error
+  ? never
+  : Type extends readonly unknown[] | { readonly kind: "List" }
+    ? Shape extends readonly (infer Item)[]
+      ? Iterable<Item> | AsyncIterable<Item>
+      : Shape
+    : Shape;
 
 export type ResultResolver<
   Types extends SchemaTypes,
@@ -111,7 +117,7 @@ export type ResultFieldOptions<
     Types,
     ParentShape,
     Args,
-    ResolvedShape<ShapeFromTypeParam<Types, Type, Nullable>>,
+    ResolvedShape<Type, ShapeFromTypeParam<Types, Type, Nullable>>,
     Failure
   >;
 };

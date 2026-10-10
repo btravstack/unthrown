@@ -92,7 +92,12 @@ that classify a defect are guarded too (a proxy's `getPrototypeOf` or a
 it is wrapped, and `outcomeOf` still never rejects. A list field's `Ok` takes any iterable of its items
 (`ResolvedShape`: an array, a generator, an async iterable), as Pothos' own
 list resolvers do; any other field's `Ok` takes its output shape, which for a
-loadable object already includes its key. A nullable `resultConnection` may
+loadable object already includes its key. Whether a field is a list comes
+from its GraphQL type (`[Type]`, a `ListRef`), never its TypeScript shape, so
+an array-shaped scalar takes its array. An `Error` cannot be a field's value
+(`ResolvedShape` is `never` for it): the errors plugin would take a returned
+`Error` for a refusal. Finiteness is tested per case member, so a literal case
+beside a pattern (`"Missing" | `E_${string}``) is refused too. A nullable `resultConnection` may
 answer `Ok(null)`, and it forwards relay's connection and edge options (its
 second and third arguments) to `connection`. `outcomeOf` is the
 DataLoader twin: the same mapping, but a `Defect` — or a failure no refusal
