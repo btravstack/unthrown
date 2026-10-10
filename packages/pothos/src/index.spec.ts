@@ -402,4 +402,14 @@ describe("outcomeOf", () => {
 
     expect(outcome).toEqual(new ClosedError(inherited as Locked));
   });
+
+  it("reads the case of a callable failure", async () => {
+    const callable = Object.assign(() => undefined, { _tag: "Missing" as const, title: "ghost" });
+
+    const outcome = await outcomeOf(Err(callable as unknown as Missing), {
+      Missing: NotFoundError,
+    });
+
+    expect(outcome).toEqual(new NotFoundError(callable as unknown as Missing));
+  });
 });

@@ -95,7 +95,8 @@ export const typesOf = <Failure>(refusals: Refusals<Failure>): ErrorClass[] => [
 
 // The case a failure names, as `CaseOf` reads it: a string `_tag`, else a string `code`.
 const caseOf = (failure: unknown): string | undefined => {
-  if (typeof failure !== "object" || failure === null) {
+  // A callable object may carry a case too, as `Caseable` allows.
+  if ((typeof failure !== "object" && typeof failure !== "function") || failure === null) {
     return undefined;
   }
   // An own `_tag` only: an inherited one is absent from the static type `CaseOf` reads.

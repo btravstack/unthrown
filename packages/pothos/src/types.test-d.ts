@@ -264,6 +264,13 @@ builder.queryFields((t) => ({
     // @ts-expect-error -- an Error cannot be a field's value: the errors plugin would take it for a refusal
     resolve: () => OkAsync(new RejectionError()),
   }),
+  nullableWithResultFields: t.resultField({
+    type: "Book",
+    nullable: true,
+    errors: { dataField: { description: "The book" } },
+    refusals: {},
+    resolve: findAlways,
+  }),
   nullableConnection: t.resultConnection({
     type: "Book",
     nullable: true,
