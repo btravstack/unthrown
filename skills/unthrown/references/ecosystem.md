@@ -245,8 +245,9 @@ whose fields are resolved by a `Result`:
   the server (Yoga does by default; graphql-js alone does not).
 - `@unthrown/pothos/relay` — `t.resultConnection(...)`, the same for Relay
   connections (side-effectful import; list `RelayPlugin` in the builder).
-- `outcomeOf(result, refusals)` — what a DataLoader answers for one key: the
-  value, the refusal, or a `Defect` as an `Error`, never a rejection.
+- `outcomeOf(result, refusals, defaultTypes?)` — what a DataLoader answers for
+  one key: the value, the refusal, or a `Defect` as an `Error`, never a
+  rejection. Pass the builder's `errors.defaultTypes`.
 - Register each refusal class as an object type
   (`builder.objectType(NotFoundError, …)`).
 

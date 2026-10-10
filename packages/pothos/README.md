@@ -66,9 +66,12 @@ A failure names its case by its `_tag` (a `TaggedError`) or its `code` (an
 - **`resultConnection`** (`@unthrown/pothos/relay`) — the same for
   `@pothos/plugin-relay`'s `t.connection`.
 - **`outcomeOf`** — a `Result` as a DataLoader answers one key: the value or the
-  refusal, a `Defect` as an `Error` rather than a rejected batch.
-- **`settle`**, **`typesOf`** — the two halves `resultField` is built from, for a
-  field type the package does not wrap.
+  refusal, a `Defect` as an `Error` rather than a rejected batch. Pass it the
+  builder's `defaultTypes`.
+
+A `Defect` is thrown as an error of the operation, never claimed as a refusal;
+hiding its message is the server's job (GraphQL Yoga masks by default,
+graphql-js alone does not).
 
 Peers: `@pothos/core` `^4.15.0`, `@pothos/plugin-errors` `^4.9.0`, `graphql`
 `^16.10.0 || ^17.0.0`, and `@pothos/plugin-relay` `^4.8.0` (optional, for

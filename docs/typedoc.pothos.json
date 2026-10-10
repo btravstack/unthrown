@@ -6,10 +6,10 @@
   "out": "api/pothos",
   "intentionallyNotExported": [
     "ConnectionOf",
+    "ConnectionValue",
     "ErrorClass",
+    "FailureOf",
     "FieldOptions",
-    "Handled",
-    "NonFiniteOf",
-    "RefusalsOfFinite"
+    "NonFiniteOf"
   ]
 }

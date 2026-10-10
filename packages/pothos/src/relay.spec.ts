@@ -42,10 +42,10 @@ builder.queryType({
       resolve: (_root, { open }) => (open ? OkAsync(SHELF) : ErrAsync(new Closed())),
     }),
     counted: t.resultConnection(
-      { type: "Book", refusals: {}, resolve: () => OkAsync(SHELF) },
+      { type: "Book", refusals: {}, resolve: () => OkAsync({ ...SHELF, totalCount: 3 }) },
       {
         fields: (c) => ({
-          totalCount: c.int({ resolve: () => 1 }),
+          totalCount: c.int({ resolve: (connection) => connection.totalCount }),
         }),
       },
     ),
@@ -100,7 +100,13 @@ describe("resultConnection", () => {
     });
 
     expect(answer).toEqual({
-      data: { counted: { __typename: "QueryCountedConnection", totalCount: 1 } },
+      data: { counted: { __typename: "QueryCountedConnection", totalCount: 3 } },
     });
+  });
+
+  it("keeps a connection that cannot fail a plain field, not a one-member union", () => {
+    const counted = schema.getQueryType()?.getFields()["counted"];
+
+    expect(String(counted?.type)).toBe("QueryCountedConnection");
   });
 });

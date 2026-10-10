@@ -41,43 +41,28 @@ import type { ErrorFieldOptions } from "@pothos/plugin-errors";
 import type { GraphQLResolveInfo } from "graphql";
 import type { AsyncResult, Result } from "unthrown";
 
-import {
-  attempt,
-  handledTypes,
-  settle,
-  typesOf,
-  type Caseable,
-  type Refusals,
-} from "./refusals.js";
+import { resultConfig, type Caseable, type Refusals } from "./refusals.js";
 
-export {
-  outcomeOf,
-  settle,
-  typesOf,
-  type Caseable,
-  type CaseOf,
-  type Refusals,
-} from "./refusals.js";
+export { outcomeOf, type Caseable, type CaseOf, type Refusals } from "./refusals.js";
+
+/**
+ * A field's value as its `Ok` may carry it. A GraphQL list (`[Type]`, a
+ * `ListRef`) takes any synchronous iterable of its items, each possibly a
+ * promise — an array, a generator; any other field takes its shape as it is,
+ * an array-shaped scalar included. An `Ok` holding an `Error` is answered as a
+ * defect at runtime: the errors plugin would take it for a refusal.
+ */
+export type ResolvedShape<Type, Shape> = Type extends readonly unknown[] | { readonly kind: "List" }
+  ? Shape extends readonly (infer Item)[]
+    ? Iterable<Item | Promise<Item>>
+    : Shape
+  : Shape;
 
 /**
  * A resolver answering a `Result`: Pothos' four resolver arguments, the
- * field's shape as the `Ok` value and `Failure` as the error channel.
+ * field's value as the `Ok` and `Failure` as the error channel. Every member
+ * of `Failure` must name its case (`Caseable`).
  */
-/**
- * A field's value as its `Ok` may carry it. A GraphQL list (`[Type]`, a
- * `ListRef`) takes any iterable of its items, each possibly a promise — an
- * array, a generator, an async iterable — as Pothos' own list resolvers do; any other field takes its shape
- * as it is, an array-shaped scalar included. An `Error` cannot be a field's
- * value: `@pothos/plugin-errors` would take it for a refusal.
- */
-export type ResolvedShape<Type, Shape> = Shape extends Error
-  ? never
-  : Type extends readonly unknown[] | { readonly kind: "List" }
-    ? Shape extends readonly (infer Item)[]
-      ? Iterable<Item | Promise<Item>> | AsyncIterable<Item>
-      : Shape
-    : Shape;
-
 export type ResultResolver<
   Types extends SchemaTypes,
   Parent,
@@ -171,20 +156,7 @@ const fieldBuilder = RootFieldBuilder.prototype as PothosSchemaTypes.RootFieldBu
 
 fieldBuilder.resultField = function resultField(fieldOptions) {
   // A subscription builder's options never reach here: they do not compile.
-  const { refusals, resolve, errors, ...options } = fieldOptions as Extract<
-    typeof fieldOptions,
-    { readonly refusals: unknown }
-  >;
-  return this.field({
-    ...options,
-    errors: { ...errors, types: typesOf(refusals) },
-    resolve: async (parent: unknown, args: object, context: object, info: GraphQLResolveInfo) =>
-      settle(
-        attempt(() => resolve(parent, args as never, context, info)),
-        refusals,
-        handledTypes(refusals, this.builder.options.errors?.defaultTypes),
-      ),
-  } as never);
+  return this.field(resultConfig(this.builder.options.errors?.defaultTypes, fieldOptions) as never);
 };
 
 /** The plugin's name, as `SchemaBuilder`'s `plugins` option takes it. */

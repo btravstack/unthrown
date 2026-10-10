@@ -984,9 +984,9 @@ copies) — issue #256, observed live in btravstack/start#99.
   own TypeScript (see the toolchain section). One `typedoc.<name>.json` per
   documented package points its `entryPoints`/`tsconfig` back at that package's
   sources and writes straight into `api/<name>/`; `scripts/build-api.ts` runs
-  the ten concurrently (wiping stale `api/*/` output first, and printing any
+  the eleven concurrently (wiping stale `api/*/` output first, and printing any
   TypeDoc warning a successful run would otherwise swallow). There is no per-package `build:docs` and no copy step.
-  Only `core`, `drizzle`, `orpc` and `saga` keep a `typedoc.<name>.json` of
+  Only `core`, `drizzle`, `orpc`, `pothos` and `saga` keep a `typedoc.<name>.json` of
   their own — they carry a `categoryOrder`, an `intentionallyNotExported`, or
   several entry points (`orpc` has no root export at all). The other six differ solely in
   name/entryPoints/tsconfig/out, so they share `typedoc.base.json` and take
@@ -1007,7 +1007,7 @@ copies) — issue #256, observed live in btravstack/start#99.
 
 Core has **no runtime dependencies** (the error matcher is built-in). Never
 pull `vitest` or any interop peer (`effect`, `neverthrow`, `@bloodyowl/boxed`,
-`@orpc/*`, `drizzle-orm`, `pg`) into core.
+`@orpc/*`, `drizzle-orm`, `pg`, `@pothos/*`, `graphql`) into core.
 
 Every satellite package depends on core via `workspace:^` (an exact pin would
 create a dual-copy hazard with the `instanceof`-based `isResult`); for the same

@@ -5,126 +5,116 @@ theses, the load-bearing runtime invariants, the public surface and the
 internal design — live in the root [`CLAUDE.md`](../../CLAUDE.md) and apply
 here too.
 
-PeerDeps `@pothos/core` `^4.15.0`, `@pothos/plugin-errors` `^4.9.0`, `graphql`
+## Peers
+
+`@pothos/core` `^4.15.0`, `@pothos/plugin-errors` `^4.9.0`, `graphql`
 `^16.10.0 || ^17.0.0`, and `@pothos/plugin-relay` `^4.8.0` as an **optional**
 peer — **peers, not deps**: Pothos plugins extend one `SchemaBuilder` class and
 one `RootFieldBuilder` prototype, and graphql checks a schema's realm, so a
-second copy of any of them breaks at runtime.
+second copy of any of them breaks at runtime. **Outside the fixed version
+group** — its majors track Pothos', not the family's.
 
-A Pothos plugin (`unthrown`) whose fields are resolved by a `Result`. The
-resolver's failure is mapped to GraphQL error classes by a `refusals` record
-keyed by **case** — the failure's `_tag` (a `TaggedError`), else its `code` (an
-`ORPCError`, or any `code`-discriminated value); a failure naming neither has
-no case (`CaseOf` is `never`) and cannot be refused. So a field's resolver
-answers `Result<Shape, Failure & Caseable>`: a failure with any member that is
-neither a string `_tag` nor a string `code` — a primitive, an untagged object —
-fails right at `resolve`, rather than vanishing from `CaseOf` and reaching the
-runtime as a defect. The constraint lives where `Failure` is inferred: an
-intersection into the options, or a constraint on the type parameter, is
-evaluated before a context-sensitive `resolve` is inferred, and rejects every
-field. At runtime `caseOf` reads a string `_tag`, else a string `code`, and
-answers no case for anything else, a primitive included, without throwing. An
-optional string `_tag` beside a `code` (`{ _tag?: "Draft"; code: "LOCKED" }`)
-contributes its values to `CaseOf` — the tag names the case whenever it is
-present — so the record must refuse both. `FailureOf` takes every member whose
-cases include the case, so a union-valued discriminant (`code: "A" | "B"`)
-keeps its type in each constructor slot rather than collapsing to `never`.
-`Refusals<Failure>` is a
-mapped type over the cases, so it is exhaustive the way the error combinators'
-matcher is (Thesis #5): a missing case, an extra one, or a class whose
-constructor takes another case's failure does not compile. The record — not a
-matcher callback — because the field's error **types** must be known as values:
-`@pothos/plugin-errors` builds the result union from `errors.types`, which
-`typesOf(refusals)` derives (each class once), so the union and the mapping
-cannot drift. `Failure` is inferred from `resolve` alone (`refusals` is
-`NoInfer`), so the record is checked against the resolver, never the reverse.
+## Cases and `Refusals`
 
-Variants map as: `Ok` → the field's value; `Err` → `new Refusal(error)`,
-**returned**, not thrown — `@pothos/plugin-errors` answers a returned `Error`
-of a declared type as its union member (its `wrapResolve` checks
-`result instanceof Error` before its `catch`), so no throw is needed to reach
-the union; `Defect` → the cause is **thrown** by `settle` (the elimination
-edge), an error of the operation like any resolver error; hiding its message
-is the server's job (Yoga masks by default, graphql-js alone does not), and the
-docs say so rather than promise masking. A cause that is an
-instance of a class the errors plugin answers on the field — one of its
-refusals, or one of the plugin's `defaultTypes` — is wrapped first
-(`new Error("Defect", { cause })`): thrown raw, the plugin would answer the bug
-as a modeled refusal. When even that wrapper would be claimed
-(`defaultTypes: [Error]`), the defect travels as a non-`Error` signal, which
-GraphQL turns into an error of its own. Any other cause, a
-`GraphQLError` included, is rethrown as it is. The resolver itself is called
-through `attempt`, inside a promise, so a synchronous throw becomes a `Defect`
-and takes the same path; and a refusal constructor that throws is answered as a
-defect by `outcomeOf`, never a rejection. Both paths share `answerOf` (value,
-refusal or defect) and differ only in how they surface a defect: `settle`
-throws it unclaimed; `outcomeOf` returns it as an `Error`, wrapped when a
-handled class would claim its cause — a loader can only reject a key with an
-`Error`, so a base `Error` among `defaultTypes` claims every loader defect,
-which the TSDoc states. Refusal classes are read as own properties
-(`Object.hasOwn`); `Refusals` refuses a widened discriminant (`code: string`,
-no cases to enumerate) and a `__proto__` case (an object literal's
-`__proto__` sets its prototype). A non-finite case (`code: string`, or a template
-literal such as `` `E_${string}` ``) is refused the same way — `{}` extends
-`Record<Case, unknown>` exactly when the cases form an index signature — and
-a resolver that cannot fail (`Failure` is `never`) takes an exactly empty
-record, so an impossible refusal cannot add a member to the union. The
-`never` test is on `Failure` itself, not on `CaseOf<Failure>`: while a
-context-sensitive `resolve` is still being inferred, `Failure` is a
-placeholder whose `CaseOf` is `never` too, and an exact empty record there
-would reject every field. Neither method resolves subscription fields — the
-errors plugin wraps a subscription's `subscribe` before any `Result` is
-settled — so on a subscription builder their options do not compile.
-`resultConnection` infers the resolved connection (`ConnectionResult`) from
-`resolve` and hands it to relay's connection and edge options, so a
-`totalCount` the resolver returns is typed where those options read it. Its nullability defaults to the builder's
-`DefaultFieldNullability`, as `resultField`'s does. Reading a failure's case is
-guarded like constructing its refusal: a `_tag` or `code` getter that throws is
-a defect. The extra-case check is TypeScript's excess-property check, so it
-holds for an inline record or one declared with `satisfies Refusals<Failure>`;
-capturing a predeclared map's type as a generic and refusing its extra keys was
-tried and rejected — evaluated before a context-sensitive `resolve` is
-inferred, it refuses valid fields. A `_tag` whose type may hold any string (`unknown`,
-`string`) beside a `code` makes the cases non-finite, so the record is refused
-rather than missing the tags `caseOf` dispatches on. The `instanceof` checks
-that classify a defect are guarded too (a proxy's `getPrototypeOf` or a
-`Symbol.hasInstance` may throw): an unclassifiable cause counts as claimed, so
-it is wrapped, and `outcomeOf` still never rejects. A list field's `Ok` takes any iterable of its items
-(`ResolvedShape`: an array, a generator, an async iterable), as Pothos' own
-list resolvers do; any other field's `Ok` takes its output shape, which for a
-loadable object already includes its key. Whether a field is a list comes
-from its GraphQL type (`[Type]`, a `ListRef`), never its TypeScript shape, so
-an array-shaped scalar takes its array. An `Error` cannot be a field's value
-(`ResolvedShape` is `never` for it): the errors plugin would take a returned
-`Error` for a refusal. Finiteness is tested per case member, so a literal case
-beside a pattern (`"Missing" | `E_${string}``) is refused too. The `Error` rule also holds at runtime: an `Ok`
-whose value is an `Error` that a loose static type let through (`unknown`,
-`{ message: string }`) is answered as a defect on both paths, never handed to
-the plugin as a value. List items may be promises (`Iterable<Item |
-Promise<Item>>`), as in Pothos' own list resolvers. `caseOf` reads `_tag` from
-the failure and its prototype chain — an own property, as `TaggedError` assigns
-it, or a class's getter — but never from `Object.prototype`, where pollution
-lands. The runtime cannot see static types, so a value whose own prototype
-carries a tag its declared type lacks is mis-typed, and is read as tagged. A nullable `resultConnection` may
-answer `Ok(null)`, and it forwards relay's connection and edge options (its
-second and third arguments) to `connection`. `outcomeOf` is the
-DataLoader twin: the same mapping, but a `Defect` — or a failure no refusal
-maps, which only an unchecked cast can produce — is **returned** as an `Error`
-(the cause itself when it is one, else `new Error("Defect", { cause })`), so
-one key's bug does not reject the whole batch.
+A Pothos plugin (`unthrown`) whose fields are resolved by a `Result`. Each case
+of the resolver's failure maps to a GraphQL error class through a `refusals`
+record. A failure names its case by its `_tag` (a `TaggedError`), else its
+`code` (an `ORPCError`, or any `code`-discriminated value); an optional string
+`_tag` beside a `code` names the case whenever present, so both count.
 
-Two entry points, both side-effectful (listed in `sideEffects`): `.` registers
-the plugin and `resultField` (declaration merge into `PothosSchemaTypes` plus a
+- `Refusals<Failure>` is a mapped type over `CaseOf<Failure>`, exhaustive the
+  way the error combinators' matcher is (Thesis #5): a missing case, an extra
+  one, or a class whose constructor takes another case's failure does not
+  compile. `FailureOf` keeps every member whose cases include the case, so a
+  union-valued discriminant (`code: "A" | "B"`) keeps its type.
+- A record, not a matcher callback: `@pothos/plugin-errors` builds the result
+  union from `errors.types`, so the classes must be known as values.
+- A resolver that cannot fail (`Failure` is `never`) takes an exactly empty
+  record. Cases that cannot be enumerated — a pattern (`string`,
+  `` `E_${string}` ``), alone or beside literals, or a `_tag` that may hold any
+  string — make the record unsatisfiable. The `never` test is on `Failure`
+  itself: while a context-sensitive `resolve` is still being inferred,
+  `CaseOf` is `never` too, and an empty record there would reject every field.
+- Every failure member must name a case: a field's resolver, and `outcomeOf`,
+  answer `Failure & Caseable`. The constraint sits where `Failure` is inferred;
+  intersecting a check into the options, or constraining the type parameter,
+  is evaluated before a context-sensitive `resolve` is inferred and rejects
+  valid fields. For the same reason a refusals map declared apart is not
+  checked for extra keys by the type; the extra-case check is TypeScript's
+  excess-property check, which `satisfies Refusals<Failure>` keeps.
+- `Failure` is inferred from `resolve` alone (`refusals` is `NoInfer`).
+
+At runtime `caseOf` reads a string `_tag`, else a string `code`, from an
+object or a callable, and answers no case for anything else without throwing;
+the refusal class is read as an own property of the record.
+
+## How each variant surfaces
+
+`answerOf` decides once, for both paths:
+
+- `Ok` → the field's value. An `Ok` holding an `Error` (a loose static type let
+  it through) is a defect: the errors plugin takes a returned `Error` for a
+  refusal.
+- `Err` → `new Refusal(error)`, **returned**, not thrown — the errors plugin
+  answers a returned `Error` of a declared type as its union member (its
+  `wrapResolve` checks `result instanceof Error` before its `catch`). Reading
+  the case and building the refusal are one guarded step: a throwing getter or
+  constructor is a defect, and so is a failure no refusal maps (only an
+  unchecked cast can produce one), whose defect carries the failure.
+- `Defect` → see below.
+
+A resolver (`settle`, internal) is called inside a promise, so a synchronous
+throw is a defect too. A defect is **thrown unclaimed**: as it is, unless one
+of the classes the plugin answers on the field (its refusals, the builder's
+`defaultTypes`) would claim it — then wrapped (`new Error("Defect", { cause })`),
+or, when even that would be claimed (`defaultTypes: [Error]`), thrown as a
+plain object GraphQL turns into an error of its own. Hiding a defect's message
+is the server's job (Yoga masks by default; graphql-js alone does not), and the
+docs say so. A `GraphQLError` cause is rethrown as it is: GraphQL's own signal
+for an error meant for the client, which an integration (an oRPC bridge
+answering "access refused") relies on.
+
+`outcomeOf` is the DataLoader twin: the same answer, but a defect is
+**returned** as an `Error` (wrapped when a handled class would claim it), so
+one key's bug does not reject the batch. It takes the builder's `defaultTypes`
+as its third argument. A loader can only reject a key with an `Error`, so a
+base `Error` among `defaultTypes` claims every loader defect — stated in its
+TSDoc and the guide. The `instanceof` checks that classify a defect are guarded
+(a proxy's `getPrototypeOf`, a `Symbol.hasInstance` may throw): an
+unclassifiable cause counts as claimed.
+
+## Field values
+
+A field's `Ok` takes its output shape (`ResolvedShape`), which for a loadable
+object already includes its key. A GraphQL list (`[Type]`, a `ListRef`) takes
+any synchronous iterable of its items, each possibly a promise; list-ness comes
+from the GraphQL type, not the TypeScript shape, so an array-shaped scalar
+takes its array. Async iterables are left out: graphql 16 does not execute them
+as lists. `resultConnection` infers the resolved connection (`ConnectionResult`)
+from `resolve` and hands it to relay's connection, edge and errors options, so a
+`totalCount` the resolver returns is typed where they read it; its nullability
+defaults to the builder's, as `resultField`'s does.
+
+## Entry points
+
+Two, both side-effectful (listed in `sideEffects`): `.` registers the plugin
+and `resultField` (declaration merge into `PothosSchemaTypes` plus a
 `RootFieldBuilder.prototype` assignment, the packaging every Pothos plugin
-uses) and exports `settle` / `outcomeOf` / `typesOf` and the types;
-`./relay` adds `resultConnection` on top of `@pothos/plugin-relay`'s
-`connection`, kept apart so relay's types are needed only by its importers.
-Both methods delegate to `t.field` / `t.connection`, keeping every other option
-— including the errors plugin's own (`directResult`, `dataField`), whose
-`types` alone the refusals replace.
+uses) and exports `outcomeOf` and the types; `./relay` adds `resultConnection`
+on top of `@pothos/plugin-relay`'s `connection`, kept apart so relay's types
+are needed only by its importers. Both delegate through one `resultConfig` to
+`t.field` / `t.connection`, keeping every other option — including the errors
+plugin's own (`directResult`, `dataField`), whose `types` alone the refusals
+replace. A field with no refusals, no errors options and no `defaultTypes` on
+the builder stays a plain field rather than a one-member union. Neither method
+resolves subscription fields — the errors plugin wraps `subscribe` before any
+`Result` is settled — so on a subscription builder their options do not
+compile.
 
-Tests run against a real Pothos schema executed with `graphql`. Vitest inlines
-`@pothos/*` (`server.deps.inline`): left external, Pothos would build its
-schema with Node's copy of graphql while a spec's own `import { graphql }`
-resolves Vite's, and graphql's realm check refuses the schema. **Outside the
-fixed version group** — its majors track Pothos', not the family's.
+## Tests
+
+Specs run against a real Pothos schema executed with `graphql`; type tests
+(`types.test-d.ts`) pin each compile-time guarantee with `@ts-expect-error`.
+Vitest inlines `@pothos/*` (`server.deps.inline`): left external, Pothos would
+build its schema with Node's copy of graphql while a spec's own
+`import { graphql }` resolves Vite's, and graphql's realm check refuses it.

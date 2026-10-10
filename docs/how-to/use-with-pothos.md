@@ -26,12 +26,14 @@ settled by the types:
 A `Defect` is never answered as a typed refusal, but hiding its message is the
 server's job. GraphQL Yoga masks unexpected errors by default; executing the
 schema with graphql-js alone, or with a server that does not mask, returns the
-defect's message to the client.
+defect's message to the client. A defect whose cause is a `GraphQLError` is
+rethrown as it is — GraphQL's own signal for an error meant for the client, so
+Yoga shows it.
 :::
 
 ## Register the plugin
 
-`@unthrown/pothos` builds on the errors plugin, which the builder lists before it:
+`@unthrown/pothos` builds on the errors plugin, which the builder lists too:
 
 ```ts
 import SchemaBuilder from "@pothos/core";
@@ -80,6 +82,11 @@ builder.queryField("book", (t) =>
 );
 ```
 
+`resolve` answers a `Result` or an `AsyncResult`, never a `Promise`: an
+`async` resolver does not compile, so async work enters through
+[`fromPromise`](./qualify-a-boundary) and composes with `flatMap`, as everywhere
+in unthrown.
+
 A failure names its case by its `_tag`, or by its `code` — so an `ORPCError` from
 [`@unthrown/orpc`](./use-with-orpc)'s client maps by the code its procedure
 declares (`{ NOT_FOUND: BookNotFound }`).
@@ -93,11 +100,13 @@ The extra-case check is TypeScript's excess-property check, so it holds for the
 record written inline. A record declared apart keeps it with `satisfies`:
 
 ```ts
-const bookRefusals = {
-  Missing: NotFoundError,
-  LOCKED: ClosedError,
-} satisfies Refusals<Missing | Locked>;
+import type { Refusals } from "@unthrown/pothos";
+
+const bookRefusals = { NotFound: BookNotFound } satisfies Refusals<NotFound>;
 ```
+
+A resolver that cannot fail takes `refusals: {}`. On a builder without
+`defaultTypes` its field stays a plain field rather than a one-member union.
 
 ## Connections
 
@@ -132,9 +141,29 @@ builder.queryField("books", (t) =>
 ## DataLoaders
 
 A loader answers each key with its value or an `Error` — never a rejection,
-which would fail the whole batch. `outcomeOf` gives exactly that from a `Result`,
-a `Defect` included:
+which would fail the whole batch. `outcomeOf` gives exactly that from a `Result`:
+the value, the refusal its failure maps to, or a `Defect` as an `Error`. Pass it
+the builder's `defaultTypes` too, so a defect one of them would claim is wrapped
+rather than answered as a refusal:
 
 ```ts
-load: (titles) => Promise.all(titles.map((title) => outcomeOf(library.find(title), refusals))),
+import { outcomeOf } from "@unthrown/pothos";
+
+const BookNode = builder.loadableObject("Book", {
+  load: (titles: readonly string[]) =>
+    Promise.all(
+      titles.map((title) =>
+        outcomeOf(
+          library.find(title),
+          { NotFound: BookNotFound },
+          builder.options.errors?.defaultTypes,
+        ),
+      ),
+    ),
+  fields: (t) => ({ title: t.exposeString("title") }),
+});
 ```
+
+A loader can only reject a key with an `Error`, so with a base `Error` among the
+errors plugin's `defaultTypes`, every defect a loader reports is claimed as that
+default type — the one case where a defect reaches the union.

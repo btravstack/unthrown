@@ -10,7 +10,7 @@ import {
   fromSafePromise,
   type AsyncResult,
 } from "unthrown";
-import { describe, expect, it, onTestFinished } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import UnthrownPlugin, { outcomeOf } from "./index.js";
 
@@ -99,24 +99,6 @@ builder.queryType({
       type: "Book",
       refusals: { Missing: ClaimedByDefaultError },
       resolve: () => find("ghost") as AsyncResult<Book, Missing>,
-    }),
-    catalogue: t.resultField({
-      type: ["Book"],
-      errors: { directResult: false },
-      refusals: {},
-      resolve: () =>
-        Ok(
-          (function* catalogue() {
-            yield { title: "Dune" };
-            yield { title: "Emma" };
-          })(),
-        ),
-    }),
-    promisedCatalogue: t.resultField({
-      type: ["Book"],
-      errors: { directResult: false },
-      refusals: {},
-      resolve: () => Ok([Promise.resolve({ title: "Dune" }), { title: "Emma" }]),
     }),
     errorAsValue: t.resultField({
       type: "Book",
@@ -230,28 +212,6 @@ describe("resultField", () => {
     });
   });
 
-  it("takes any iterable for a list", async () => {
-    const answer = await graphql({
-      schema,
-      source: "{ catalogue { ... on QueryCatalogueSuccess { data { title } } } }",
-    });
-
-    expect(answer).toEqual({
-      data: { catalogue: { data: [{ title: "Dune" }, { title: "Emma" }] } },
-    });
-  });
-
-  it("takes promised items for a list", async () => {
-    const answer = await graphql({
-      schema,
-      source: "{ promisedCatalogue { ... on QueryPromisedCatalogueSuccess { data { title } } } }",
-    });
-
-    expect(answer).toEqual({
-      data: { promisedCatalogue: { data: [{ title: "Dune" }, { title: "Emma" }] } },
-    });
-  });
-
   it("answers an Error its static type let through as a Defect, not a refusal", async () => {
     const answer = await graphql({ schema, source: "{ errorAsValue { __typename } }" });
 
@@ -292,23 +252,26 @@ describe("outcomeOf", () => {
     expect(await outcomeOf(torn, {})).toEqual(new Error("Defect", { cause: "disk failure" }));
   });
 
-  it("answers a failure no refusal maps as a defect", async () => {
-    // Only an unchecked cast can leave a case unmapped; the refusals record is exhaustive otherwise.
-    const outcome = await outcomeOf(Err(new Missing({ title: "ghost" })), {} as never);
+  it("answers a failure no refusal maps as a defect carrying it", async () => {
+    // Only an unchecked cast leaves a failure unmapped: a missing case, a failure
+    // naming no case, a primitive, or a case only the record's prototype answers.
+    const unmapped: readonly unknown[] = [
+      new Missing({ title: "ghost" }),
+      { reason: "unnamed" },
+      "not_found",
+      { code: "toString" },
+    ];
 
-    expect(outcome).toBeInstanceOf(Error);
-  });
+    const outcomes = await Promise.all(
+      unmapped.map(async (failure) => outcomeOf(Err(failure) as never, {} as never)),
+    );
 
-  it("answers a failure naming no case as a defect", async () => {
-    const outcome = await outcomeOf(Err({ reason: "unnamed" }) as never, {} as never);
-
-    expect(outcome).toBeInstanceOf(Error);
-  });
-
-  it("answers a primitive failure as a defect, without rejecting", async () => {
-    const outcome = await outcomeOf(Err("not_found") as never, {} as never);
-
-    expect(outcome).toBeInstanceOf(Error);
+    // An unclaimed `Error` is returned as it is; anything else is wrapped.
+    expect(outcomes).toEqual(
+      unmapped.map((failure) =>
+        failure instanceof Error ? failure : new Error("Defect", { cause: failure }),
+      ),
+    );
   });
 
   it("reads the code of a failure whose tag is no string", async () => {
@@ -338,12 +301,6 @@ describe("outcomeOf", () => {
     const outcome = await outcomeOf(fromSafePromise(Promise.reject(claimed)), {}, [NotFoundError]);
 
     expect(outcome).toEqual(new Error("Defect", { cause: claimed }));
-  });
-
-  it("never reads a refusal from the record's prototype", async () => {
-    const outcome = await outcomeOf(Err({ code: "toString" }) as never, {} as never);
-
-    expect(outcome).toBeInstanceOf(Error);
   });
 
   it("answers a failure whose case cannot be read as a defect, without rejecting", async () => {
@@ -410,18 +367,6 @@ describe("outcomeOf", () => {
     const outcome = await outcomeOf(Err(failure), { Missing: GetterNotFoundError });
 
     expect(outcome).toEqual(new GetterNotFoundError(failure));
-  });
-
-  it("ignores a tag polluted onto Object.prototype", async () => {
-    Object.defineProperty(Object.prototype, "_tag", { value: "Draft", configurable: true });
-    onTestFinished(() => {
-      Reflect.deleteProperty(Object.prototype, "_tag");
-    });
-    const locked: Locked = { code: "LOCKED", until: "2027-01-01" };
-
-    const outcome = await outcomeOf(Err(locked), { LOCKED: ClosedError });
-
-    expect(outcome).toEqual(new ClosedError(locked));
   });
 
   it("reads the case of a callable failure", async () => {

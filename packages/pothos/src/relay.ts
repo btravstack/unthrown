@@ -13,6 +13,7 @@ import {
   type InputFieldsFromShape,
   type InputShapeFromFields,
   type InterfaceParam,
+  type ObjectRef,
   type OutputType,
   type SchemaTypes,
   type ShapeFromTypeParam,
@@ -22,14 +23,7 @@ import type { ConnectionShapeForType, DefaultConnectionArguments } from "@pothos
 import type { GraphQLResolveInfo } from "graphql";
 import type { AsyncResult, Result } from "unthrown";
 
-import {
-  attempt,
-  handledTypes,
-  settle,
-  typesOf,
-  type Caseable,
-  type Refusals,
-} from "./refusals.js";
+import { resultConfig, type Caseable, type Refusals } from "./refusals.js";
 
 type ConnectionArgs<Types extends SchemaTypes, Args extends InputFieldMap> = InputFieldsFromShape<
   Types,
@@ -45,6 +39,10 @@ type ConnectionOf<
   EdgeNullability extends FieldNullability<[unknown]>,
   NodeNullability extends boolean,
 > = ConnectionShapeForType<Types, Type, false, EdgeNullability, NodeNullability>;
+
+type ConnectionValue<ConnectionResult, Nullable extends boolean> = Nullable extends true
+  ? ConnectionResult | null | undefined
+  : ConnectionResult;
 
 type FieldOptions<
   Types extends SchemaTypes,
@@ -88,7 +86,11 @@ export type ResultConnectionOptions<
   readonly args?: Args;
   readonly edgesNullable?: EdgeNullability;
   readonly nodeNullable?: NodeNullability;
-  readonly errors?: Omit<ErrorFieldOptions<Types, Type, ConnectionResult, Nullable>, "types">;
+  // The success value is the generated connection, not the node `Type`.
+  readonly errors?: Omit<
+    ErrorFieldOptions<Types, ObjectRef<Types, ConnectionResult>, ConnectionResult, Nullable>,
+    "types"
+  >;
   readonly refusals: NoInfer<Refusals<Failure>>;
   readonly resolve: (
     parent: ParentShape,
@@ -96,14 +98,8 @@ export type ResultConnectionOptions<
     context: Types["Context"],
     info: GraphQLResolveInfo,
   ) =>
-    | Result<
-        Nullable extends true ? ConnectionResult | null | undefined : ConnectionResult,
-        Failure & Caseable
-      >
-    | AsyncResult<
-        Nullable extends true ? ConnectionResult | null | undefined : ConnectionResult,
-        Failure & Caseable
-      >;
+    | Result<ConnectionValue<ConnectionResult, Nullable>, Failure & Caseable>
+    | AsyncResult<ConnectionValue<ConnectionResult, Nullable>, Failure & Caseable>;
 };
 
 // oxlint-disable typescript/consistent-type-definitions, typescript/no-namespace -- declaration merging into Pothos' global types requires a namespace of interfaces; a `type` cannot merge.
@@ -194,21 +190,8 @@ fieldBuilder.resultConnection = function resultConnection(
   edgeOptions,
 ) {
   // A subscription builder's options never reach here: they do not compile.
-  const { refusals, resolve, errors, ...options } = fieldOptions as Extract<
-    typeof fieldOptions,
-    { readonly refusals: unknown }
-  >;
   return this.connection(
-    {
-      ...options,
-      errors: { ...errors, types: typesOf(refusals) },
-      resolve: async (parent: unknown, args: object, context: object, info: GraphQLResolveInfo) =>
-        settle(
-          attempt(() => resolve(parent, args as never, context, info)),
-          refusals,
-          handledTypes(refusals, this.builder.options.errors?.defaultTypes),
-        ),
-    } as never,
+    resultConfig(this.builder.options.errors?.defaultTypes, fieldOptions) as never,
     connectionOptions as never,
     edgeOptions as never,
   );

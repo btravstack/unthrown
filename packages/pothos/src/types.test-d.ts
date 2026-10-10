@@ -9,9 +9,9 @@
 import SchemaBuilder from "@pothos/core";
 import ErrorsPlugin from "@pothos/plugin-errors";
 import RelayPlugin from "@pothos/plugin-relay";
-import { ErrAsync, OkAsync, TaggedError, type AsyncResult } from "unthrown";
+import { Err, ErrAsync, OkAsync, TaggedError, type AsyncResult } from "unthrown";
 
-import UnthrownPlugin, { type CaseOf, type Refusals } from "./index.js";
+import UnthrownPlugin, { outcomeOf, type CaseOf, type Refusals } from "./index.js";
 import "./relay.js";
 
 type Equal<X, Y> =
@@ -59,17 +59,6 @@ declare const findSplit: () => AsyncResult<{ readonly title: string }, Split>;
 
 declare const findWidened: () => AsyncResult<{ readonly title: string }, { readonly code: string }>;
 
-declare const findProto: () => AsyncResult<
-  { readonly title: string },
-  { readonly code: "__proto__" }
->;
-
-class AnyError extends Error {
-  constructor(_failure: { readonly code: string }) {
-    super("any");
-  }
-}
-
 declare const findTemplated: () => AsyncResult<
   { readonly title: string },
   { readonly code: `E_${string}` }
@@ -82,7 +71,7 @@ declare const findBroadTag: () => AsyncResult<
   { readonly _tag: unknown; readonly code: "LOCKED" }
 >;
 
-class RejectionError extends Error {}
+declare const bookGenerator: Generator<{ readonly title: string }>;
 
 declare const pairGenerator: Generator<number>;
 
@@ -120,7 +109,8 @@ const builder = new SchemaBuilder<{
   relay: {},
 });
 
-const Rejection = builder.objectRef<RejectionError>("Rejection");
+// An object type whose shape has a name and a message is no Error: it resolves.
+const Greeting = builder.objectRef<{ readonly name: string; readonly message: string }>("Greeting");
 
 builder.scalarType("Pair", { serialize: (pair) => pair, parseValue: () => [0, 0] });
 
@@ -194,12 +184,6 @@ builder.queryFields((t) => ({
     refusals: {},
     resolve: findWidened,
   }),
-  proto: t.resultField({
-    type: "Book",
-    // @ts-expect-error -- __proto__ sets an object literal's prototype, so it can name no refusal
-    refusals: { ["__proto__"]: AnyError },
-    resolve: findProto,
-  }),
   templated: t.resultField({
     type: "Book",
     // @ts-expect-error -- a template-literal code has no finite cases to enumerate
@@ -258,11 +242,20 @@ builder.queryFields((t) => ({
     // @ts-expect-error -- an array-shaped scalar is no GraphQL list: it takes its array
     resolve: () => OkAsync(pairGenerator),
   }),
-  errorValued: t.resultField({
-    type: Rejection,
+  listFromGenerator: t.resultField({
+    type: ["Book"],
     refusals: {},
-    // @ts-expect-error -- an Error cannot be a field's value: the errors plugin would take it for a refusal
-    resolve: () => OkAsync(new RejectionError()),
+    resolve: () => OkAsync(bookGenerator),
+  }),
+  listOfPromises: t.resultField({
+    type: ["Book"],
+    refusals: {},
+    resolve: () => OkAsync([Promise.resolve({ title: "Dune" }), { title: "Emma" }]),
+  }),
+  greeting: t.resultField({
+    type: Greeting,
+    refusals: {},
+    resolve: () => OkAsync({ name: "hello", message: "Hello" }),
   }),
   nullableWithResultFields: t.resultField({
     type: "Book",
@@ -326,6 +319,20 @@ builder.subscriptionFields((t) => ({
 }));
 
 export const _declared = [declaredWithExtra];
+
+// The record a non-finite failure gets cannot be satisfied, not even by its own key.
+const nonFinite: Refusals<{ readonly code: string }> = {
+  // @ts-expect-error -- its value is never
+  "every failure needs a literal _tag or code": NotFoundError,
+};
+
+// `outcomeOf` refuses failures that name no case, as a field's resolver does.
+// @ts-expect-error -- a string failure names no case
+export const loadPrimitive = outcomeOf(Err("not_found"), {});
+// @ts-expect-error -- an untagged member names no case
+export const loadUnnamed = outcomeOf(findOrUnnamed(), { Missing: NotFoundError });
+
+export const _nonFinite = [nonFinite];
 
 export type _Assertions = [
   OptionalTagAddsItsCase,

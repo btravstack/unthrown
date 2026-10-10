@@ -1,33 +1,32 @@
 // The failure-to-GraphQL-error mapping every `@unthrown/pothos` field shares:
-// the `Refusals` record a field declares, and the two ways a `Result` is
-// handed to Pothos — `settle` for a resolver, `outcomeOf` for a DataLoader.
+// the `Refusals` record a field declares, `resultConfig`, which turns a field's
+// options into what Pothos takes, and `outcomeOf`, what a DataLoader answers.
 
 import { fromSafePromise, fromSafeThrowable, Ok, type AsyncResult, type Result } from "unthrown";
 
 /**
  * The name of a failure's case: its `_tag` (a `TaggedError`), else its `code`
- * (an `ORPCError`, or any `code`-discriminated object). A failure with
- * neither has no case, so it cannot be refused — it stays a type error at the
- * field that would have to map it.
+ * (an `ORPCError`, or any `code`-discriminated object). An optional string
+ * `_tag` beside a `code` names the case whenever it is present, so both count;
+ * a tag that may hold any string (`unknown`, `string`) makes the cases
+ * non-finite, which `Refusals` refuses.
  */
 export type CaseOf<Failure> = Failure extends { readonly _tag: infer Tag extends string }
   ? Tag
   : Failure extends { readonly code: infer Code extends string }
-    ? // An optional string `_tag` names the case whenever it is present; a tag
-      // that may hold any string (`unknown`, `string`) makes the cases non-finite.
-      | ("_tag" extends keyof Failure
-          ? string extends Failure["_tag"]
-            ? string
-            : Extract<Failure["_tag"], string>
-          : never)
-      | Code
+    ?
+        | ("_tag" extends keyof Failure
+            ? string extends Failure["_tag"]
+              ? string
+              : Extract<Failure["_tag"], string>
+            : never)
+        | Code
     : never;
 
 /**
- * A failure that names its case: a string `_tag`, or a string `code`. Every
- * member of a field's failure must be one — a member naming no case would leave
- * no refusal to answer it — so a field's resolver answers `Failure & Caseable`,
- * and a failure with any other member does not compile.
+ * A failure that names its case: a string `_tag`, or a string `code`. A field's
+ * resolver (and `outcomeOf`) answers `Failure & Caseable`, so a failure with a
+ * member naming no case does not compile — no refusal could answer it.
  */
 export type Caseable = { readonly _tag: string } | { readonly code: string };
 
@@ -39,35 +38,8 @@ type FailureOf<Failure, Case> = Failure extends unknown
     : never
   : never;
 
-/**
- * One GraphQL error class per case of `Failure`, each constructed from the
- * failure of that case. It is exhaustive by construction: a missing case, an
- * extra one, or a class built from another case's failure does not compile —
- * the same guarantee the error combinators' matcher gives, keyed by the case
- * the failure names.
- *
- * The extra-case check is TypeScript's excess-property check, which holds for
- * an object literal: write the record inline, or declare it apart with
- * `satisfies Refusals<Failure>`, which checks it the same way.
- *
- * The classes are the field's error types for `@pothos/plugin-errors`, so each
- * must be registered as an object type (`builder.objectType(NotFoundError, …)`).
- */
-export type Refusals<Failure> = [Failure] extends [never]
-  ? // A resolver that cannot fail has no case to refuse: the record must stay empty.
-    { readonly [name: string]: never }
-  : [CaseOf<Failure>] extends [never]
-    ? // No case named yet (a failure still being inferred, or one `resolve` refuses).
-      { readonly [Case in CaseOf<Failure>]: never }
-    : [NonFiniteOf<CaseOf<Failure>>] extends [never]
-      ? RefusalsOfFinite<Failure>
-      : // A non-finite case (`code: string`, `` code: `E_${string}` ``) cannot be enumerated,
-        // alone or beside literal cases.
-        { readonly "every failure needs a literal _tag or code": NonFiniteOf<CaseOf<Failure>> };
-
-// The members of a case set that are patterns rather than literals: each is
-// tested on its own, since a literal beside a pattern makes the whole record
-// look finite.
+// The cases that are patterns rather than literals (`string`, `` `E_${string}` ``),
+// each tested on its own: a literal beside a pattern makes a record look finite.
 type NonFiniteOf<Case extends PropertyKey> = Case extends unknown
   ? // oxlint-disable-next-line typescript/no-empty-object-type -- `{}` tests whether one case forms an index signature
     {} extends Record<Case, unknown>
@@ -75,61 +47,48 @@ type NonFiniteOf<Case extends PropertyKey> = Case extends unknown
     : never
   : never;
 
-type RefusalsOfFinite<Failure> =
-  "__proto__" extends CaseOf<Failure>
-    ? // An object literal's `__proto__` sets its prototype: it can name no refusal.
-      { readonly "__proto__ cannot name a refusal": never }
-    : {
-        readonly [Case in CaseOf<Failure>]: new (failure: FailureOf<Failure, Case>) => Error;
-      };
-
-type ErrorClass = new (...args: never[]) => Error;
-
 /**
- * The GraphQL error types a field answers — one per refusal, each once — as
- * `@pothos/plugin-errors`' `errors.types` takes them.
+ * One GraphQL error class per case of `Failure`, each constructed from the
+ * failure of that case. It is exhaustive by construction: a missing case, an
+ * extra one, or a class built from another case's failure does not compile —
+ * the same guarantee the error combinators' matcher gives, keyed by the case
+ * the failure names. A resolver that cannot fail takes an empty record, and a
+ * failure whose cases cannot be enumerated takes none at all.
+ *
+ * The extra-case check is TypeScript's excess-property check, which holds for
+ * an object literal: write the record inline, or declare it apart with
+ * `satisfies Refusals<Failure>`.
+ *
+ * The classes are the field's error types for `@pothos/plugin-errors`, so each
+ * must be registered as an object type (`builder.objectType(NotFoundError, …)`).
  */
-export const typesOf = <Failure>(refusals: Refusals<Failure>): ErrorClass[] => [
-  ...new Set(Object.values(refusals as Readonly<Record<string, ErrorClass>>)),
-];
+export type Refusals<Failure> = [Failure] extends [never]
+  ? { readonly [name: string]: never }
+  : [CaseOf<Failure>] extends [never]
+    ? // No case yet: a failure still being inferred from a context-sensitive `resolve`.
+      { readonly [Case in CaseOf<Failure>]: never }
+    : [NonFiniteOf<CaseOf<Failure>>] extends [never]
+      ? {
+          readonly [Case in CaseOf<Failure>]: new (failure: FailureOf<Failure, Case>) => Error;
+        }
+      : { readonly "every failure needs a literal _tag or code": never };
 
-// A `_tag` the failure or its class declares — an own property or a prototype
-// getter — but never one polluted onto `Object.prototype`.
-const carriesTag = (value: object | null): boolean =>
-  value !== null &&
-  value !== Object.prototype &&
-  (Object.hasOwn(value, "_tag") || carriesTag(Object.getPrototypeOf(value) as object | null));
+type ErrorClass = new (...args: never[]) => unknown;
 
-// The case a failure names, as `CaseOf` reads it: a string `_tag`, else a string `code`.
+const typesOf = <Failure>(refusals: Refusals<Failure>): ErrorClass[] =>
+  Object.values(refusals as Readonly<Record<string, ErrorClass>>);
+
+// The case a failure names, as `CaseOf` reads it: a string `_tag`, else a string
+// `code`. A callable object may carry a case too.
 const caseOf = (failure: unknown): string | undefined => {
-  // A callable object may carry a case too, as `Caseable` allows.
   if ((typeof failure !== "object" && typeof failure !== "function") || failure === null) {
     return undefined;
   }
-  if (carriesTag(failure) && "_tag" in failure && typeof failure._tag === "string") {
+  if ("_tag" in failure && typeof failure._tag === "string") {
     return failure._tag;
   }
   return "code" in failure && typeof failure.code === "string" ? failure.code : undefined;
 };
-
-/**
- * The classes `@pothos/plugin-errors` answers on a field: its refusals, and the
- * plugin's `defaultTypes`.
- */
-export const handledTypes = <Failure>(
-  refusals: Refusals<Failure>,
-  defaultTypes: readonly (new (...args: never[]) => unknown)[] | undefined,
-): readonly (new (...args: never[]) => unknown)[] => [
-  ...typesOf(refusals),
-  ...(defaultTypes ?? []),
-];
-
-type Handled = readonly (new (...args: never[]) => unknown)[];
-
-type Answer<Value> =
-  | { readonly kind: "value"; readonly value: Value }
-  | { readonly kind: "refusal"; readonly refusal: Error }
-  | { readonly kind: "defect"; readonly cause: unknown };
 
 // The refusal class a case maps to, read as an own property only.
 const refusalFor = <Failure>(
@@ -149,8 +108,18 @@ const safely = (test: () => boolean, onThrow: boolean): boolean =>
 
 const isError = (value: unknown): value is Error => safely(() => value instanceof Error, false);
 
-// What a settled `Result` answers: its value, its refusal, or a defect. A refusal
-// constructor that throws is a bug, so it answers a defect too; and a failure no
+const claimedBy = (handled: readonly ErrorClass[], value: unknown): boolean =>
+  safely(() => handled.some((Type) => value instanceof Type), true);
+
+type Answer<Value> =
+  | { readonly kind: "value"; readonly value: Value }
+  | { readonly kind: "refusal"; readonly refusal: Error }
+  | { readonly kind: "defect"; readonly cause: unknown };
+
+// What a settled `Result` answers. A returned `Error` is what the errors plugin
+// takes for a refusal, so as a value it is a defect, whatever its static type
+// let through. Reading the case (a getter may throw) and building the refusal
+// are one guarded step: a throw there is a defect, and so is a failure no
 // refusal maps, which only an unchecked cast can produce.
 const answerOf = <Value, Failure>(
   settled: Result<Value, Failure>,
@@ -158,101 +127,106 @@ const answerOf = <Value, Failure>(
 ): Answer<Value> => {
   if (settled.isOk()) {
     const { value } = settled;
-    // A returned `Error` is what the errors plugin takes for a refusal: as a
-    // field's value it is a bug, whatever its static type let through.
     return isError(value) ? { kind: "defect", cause: value } : { kind: "value", value };
   }
   if (settled.isDefect()) {
     return { kind: "defect", cause: settled.cause };
   }
   const { error } = settled;
-  // Reading the case (a getter may throw) and building the refusal are both guarded.
-  return fromSafeThrowable(() => refusalFor(refusals, caseOf(error)))()
-    .flatMap((Refusal) =>
-      Refusal === undefined
-        ? Ok<Answer<Value>>({ kind: "defect", cause: settled })
-        : fromSafeThrowable(() => new Refusal(error))().map((refusal): Answer<Value> => ({
-            kind: "refusal",
-            refusal,
-          })),
-    )
+  return fromSafeThrowable((): Answer<Value> => {
+    const Refusal = refusalFor(refusals, caseOf(error));
+    return Refusal === undefined
+      ? { kind: "defect", cause: error }
+      : { kind: "refusal", refusal: new Refusal(error) };
+  })()
     .recoverDefect((cause) => Ok<Answer<Value>>({ kind: "defect", cause }))
     .get();
 };
 
-const claimedBy = (handled: Handled, value: unknown): boolean =>
-  safely(() => handled.some((Type) => value instanceof Type), true);
-
 /**
  * A `Result` as a DataLoader answers one key: the value, or the refusal its
- * failure maps to. A `Defect` — a refusal constructor that throws included —
- * is returned as an `Error`, never thrown, so one key's bug does not reject
- * the batch. Its cause is returned as it is unless one of the `handled` classes
- * would claim it, in which case it is wrapped (`new Error("Defect", { cause })`).
- * A loader can only reject a key with an `Error`, so a base `Error` among the
- * errors plugin's `defaultTypes` claims every defect a loader reports.
+ * failure maps to. A `Defect` is returned as an `Error`, never thrown, so one
+ * key's bug does not reject the batch — wrapped (`new Error("Defect", { cause })`)
+ * when one of the field's refusals or the builder's `defaultTypes` would claim
+ * it. Pass the builder's `defaultTypes`: a loader can only reject a key with an
+ * `Error`, so a base `Error` among them claims every defect a loader reports.
  */
 export const outcomeOf = async <Value, Failure>(
-  result: Result<Value, Failure> | AsyncResult<Value, Failure>,
+  result: Result<Value, Failure & Caseable> | AsyncResult<Value, Failure & Caseable>,
   refusals: Refusals<Failure>,
-  handled: Handled = typesOf(refusals),
+  defaultTypes: readonly ErrorClass[] = [],
 ): Promise<Value | Error> => {
   const answer = answerOf(await result, refusals);
   if (answer.kind === "defect") {
     const { cause } = answer;
+    const handled = [...typesOf(refusals), ...defaultTypes];
     return isError(cause) && !claimedBy(handled, cause) ? cause : new Error("Defect", { cause });
   }
   return answer.kind === "value" ? answer.value : answer.refusal;
 };
 
-/**
- * A defect no class of the errors plugin can claim. When even a plain `Error`
- * would be claimed (`defaultTypes: [Error]`), it travels as this signal, which
- * GraphQL turns into an error of its own.
- */
-class DefectSignal {
-  readonly message = "Defect";
-
-  constructor(readonly cause: unknown) {}
-}
-
-const unclaimed = (cause: unknown, handled: Handled): unknown => {
+// A defect thrown so no handled class claims it: as it is, else wrapped in an
+// `Error`, else — when even that would be claimed (`defaultTypes: [Error]`) — as
+// a plain object, which GraphQL turns into an error of its own. A `GraphQLError`
+// cause is rethrown as it is: GraphQL's own signal for an error meant for the
+// client, which a server shows rather than masks.
+const unclaimed = (cause: unknown, handled: readonly ErrorClass[]): unknown => {
   if (!claimedBy(handled, cause)) {
     return cause;
   }
   const wrapped = new Error("Defect", { cause });
-  return claimedBy(handled, wrapped) ? new DefectSignal(cause) : wrapped;
+  return claimedBy(handled, wrapped) ? { message: "Defect", cause } : wrapped;
 };
 
-/**
- * A resolver called for its `Result`: a synchronous throw becomes a `Defect`,
- * so it is settled like any other and never reaches the errors plugin raw.
- */
-export const attempt = <Value, Failure>(
+// A field's `Result` as a resolver answers it: the value, or the refusal —
+// returned, not thrown, since the errors plugin answers a returned error of a
+// declared type as its union member. The resolver is called inside a promise,
+// so a synchronous throw becomes a `Defect` too, and a `Defect` is thrown
+// unclaimed: an error of the operation for the server to mask.
+const settle = async <Value, Failure>(
   resolve: () => Result<Value, Failure> | AsyncResult<Value, Failure>,
-): AsyncResult<Value, Failure> =>
-  // Called inside a promise: a throw becomes its rejection, and an `AsyncResult`
-  // settles to its `Result`; `fromSafeThrowable` refuses a thenable-returning function.
-  fromSafePromise(Promise.resolve().then(resolve)).flatMap((result) => result);
-
-/**
- * A `Result` as a resolver answers it: the value, or the refusal its failure
- * maps to — returned, not thrown, because `@pothos/plugin-errors` answers a
- * returned error of a declared type as its union member. A `Defect` — a refusal
- * constructor that throws included — is a bug: it is thrown, never claimed by
- * one of the `handled` classes (the field's error types, the errors plugin's
- * `defaultTypes`), so it stays an error of the operation for the server to mask
- * (GraphQL Yoga masks by default; graphql-js alone does not).
- */
-export const settle = async <Value, Failure>(
-  result: Result<Value, Failure> | AsyncResult<Value, Failure>,
   refusals: Refusals<Failure>,
-  handled: Handled = typesOf(refusals),
+  handled: readonly ErrorClass[],
 ): Promise<Value | Error> => {
-  const answer = answerOf(await result, refusals);
+  // `fromSafeThrowable` refuses a thenable-returning function, and an `AsyncResult` is one.
+  const settled = await fromSafePromise(Promise.resolve().then(resolve)).flatMap(
+    (result) => result,
+  );
+  const answer = answerOf(settled, refusals);
   if (answer.kind === "defect") {
     // The elimination edge: a defect reaches GraphQL as a thrown error.
     throw unclaimed(answer.cause, handled);
   }
   return answer.kind === "value" ? answer.value : answer.refusal;
+};
+
+type ResultOptions = {
+  readonly refusals: Refusals<Caseable>;
+  readonly resolve: (
+    ...args: readonly [unknown, never, never, unknown]
+  ) => Result<unknown, Caseable> | AsyncResult<unknown, Caseable>;
+  readonly errors?: object;
+};
+
+/**
+ * A result field's options as Pothos' `field` (or relay's `connection`) takes
+ * them: the errors plugin's options with the refusals as `types`, and a
+ * resolver that settles the `Result`. A field that cannot fail, with no errors
+ * options of its own and no `defaultTypes` on the builder, stays a plain field
+ * rather than a one-member union.
+ */
+export const resultConfig = (
+  defaultTypes: readonly ErrorClass[] | undefined,
+  fieldOptions: object,
+): object => {
+  const { refusals, resolve, errors, ...options } = fieldOptions as ResultOptions;
+  const types = typesOf(refusals);
+  const handled = [...types, ...(defaultTypes ?? [])];
+  const plain = handled.length === 0 && errors === undefined;
+  return {
+    ...options,
+    ...(plain ? {} : { errors: { ...errors, types } }),
+    resolve: async (parent: unknown, args: never, context: never, info: unknown) =>
+      settle(() => resolve(parent, args, context, info), refusals, handled),
+  };
 };
