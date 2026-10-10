@@ -1,6 +1,6 @@
 {
   "name": "@unthrown/pothos",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Pothos integration for unthrown: GraphQL fields resolved by a Result, each failure answered as a typed error of the field's union",
   "keywords": [
     "errors-as-values",
