@@ -130,7 +130,7 @@ declare global {
       resultConnection: <
         Type extends OutputType<Types>,
         Failure,
-        Nullable extends boolean,
+        Nullable extends boolean = Types["DefaultFieldNullability"] extends true ? true : false,
         // oxlint-disable-next-line typescript/no-empty-object-type -- Pothos' own default for a field without arguments
         Args extends InputFieldMap = {},
         EdgeNullability extends FieldNullability<[unknown]> = Types["DefaultEdgesNullability"],

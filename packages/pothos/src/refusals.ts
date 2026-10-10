@@ -40,6 +40,10 @@ type FailureOf<Failure, Case> = Failure extends unknown
  * the same guarantee the error combinators' matcher gives, keyed by the case
  * the failure names.
  *
+ * The extra-case check is TypeScript's excess-property check, which holds for
+ * an object literal: write the record inline, or declare it apart with
+ * `satisfies Refusals<Failure>`, which checks it the same way.
+ *
  * The classes are the field's error types for `@pothos/plugin-errors`, so each
  * must be registered as an object type (`builder.objectType(NotFoundError, …)`).
  */
@@ -123,12 +127,16 @@ const answerOf = <Value, Failure>(
     return { kind: "defect", cause: settled.cause };
   }
   const { error } = settled;
-  const Refusal = refusalFor(refusals, caseOf(error));
-  if (Refusal === undefined) {
-    return { kind: "defect", cause: settled };
-  }
-  return fromSafeThrowable(() => new Refusal(error))()
-    .map((refusal): Answer<Value> => ({ kind: "refusal", refusal }))
+  // Reading the case (a getter may throw) and building the refusal are both guarded.
+  return fromSafeThrowable(() => refusalFor(refusals, caseOf(error)))()
+    .flatMap((Refusal) =>
+      Refusal === undefined
+        ? Ok<Answer<Value>>({ kind: "defect", cause: settled })
+        : fromSafeThrowable(() => new Refusal(error))().map((refusal): Answer<Value> => ({
+            kind: "refusal",
+            refusal,
+          })),
+    )
     .recoverDefect((cause) => Ok<Answer<Value>>({ kind: "defect", cause }))
     .get();
 };

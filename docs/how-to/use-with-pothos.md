@@ -86,7 +86,15 @@ declares (`{ NOT_FOUND: BookNotFound }`).
 
 The record is checked [like a matcher](../explanation/exhaustive-error-matching):
 a case left out, a case the failure cannot be, or a class whose constructor takes
-another case's failure does not compile. Adding a case to the resolver's failure
+another case's failure does not compile. The extra-case check is TypeScript's excess-property
+check, so it holds for the record written inline; a record declared apart keeps
+it with `satisfies`:
+
+````ts
+const bookRefusals = { Missing: NotFoundError, LOCKED: ClosedError } satisfies Refusals<
+  Missing | Locked
+>;
+``` Adding a case to the resolver's failure
 breaks every field that resolves it until the case has its refusal.
 
 ## Connections
@@ -98,7 +106,7 @@ plugins, then import the entry:
 
 ```sh
 pnpm add @pothos/plugin-relay
-```
+````
 
 ```ts
 import RelayPlugin from "@pothos/plugin-relay";

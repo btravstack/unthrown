@@ -290,4 +290,17 @@ describe("outcomeOf", () => {
 
     expect(outcome).toBeInstanceOf(Error);
   });
+
+  it("answers a failure whose case cannot be read as a defect, without rejecting", async () => {
+    const unreadable = {
+      get code(): "LOCKED" {
+        throw new Error("Unreadable code");
+      },
+      until: "2027-01-01",
+    };
+
+    const outcome = await outcomeOf(Err(unreadable), { LOCKED: ClosedError });
+
+    expect(outcome).toEqual(new Error("Unreadable code"));
+  });
 });

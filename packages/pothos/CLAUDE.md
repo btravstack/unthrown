@@ -77,7 +77,14 @@ errors plugin wraps a subscription's `subscribe` before any `Result` is
 settled — so on a subscription builder their options do not compile.
 `resultConnection` infers the resolved connection (`ConnectionResult`) from
 `resolve` and hands it to relay's connection and edge options, so a
-`totalCount` the resolver returns is typed where those options read it. A nullable `resultConnection` may
+`totalCount` the resolver returns is typed where those options read it. Its nullability defaults to the builder's
+`DefaultFieldNullability`, as `resultField`'s does. Reading a failure's case is
+guarded like constructing its refusal: a `_tag` or `code` getter that throws is
+a defect. The extra-case check is TypeScript's excess-property check, so it
+holds for an inline record or one declared with `satisfies Refusals<Failure>`;
+capturing a predeclared map's type as a generic and refusing its extra keys was
+tried and rejected — evaluated before a context-sensitive `resolve` is
+inferred, it refuses valid fields. A nullable `resultConnection` may
 answer `Ok(null)`, and it forwards relay's connection and edge options (its
 second and third arguments) to `connection`. `outcomeOf` is the
 DataLoader twin: the same mapping, but a `Defect` — or a failure no refusal

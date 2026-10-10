@@ -226,10 +226,47 @@ builder.queryFields((t) => ({
   }),
 }));
 
+// A connection's nullability defaults to the builder's: non-null here, so no `Ok(null)`.
+const strictBuilder = new SchemaBuilder<{
+  DefaultFieldNullability: false;
+  Objects: { Book: { readonly title: string } };
+}>({
+  plugins: [ErrorsPlugin, RelayPlugin, UnthrownPlugin],
+  relay: {},
+  defaultFieldNullability: false,
+});
+
+strictBuilder.queryField("books", (t) =>
+  t.resultConnection({
+    type: "Book",
+    refusals: {},
+    // @ts-expect-error -- the builder's fields are non-null by default
+    resolve: () => OkAsync(null),
+  }),
+);
+
+// A record declared apart keeps the extra-case check with `satisfies`.
+const declaredRefusals = {
+  Missing: NotFoundError,
+  LOCKED: ClosedError,
+} satisfies Refusals<Missing | Locked>;
+const declaredWithExtra = {
+  Missing: NotFoundError,
+  LOCKED: ClosedError,
+  // @ts-expect-error -- no failure is a Torn
+  Torn: ClosedError,
+} satisfies Refusals<Missing | Locked>;
+
+builder.queryField("declared", (t) =>
+  t.resultField({ type: "Book", refusals: declaredRefusals, resolve: find }),
+);
+
 builder.subscriptionFields((t) => ({
   // @ts-expect-error -- resultField does not resolve subscription fields
   feed: t.resultField({ type: "Book", refusals: {}, resolve: findAlways }),
 }));
+
+export const _declared = [declaredWithExtra];
 
 export type _Assertions = [
   OptionalTagAddsItsCase,
