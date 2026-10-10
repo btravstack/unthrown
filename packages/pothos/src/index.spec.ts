@@ -10,7 +10,7 @@ import {
   fromSafePromise,
   type AsyncResult,
 } from "unthrown";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, onTestFinished } from "vitest";
 
 import UnthrownPlugin, { outcomeOf } from "./index.js";
 
@@ -392,15 +392,36 @@ describe("outcomeOf", () => {
     expect(outcome).toEqual(new Error("Defect", { cause }));
   });
 
-  it("reads a tag only when the failure owns it", async () => {
-    const inherited = Object.assign(Object.create({ _tag: "Draft" }) as object, {
-      code: "LOCKED" as const,
-      until: "2027-01-01",
+  it("reads a tag its class declares with a getter", async () => {
+    class GetterMissing {
+      get _tag(): "Missing" {
+        return "Missing";
+      }
+
+      readonly title = "ghost";
+    }
+    class GetterNotFoundError extends Error {
+      constructor(failure: GetterMissing) {
+        super(`No book titled ${failure.title}`);
+      }
+    }
+    const failure = new GetterMissing();
+
+    const outcome = await outcomeOf(Err(failure), { Missing: GetterNotFoundError });
+
+    expect(outcome).toEqual(new GetterNotFoundError(failure));
+  });
+
+  it("ignores a tag polluted onto Object.prototype", async () => {
+    Object.defineProperty(Object.prototype, "_tag", { value: "Draft", configurable: true });
+    onTestFinished(() => {
+      Reflect.deleteProperty(Object.prototype, "_tag");
     });
+    const locked: Locked = { code: "LOCKED", until: "2027-01-01" };
 
-    const outcome = await outcomeOf(Err(inherited as Locked), { LOCKED: ClosedError });
+    const outcome = await outcomeOf(Err(locked), { LOCKED: ClosedError });
 
-    expect(outcome).toEqual(new ClosedError(inherited as Locked));
+    expect(outcome).toEqual(new ClosedError(locked));
   });
 
   it("reads the case of a callable failure", async () => {

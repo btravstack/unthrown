@@ -88,15 +88,7 @@ export type ResultConnectionOptions<
   readonly args?: Args;
   readonly edgesNullable?: EdgeNullability;
   readonly nodeNullable?: NodeNullability;
-  readonly errors?: Omit<
-    ErrorFieldOptions<
-      Types,
-      Type,
-      ConnectionOf<Types, Type, EdgeNullability, NodeNullability>,
-      Nullable
-    >,
-    "types"
-  >;
+  readonly errors?: Omit<ErrorFieldOptions<Types, Type, ConnectionResult, Nullable>, "types">;
   readonly refusals: NoInfer<Refusals<Failure>>;
   readonly resolve: (
     parent: ParentShape,

@@ -93,14 +93,20 @@ export const typesOf = <Failure>(refusals: Refusals<Failure>): ErrorClass[] => [
   ...new Set(Object.values(refusals as Readonly<Record<string, ErrorClass>>)),
 ];
 
+// A `_tag` the failure or its class declares — an own property or a prototype
+// getter — but never one polluted onto `Object.prototype`.
+const carriesTag = (value: object | null): boolean =>
+  value !== null &&
+  value !== Object.prototype &&
+  (Object.hasOwn(value, "_tag") || carriesTag(Object.getPrototypeOf(value) as object | null));
+
 // The case a failure names, as `CaseOf` reads it: a string `_tag`, else a string `code`.
 const caseOf = (failure: unknown): string | undefined => {
   // A callable object may carry a case too, as `Caseable` allows.
   if ((typeof failure !== "object" && typeof failure !== "function") || failure === null) {
     return undefined;
   }
-  // An own `_tag` only: an inherited one is absent from the static type `CaseOf` reads.
-  if (Object.hasOwn(failure, "_tag") && "_tag" in failure && typeof failure._tag === "string") {
+  if (carriesTag(failure) && "_tag" in failure && typeof failure._tag === "string") {
     return failure._tag;
   }
   return "code" in failure && typeof failure.code === "string" ? failure.code : undefined;

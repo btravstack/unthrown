@@ -101,9 +101,11 @@ beside a pattern (`"Missing" | `E_${string}``) is refused too. The `Error` rule 
 whose value is an `Error` that a loose static type let through (`unknown`,
 `{ message: string }`) is answered as a defect on both paths, never handed to
 the plugin as a value. List items may be promises (`Iterable<Item |
-Promise<Item>>`), as in Pothos' own list resolvers. `caseOf` reads `_tag` as an
-own property only (`TaggedError` assigns it on the instance): an inherited tag
-is absent from the static type `CaseOf` reads. A nullable `resultConnection` may
+Promise<Item>>`), as in Pothos' own list resolvers. `caseOf` reads `_tag` from
+the failure and its prototype chain — an own property, as `TaggedError` assigns
+it, or a class's getter — but never from `Object.prototype`, where pollution
+lands. The runtime cannot see static types, so a value whose own prototype
+carries a tag its declared type lacks is mis-typed, and is read as tagged. A nullable `resultConnection` may
 answer `Ok(null)`, and it forwards relay's connection and edge options (its
 second and third arguments) to `connection`. `outcomeOf` is the
 DataLoader twin: the same mapping, but a `Defect` — or a failure no refusal
