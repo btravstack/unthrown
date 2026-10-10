@@ -4,7 +4,7 @@
 > [Pothos](https://pothos-graphql.dev) GraphQL fields from a `Result`: `Ok` is the
 > field's value, each modeled failure becomes a typed member of the field's
 > result union, and a [`Defect`](../explanation/the-defect-channel) stays an
-> error GraphQL masks.
+> error of the operation, never a refusal.
 
 ```sh
 pnpm add @unthrown/pothos unthrown @pothos/core @pothos/plugin-errors graphql
@@ -20,7 +20,14 @@ settled by the types:
 | ------------ | ---------------------------------------------------------- |
 | `Ok(value)`  | the field's value                                          |
 | `Err(error)` | the refusal its case maps to, a member of the result union |
-| `Defect`     | a thrown error, which GraphQL masks                        |
+| `Defect`     | a thrown error, which the server must mask                 |
+
+::: warning Mask errors at the server
+A `Defect` is never answered as a typed refusal, but hiding its message is the
+server's job. GraphQL Yoga masks unexpected errors by default; executing the
+schema with graphql-js alone, or with a server that does not mask, returns the
+defect's message to the client.
+:::
 
 ## Register the plugin
 

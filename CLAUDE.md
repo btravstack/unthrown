@@ -937,7 +937,7 @@ copies) — issue #256, observed live in btravstack/start#99.
   `resultField` / `resultConnection` are resolved by a `Result` — `Ok` → the
   field's value, `Err` → the refusal its case (`_tag` or `code`) maps to,
   returned as a member of the errors plugin's result union, `Defect` → thrown
-  for GraphQL to mask; the `refusals` record is exhaustive over the failure's
+  for the server to mask (Yoga does by default; graphql-js alone does not); the `refusals` record is exhaustive over the failure's
   cases. Two side-effectful entry points, `.` and `./relay`. **Outside the
   fixed version group.** Full spec: `packages/pothos/CLAUDE.md`.)
 - shared config is **external**, not a workspace package: the tsconfig and

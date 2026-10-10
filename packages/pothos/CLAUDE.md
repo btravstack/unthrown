@@ -44,17 +44,27 @@ Variants map as: `Ok` → the field's value; `Err` → `new Refusal(error)`,
 of a declared type as its union member (its `wrapResolve` checks
 `result instanceof Error` before its `catch`), so no throw is needed to reach
 the union; `Defect` → the cause is **thrown** by `settle` (the elimination
-edge), so GraphQL masks it like any resolver error. A cause that is an
+edge), an error of the operation like any resolver error; hiding its message
+is the server's job (Yoga masks by default, graphql-js alone does not), and the
+docs say so rather than promise masking. A cause that is an
 instance of a class the errors plugin answers on the field — one of its
 refusals, or one of the plugin's `defaultTypes` — is wrapped first
 (`new Error("Defect", { cause })`): thrown raw, the plugin would answer the bug
 as a modeled refusal. When even that wrapper would be claimed
 (`defaultTypes: [Error]`), the defect travels as a non-`Error` signal, which
-GraphQL turns into an error of its own and masks. Any other cause, a
+GraphQL turns into an error of its own. Any other cause, a
 `GraphQLError` included, is rethrown as it is. The resolver itself is called
 through `attempt`, inside a promise, so a synchronous throw becomes a `Defect`
 and takes the same path; and a refusal constructor that throws is answered as a
-defect by `outcomeOf`, never a rejection. A nullable `resultConnection` may
+defect by `outcomeOf`, never a rejection. Both paths share `answerOf` (value,
+refusal or defect) and differ only in how they surface a defect: `settle`
+throws it unclaimed; `outcomeOf` returns it as an `Error`, wrapped when a
+handled class would claim its cause — a loader can only reject a key with an
+`Error`, so a base `Error` among `defaultTypes` claims every loader defect,
+which the TSDoc states. Refusal classes are read as own properties
+(`Object.hasOwn`); `Refusals` refuses a widened discriminant (`code: string`,
+no cases to enumerate) and a `__proto__` case (an object literal's
+`__proto__` sets its prototype). A nullable `resultConnection` may
 answer `Ok(null)`, and it forwards relay's connection and edge options (its
 second and third arguments) to `connection`. `outcomeOf` is the
 DataLoader twin: the same mapping, but a `Defect` — or a failure no refusal

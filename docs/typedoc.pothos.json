@@ -4,5 +4,5 @@
   "entryPoints": ["../packages/pothos/src/index.ts", "../packages/pothos/src/relay.ts"],
   "tsconfig": "../packages/pothos/tsconfig.json",
   "out": "api/pothos",
-  "intentionallyNotExported": ["ConnectionOf", "ErrorClass", "FailureOf", "FieldOptions"]
+  "intentionallyNotExported": ["ConnectionOf", "ErrorClass", "FailureOf", "FieldOptions", "Handled"]
 }

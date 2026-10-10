@@ -23,7 +23,11 @@ compile.
 | ------------ | ---------------------------------------------------------- |
 | `Ok(value)`  | the field's value                                          |
 | `Err(error)` | the refusal its case maps to, a member of the result union |
-| `Defect`     | a thrown error, which GraphQL masks                        |
+| `Defect`     | a thrown error, which the server must mask                 |
+
+A `Defect` is never answered as a typed refusal, but its message is only hidden
+if the server masks errors: GraphQL Yoga does by default; executing the schema
+with graphql-js alone returns the message as it is.
 
 ```ts
 import SchemaBuilder from "@pothos/core";

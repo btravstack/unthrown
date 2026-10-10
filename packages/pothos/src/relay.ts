@@ -123,7 +123,7 @@ declare global {
       /**
        * A Relay connection resolved by a `Result`: `Ok` is the connection; an
        * `Err` is answered as the refusal its case maps to; a `Defect` is
-       * thrown, so GraphQL masks it.
+       * thrown, an error of the operation the server must mask.
        */
       resultConnection: <
         Type extends OutputType<Types>,

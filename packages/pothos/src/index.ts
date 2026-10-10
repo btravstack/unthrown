@@ -124,8 +124,9 @@ declare global {
       /**
        * A field resolved by a `Result`: `Ok` is the field's value; an `Err`
        * is answered as the refusal its case maps to, a member of the field's
-       * result union (`@pothos/plugin-errors`); a `Defect` is thrown, so
-       * GraphQL masks it.
+       * result union (`@pothos/plugin-errors`); a `Defect` is thrown, an error
+       * of the operation the server must mask (GraphQL Yoga does by default;
+       * graphql-js alone does not).
        */
       resultField: <
         Type extends TypeParam<Types>,

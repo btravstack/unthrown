@@ -57,6 +57,19 @@ class SplitError extends Error {
 
 declare const findSplit: () => AsyncResult<{ readonly title: string }, Split>;
 
+declare const findWidened: () => AsyncResult<{ readonly title: string }, { readonly code: string }>;
+
+declare const findProto: () => AsyncResult<
+  { readonly title: string },
+  { readonly code: "__proto__" }
+>;
+
+class AnyError extends Error {
+  constructor(_failure: { readonly code: string }) {
+    super("any");
+  }
+}
+
 declare const findOrUnnamed: () => AsyncResult<
   { readonly title: string },
   Missing | { readonly reason: string }
@@ -144,6 +157,18 @@ builder.queryFields((t) => ({
     // @ts-expect-error -- NotFoundError is built from a Missing, not a Split
     refusals: { LOST: NotFoundError, BURNT: SplitError },
     resolve: findSplit,
+  }),
+  widened: t.resultField({
+    type: "Book",
+    // @ts-expect-error -- a widened code has no cases to enumerate
+    refusals: {},
+    resolve: findWidened,
+  }),
+  proto: t.resultField({
+    type: "Book",
+    // @ts-expect-error -- __proto__ sets an object literal's prototype, so it can name no refusal
+    refusals: { ["__proto__"]: AnyError },
+    resolve: findProto,
   }),
   nullableConnection: t.resultConnection({
     type: "Book",

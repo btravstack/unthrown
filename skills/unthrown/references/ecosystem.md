@@ -241,7 +241,8 @@ whose fields are resolved by a `Result`:
   else `code`) to the GraphQL error class built from it. A missing, extra or
   mismatched case does not compile, and every failure member must name a case
   (`Failure & Caseable`). `Err` is answered as its union member (returned, not
-  thrown); a `Defect` is thrown, so GraphQL masks it.
+  thrown); a `Defect` is thrown, never claimed as a refusal — mask errors at
+  the server (Yoga does by default; graphql-js alone does not).
 - `@unthrown/pothos/relay` — `t.resultConnection(...)`, the same for Relay
   connections (side-effectful import; list `RelayPlugin` in the builder).
 - `outcomeOf(result, refusals)` — what a DataLoader answers for one key: the

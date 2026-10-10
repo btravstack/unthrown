@@ -37,6 +37,14 @@ class ClosedError extends Error {
 
 type Book = { readonly title: string };
 
+// A refusal whose constructor is a bug: it throws an error the errors plugin claims.
+class ClaimedByDefaultError extends Error {
+  constructor(_failure: Missing) {
+    super("unreachable");
+    throw new ClosedError({ code: "LOCKED", until: "2027-01-01" });
+  }
+}
+
 const find = (title: string): AsyncResult<Book, Missing | Locked> => {
   if (title === "draft") {
     return ErrAsync({ code: "LOCKED", until: "2027-01-01" });
@@ -56,6 +64,7 @@ const Failure = builder.interfaceRef<Error>("Failure").implement({
 });
 builder.objectType(NotFoundError, { name: "NotFound", interfaces: [Failure] });
 builder.objectType(ClosedError, { name: "Closed", interfaces: [Failure] });
+builder.objectType(ClaimedByDefaultError, { name: "ClaimedByDefault", interfaces: [Failure] });
 builder.objectType("Book", { fields: (t) => ({ title: t.exposeString("title") }) });
 builder.queryType({
   fields: (t) => ({
@@ -85,6 +94,11 @@ builder.queryType({
       resolve: (): AsyncResult<Book, Missing> => {
         throw new NotFoundError(new Missing({ title: "lost" }));
       },
+    }),
+    brokenRefusal: t.resultField({
+      type: "Book",
+      refusals: { Missing: ClaimedByDefaultError },
+      resolve: () => find("ghost") as AsyncResult<Book, Missing>,
     }),
     shelf: t.resultField({
       type: "Book",
@@ -184,6 +198,15 @@ describe("resultField", () => {
     });
   });
 
+  it("keeps a refusal constructor's claimed throw out of the union", async () => {
+    const answer = await graphql({ schema, source: "{ brokenRefusal { __typename } }" });
+
+    expect(answer).toEqual({
+      data: { brokenRefusal: null },
+      errors: [expect.objectContaining({ message: "Defect" })],
+    });
+  });
+
   it("takes a synchronous Result", async () => {
     expect(await graphql({ schema, source: "{ shelf { ... on Book { title } } }" })).toEqual({
       data: { shelf: { title: "Shelf" } },
@@ -252,5 +275,21 @@ describe("outcomeOf", () => {
     const outcome = await outcomeOf(Err(new Missing({ title: "ghost" })), { Missing: BrokenError });
 
     expect(outcome).toEqual(new Error("Broken refusal"));
+  });
+
+  it("wraps a Defect whose cause one of its refusal classes would claim", async () => {
+    const claimed = new NotFoundError(new Missing({ title: "lost" }));
+
+    const outcome = await outcomeOf(fromSafePromise(Promise.reject(claimed)), {
+      Missing: NotFoundError,
+    });
+
+    expect(outcome).toEqual(new Error("Defect", { cause: claimed }));
+  });
+
+  it("never reads a refusal from the record's prototype", async () => {
+    const outcome = await outcomeOf(Err({ code: "toString" }) as never, {} as never);
+
+    expect(outcome).toBeInstanceOf(Error);
   });
 });
