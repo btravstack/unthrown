@@ -425,4 +425,31 @@ describe("outcomeOf", () => {
 
     expect(outcome).toEqual(new NotFoundError(flickering as unknown as Missing));
   });
+
+  it("answers a thenable value as a defect, without rejecting", async () => {
+    const pending = Promise.reject(new Error("Late failure"));
+    pending.catch(() => undefined);
+
+    const outcome = await outcomeOf(Ok(pending), {});
+
+    expect(outcome).toEqual(new Error("Defect", { cause: pending }));
+  });
+
+  it("answers a value whose class cannot be told as a defect", async () => {
+    const opaque = new Proxy(
+      {},
+      {
+        getPrototypeOf: () => {
+          throw new Error("Opaque");
+        },
+      },
+    );
+
+    const outcome = await outcomeOf(Ok(opaque), {});
+
+    // Compared by identity: equality would inspect the proxy, whose prototype throws.
+    expect(
+      outcome instanceof Error && { message: outcome.message, cause: outcome.cause === opaque },
+    ).toEqual({ message: "Defect", cause: true });
+  });
 });

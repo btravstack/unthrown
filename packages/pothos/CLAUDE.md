@@ -55,9 +55,11 @@ no reserved `__proto__` case (nobody names a failure that).
 
 `answerOf` decides once, for both paths:
 
-- `Ok` → the field's value. An `Ok` holding an `Error` (a loose static type let
-  it through) is a defect: the errors plugin takes a returned `Error` for a
-  refusal.
+- `Ok` → the field's value. An `Ok` holding a value the errors plugin could not
+  take as one is a defect, whatever static type let it through: an `Error` (the
+  plugin takes a returned `Error` for a refusal), a thenable (awaited, its
+  rejection would escape the `Result` — a `Result` carries a settled value), or
+  a value whose class cannot be told (a proxy whose `getPrototypeOf` throws).
 - `Err` → `new Refusal(error)`, **returned**, not thrown — the errors plugin
   answers a returned `Error` of a declared type as its union member (its
   `wrapResolve` checks `result instanceof Error` before its `catch`). Reading

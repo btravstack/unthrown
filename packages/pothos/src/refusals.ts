@@ -111,6 +111,20 @@ const safely = (test: () => boolean, onThrow: boolean): boolean =>
 
 const isError = (value: unknown): value is Error => safely(() => value instanceof Error, false);
 
+// A field's value the errors plugin could not take as one: an `Error` (it would
+// be read as a refusal), a thenable (awaited, its rejection would escape the
+// `Result`), or a value whose class cannot even be told (its own checks would throw).
+const unfitValue = (value: unknown): boolean =>
+  safely(
+    () =>
+      value instanceof Error ||
+      ((typeof value === "object" || typeof value === "function") &&
+        value !== null &&
+        "then" in value &&
+        typeof value.then === "function"),
+    true,
+  );
+
 const claimedBy = (handled: readonly ErrorClass[], value: unknown): boolean =>
   safely(() => handled.some((Type) => value instanceof Type), true);
 
@@ -119,18 +133,18 @@ type Answer<Value> =
   | { readonly kind: "refusal"; readonly refusal: Error }
   | { readonly kind: "defect"; readonly cause: unknown };
 
-// What a settled `Result` answers. A returned `Error` is what the errors plugin
-// takes for a refusal, so as a value it is a defect, whatever its static type
-// let through. Reading the case (a getter may throw) and building the refusal
-// are one guarded step: a throw there is a defect, and so is a failure no
-// refusal maps, which only an unchecked cast can produce.
+// What a settled `Result` answers. A value the errors plugin could not take as
+// one (`unfitValue`) is a defect, whatever its static type let through. Reading
+// the case (a getter may throw) and building the refusal are one guarded step:
+// a throw there is a defect, and so is a failure no refusal maps, which only an
+// unchecked cast can produce.
 const answerOf = <Value, Failure>(
   settled: Result<Value, Failure>,
   refusals: Refusals<Failure>,
 ): Answer<Value> => {
   if (settled.isOk()) {
     const { value } = settled;
-    return isError(value) ? { kind: "defect", cause: value } : { kind: "value", value };
+    return unfitValue(value) ? { kind: "defect", cause: value } : { kind: "value", value };
   }
   if (settled.isDefect()) {
     return { kind: "defect", cause: settled.cause };
