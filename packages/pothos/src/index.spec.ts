@@ -303,4 +303,37 @@ describe("outcomeOf", () => {
 
     expect(outcome).toEqual(new Error("Unreadable code"));
   });
+
+  it("wraps a Defect whose cause cannot even be classified", async () => {
+    const opaque = new Proxy(
+      {},
+      {
+        getPrototypeOf: () => {
+          throw new Error("Opaque");
+        },
+      },
+    );
+
+    const outcome = await outcomeOf(fromSafePromise(Promise.reject(opaque)), {});
+
+    // Compared by identity: equality would inspect the proxy, whose prototype throws.
+    expect(
+      outcome instanceof Error && { message: outcome.message, cause: outcome.cause === opaque },
+    ).toEqual({ message: "Defect", cause: true });
+  });
+
+  it("wraps a Defect a handled class cannot classify", async () => {
+    class UnclassifiableError extends Error {
+      static override [Symbol.hasInstance](): boolean {
+        throw new Error("Unclassifiable");
+      }
+    }
+    const cause = new Error("Disk failure");
+
+    const outcome = await outcomeOf(fromSafePromise(Promise.reject(cause)), {}, [
+      UnclassifiableError,
+    ]);
+
+    expect(outcome).toEqual(new Error("Defect", { cause }));
+  });
 });

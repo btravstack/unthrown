@@ -84,7 +84,12 @@ a defect. The extra-case check is TypeScript's excess-property check, so it
 holds for an inline record or one declared with `satisfies Refusals<Failure>`;
 capturing a predeclared map's type as a generic and refusing its extra keys was
 tried and rejected — evaluated before a context-sensitive `resolve` is
-inferred, it refuses valid fields. A nullable `resultConnection` may
+inferred, it refuses valid fields. A `_tag` whose type may hold any string (`unknown`,
+`string`) beside a `code` makes the cases non-finite, so the record is refused
+rather than missing the tags `caseOf` dispatches on. The `instanceof` checks
+that classify a defect are guarded too (a proxy's `getPrototypeOf` or a
+`Symbol.hasInstance` may throw): an unclassifiable cause counts as claimed, so
+it is wrapped, and `outcomeOf` still never rejects. A nullable `resultConnection` may
 answer `Ok(null)`, and it forwards relay's connection and edge options (its
 second and third arguments) to `connection`. `outcomeOf` is the
 DataLoader twin: the same mapping, but a `Defect` — or a failure no refusal

@@ -13,8 +13,14 @@ import { fromSafePromise, fromSafeThrowable, Ok, type AsyncResult, type Result }
 export type CaseOf<Failure> = Failure extends { readonly _tag: infer Tag extends string }
   ? Tag
   : Failure extends { readonly code: infer Code extends string }
-    ? // An optional string `_tag` names the case whenever it is present.
-      ("_tag" extends keyof Failure ? Extract<Failure["_tag"], string> : never) | Code
+    ? // An optional string `_tag` names the case whenever it is present; a tag
+      // that may hold any string (`unknown`, `string`) makes the cases non-finite.
+      | ("_tag" extends keyof Failure
+          ? string extends Failure["_tag"]
+            ? string
+            : Extract<Failure["_tag"], string>
+          : never)
+      | Code
     : never;
 
 /**
@@ -141,8 +147,17 @@ const answerOf = <Value, Failure>(
     .get();
 };
 
+// `instanceof` can throw (a proxy's `getPrototypeOf`, a `Symbol.hasInstance`);
+// such a value counts as the answer that keeps it a defect.
+const safely = (test: () => boolean, onThrow: boolean): boolean =>
+  fromSafeThrowable(test)()
+    .recoverDefect(() => Ok(onThrow))
+    .get();
+
+const isError = (value: unknown): value is Error => safely(() => value instanceof Error, false);
+
 const claimedBy = (handled: Handled, value: unknown): boolean =>
-  handled.some((Type) => value instanceof Type);
+  safely(() => handled.some((Type) => value instanceof Type), true);
 
 /**
  * A `Result` as a DataLoader answers one key: the value, or the refusal its
@@ -161,9 +176,7 @@ export const outcomeOf = async <Value, Failure>(
   const answer = answerOf(await result, refusals);
   if (answer.kind === "defect") {
     const { cause } = answer;
-    return cause instanceof Error && !claimedBy(handled, cause)
-      ? cause
-      : new Error("Defect", { cause });
+    return isError(cause) && !claimedBy(handled, cause) ? cause : new Error("Defect", { cause });
   }
   return answer.kind === "value" ? answer.value : answer.refusal;
 };

@@ -77,6 +77,11 @@ declare const findTemplated: () => AsyncResult<
 
 declare const findAlways: () => AsyncResult<{ readonly title: string }, never>;
 
+declare const findBroadTag: () => AsyncResult<
+  { readonly title: string },
+  { readonly _tag: unknown; readonly code: "LOCKED" }
+>;
+
 declare const findOrUnnamed: () => AsyncResult<
   { readonly title: string },
   Missing | { readonly reason: string }
@@ -212,6 +217,12 @@ builder.queryFields((t) => ({
     },
     { fields: (c) => ({ totalCount: c.int({ resolve: (connection) => connection.totalCount }) }) },
   ),
+  broadTag: t.resultField({
+    type: "Book",
+    // @ts-expect-error -- a tag that may hold any string makes the cases non-finite
+    refusals: { LOCKED: LockedError },
+    resolve: findBroadTag,
+  }),
   nullableConnection: t.resultConnection({
     type: "Book",
     nullable: true,
