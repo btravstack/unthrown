@@ -84,10 +84,13 @@ const caseOf = (failure: unknown): string | undefined => {
   if ((typeof failure !== "object" && typeof failure !== "function") || failure === null) {
     return undefined;
   }
-  if ("_tag" in failure && typeof failure._tag === "string") {
-    return failure._tag;
+  // Each discriminant is read once: a getter may answer differently on a second read.
+  const tag = "_tag" in failure ? failure._tag : undefined;
+  if (typeof tag === "string") {
+    return tag;
   }
-  return "code" in failure && typeof failure.code === "string" ? failure.code : undefined;
+  const code = "code" in failure ? failure.code : undefined;
+  return typeof code === "string" ? code : undefined;
 };
 
 // The refusal class a case maps to, read as an own property only.
@@ -165,8 +168,9 @@ export const outcomeOf = async <Value, Failure>(
   const answer = answerOf(await result, refusals);
   if (answer.kind === "defect") {
     const { cause } = answer;
-    const handled = [...typesOf(refusals), ...defaultTypes];
-    return isError(cause) && !claimedBy(handled, cause) ? cause : new Error("Defect", { cause });
+    // Listing the handled classes reads the record, whose getters may throw: guarded too.
+    const claimed = safely(() => claimedBy([...typesOf(refusals), ...defaultTypes], cause), true);
+    return isError(cause) && !claimed ? cause : new Error("Defect", { cause });
   }
   return answer.kind === "value" ? answer.value : answer.refusal;
 };

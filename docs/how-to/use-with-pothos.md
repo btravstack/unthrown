@@ -146,8 +146,21 @@ the value, the refusal its failure maps to, or a `Defect` as an `Error`. Pass it
 the builder's `defaultTypes` too, so a defect one of them would claim is wrapped
 rather than answered as a refusal:
 
+Loadable objects come from `@pothos/plugin-dataloader`, which the builder lists
+too:
+
+```sh
+pnpm add @pothos/plugin-dataloader dataloader
+```
+
 ```ts
+import DataloaderPlugin from "@pothos/plugin-dataloader";
 import { outcomeOf } from "@unthrown/pothos";
+
+const builder = new SchemaBuilder<{ Objects: { Book: Book } }>({
+  plugins: [ErrorsPlugin, DataloaderPlugin, UnthrownPlugin],
+  errors: { directResult: true },
+});
 
 const BookNode = builder.loadableObject("Book", {
   load: (titles: readonly string[]) =>

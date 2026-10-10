@@ -392,4 +392,37 @@ describe("outcomeOf", () => {
 
     expect(outcome instanceof Error && !(outcome instanceof LooseError)).toBe(true);
   });
+
+  it("answers a defect without rejecting when its refusals cannot be listed", async () => {
+    const unlistable = {
+      get Missing(): typeof NotFoundError {
+        throw new Error("Unlistable refusals");
+      },
+    };
+    const torn = fromSafePromise(Promise.reject(new Error("Disk failure")));
+
+    const outcome = await outcomeOf(torn as AsyncResult<Book, Missing>, unlistable);
+
+    expect(outcome).toEqual(new Error("Defect", { cause: new Error("Disk failure") }));
+  });
+
+  it("reads a failure's tag once", async () => {
+    let reads = 0;
+    const flickering = {
+      get _tag(): "Missing" | undefined {
+        reads += 1;
+        return reads === 1 ? "Missing" : undefined;
+      },
+      code: "LOCKED" as const,
+      until: "2027-01-01",
+      title: "ghost",
+    };
+
+    const outcome = await outcomeOf(Err(flickering), {
+      Missing: NotFoundError as never,
+      LOCKED: ClosedError,
+    });
+
+    expect(outcome).toEqual(new NotFoundError(flickering as unknown as Missing));
+  });
 });
