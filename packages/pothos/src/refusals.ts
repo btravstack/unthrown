@@ -98,7 +98,8 @@ const caseOf = (failure: unknown): string | undefined => {
   if (typeof failure !== "object" || failure === null) {
     return undefined;
   }
-  if ("_tag" in failure && typeof failure._tag === "string") {
+  // An own `_tag` only: an inherited one is absent from the static type `CaseOf` reads.
+  if (Object.hasOwn(failure, "_tag") && "_tag" in failure && typeof failure._tag === "string") {
     return failure._tag;
   }
   return "code" in failure && typeof failure.code === "string" ? failure.code : undefined;
@@ -132,6 +133,15 @@ const refusalFor = <Failure>(
     ? (refusals as unknown as Readonly<Record<string, new (failure: Failure) => Error>>)[name]
     : undefined;
 
+// `instanceof` can throw (a proxy's `getPrototypeOf`, a `Symbol.hasInstance`);
+// such a value counts as the answer that keeps it a defect.
+const safely = (test: () => boolean, onThrow: boolean): boolean =>
+  fromSafeThrowable(test)()
+    .recoverDefect(() => Ok(onThrow))
+    .get();
+
+const isError = (value: unknown): value is Error => safely(() => value instanceof Error, false);
+
 // What a settled `Result` answers: its value, its refusal, or a defect. A refusal
 // constructor that throws is a bug, so it answers a defect too; and a failure no
 // refusal maps, which only an unchecked cast can produce.
@@ -140,7 +150,10 @@ const answerOf = <Value, Failure>(
   refusals: Refusals<Failure>,
 ): Answer<Value> => {
   if (settled.isOk()) {
-    return { kind: "value", value: settled.value };
+    const { value } = settled;
+    // A returned `Error` is what the errors plugin takes for a refusal: as a
+    // field's value it is a bug, whatever its static type let through.
+    return isError(value) ? { kind: "defect", cause: value } : { kind: "value", value };
   }
   if (settled.isDefect()) {
     return { kind: "defect", cause: settled.cause };
@@ -159,15 +172,6 @@ const answerOf = <Value, Failure>(
     .recoverDefect((cause) => Ok<Answer<Value>>({ kind: "defect", cause }))
     .get();
 };
-
-// `instanceof` can throw (a proxy's `getPrototypeOf`, a `Symbol.hasInstance`);
-// such a value counts as the answer that keeps it a defect.
-const safely = (test: () => boolean, onThrow: boolean): boolean =>
-  fromSafeThrowable(test)()
-    .recoverDefect(() => Ok(onThrow))
-    .get();
-
-const isError = (value: unknown): value is Error => safely(() => value instanceof Error, false);
 
 const claimedBy = (handled: Handled, value: unknown): boolean =>
   safely(() => handled.some((Type) => value instanceof Type), true);

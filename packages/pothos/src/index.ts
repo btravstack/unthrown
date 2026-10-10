@@ -65,8 +65,8 @@ export {
  */
 /**
  * A field's value as its `Ok` may carry it. A GraphQL list (`[Type]`, a
- * `ListRef`) takes any iterable of its items — an array, a generator, an async
- * iterable — as Pothos' own list resolvers do; any other field takes its shape
+ * `ListRef`) takes any iterable of its items, each possibly a promise — an
+ * array, a generator, an async iterable — as Pothos' own list resolvers do; any other field takes its shape
  * as it is, an array-shaped scalar included. An `Error` cannot be a field's
  * value: `@pothos/plugin-errors` would take it for a refusal.
  */
@@ -74,7 +74,7 @@ export type ResolvedShape<Type, Shape> = Shape extends Error
   ? never
   : Type extends readonly unknown[] | { readonly kind: "List" }
     ? Shape extends readonly (infer Item)[]
-      ? Iterable<Item> | AsyncIterable<Item>
+      ? Iterable<Item | Promise<Item>> | AsyncIterable<Item>
       : Shape
     : Shape;
 

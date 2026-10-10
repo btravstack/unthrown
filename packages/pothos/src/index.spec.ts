@@ -112,6 +112,17 @@ builder.queryType({
           })(),
         ),
     }),
+    promisedCatalogue: t.resultField({
+      type: ["Book"],
+      errors: { directResult: false },
+      refusals: {},
+      resolve: () => Ok([Promise.resolve({ title: "Dune" }), { title: "Emma" }]),
+    }),
+    errorAsValue: t.resultField({
+      type: "Book",
+      refusals: {},
+      resolve: () => Ok(new Error("Not a book") as unknown as Book),
+    }),
     shelf: t.resultField({
       type: "Book",
       refusals: {},
@@ -227,6 +238,27 @@ describe("resultField", () => {
 
     expect(answer).toEqual({
       data: { catalogue: { data: [{ title: "Dune" }, { title: "Emma" }] } },
+    });
+  });
+
+  it("takes promised items for a list", async () => {
+    const answer = await graphql({
+      schema,
+      source: "{ promisedCatalogue { ... on QueryPromisedCatalogueSuccess { data { title } } } }",
+    });
+
+    expect(answer).toEqual({
+      data: { promisedCatalogue: { data: [{ title: "Dune" }, { title: "Emma" }] } },
+    });
+  });
+
+  it("answers an Error its static type let through as a Defect, not a refusal", async () => {
+    const answer = await graphql({ schema, source: "{ errorAsValue { __typename } }" });
+
+    // Thrown as the defect it is: an error of the operation, not a union member.
+    expect(answer).toEqual({
+      data: { errorAsValue: null },
+      errors: [expect.objectContaining({ message: "Not a book" })],
     });
   });
 
@@ -358,5 +390,16 @@ describe("outcomeOf", () => {
     ]);
 
     expect(outcome).toEqual(new Error("Defect", { cause }));
+  });
+
+  it("reads a tag only when the failure owns it", async () => {
+    const inherited = Object.assign(Object.create({ _tag: "Draft" }) as object, {
+      code: "LOCKED" as const,
+      until: "2027-01-01",
+    });
+
+    const outcome = await outcomeOf(Err(inherited as Locked), { LOCKED: ClosedError });
+
+    expect(outcome).toEqual(new ClosedError(inherited as Locked));
   });
 });
