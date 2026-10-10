@@ -89,7 +89,10 @@ inferred, it refuses valid fields. A `_tag` whose type may hold any string (`unk
 rather than missing the tags `caseOf` dispatches on. The `instanceof` checks
 that classify a defect are guarded too (a proxy's `getPrototypeOf` or a
 `Symbol.hasInstance` may throw): an unclassifiable cause counts as claimed, so
-it is wrapped, and `outcomeOf` still never rejects. A nullable `resultConnection` may
+it is wrapped, and `outcomeOf` still never rejects. A list field's `Ok` takes any iterable of its items
+(`ResolvedShape`: an array, a generator, an async iterable), as Pothos' own
+list resolvers do; any other field's `Ok` takes its output shape, which for a
+loadable object already includes its key. A nullable `resultConnection` may
 answer `Ok(null)`, and it forwards relay's connection and edge options (its
 second and third arguments) to `connection`. `outcomeOf` is the
 DataLoader twin: the same mapping, but a `Defect` — or a failure no refusal

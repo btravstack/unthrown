@@ -63,6 +63,15 @@ export {
  * A resolver answering a `Result`: Pothos' four resolver arguments, the
  * field's shape as the `Ok` value and `Failure` as the error channel.
  */
+/**
+ * A field's value as its `Ok` may carry it: a list as any iterable of its
+ * items — an array, a generator, an async iterable — as Pothos' own list
+ * resolvers take it; any other shape as it is.
+ */
+export type ResolvedShape<Shape> = Shape extends readonly (infer Item)[]
+  ? Iterable<Item> | AsyncIterable<Item>
+  : Shape;
+
 export type ResultResolver<
   Types extends SchemaTypes,
   Parent,
@@ -102,7 +111,7 @@ export type ResultFieldOptions<
     Types,
     ParentShape,
     Args,
-    ShapeFromTypeParam<Types, Type, Nullable>,
+    ResolvedShape<ShapeFromTypeParam<Types, Type, Nullable>>,
     Failure
   >;
 };

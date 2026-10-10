@@ -100,6 +100,18 @@ builder.queryType({
       refusals: { Missing: ClaimedByDefaultError },
       resolve: () => find("ghost") as AsyncResult<Book, Missing>,
     }),
+    catalogue: t.resultField({
+      type: ["Book"],
+      errors: { directResult: false },
+      refusals: {},
+      resolve: () =>
+        Ok(
+          (function* catalogue() {
+            yield { title: "Dune" };
+            yield { title: "Emma" };
+          })(),
+        ),
+    }),
     shelf: t.resultField({
       type: "Book",
       refusals: {},
@@ -204,6 +216,17 @@ describe("resultField", () => {
     expect(answer).toEqual({
       data: { brokenRefusal: null },
       errors: [expect.objectContaining({ message: "Defect" })],
+    });
+  });
+
+  it("takes any iterable for a list", async () => {
+    const answer = await graphql({
+      schema,
+      source: "{ catalogue { ... on QueryCatalogueSuccess { data { title } } } }",
+    });
+
+    expect(answer).toEqual({
+      data: { catalogue: { data: [{ title: "Dune" }, { title: "Emma" }] } },
     });
   });
 
