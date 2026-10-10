@@ -45,6 +45,20 @@ class ClaimedByDefaultError extends Error {
   }
 }
 
+// A refusals record whose getter answers another class after its first read.
+class StrayError extends Error {
+  constructor(failure: Missing) {
+    super(`No book titled ${failure.title}`);
+  }
+}
+let refusalReads = 0;
+const shiftingRefusals = {
+  get Missing(): typeof NotFoundError {
+    refusalReads += 1;
+    return refusalReads === 1 ? NotFoundError : StrayError;
+  },
+};
+
 const find = (title: string): AsyncResult<Book, Missing | Locked> => {
   if (title === "draft") {
     return ErrAsync({ code: "LOCKED", until: "2027-01-01" });
@@ -104,6 +118,11 @@ builder.queryType({
       type: "Book",
       refusals: {},
       resolve: () => Ok(new Error("Not a book") as unknown as Book),
+    }),
+    shifting: t.resultField({
+      type: "Book",
+      refusals: shiftingRefusals,
+      resolve: () => find("ghost") as AsyncResult<Book, Missing>,
     }),
     shelf: t.resultField({
       type: "Book",
@@ -451,5 +470,30 @@ describe("outcomeOf", () => {
     expect(
       outcome instanceof Error && { message: outcome.message, cause: outcome.cause === opaque },
     ).toEqual({ message: "Defect", cause: true });
+  });
+
+  it("answers a thenable refusal as a defect, without awaiting it", async () => {
+    class PendingError extends Error {
+      constructor(_failure: Missing) {
+        super("Pending");
+      }
+
+      // oxlint-disable-next-line unicorn/no-thenable -- the case under test: a refusal that is also a thenable
+      then(_resolve: unknown, reject: (reason: unknown) => void): void {
+        reject(new Error("Rejected refusal"));
+      }
+    }
+
+    const outcome = await outcomeOf(Err(new Missing({ title: "ghost" })), {
+      Missing: PendingError,
+    });
+
+    expect(outcome instanceof Error && outcome.message).toBe("Defect");
+  });
+
+  it("constructs a refusal from the classes its union was built from", async () => {
+    const answer = await graphql({ schema, source: "{ shifting { __typename } }" });
+
+    expect(answer).toEqual({ data: { shifting: { __typename: "NotFound" } } });
   });
 });

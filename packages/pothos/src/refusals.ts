@@ -111,19 +111,19 @@ const safely = (test: () => boolean, onThrow: boolean): boolean =>
 
 const isError = (value: unknown): value is Error => safely(() => value instanceof Error, false);
 
+// Returned from an `async` function, a thenable is awaited: its rejection would
+// escape the `Result`.
+const isThenable = (value: unknown): boolean =>
+  (typeof value === "object" || typeof value === "function") &&
+  value !== null &&
+  "then" in value &&
+  typeof value.then === "function";
+
 // A field's value the errors plugin could not take as one: an `Error` (it would
-// be read as a refusal), a thenable (awaited, its rejection would escape the
-// `Result`), or a value whose class cannot even be told (its own checks would throw).
+// be read as a refusal), a thenable, or a value whose class cannot even be told
+// (its own checks would throw).
 const unfitValue = (value: unknown): boolean =>
-  safely(
-    () =>
-      value instanceof Error ||
-      ((typeof value === "object" || typeof value === "function") &&
-        value !== null &&
-        "then" in value &&
-        typeof value.then === "function"),
-    true,
-  );
+  safely(() => value instanceof Error || isThenable(value), true);
 
 const claimedBy = (handled: readonly ErrorClass[], value: unknown): boolean =>
   safely(() => handled.some((Type) => value instanceof Type), true);
@@ -157,8 +157,9 @@ const answerOf = <Value, Failure>(
     }
     const refusal = new Refusal(error);
     // A constructor that answers anything but an `Error` of its own class (a
-    // structural look-alike, a base `Error`) builds nothing the plugin can place.
-    return refusal instanceof Refusal && refusal instanceof Error
+    // structural look-alike, a base `Error`) builds nothing the plugin can place,
+    // and a thenable one would be awaited rather than answered.
+    return refusal instanceof Refusal && refusal instanceof Error && !isThenable(refusal)
       ? { kind: "refusal", refusal }
       : { kind: "defect", cause: refusal };
   })()
@@ -244,7 +245,9 @@ export const resultConfig = (
   fieldOptions: object,
   inheritedErrors?: { readonly types?: readonly ErrorClass[] },
 ): object => {
-  const { refusals, resolve, errors, ...options } = fieldOptions as ResultOptions;
+  const { refusals: declared, resolve, errors, ...options } = fieldOptions as ResultOptions;
+  // Read once: the union is built from the same classes the resolver constructs.
+  const refusals = Object.fromEntries(Object.entries(declared)) as Refusals<Caseable>;
   // Errors options a field inherits (relay's default connection field options)
   // are merged, not replaced: their types are handled too.
   const types = [...(inheritedErrors?.types ?? []), ...typesOf(refusals)];

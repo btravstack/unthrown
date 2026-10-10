@@ -67,7 +67,8 @@ no reserved `__proto__` case (nobody names a failure that).
   constructor is a defect, and so is a failure no refusal maps (only an
   unchecked cast can produce one), whose defect carries the failure. A
   constructor that answers anything but an `Error` of its own class is a
-  defect too: the plugin could not place it.
+  defect too: the plugin could not place it; so is a thenable refusal, which
+  an `async` return would await rather than answer.
 - `Defect` → see below.
 
 A resolver (`settle`, internal) is called inside a promise, so a synchronous
@@ -115,7 +116,8 @@ on top of `@pothos/plugin-relay`'s `connection`, kept apart so relay's types
 are needed only by its importers. Both delegate through one `resultConfig` to
 `t.field` / `t.connection`, keeping every other option — including the errors
 plugin's own (`directResult`, `dataField`), whose `types` alone the refusals
-replace. Errors options a connection inherits from relay's
+replace. The refusals record is read once, so the union is built from the
+same classes the resolver constructs. Errors options a connection inherits from relay's
 `defaultConnectionFieldOptions` are merged, their types handled like the
 refusals'. A field with no refusals, no errors options and no `defaultTypes` on
 the builder stays a plain field rather than a one-member union. The errors
