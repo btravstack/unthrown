@@ -2,7 +2,7 @@ import SchemaBuilder from "@pothos/core";
 import ErrorsPlugin from "@pothos/plugin-errors";
 import RelayPlugin from "@pothos/plugin-relay";
 import { graphql } from "graphql";
-import { ErrAsync, OkAsync, TaggedError } from "unthrown";
+import { ErrAsync, OkAsync, TaggedError, fromSafePromise } from "unthrown";
 import { describe, expect, it } from "vitest";
 
 import UnthrownPlugin from "./index.js";
@@ -108,5 +108,37 @@ describe("resultConnection", () => {
     const counted = schema.getQueryType()?.getFields()["counted"];
 
     expect(String(counted?.type)).toBe("QueryCountedConnection");
+  });
+
+  it("keeps a defect of relay's default connection error types out of the union", async () => {
+    const relayDefaults = new SchemaBuilder<{ Objects: { Book: { readonly title: string } } }>({
+      plugins: [ErrorsPlugin, RelayPlugin, UnthrownPlugin],
+      errors: { directResult: true },
+      relay: { defaultConnectionFieldOptions: { errors: { types: [ShelfClosedError] } } },
+    });
+    relayDefaults.objectType(ShelfClosedError, {
+      name: "ShelfClosed",
+      fields: (t) => ({ message: t.exposeString("message") }),
+    });
+    relayDefaults.objectType("Book", { fields: (t) => ({ title: t.exposeString("title") }) });
+    relayDefaults.queryType({
+      fields: (t) => ({
+        books: t.resultConnection({
+          type: "Book",
+          refusals: {},
+          resolve: () => fromSafePromise(Promise.reject(new ShelfClosedError(new Closed()))),
+        }),
+      }),
+    });
+
+    const answer = await graphql({
+      schema: relayDefaults.toSchema(),
+      source: "{ books(first: 1) { __typename } }",
+    });
+
+    expect(answer).toEqual({
+      data: { books: null },
+      errors: [expect.objectContaining({ message: "Defect" })],
+    });
   });
 });

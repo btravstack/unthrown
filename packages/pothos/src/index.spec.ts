@@ -378,4 +378,18 @@ describe("outcomeOf", () => {
 
     expect(outcome).toEqual(new NotFoundError(callable as unknown as Missing));
   });
+
+  it("answers a refusal that is not of its mapped class as a defect", async () => {
+    class LooseError extends Error {
+      constructor(_failure: Missing) {
+        super("unreachable");
+        // oxlint-disable-next-line no-constructor-return -- the case under test: a constructor answering another object
+        return new Error("Not a LooseError");
+      }
+    }
+
+    const outcome = await outcomeOf(Err(new Missing({ title: "ghost" })), { Missing: LooseError });
+
+    expect(outcome instanceof Error && !(outcome instanceof LooseError)).toBe(true);
+  });
 });

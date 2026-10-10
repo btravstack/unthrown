@@ -46,7 +46,10 @@ record. A failure names its case by its `_tag` (a `TaggedError`), else its
 
 At runtime `caseOf` reads a string `_tag`, else a string `code`, from an
 object or a callable, and answers no case for anything else without throwing;
-the refusal class is read as an own property of the record.
+the refusal class is read as an own property of the record. Like core's matcher,
+it reads `_tag` the plain way: no guard against a tag polluted onto
+`Object.prototype` (a compromised process, which one lookup cannot defend), and
+no reserved `__proto__` case (nobody names a failure that).
 
 ## How each variant surfaces
 
@@ -60,7 +63,9 @@ the refusal class is read as an own property of the record.
   `wrapResolve` checks `result instanceof Error` before its `catch`). Reading
   the case and building the refusal are one guarded step: a throwing getter or
   constructor is a defect, and so is a failure no refusal maps (only an
-  unchecked cast can produce one), whose defect carries the failure.
+  unchecked cast can produce one), whose defect carries the failure. A
+  constructor that answers anything but an `Error` of its own class is a
+  defect too: the plugin could not place it.
 - `Defect` → see below.
 
 A resolver (`settle`, internal) is called inside a promise, so a synchronous
@@ -105,8 +110,12 @@ on top of `@pothos/plugin-relay`'s `connection`, kept apart so relay's types
 are needed only by its importers. Both delegate through one `resultConfig` to
 `t.field` / `t.connection`, keeping every other option — including the errors
 plugin's own (`directResult`, `dataField`), whose `types` alone the refusals
-replace. A field with no refusals, no errors options and no `defaultTypes` on
-the builder stays a plain field rather than a one-member union. Neither method
+replace. Errors options a connection inherits from relay's
+`defaultConnectionFieldOptions` are merged, their types handled like the
+refusals'. A field with no refusals, no errors options and no `defaultTypes` on
+the builder stays a plain field rather than a one-member union. The errors
+options' success shape is the non-null `ResolvedShape`, so a list's custom
+success fields see the iterable the resolver answered. Neither method
 resolves subscription fields — the errors plugin wraps `subscribe` before any
 `Result` is settled — so on a subscription builder their options do not
 compile.

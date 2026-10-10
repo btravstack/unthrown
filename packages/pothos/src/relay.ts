@@ -191,7 +191,11 @@ fieldBuilder.resultConnection = function resultConnection(
 ) {
   // A subscription builder's options never reach here: they do not compile.
   return this.connection(
-    resultConfig(this.builder.options.errors?.defaultTypes, fieldOptions) as never,
+    resultConfig(
+      this.builder.options.errors?.defaultTypes,
+      fieldOptions,
+      this.builder.options.relay?.defaultConnectionFieldOptions?.errors,
+    ) as never,
     connectionOptions as never,
     edgeOptions as never,
   );

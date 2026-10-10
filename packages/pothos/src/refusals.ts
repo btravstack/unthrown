@@ -135,9 +135,15 @@ const answerOf = <Value, Failure>(
   const { error } = settled;
   return fromSafeThrowable((): Answer<Value> => {
     const Refusal = refusalFor(refusals, caseOf(error));
-    return Refusal === undefined
-      ? { kind: "defect", cause: error }
-      : { kind: "refusal", refusal: new Refusal(error) };
+    if (Refusal === undefined) {
+      return { kind: "defect", cause: error };
+    }
+    const refusal = new Refusal(error);
+    // A constructor that answers anything but an `Error` of its own class (a
+    // structural look-alike, a base `Error`) builds nothing the plugin can place.
+    return refusal instanceof Refusal && refusal instanceof Error
+      ? { kind: "refusal", refusal }
+      : { kind: "defect", cause: refusal };
   })()
     .recoverDefect((cause) => Ok<Answer<Value>>({ kind: "defect", cause }))
     .get();
@@ -218,14 +224,17 @@ type ResultOptions = {
 export const resultConfig = (
   defaultTypes: readonly ErrorClass[] | undefined,
   fieldOptions: object,
+  inheritedErrors?: { readonly types?: readonly ErrorClass[] },
 ): object => {
   const { refusals, resolve, errors, ...options } = fieldOptions as ResultOptions;
-  const types = typesOf(refusals);
+  // Errors options a field inherits (relay's default connection field options)
+  // are merged, not replaced: their types are handled too.
+  const types = [...(inheritedErrors?.types ?? []), ...typesOf(refusals)];
   const handled = [...types, ...(defaultTypes ?? [])];
-  const plain = handled.length === 0 && errors === undefined;
+  const plain = handled.length === 0 && errors === undefined && inheritedErrors === undefined;
   return {
     ...options,
-    ...(plain ? {} : { errors: { ...errors, types } }),
+    ...(plain ? {} : { errors: { ...inheritedErrors, ...errors, types } }),
     resolve: async (parent: unknown, args: never, context: never, info: unknown) =>
       settle(() => resolve(parent, args, context, info), refusals, handled),
   };

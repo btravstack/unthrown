@@ -94,8 +94,14 @@ export type ResultFieldOptions<
   "resolve" | "errors"
 > & {
   readonly errors?: Omit<
-    // The success object's shape is non-null: null stays the nullable outer field's.
-    ErrorFieldOptions<Types, Type, ShapeFromTypeParam<Types, Type, false>, Nullable>,
+    // The success value as the resolver answers it, non-null: null stays the
+    // nullable outer field's, and a list keeps the iterable it was given.
+    ErrorFieldOptions<
+      Types,
+      Type,
+      ResolvedShape<Type, ShapeFromTypeParam<Types, Type, false>>,
+      Nullable
+    >,
     "types"
   >;
   readonly refusals: NoInfer<Refusals<Failure>>;
