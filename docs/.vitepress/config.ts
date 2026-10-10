@@ -58,6 +58,7 @@ const GUIDE_SIDEBAR = [
       { text: "Use with Prisma", link: "/how-to/use-with-prisma" },
       { text: "Use with Drizzle", link: "/how-to/use-with-drizzle" },
       { text: "Use with oRPC", link: "/how-to/use-with-orpc" },
+      { text: "Use with Pothos", link: "/how-to/use-with-pothos" },
       { text: "Test with Vitest", link: "/how-to/test-with-vitest" },
       { text: "Lint your codebase", link: "/how-to/lint-your-codebase" },
       { text: "Interoperate with libraries", link: "/how-to/interoperate-with-libraries" },
@@ -104,6 +105,7 @@ const API_SIDEBAR = [
       { text: "@unthrown/prisma", link: "/api/prisma/" },
       { text: "@unthrown/drizzle", link: "/api/drizzle/" },
       { text: "@unthrown/orpc", link: "/api/orpc/" },
+      { text: "@unthrown/pothos", link: "/api/pothos/" },
     ],
   },
 ];

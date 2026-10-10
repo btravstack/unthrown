@@ -22,7 +22,7 @@ const TYPEDOC = join(
   "typedoc",
 );
 
-// Every documented package. `core`, `drizzle`, `orpc` and `saga` keep an options
+// Every documented package. `core`, `drizzle`, `orpc`, `pothos` and `saga` keep an options
 // file of their own because they carry settings nothing else needs (a
 // `categoryOrder`, `intentionallyNotExported`, or several entry points — `orpc`
 // has no root export at all); the rest differ only in the four values derived below, so they
@@ -42,10 +42,11 @@ const packages: readonly string[] = [
   "prisma",
   "drizzle",
   "orpc",
+  "pothos",
 ];
 
 // Packages whose settings do not fit the shared base.
-const OWN_OPTIONS: ReadonlySet<string> = new Set(["core", "drizzle", "orpc", "saga"]);
+const OWN_OPTIONS: ReadonlySet<string> = new Set(["core", "drizzle", "orpc", "pothos", "saga"]);
 
 // `unthrown` is published unscoped; every satellite is `@unthrown/<dir>`.
 const displayName = (name: string): string => (name === "core" ? "unthrown" : `@unthrown/${name}`);

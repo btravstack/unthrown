@@ -35,6 +35,9 @@ This reference is generated from the source with
   `.result()` for `Result`-returning procedure handlers, `createResultClient` /
   `fromCall` for an `AsyncResult` client, with the inferable `ORPCError` union
   as the modeled error.
+- [**@unthrown/pothos**](./pothos/) — a Pothos plugin: `resultField` /
+  `resultConnection` resolved by a `Result`, each failure answered as the typed
+  refusal its case maps to in the field's result union.
 - [**@unthrown/prisma**](./prisma/) — a Prisma Client extension
   (`$extends(unthrownPrisma)`) adding `try*` variants of every model operation
   (each an `AsyncResult` whose error channel is exactly the P-codes it can

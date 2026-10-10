@@ -22,6 +22,9 @@ catalog:
   "@orpc/client": 2.0.0-beta.40
   "@orpc/contract": 2.0.0-beta.40
   "@orpc/server": 2.0.0-beta.40
+  "@pothos/core": 4.15.1
+  "@pothos/plugin-errors": 4.9.3
+  "@pothos/plugin-relay": 4.8.1
   "@prisma/adapter-better-sqlite3": 7.10.0
   "@prisma/client": 7.10.0
   "@testcontainers/postgresql": 12.2.0
@@ -35,6 +38,7 @@ catalog:
   # (`_prepare`, the `entityKind` brand), so bumps are deliberate.
   drizzle-orm: 1.0.0-rc.5-5935859
   effect: 3.22.2
+  graphql: 17.0.2
   knip: 6.38.0
   lefthook: 2.1.14
   neverthrow: 8.2.0

@@ -931,6 +931,15 @@ copies) — issue #256, observed live in btravstack/start#99.
   the procedure declared via `.errors({...})`, `Defect` ↔ everything else
   (including an undeclared `ORPCError`). Three entry points, no root export.
   **Outside the fixed version group.** Full spec: `packages/orpc/CLAUDE.md`.)
+- `packages/pothos` → `@unthrown/pothos` (peerDeps `@pothos/core` `^4.15.0`,
+  `@pothos/plugin-errors` `^4.9.0`, `graphql` `^16.10.0 || ^17.0.0`, and
+  `@pothos/plugin-relay` `^4.8.0`, optional; a Pothos plugin whose
+  `resultField` / `resultConnection` are resolved by a `Result` — `Ok` → the
+  field's value, `Err` → the refusal its case (`_tag` or `code`) maps to,
+  returned as a member of the errors plugin's result union, `Defect` → thrown
+  for the server to mask (Yoga does by default; graphql-js alone does not); the `refusals` record is exhaustive over the failure's
+  cases. Two side-effectful entry points, `.` and `./relay`. **Outside the
+  fixed version group.** Full spec: `packages/pothos/CLAUDE.md`.)
 - shared config is **external**, not a workspace package: the tsconfig and
   typedoc bases come from the catalog dependencies `@btravstack/tsconfig` and
   `@btravstack/typedoc` (alongside `@btravstack/oxlint`, `@btravstack/commitlint`,
@@ -975,9 +984,9 @@ copies) — issue #256, observed live in btravstack/start#99.
   own TypeScript (see the toolchain section). One `typedoc.<name>.json` per
   documented package points its `entryPoints`/`tsconfig` back at that package's
   sources and writes straight into `api/<name>/`; `scripts/build-api.ts` runs
-  the ten concurrently (wiping stale `api/*/` output first, and printing any
+  the eleven concurrently (wiping stale `api/*/` output first, and printing any
   TypeDoc warning a successful run would otherwise swallow). There is no per-package `build:docs` and no copy step.
-  Only `core`, `drizzle`, `orpc` and `saga` keep a `typedoc.<name>.json` of
+  Only `core`, `drizzle`, `orpc`, `pothos` and `saga` keep a `typedoc.<name>.json` of
   their own — they carry a `categoryOrder`, an `intentionallyNotExported`, or
   several entry points (`orpc` has no root export at all). The other six differ solely in
   name/entryPoints/tsconfig/out, so they share `typedoc.base.json` and take
@@ -998,7 +1007,7 @@ copies) — issue #256, observed live in btravstack/start#99.
 
 Core has **no runtime dependencies** (the error matcher is built-in). Never
 pull `vitest` or any interop peer (`effect`, `neverthrow`, `@bloodyowl/boxed`,
-`@orpc/*`, `drizzle-orm`, `pg`) into core.
+`@orpc/*`, `drizzle-orm`, `pg`, `@pothos/*`, `graphql`) into core.
 
 Every satellite package depends on core via `workspace:^` (an exact pin would
 create a dual-copy hazard with the `instanceof`-based `isResult`); for the same

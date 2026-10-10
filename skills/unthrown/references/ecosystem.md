@@ -3,7 +3,7 @@
 Contents: [Testing: @unthrown/vitest](#testing-unthrownvitest) ·
 [Linting: @unthrown/oxlint](#linting-unthrownoxlint) ·
 [Prisma](#prisma-unthrownprisma) · [Drizzle](#drizzle-unthrowndrizzle) ·
-[oRPC](#orpc-unthrownorpc) ·
+[oRPC](#orpc-unthrownorpc) · [Pothos](#pothos-unthrownpothos) ·
 [Validation: @unthrown/standard-schema](#validation-unthrownstandard-schema) ·
 [Sagas: @unthrown/saga](#sagas-unthrownsaga) ·
 [Interop bridges](#interop-bridges-effect-neverthrow-boxed)
@@ -229,6 +229,27 @@ Peers `@orpc/client` + `@orpc/contract` + optional `@orpc/server`
   `ORPCError` union discriminated by `code` — match with
   `.with({ code: "NOT_FOUND" }, …)`, not `P.tag`.
 - Event-iterator (streaming) procedures are out of scope — use the raw client.
+
+## Pothos: @unthrown/pothos
+
+Peers `@pothos/core`, `@pothos/plugin-errors`, `graphql`, optional
+`@pothos/plugin-relay`. A Pothos plugin (`plugins: [ErrorsPlugin, UnthrownPlugin]`)
+whose fields are resolved by a `Result`:
+
+- `t.resultField({ type, refusals, resolve })` — `resolve` answers a
+  `Result`/`AsyncResult`; `refusals` maps every case of its failure (`_tag`,
+  else `code`) to the GraphQL error class built from it. A missing, extra or
+  mismatched case does not compile, and every failure member must name a case
+  (`Failure & Caseable`). `Err` is answered as its union member (returned, not
+  thrown); a `Defect` is thrown, never claimed as a refusal — mask errors at
+  the server (Yoga does by default; graphql-js alone does not).
+- `@unthrown/pothos/relay` — `t.resultConnection(...)`, the same for Relay
+  connections (side-effectful import; list `RelayPlugin` in the builder).
+- `outcomeOf(result, refusals, defaultTypes?)` — what a DataLoader answers for
+  one key: the value, the refusal, or a `Defect` as an `Error`, never a
+  rejection. Pass the builder's `errors.defaultTypes`.
+- Register each refusal class as an object type
+  (`builder.objectType(NotFoundError, …)`).
 
 ## Validation: @unthrown/standard-schema
 
