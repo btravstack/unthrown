@@ -177,9 +177,9 @@ export const outcomeOf = async <Value, Failure>(
 
 // A defect thrown so no handled class claims it: as it is, else wrapped in an
 // `Error`, else — when even that would be claimed (`defaultTypes: [Error]`) — as
-// a plain object, which GraphQL turns into an error of its own. A `GraphQLError`
-// cause is rethrown as it is: GraphQL's own signal for an error meant for the
-// client, which a server shows rather than masks.
+// a plain object, which GraphQL turns into an error of its own. So a `GraphQLError`
+// cause — GraphQL's own signal for an error meant for the client — is rethrown as
+// it is unless a handled class (a base `Error` in `defaultTypes`) would claim it.
 const unclaimed = (cause: unknown, handled: readonly ErrorClass[]): unknown => {
   if (!claimedBy(handled, cause)) {
     return cause;

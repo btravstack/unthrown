@@ -75,9 +75,11 @@ of the classes the plugin answers on the field (its refusals, the builder's
 or, when even that would be claimed (`defaultTypes: [Error]`), thrown as a
 plain object GraphQL turns into an error of its own. Hiding a defect's message
 is the server's job (Yoga masks by default; graphql-js alone does not), and the
-docs say so. A `GraphQLError` cause is rethrown as it is: GraphQL's own signal
+docs say so. A `GraphQLError` cause is rethrown as it is — GraphQL's own signal
 for an error meant for the client, which an integration (an oRPC bridge
-answering "access refused") relies on.
+answering "access refused") relies on — unless a handled class would claim it:
+with a base `Error` in `defaultTypes` it is wrapped like any other defect, and
+the client loses its message.
 
 `outcomeOf` is the DataLoader twin: the same answer, but a defect is
 **returned** as an `Error` (wrapped when a handled class would claim it), so

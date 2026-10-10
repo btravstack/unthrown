@@ -28,7 +28,8 @@ server's job. GraphQL Yoga masks unexpected errors by default; executing the
 schema with graphql-js alone, or with a server that does not mask, returns the
 defect's message to the client. A defect whose cause is a `GraphQLError` is
 rethrown as it is — GraphQL's own signal for an error meant for the client, so
-Yoga shows it.
+Yoga shows it — unless a handled class would claim it: with a base `Error` in
+the errors plugin's `defaultTypes`, it is wrapped like any other defect.
 :::
 
 ## Register the plugin
