@@ -43,16 +43,22 @@ type FailureOf<Failure, Case> = Failure extends unknown
  * The classes are the field's error types for `@pothos/plugin-errors`, so each
  * must be registered as an object type (`builder.objectType(NotFoundError, …)`).
  */
-export type Refusals<Failure> =
-  string extends CaseOf<Failure>
-    ? // A widened discriminant (`code: string`) has no cases to enumerate.
-      { readonly "every failure needs a literal _tag or code": CaseOf<Failure> }
-    : "__proto__" extends CaseOf<Failure>
-      ? // An object literal's `__proto__` sets its prototype: it can name no refusal.
-        { readonly "__proto__ cannot name a refusal": never }
-      : {
-          readonly [Case in CaseOf<Failure>]: new (failure: FailureOf<Failure, Case>) => Error;
-        };
+export type Refusals<Failure> = [Failure] extends [never]
+  ? // A resolver that cannot fail has no case to refuse: the record must stay empty.
+    { readonly [name: string]: never }
+  : [CaseOf<Failure>] extends [never]
+    ? // No case named yet (a failure still being inferred, or one `resolve` refuses).
+      { readonly [Case in CaseOf<Failure>]: never }
+    : // oxlint-disable-next-line typescript/no-empty-object-type -- `{}` tests whether the cases form an index signature
+      {} extends Record<CaseOf<Failure>, unknown>
+      ? // A non-finite case (`code: string`, `` code: `E_${string}` ``) cannot be enumerated.
+        { readonly "every failure needs a literal _tag or code": CaseOf<Failure> }
+      : "__proto__" extends CaseOf<Failure>
+        ? // An object literal's `__proto__` sets its prototype: it can name no refusal.
+          { readonly "__proto__ cannot name a refusal": never }
+        : {
+            readonly [Case in CaseOf<Failure>]: new (failure: FailureOf<Failure, Case>) => Error;
+          };
 
 type ErrorClass = new (...args: never[]) => Error;
 

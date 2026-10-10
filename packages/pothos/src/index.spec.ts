@@ -277,12 +277,10 @@ describe("outcomeOf", () => {
     expect(outcome).toEqual(new Error("Broken refusal"));
   });
 
-  it("wraps a Defect whose cause one of its refusal classes would claim", async () => {
+  it("wraps a Defect whose cause a handled class would claim", async () => {
     const claimed = new NotFoundError(new Missing({ title: "lost" }));
 
-    const outcome = await outcomeOf(fromSafePromise(Promise.reject(claimed)), {
-      Missing: NotFoundError,
-    });
+    const outcome = await outcomeOf(fromSafePromise(Promise.reject(claimed)), {}, [NotFoundError]);
 
     expect(outcome).toEqual(new Error("Defect", { cause: claimed }));
   });

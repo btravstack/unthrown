@@ -135,7 +135,9 @@ declare global {
         // oxlint-disable-next-line typescript/no-empty-object-type -- Pothos' own default for a field without arguments
         Args extends InputFieldMap = {},
       >(
-        options: ResultFieldOptions<Types, ParentShape, Type, Nullable, Args, Kind, Failure>,
+        options: Kind extends "Subscription"
+          ? { readonly "resultField does not resolve subscription fields": never }
+          : ResultFieldOptions<Types, ParentShape, Type, Nullable, Args, Kind, Failure>,
       ) => FieldRef<Types, ShapeFromTypeParam<Types, Type, Nullable>, Kind>;
     }
   }
@@ -151,7 +153,12 @@ const fieldBuilder = RootFieldBuilder.prototype as PothosSchemaTypes.RootFieldBu
   unknown
 >;
 
-fieldBuilder.resultField = function resultField({ refusals, resolve, errors, ...options }) {
+fieldBuilder.resultField = function resultField(fieldOptions) {
+  // A subscription builder's options never reach here: they do not compile.
+  const { refusals, resolve, errors, ...options } = fieldOptions as Extract<
+    typeof fieldOptions,
+    { readonly refusals: unknown }
+  >;
   return this.field({
     ...options,
     errors: { ...errors, types: typesOf(refusals) },

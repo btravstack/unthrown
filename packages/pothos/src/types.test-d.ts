@@ -70,6 +70,13 @@ class AnyError extends Error {
   }
 }
 
+declare const findTemplated: () => AsyncResult<
+  { readonly title: string },
+  { readonly code: `E_${string}` }
+>;
+
+declare const findAlways: () => AsyncResult<{ readonly title: string }, never>;
+
 declare const findOrUnnamed: () => AsyncResult<
   { readonly title: string },
   Missing | { readonly reason: string }
@@ -170,6 +177,41 @@ builder.queryFields((t) => ({
     refusals: { ["__proto__"]: AnyError },
     resolve: findProto,
   }),
+  templated: t.resultField({
+    type: "Book",
+    // @ts-expect-error -- a template-literal code has no finite cases to enumerate
+    refusals: {},
+    resolve: findTemplated,
+  }),
+  neverFails: t.resultField({
+    type: "Book",
+    refusals: {},
+    resolve: findAlways,
+  }),
+  neverFailsExtra: t.resultField({
+    type: "Book",
+    // @ts-expect-error -- a resolver that cannot fail has no case to refuse
+    refusals: { Missing: NotFoundError },
+    resolve: findAlways,
+  }),
+  counted: t.resultConnection(
+    {
+      type: "Book",
+      refusals: {},
+      resolve: () =>
+        OkAsync({
+          edges: [],
+          pageInfo: {
+            hasNextPage: false,
+            hasPreviousPage: false,
+            startCursor: null,
+            endCursor: null,
+          },
+          totalCount: 0,
+        }),
+    },
+    { fields: (c) => ({ totalCount: c.int({ resolve: (connection) => connection.totalCount }) }) },
+  ),
   nullableConnection: t.resultConnection({
     type: "Book",
     nullable: true,
@@ -182,6 +224,11 @@ builder.queryFields((t) => ({
     refusals: {},
     resolve: () => ErrAsync(new Missing()),
   }),
+}));
+
+builder.subscriptionFields((t) => ({
+  // @ts-expect-error -- resultField does not resolve subscription fields
+  feed: t.resultField({ type: "Book", refusals: {}, resolve: findAlways }),
 }));
 
 export type _Assertions = [

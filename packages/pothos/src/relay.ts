@@ -78,6 +78,8 @@ export type ResultConnectionOptions<
   Args extends InputFieldMap,
   Kind extends FieldKind,
   Failure,
+  ConnectionResult extends ConnectionOf<Types, Type, EdgeNullability, NodeNullability> =
+    ConnectionOf<Types, Type, EdgeNullability, NodeNullability>,
 > = Omit<
   FieldOptions<Types, ParentShape, Type, Nullable, Args, Kind>,
   "args" | "type" | "errors" | InferredFieldOptionKeys
@@ -103,11 +105,11 @@ export type ResultConnectionOptions<
     info: GraphQLResolveInfo,
   ) =>
     | Result<
-        ConnectionShapeForType<Types, Type, Nullable, EdgeNullability, NodeNullability>,
+        Nullable extends true ? ConnectionResult | null | undefined : ConnectionResult,
         Failure & Caseable
       >
     | AsyncResult<
-        ConnectionShapeForType<Types, Type, Nullable, EdgeNullability, NodeNullability>,
+        Nullable extends true ? ConnectionResult | null | undefined : ConnectionResult,
         Failure & Caseable
       >;
 };
@@ -133,20 +135,25 @@ declare global {
         Args extends InputFieldMap = {},
         EdgeNullability extends FieldNullability<[unknown]> = Types["DefaultEdgesNullability"],
         NodeNullability extends boolean = Types["DefaultNodeNullability"],
+        ConnectionResult extends ConnectionOf<Types, Type, EdgeNullability, NodeNullability> =
+          ConnectionOf<Types, Type, EdgeNullability, NodeNullability>,
         const ConnectionInterfaces extends InterfaceParam<Types>[] = [],
         const EdgeInterfaces extends InterfaceParam<Types>[] = [],
       >(
-        options: ResultConnectionOptions<
-          Types,
-          ParentShape,
-          Type,
-          Nullable,
-          EdgeNullability,
-          NodeNullability,
-          Args,
-          Kind,
-          Failure
-        >,
+        options: Kind extends "Subscription"
+          ? { readonly "resultConnection does not resolve subscription fields": never }
+          : ResultConnectionOptions<
+              Types,
+              ParentShape,
+              Type,
+              Nullable,
+              EdgeNullability,
+              NodeNullability,
+              Args,
+              Kind,
+              Failure,
+              ConnectionResult
+            >,
         connectionOptions?:
           | ObjectRef<
               Types,
@@ -158,7 +165,7 @@ declare global {
                 Type,
                 EdgeNullability,
                 NodeNullability,
-                ConnectionShapeForType<Types, Type, false, EdgeNullability, NodeNullability>,
+                ConnectionResult,
                 ConnectionInterfaces
               >,
               "edgesNullable"
@@ -168,7 +175,7 @@ declare global {
               Types,
               Type,
               NodeNullability,
-              ConnectionShapeForType<Types, Type, false, EdgeNullability, NodeNullability>,
+              ConnectionResult,
               EdgeInterfaces
             >
           | ObjectRef<
@@ -190,10 +197,15 @@ const fieldBuilder = RootFieldBuilder.prototype as PothosSchemaTypes.RootFieldBu
 >;
 
 fieldBuilder.resultConnection = function resultConnection(
-  { refusals, resolve, errors, ...options },
+  fieldOptions,
   connectionOptions,
   edgeOptions,
 ) {
+  // A subscription builder's options never reach here: they do not compile.
+  const { refusals, resolve, errors, ...options } = fieldOptions as Extract<
+    typeof fieldOptions,
+    { readonly refusals: unknown }
+  >;
   return this.connection(
     {
       ...options,

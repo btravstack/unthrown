@@ -64,7 +64,20 @@ handled class would claim its cause — a loader can only reject a key with an
 which the TSDoc states. Refusal classes are read as own properties
 (`Object.hasOwn`); `Refusals` refuses a widened discriminant (`code: string`,
 no cases to enumerate) and a `__proto__` case (an object literal's
-`__proto__` sets its prototype). A nullable `resultConnection` may
+`__proto__` sets its prototype). A non-finite case (`code: string`, or a template
+literal such as `` `E_${string}` ``) is refused the same way — `{}` extends
+`Record<Case, unknown>` exactly when the cases form an index signature — and
+a resolver that cannot fail (`Failure` is `never`) takes an exactly empty
+record, so an impossible refusal cannot add a member to the union. The
+`never` test is on `Failure` itself, not on `CaseOf<Failure>`: while a
+context-sensitive `resolve` is still being inferred, `Failure` is a
+placeholder whose `CaseOf` is `never` too, and an exact empty record there
+would reject every field. Neither method resolves subscription fields — the
+errors plugin wraps a subscription's `subscribe` before any `Result` is
+settled — so on a subscription builder their options do not compile.
+`resultConnection` infers the resolved connection (`ConnectionResult`) from
+`resolve` and hands it to relay's connection and edge options, so a
+`totalCount` the resolver returns is typed where those options read it. A nullable `resultConnection` may
 answer `Ok(null)`, and it forwards relay's connection and edge options (its
 second and third arguments) to `connection`. `outcomeOf` is the
 DataLoader twin: the same mapping, but a `Defect` — or a failure no refusal
