@@ -496,4 +496,18 @@ describe("outcomeOf", () => {
 
     expect(answer).toEqual({ data: { shifting: { __typename: "NotFound" } } });
   });
+
+  it("answers a thenable defect wrapped, without awaiting it", async () => {
+    class ThenableError extends Error {
+      // oxlint-disable-next-line unicorn/no-thenable -- the case under test: a defect that is also a thenable
+      then(_resolve: unknown, reject: (reason: unknown) => void): void {
+        reject(new Error("Rejected defect"));
+      }
+    }
+    const cause = new ThenableError("Thenable");
+
+    const outcome = await outcomeOf(Ok<Error>(cause), {});
+
+    expect(outcome instanceof Error && outcome.cause === cause).toBe(true);
+  });
 });

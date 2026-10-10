@@ -86,7 +86,8 @@ the client loses its message.
 
 `outcomeOf` is the DataLoader twin: the same answer, but a defect is
 **returned** as an `Error` (wrapped when a handled class would claim it), so
-one key's bug does not reject the batch. It takes the builder's `defaultTypes`
+one key's bug does not reject the batch; a thenable cause is wrapped too, or
+its \`async\` return would await it. It takes the builder's `defaultTypes`
 as its third argument. A loader can only reject a key with an `Error`, so a
 base `Error` among `defaultTypes` claims every loader defect — stated in its
 TSDoc and the guide. The `instanceof` checks that classify a defect are guarded

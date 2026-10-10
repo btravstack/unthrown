@@ -185,7 +185,9 @@ export const outcomeOf = async <Value, Failure>(
     const { cause } = answer;
     // Listing the handled classes reads the record, whose getters may throw: guarded too.
     const claimed = safely(() => claimedBy([...typesOf(refusals), ...defaultTypes], cause), true);
-    return isError(cause) && !claimed ? cause : new Error("Defect", { cause });
+    // Returned from this `async` function, a thenable cause would be awaited: wrapped too.
+    const asIs = isError(cause) && !claimed && !safely(() => isThenable(cause), true);
+    return asIs ? cause : new Error("Defect", { cause });
   }
   return answer.kind === "value" ? answer.value : answer.refusal;
 };
