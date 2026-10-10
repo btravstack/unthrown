@@ -247,6 +247,12 @@ builder.queryFields((t) => ({
     refusals: {},
     resolve: () => OkAsync(bookGenerator),
   }),
+  listOfStringsFromString: t.resultField({
+    type: ["String"],
+    refusals: {},
+    // @ts-expect-error -- a string is iterable, but graphql completes a list only from an iterable object
+    resolve: () => OkAsync("abc"),
+  }),
   listOfPromises: t.resultField({
     type: ["Book"],
     refusals: {},

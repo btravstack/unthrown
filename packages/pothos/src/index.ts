@@ -48,13 +48,14 @@ export { outcomeOf, type Caseable, type CaseOf, type Refusals } from "./refusals
 /**
  * A field's value as its `Ok` may carry it. A GraphQL list (`[Type]`, a
  * `ListRef`) takes any synchronous iterable of its items, each possibly a
- * promise — an array, a generator; any other field takes its shape as it is,
- * an array-shaped scalar included. An `Ok` holding an `Error` is answered as a
- * defect at runtime: the errors plugin would take it for a refusal.
+ * promise — an array, a generator, never a string; any other field takes its
+ * shape as it is, an array-shaped scalar included. An `Ok` holding an `Error`
+ * is answered as a defect at runtime: the errors plugin would take it for a
+ * refusal.
  */
 export type ResolvedShape<Type, Shape> = Type extends readonly unknown[] | { readonly kind: "List" }
   ? Shape extends readonly (infer Item)[]
-    ? Iterable<Item | Promise<Item>>
+    ? Iterable<Item | Promise<Item>> & object
     : Shape
   : Shape;
 

@@ -96,7 +96,8 @@ unclassifiable cause counts as claimed.
 
 A field's `Ok` takes its output shape (`ResolvedShape`), which for a loadable
 object already includes its key. A GraphQL list (`[Type]`, a `ListRef`) takes
-any synchronous iterable of its items, each possibly a promise; list-ness comes
+any synchronous iterable object of its items (never a string: graphql completes
+a list only from an object), each possibly a promise; list-ness comes
 from the GraphQL type, not the TypeScript shape, so an array-shaped scalar
 takes its array. Async iterables are left out: graphql 16 does not execute them
 as lists. `resultConnection` infers the resolved connection (`ConnectionResult`)
