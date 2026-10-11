@@ -73,10 +73,34 @@ const throwing = os.handler(
   }),
 );
 
+const transportCause = new ORPCError("NOT_FOUND", {
+  message: "secret database details",
+  data: { secret: "credentials" },
+});
+const throwingDeclared = os.errors({ NOT_FOUND: {} }).handler(
+  handlerResult((): Result<number, never> => {
+    throw transportCause;
+  }),
+);
+const rejectingDeclared = os.errors({ NOT_FOUND: {} }).handler(
+  handlerResult(async () => {
+    throw transportCause;
+  }),
+);
+
 const asyncOk = os.handler(handlerResult(async () => Ok("async")));
 const liftedOk = os.handler(handlerResult(() => fromSafePromise(Promise.resolve(42))));
 
-const router = { planet: { find }, undeclared, buggy, throwing, asyncOk, liftedOk };
+const router = {
+  planet: { find },
+  undeclared,
+  buggy,
+  throwing,
+  throwingDeclared,
+  rejectingDeclared,
+  asyncOk,
+  liftedOk,
+};
 const client = createRouterClient(router);
 const rc = createResultClient(client);
 
@@ -121,6 +145,19 @@ describe("handlerResult over the in-process client", () => {
     expect(result).toBeDefect();
     if (result.isDefect()) expect((result.cause as Error).message).toBe("handler boom");
   });
+
+  test.each(["throwingDeclared", "rejectingDeclared"] as const)(
+    "%s treats a declared ORPCError thrown by the callback as a Defect",
+    async (procedure) => {
+      const result = await rc[procedure]();
+
+      expect(result).toBeDefect();
+      if (result.isDefect()) {
+        expect(isDefinedError(result.cause)).toBe(false);
+        expect((result.cause as Error).cause).toBe(transportCause);
+      }
+    },
+  );
 
   test("the handler may be async (edge elimination) or return an AsyncResult", async () => {
     await expect(rc.asyncOk()).toBeOkWith("async");
@@ -336,6 +373,23 @@ describe("through a real serialization round-trip (RPCHandler ↔ RPCLink)", () 
       expect(isDefinedError(cause)).toBe(false);
     }
   });
+
+  test.each(["throwingDeclared", "rejectingDeclared"] as const)(
+    "%s hides a callback's declared ORPCError over the wire",
+    async (procedure) => {
+      const result = await wire[procedure]();
+
+      expect(result).toBeDefect();
+      if (result.isDefect()) {
+        expect(result.cause).toMatchObject({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Internal Server Error",
+          data: undefined,
+          defined: false,
+        });
+      }
+    },
+  );
 
   test("a defect is collapsed to INTERNAL_SERVER_ERROR and stays a Defect", async () => {
     const result = await wire.buggy();

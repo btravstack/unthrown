@@ -4,11 +4,11 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.spec.ts"],
-    // Pothos and graphql are evaluated by the same loader as the specs: left
+    // Pothos, Yoga and graphql use the same loader as the specs: left
     // external, Pothos would build its schema with Node's copy of graphql while
     // a spec's `import { graphql } from "graphql"` gets Vite's, and graphql's
     // realm check refuses a schema from the other copy.
-    server: { deps: { inline: [/@pothos\//u] } },
+    server: { deps: { inline: [/@pothos\//u, /graphql/u, /@envelop\//u] } },
     coverage: {
       // Always on, so a bare `vitest run` enforces the thresholds below.
       // CI appends `--coverage`; a second CLI flag would crash vitest, so this

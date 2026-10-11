@@ -37,7 +37,9 @@ halves build on. Its majors track oRPC's cadence, not the unthrown family's.
 
 `handlerResult` adapts a `Result`-returning handler into a plain oRPC handler —
 your service layer keeps speaking `Result`, and the endpoint stops needing to
-unwrap it into throws:
+unwrap it into throws. A throw or rejection from the handler callback is a
+defect even when it throws a declared `ORPCError`; only a returned `Err`
+answers a modeled failure:
 
 ```ts
 import { P } from "unthrown";

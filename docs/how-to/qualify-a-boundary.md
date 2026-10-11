@@ -30,6 +30,11 @@ fromNullable(cache.get("a"), () => "missing"); // Ok(1)
 fromNullable(cache.get("z"), () => "missing"); // Err("missing")
 ```
 
+`onAbsent` is lazy and synchronous: it runs only for absence. A throw becomes
+a `Defect`; an async or thenable-returning factory is rejected at compile time.
+An untyped thenable return becomes a `Defect`, with an orphaned Promise silenced
+and a lazy thenable left unstarted.
+
 This is the sanctioned bridge for nullable third-party APIs — and the reason
 `unthrown` ships no `Option` type (see
 [Design decisions](../explanation/design-decisions#no-option-type)).

@@ -2,6 +2,7 @@
 // the `Refusals` record a field declares, `resultConfig`, which turns a field's
 // options into what Pothos takes, and `outcomeOf`, what a DataLoader answers.
 
+import { GraphQLError } from "graphql";
 import { fromSafePromise, fromSafeThrowable, Ok, type AsyncResult, type Result } from "unthrown";
 
 /**
@@ -111,6 +112,10 @@ const safely = (test: () => boolean, onThrow: boolean): boolean =>
 
 const isError = (value: unknown): value is Error => safely(() => value instanceof Error, false);
 
+// GraphQL errors signal client-visible messages to masking servers, even for defects.
+const isTransportError = (value: unknown): boolean =>
+  safely(() => value instanceof GraphQLError, true);
+
 // Returned from an `async` function, a thenable is awaited: its rejection would
 // escape the `Result`.
 const isThenable = (value: unknown): boolean =>
@@ -171,8 +176,8 @@ const answerOf = <Value, Failure>(
  * A `Result` as a DataLoader answers one key: the value, or the refusal its
  * failure maps to. A `Defect` is returned as an `Error`, never thrown, so one
  * key's bug does not reject the batch — wrapped (`new Error("Defect", { cause })`)
- * when one of the field's refusals or the builder's `defaultTypes` would claim
- * it. Pass the builder's `defaultTypes`: a loader can only reject a key with an
+ * when it is a `GraphQLError` or a handled class would claim it. Pass the
+ * builder's `defaultTypes`: a loader can only reject a key with an
  * `Error`, so a base `Error` among them claims every defect a loader reports.
  */
 export const outcomeOf = async <Value, Failure>(
@@ -186,19 +191,20 @@ export const outcomeOf = async <Value, Failure>(
     // Listing the handled classes reads the record, whose getters may throw: guarded too.
     const claimed = safely(() => claimedBy([...typesOf(refusals), ...defaultTypes], cause), true);
     // Returned from this `async` function, a thenable cause would be awaited: wrapped too.
-    const asIs = isError(cause) && !claimed && !safely(() => isThenable(cause), true);
+    const asIs =
+      isError(cause) &&
+      !isTransportError(cause) &&
+      !claimed &&
+      !safely(() => isThenable(cause), true);
     return asIs ? cause : new Error("Defect", { cause });
   }
   return answer.kind === "value" ? answer.value : answer.refusal;
 };
 
-// A defect thrown so no handled class claims it: as it is, else wrapped in an
-// `Error`, else — when even that would be claimed (`defaultTypes: [Error]`) — as
-// a plain object, which GraphQL turns into an error of its own. So a `GraphQLError`
-// cause — GraphQL's own signal for an error meant for the client — is rethrown as
-// it is unless a handled class (a base `Error` in `defaultTypes`) would claim it.
+// A transport error must lose its client-visible signal; no handled class may
+// claim the wrapper, either (a base Error default needs a plain object instead).
 const unclaimed = (cause: unknown, handled: readonly ErrorClass[]): unknown => {
-  if (!claimedBy(handled, cause)) {
+  if (!isTransportError(cause) && !claimedBy(handled, cause)) {
     return cause;
   }
   const wrapped = new Error("Defect", { cause });

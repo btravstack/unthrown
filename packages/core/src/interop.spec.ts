@@ -28,6 +28,53 @@ describe("fromNullable", () => {
     expect(fromNullable(undefined, () => "absent").getErr()).toBe("absent");
   });
 
+  it("turns an onAbsent throw into a Defect", () => {
+    expectDefect(
+      fromNullable(null, () => {
+        throw boom;
+      }),
+    );
+  });
+
+  it("does not call onAbsent for a present value", () => {
+    expectOk(
+      fromNullable(0, () => {
+        throw boom;
+      }),
+      0,
+    );
+  });
+
+  it("rejects an untyped thenable error and silences its rejection", async () => {
+    const { thenable, adoptions } = adoptionProbe();
+    const result = fromNullable(null, (() => thenable) as never);
+
+    expect(result.isDefect()).toBe(true);
+    if (result.isDefect()) expect(result.cause).toBeInstanceOf(TypeError);
+    await flushMicrotasks();
+    expect(adoptions).toHaveLength(1);
+    expect(typeof adoptions[0]?.onRejected).toBe("function");
+  });
+
+  it("rejects a lazy thenable error without starting its work", () => {
+    const { thenable, calls } = lazyThenable();
+    const result = fromNullable(undefined, (() => thenable) as never);
+
+    expect(result.isDefect()).toBe(true);
+    expect(calls()).toBe(0);
+  });
+
+  it("turns a hostile onAbsent then getter into a Defect", () => {
+    // oxlint-disable-next-line no-thenable -- a hostile getter must stay inside the boundary
+    const hostile = Object.defineProperty({}, "then", {
+      get() {
+        throw boom;
+      },
+    });
+
+    expectDefect(fromNullable(null, () => hostile));
+  });
+
   it("keeps a present value as Ok (and treats falsy non-null as present)", () => {
     const r1 = fromNullable(5, () => "absent");
     expectOk(r1, 5);

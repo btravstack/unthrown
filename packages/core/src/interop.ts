@@ -29,12 +29,15 @@ import type {
  *
  * @remarks
  * `null` and `undefined` map to `Err(onAbsent())`; any other value (including
- * falsy ones like `0`, `""`, `false`) maps to `Ok`.
+ * falsy ones like `0`, `""`, `false`) maps to `Ok`. A throw inside `onAbsent`
+ * becomes a `Defect`. Its return must be synchronous ({@link NotThenable});
+ * a thenable slipped past the types becomes a `Defect`, with an orphaned
+ * Promise silenced and a lazy thenable left unstarted.
  *
  * @typeParam T - the (nullable) value type.
  * @typeParam E - the error produced when the value is absent.
  * @param value - the possibly-absent value.
- * @param onAbsent - lazily produces the error for the absent case.
+ * @param onAbsent - synchronously and lazily produces the error for the absent case.
  *
  * @category Interop
  *
@@ -50,9 +53,20 @@ import type {
  */
 export function fromNullable<T, E>(
   value: T | null | undefined,
-  onAbsent: () => E,
+  onAbsent: () => E & NotThenable<E>,
 ): Result<NonNullable<T>, E> {
-  return value === null || value === undefined ? Err(onAbsent()) : Ok(value as NonNullable<T>);
+  if (value !== null && value !== undefined) return Ok(value as NonNullable<T>);
+  try {
+    const error = onAbsent();
+    return isThenable(error)
+      ? thenableReturnDefect(
+          error,
+          "unthrown: fromNullable's onAbsent must be synchronous — it returned a thenable",
+        )
+      : Err(error);
+  } catch (cause) {
+    return defectRes(cause);
+  }
 }
 
 /**
