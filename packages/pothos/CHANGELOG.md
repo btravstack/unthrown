@@ -1,5 +1,11 @@
 # @unthrown/pothos
 
+## 0.1.1
+
+### Patch Changes
+
+- aac0735: Fix the CommonJS entry: `require("@unthrown/pothos")` threw `registerPlugin is not a function`, because the bundler's Node interop made the default import of `@pothos/core` its whole module. The build now loads both CommonJS entries, so this fails `pnpm build` if it recurs.
+
 ## 0.1.0
 
 ### Minor Changes
