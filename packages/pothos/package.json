@@ -55,7 +55,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/relay.ts --format cjs,esm --dts --clean",
+    "build": "tsdown src/index.ts src/relay.ts --format cjs,esm --dts --clean && node --eval \"require('./dist/index.cjs'); require('./dist/relay.cjs')\"",
     "dev": "tsdown src/index.ts src/relay.ts --format cjs,esm --dts --watch",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

@@ -25,7 +25,8 @@
 // union from those classes and answers a returned instance as its member — no
 // throw. The mapping is checked like a matcher: a case left out does not compile.
 
-import SchemaBuilder, {
+import * as Pothos from "@pothos/core";
+import {
   BasePlugin,
   RootFieldBuilder,
   type FieldKind,
@@ -153,6 +154,15 @@ declare global {
 // oxlint-enable typescript/consistent-type-definitions, typescript/no-namespace
 
 const pluginName = "unthrown";
+
+// `@pothos/core` default-exports its builder class. This package's CommonJS
+// build follows Node's interop, which makes the default import the whole
+// `module.exports`, so the class is one `default` deeper there. The specs run
+// the ES module; the build script loads the CommonJS entries instead.
+const SchemaBuilder: typeof Pothos.default =
+  "registerPlugin" in Pothos.default
+    ? Pothos.default
+    : /* v8 ignore next */ (Pothos.default as unknown as typeof Pothos).default;
 
 SchemaBuilder.registerPlugin(pluginName, PothosUnthrownPlugin);
 

@@ -128,6 +128,12 @@ resolves subscription fields — the errors plugin wraps `subscribe` before any
 `Result` is settled — so on a subscription builder their options do not
 compile.
 
+`@pothos/core` default-exports its builder class, with no named export of it.
+The CommonJS build follows Node's interop, under which a default import is the
+whole `module.exports`, so `index.ts` reads the class from a namespace import,
+one `default` deeper in that build. The package's `build` script loads both
+CommonJS entries after bundling, so an interop regression fails the build.
+
 ## Tests
 
 Specs run against a real Pothos schema executed with `graphql`; type tests
