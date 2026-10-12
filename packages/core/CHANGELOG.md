@@ -1,5 +1,11 @@
 # unthrown
 
+## 5.12.1
+
+### Patch Changes
+
+- 8a814c1: Guard fromNullable's onAbsent factory: throws become defects, and async or thenable returns are rejected at compile time and at runtime. Discarded Promise rejections are silenced without starting lazy thenables.
+
 ## 5.12.0
 
 ### Minor Changes

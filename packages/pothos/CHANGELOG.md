@@ -1,5 +1,11 @@
 # @unthrown/pothos
 
+## 0.1.2
+
+### Patch Changes
+
+- 8a814c1: Wrap GraphQLError defects with their original cause before resolver or DataLoader elimination, so default Yoga masking hides their messages and extensions. Mapped Err refusals and defaultTypes behavior stay intact.
+
 ## 0.1.1
 
 ### Patch Changes
