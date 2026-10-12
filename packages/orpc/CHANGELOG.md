@@ -1,5 +1,11 @@
 # @unthrown/orpc
 
+## 0.4.2
+
+### Patch Changes
+
+- 8a814c1: Qualify handlerResult callback invocation and settlement before eliminating its Result. Thrown or rejected declared ORPCErrors remain defects and expose no message or data on the wire; returned Err values remain modeled failures.
+
 ## 0.4.1
 
 ### Patch Changes
