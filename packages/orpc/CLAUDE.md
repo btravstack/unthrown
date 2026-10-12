@@ -30,7 +30,9 @@ a successful output or fail output validation into a 500; a `Defect`
 rethrows its cause — an `ORPCError` cause wrapped in a plain `Error` first,
 because oRPC reconciles every thrown `ORPCError` against the procedure's
 `.errors()` and a declared code would otherwise reach the client defined;
-the callback may be async — an elimination edge, exempt like `match`). `./extensions/result` — the opt-in `.result()` builder
+the callback may be async — an elimination edge, exempt like `match`;
+its invocation and settlement enter a safe boundary before elimination, so a
+throw or rejection is always a defect, even for a declared `ORPCError`). `./extensions/result` — the opt-in `.result()` builder
 method via `declare module "@orpc/server"` augmentation + two prototype
 patches (`Builder`, `ProcedureImplementer` — every builder state shares the
 `Builder` class at runtime); the package's ONE side-effectful entry, listed

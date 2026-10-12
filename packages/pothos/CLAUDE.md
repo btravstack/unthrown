@@ -72,20 +72,18 @@ no reserved `__proto__` case (nobody names a failure that).
 - `Defect` → see below.
 
 A resolver (`settle`, internal) is called inside a promise, so a synchronous
-throw is a defect too. A defect is **thrown unclaimed**: as it is, unless one
-of the classes the plugin answers on the field (its refusals, the builder's
-`defaultTypes`) would claim it — then wrapped (`new Error("Defect", { cause })`),
-or, when even that would be claimed (`defaultTypes: [Error]`), thrown as a
-plain object GraphQL turns into an error of its own. Hiding a defect's message
-is the server's job (Yoga masks by default; graphql-js alone does not), and the
-docs say so. A `GraphQLError` cause is rethrown as it is — GraphQL's own signal
-for an error meant for the client, which an integration (an oRPC bridge
-answering "access refused") relies on — unless a handled class would claim it:
-with a base `Error` in `defaultTypes` it is wrapped like any other defect, and
-the client loses its message.
+throw is a defect too. A defect is **thrown unclaimed**: a `GraphQLError` is
+always wrapped (`new Error("Defect", { cause })`), because its transport signal
+would otherwise bypass Yoga's default masking and expose its message and
+extensions. Any other cause is thrown as it is unless a handled class (the
+field's refusals or the builder's `defaultTypes`) claims it, in which case it
+is wrapped too. When even the wrapper would be claimed (`defaultTypes: [Error]`),
+a plain object is thrown instead, which GraphQL turns into an error of its own.
+Hiding a defect's message remains the server's job: Yoga masks by default;
+graphql-js alone does not. Client-visible refusals must come from a mapped `Err`.
 
 `outcomeOf` is the DataLoader twin: the same answer, but a defect is
-**returned** as an `Error` (wrapped when a handled class would claim it), so
+**returned** as an `Error` (wrapped for a `GraphQLError` or when a handled class would claim it), so
 one key's bug does not reject the batch; a thenable cause is wrapped too, or
 its `async` return would await it. It takes the builder's `defaultTypes`
 as its third argument. A loader can only reject a key with an `Error`, so a

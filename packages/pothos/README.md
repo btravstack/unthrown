@@ -71,7 +71,9 @@ A failure names its case by its `_tag` (a `TaggedError`) or its `code` (an
 
 A `Defect` is thrown as an error of the operation, never claimed as a refusal;
 hiding its message is the server's job (GraphQL Yoga masks by default,
-graphql-js alone does not).
+graphql-js alone does not). A `GraphQLError` defect is wrapped with its original
+cause so its message and extensions cannot bypass default masking; answer
+client-visible refusals through a mapped `Err`. `outcomeOf` wraps it too.
 
 Peers: `@pothos/core` `^4.15.0`, `@pothos/plugin-errors` `^4.9.0`, `graphql`
 `^16.10.0 || ^17.0.0`, and `@pothos/plugin-relay` `^4.8.0` (optional, for

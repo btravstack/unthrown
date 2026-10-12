@@ -27,7 +27,7 @@ import type {
   ProcedureHandler,
   ProcedureHandlerOptions,
 } from "@orpc/server";
-import type { AsyncResult, Result } from "unthrown";
+import { fromSafePromise, type AsyncResult, type Result } from "unthrown";
 
 /**
  * A procedure handler that speaks `Result`: same options as a plain oRPC
@@ -65,8 +65,8 @@ export type ResultHandler<
  *
  * Like `match` handlers, the callback may be `async` (an edge elimination is
  * exempt from the no-thenable rule): a rejection or throw inside it cannot
- * skip triage, because oRPC's own boundary already treats it as the defect
- * path.
+ * skip triage: invocation and settlement are qualified as defects before
+ * eliminating the returned Result, including a declared `ORPCError`.
  *
  * @param handler - the `Result`-speaking handler to adapt.
  *
@@ -101,7 +101,9 @@ export function handlerResult<
   handler: ResultHandler<TCurrentContext, TInput, TOutput, TError, TErrorMap>,
 ): ProcedureHandler<TCurrentContext, TInput, TOutput, ORPCErrorConstructorMap<TErrorMap>> {
   return async (opts, input) => {
-    const result = await handler(opts, input);
+    const result = await fromSafePromise(
+      Promise.resolve().then(() => handler(opts, input)),
+    ).flatMap((answer) => answer);
     // Branch via the guards rather than `match`: this library code is generic in
     // the error type `TError`, and `match`'s exhaustive `errCases` matcher cannot be
     // proven exhaustive by tag arms over an unresolved type parameter. The

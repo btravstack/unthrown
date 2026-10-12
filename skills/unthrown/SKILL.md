@@ -134,6 +134,10 @@ sides: `qualify` is sync (an `async` one is a compile error), and so is `fn`. An
 never be triaged — it becomes a `Defect` rather than an `Ok` wrapping a live
 promise. Use `fromPromise` / `fromSafePromise` for async work.
 
+`fromNullable`'s `onAbsent` is lazy and synchronous: it runs only for absence.
+A throw becomes a `Defect`; an async or thenable return is rejected by the
+types and guarded at runtime (a lazy thenable is never started).
+
 The `Defect` arm of `qualify`'s return is **subtracted** from `E` — a
 defect-only qualify yields `E = never`. The `defect` helper is **injected** as
 the second argument; never import it.

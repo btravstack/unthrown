@@ -26,10 +26,10 @@ settled by the types:
 A `Defect` is never answered as a typed refusal, but hiding its message is the
 server's job. GraphQL Yoga masks unexpected errors by default; executing the
 schema with graphql-js alone, or with a server that does not mask, returns the
-defect's message to the client. A defect whose cause is a `GraphQLError` is
-rethrown as it is — GraphQL's own signal for an error meant for the client, so
-Yoga shows it — unless a handled class would claim it: with a base `Error` in
-the errors plugin's `defaultTypes`, it is wrapped like any other defect.
+defect's message to the client. A `GraphQLError` in the defect channel is
+wrapped with its original cause: it must not bypass masking or expose its
+message and extensions. To answer a client-visible refusal, return a mapped
+`Err`. The same wrapping applies to `outcomeOf`'s per-key loader errors.
 :::
 
 ## Register the plugin

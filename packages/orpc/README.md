@@ -31,6 +31,9 @@ second error concept in between.
 
 ## Server — `handlerResult` / `.result()`
 
+A callback throw or rejection is always a defect, including a declared
+`ORPCError`. Return `Err(errors.CODE(...))` for a modeled failure.
+
 ```ts
 import { P } from "unthrown";
 import { handlerResult } from "@unthrown/orpc/server";

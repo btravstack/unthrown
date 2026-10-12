@@ -26,6 +26,7 @@ import {
   type ErrView,
   type FailureView,
   fromExecutor,
+  fromNullable,
   fromPromise,
   fromSafeThrowable,
   fromThrowable,
@@ -1626,3 +1627,14 @@ function residualWidenedPatterns(
   );
   type _Sound = Expect<Equal<typeof sound, Result<number, "a" | "b">>>;
 }
+
+// fromNullable's lazy error factory must be synchronous, including partial unions.
+const nullableValue = fromNullable(1 as number | null | undefined, () => "absent" as const);
+type _nullable = Expect<Equal<typeof nullableValue, Result<number, "absent">>>;
+// @ts-expect-error an async factory would leave an unqualified Promise in E
+fromNullable(null, async () => "absent" as const);
+// @ts-expect-error a thenable factory must also be rejected
+fromNullable(null, () => Promise.resolve("absent" as const));
+declare const sometimesAsyncAbsence: () => "absent" | Promise<"absent">;
+// @ts-expect-error a partly async factory must not pass the constraint
+fromNullable(null, sometimesAsyncAbsence);

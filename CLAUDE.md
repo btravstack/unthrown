@@ -25,7 +25,10 @@ was planned).
    domain error type.
 2. **No `Option` type.** Absence is expressed with the type system we already
    trust: `T | undefined`, `T | null`, or `Result<T, NotFound>`. Interop with
-   nullable third-party APIs goes through `fromNullable`. Do not add `Option`.
+   nullable third-party APIs goes through `fromNullable`. Its lazy `onAbsent`
+   factory is synchronous (`NotThenable`): a throw becomes a Defect, and an
+   untyped thenable return is a Defect with its Promise silenced, never a lazy
+   thenable started. Do not add `Option`.
 3. **Qualification is enforced at every boundary.** `fromPromise` / `fromThrowable`
    take a mandatory `qualify: (cause: unknown, defect) => E | Defect`, where
    `defect` is a helper the boundary **injects** as the second argument (domain
