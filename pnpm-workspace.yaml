@@ -76,6 +76,9 @@ catalogs:
 # runtime deps); the overrides span High and moderate severity. Each selector is
 # version-scoped so only the affected line moves and unrelated lines are untouched.
 overrides:
+  # GHSA-7mx3-vvmw-hjmv: Yoga's test-only utils 11.x has mergeDeep
+  # prototype pollution. 12.0.3 is patched and already used by this tree.
+  "@graphql-tools/utils@<12.0.1": "12.0.3"
   # GHSA-3jxr-9vmj-r5cp (ReDoS) + GHSA-mh99-v99m-4gvg (DoS via unbounded
   # expansion length) + the later DoS via unbounded intermediate arrays, which
   # bypasses the CVE-2026-14257 mitigation and so is NOT fixed by 5.0.8.
