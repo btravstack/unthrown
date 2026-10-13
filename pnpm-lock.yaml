@@ -237,8 +237,8 @@ catalogs:
       specifier: 1.0.0-rc.5-5935859
       version: 1.0.0-rc.5-5935859
     effect:
-      specifier: 3.22.2
-      version: 3.22.2
+      specifier: 4.0.1
+      version: 4.0.1
     graphql:
       specifier: 17.0.2
       version: 17.0.2
@@ -579,7 +579,7 @@ importers:
         version: 5.0.2(vitest@5.0.2)
       drizzle-orm:
         specifier: 'catalog:'
-        version: 1.0.0-rc.5-5935859(@electric-sql/pglite@0.4.3)(@types/pg@8.23.1)(better-sqlite3@13.0.3)(mysql2@3.23.1(@types/node@26.6.4))(pg@8.23.1)(postgres@3.4.7)(valibot@1.4.2(typescript@7.0.2))(zod@4.5.4)
+        version: 1.0.0-rc.5-5935859(@electric-sql/pglite@0.4.3)(@types/pg@8.23.1)(better-sqlite3@13.0.3)(effect@4.0.1)(mysql2@3.23.1(@types/node@26.6.4))(pg@8.23.1)(postgres@3.4.7)(valibot@1.4.2(typescript@7.0.2))(zod@4.5.4)
       pg:
         specifier: 'catalog:'
         version: 8.23.1
@@ -609,7 +609,7 @@ importers:
         version: 5.0.2(vitest@5.0.2)
       effect:
         specifier: 'catalog:'
-        version: 3.22.2
+        version: 4.0.1
       tsdown:
         specifier: 'catalog:'
         version: 0.23.0(oxc-resolver@11.24.2)(tsx@4.23.13)(typescript@7.0.2)
@@ -3875,8 +3875,8 @@ packages:
   effect@3.20.0:
     resolution: {integrity: sha512-qMLfDJscrNG8p/aw+IkT9W7fgj50Z4wG5bLBy0Txsxz8iUHjDIkOgO3SV0WZfnQbNG2VJYb0b+rDLMrhM4+Krw==}
 
-  effect@3.22.2:
-    resolution: {integrity: sha512-fm1CQXCs7GTMwpadZxwU5rnAb2bN6mbQpknq/pXBGCzSKkosNYb9k0wsoL0TfB10rSa5xOEZJjo77u/KLXSANg==}
+  effect@4.0.1:
+    resolution: {integrity: sha512-b1VlQG9g8fwxE5QnIZuPoOP/0MsqHJSRKxUijjoM80E5q95FXrX5yWtY5XI8G+GJsBQAVSDbLS458z9a++uVvw==}
 
   elkjs@0.11.1:
     resolution: {integrity: sha512-zxxR9k+rx5ktMwT/FwyLdPCrq7xN6e4VGGHH8hA01vVYKjTFik7nHOxBnAYtrgYUB1RpAiLvA1/U2YraWxyKKg==}
@@ -7810,11 +7810,12 @@ snapshots:
 
   dotenv@17.4.2: {}
 
-  drizzle-orm@1.0.0-rc.5-5935859(@electric-sql/pglite@0.4.3)(@types/pg@8.23.1)(better-sqlite3@13.0.3)(mysql2@3.23.1(@types/node@26.6.4))(pg@8.23.1)(postgres@3.4.7)(valibot@1.4.2(typescript@7.0.2))(zod@4.5.4):
+  drizzle-orm@1.0.0-rc.5-5935859(@electric-sql/pglite@0.4.3)(@types/pg@8.23.1)(better-sqlite3@13.0.3)(effect@4.0.1)(mysql2@3.23.1(@types/node@26.6.4))(pg@8.23.1)(postgres@3.4.7)(valibot@1.4.2(typescript@7.0.2))(zod@4.5.4):
     optionalDependencies:
       '@electric-sql/pglite': 0.4.3
       '@types/pg': 8.23.1
       better-sqlite3: 13.0.3
+      effect: 4.0.1
       mysql2: 3.23.1(@types/node@26.6.4)
       pg: 8.23.1
       postgres: 3.4.7
@@ -7832,10 +7833,7 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       fast-check: 3.23.2
 
-  effect@3.22.2:
-    dependencies:
-      '@standard-schema/spec': 1.1.0
-      fast-check: 3.23.2
+  effect@4.0.1: {}
 
   elkjs@0.11.1: {}
 
