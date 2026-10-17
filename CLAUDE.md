@@ -897,7 +897,8 @@ copies) — issue #256, observed live in btravstack/start#99.
   core is a finishable library: a saga in the root would invite a retry
   algebra and a scheduler beside it. Built on `unthrown`'s public API only, so
   the boundary is checked by the compiler rather than by review.)
-- `packages/effect` → `@unthrown/effect` (peerDep `effect`)
+- `packages/effect` → `@unthrown/effect` (peerDep `effect` `^4.0.1`;
+  Node `^20.19.0 || >=22.12.0` for CJS loading of Effect's ESM distribution)
 - `packages/neverthrow` → `@unthrown/neverthrow` (peerDep `neverthrow`)
 - `packages/boxed` → `@unthrown/boxed` (peerDep `@bloodyowl/boxed` — Boxed's
   maintained scope; `@swan-io/boxed` is the deprecated former name)
@@ -917,7 +918,7 @@ copies) — issue #256, observed live in btravstack/start#99.
   variants of all seventeen model delegate operations, plus `$tryTransaction`
   and `tryPaginate`. `E` carries only the three domain P-codes; every
   infrastructure failure is a `Defect`. **Outside the fixed version group**,
-  and the one package on `node >=20.19`. Full spec:
+  and on `node >=20.19`. Full spec:
   `packages/prisma/CLAUDE.md`.)
 - `packages/drizzle` → `@unthrown/drizzle` (peerDeps `drizzle-orm` `^1.0.0-rc.5-0`
   and `pg` `^8.16.0`; **replaces** the stock `drizzle-orm/node-postgres`
@@ -1016,7 +1017,9 @@ Every satellite package depends on core via `workspace:^` (an exact pin would
 create a dual-copy hazard with the `instanceof`-based `isResult`); for the same
 reason, `@unthrown/vitest` takes core as a **peerDependency**, not a regular
 dependency. Every published package carries `engines: { node: ">=20" }`
-(`@unthrown/prisma` alone raises it to `>=20.19`, Prisma 7's floor), ships
+(`@unthrown/prisma` raises it to `>=20.19`, Prisma 7's floor;
+`@unthrown/effect` requires `^20.19.0 || >=22.12.0` so its CJS entry can require
+Effect 4's ESM distribution), ships
 its own `LICENSE`, and sets `files: ["dist"]`.
 
 ### Interop packages (`packages/effect`, `packages/neverthrow`, `packages/boxed`)
@@ -1028,7 +1031,9 @@ channel?**
 - **Effect does** (`Cause.die`), so `Result ↔ Exit` is a genuine **bijection**
   (`Ok↔succeed`, `Err↔Cause.fail`, `Defect↔Cause.die`). `fromExit` lets a
   `Defect` **dominate** a modeled failure in a composite cause (same rule as
-  `all`). `toEither` has no defect target, so it takes a mandatory `onDefect`.
+  `all`). `toResult` has no defect target, so it takes a mandatory `onDefect`.
+  Effect 4 renamed `Either` to `Result`; the two-channel pair is
+  `toResult` / `fromResult` (the former `toEither` / `fromEither` are removed).
 - **neverthrow and Boxed do not.** Coming _in_, results are only `Ok`/`Err` —
   never a `Defect`. Going _out_, every `to*` takes a **mandatory `onDefect:
   (cause) => E`** (forced triage, Thesis #3): a defect is never silently folded

@@ -1,5 +1,5 @@
 // @unthrown/effect — interop between unthrown's `Result`/`AsyncResult` and
-// Effect's `Exit`, `Either`, and `Effect`.
+// Effect's `Exit`, `Result`, and `Effect`.
 //
 // Effect is the one neighbour that shares unthrown's three-channel shape: an
 // `Exit<A, E>` is `Success` | `Failure(Cause)`, and a `Cause` distinguishes a
@@ -12,11 +12,11 @@
 //   toExit(Ok(1));                 // Exit.succeed(1)
 //   await fromEffect(Effect.succeed(1)).match({ ok, errCases, defect });
 //
-// `Either` has only two channels, so converting a `Result` *into* an `Either`
+// Effect's `Result` has only two channels, so converting into it
 // forces you to triage the Defect with `onDefect` (Thesis #3): there is no
 // silent path that drops it.
 
-import { Cause, Effect, Either, Exit, Option } from "effect";
+import { Cause, Effect, Exit, Result as EffectResult } from "effect";
 import { Err, fromSafePromise, fromThrowable, Ok } from "unthrown";
 import type { AsyncResult, Result } from "unthrown";
 
@@ -81,10 +81,10 @@ export function fromExit<T, E>(exit: Exit.Exit<T, E>): Result<T, E> {
   return Exit.match(exit, {
     onSuccess: (value) => Ok(value),
     onFailure: (cause) => {
-      const die = Cause.dieOption(cause);
-      if (Option.isSome(die)) return dieToResult<T, E>(die.value);
-      const failure = Cause.failureOption(cause);
-      if (Option.isSome(failure)) return Err(failure.value);
+      const die = Cause.findDefect(cause);
+      if (EffectResult.isSuccess(die)) return dieToResult<T, E>(die.success);
+      const failure = Cause.findError(cause);
+      if (EffectResult.isSuccess(failure)) return Err(failure.success);
       // No modeled failure and no die: a pure interruption (or empty cause).
       return dieToResult<T, E>(Cause.squash(cause));
     },
@@ -92,13 +92,13 @@ export function fromExit<T, E>(exit: Exit.Exit<T, E>): Result<T, E> {
 }
 
 /**
- * Convert a `Result` into an Effect `Either`, triaging any Defect.
+ * Convert an unthrown `Result` into an Effect `Result`, triaging any Defect.
  *
  * @remarks
- * `Either` has no Defect channel, so a `Defect` cannot pass through silently —
- * `onDefect` **must** fold its cause into a modeled error `E` (a `Left`). This
+ * Effect's `Result` has no Defect channel, so a `Defect` cannot pass through silently —
+ * `onDefect` **must** fold its cause into a modeled error `E` (a `Failure`). This
  * is the boundary-qualification rule (Thesis #3) applied on the way out:
- * `Ok → Right`, `Err → Left`, `Defect → Left(onDefect(cause))`.
+ * `Ok → Success`, `Err → Failure`, `Defect → Failure(onDefect(cause))`.
  *
  * @typeParam T - the success value type.
  * @typeParam E - the modeled error type.
@@ -108,49 +108,49 @@ export function fromExit<T, E>(exit: Exit.Exit<T, E>): Result<T, E> {
  * @example
  * ```ts
  * import { fromThrowable } from "unthrown";
- * import { toEither } from "@unthrown/effect";
+ * import { toResult } from "@unthrown/effect";
  *
- * // Mint a Defect, then convert: it has no home in Either, so onDefect folds it into E.
+ * // Mint a Defect, then convert: it has no home in Effect's Result, so onDefect folds it into E.
  * const defective = fromThrowable((): number => {
  *   throw new Error("boom");
  * }, (cause, defect) => defect(cause))();
- * const either = toEither(defective, (cause) => `bug: ${String(cause)}`);
- * either._tag; // => "Left" — carrying "bug: Error: boom"
+ * const result = toResult(defective, (cause) => `bug: ${String(cause)}`);
+ * result._tag; // => "Failure" — carrying "bug: Error: boom"
  * ```
  */
-export function toEither<T, E>(
+export function toResult<T, E>(
   result: Result<T, E>,
   onDefect: (cause: unknown) => E,
-): Either.Either<T, E> {
-  if (result.isOk()) return Either.right(result.value);
-  if (result.isErr()) return Either.left(result.error);
-  return Either.left(onDefect(result.cause));
+): EffectResult.Result<T, E> {
+  if (result.isOk()) return EffectResult.succeed(result.value);
+  if (result.isErr()) return EffectResult.fail(result.error);
+  return EffectResult.fail(onDefect(result.cause));
 }
 
 /**
- * Convert an Effect `Either` into a `Result`.
+ * Convert an Effect `Result` into an unthrown `Result`.
  *
  * @remarks
- * `Right → Ok`, `Left → Err`. An `Either` carries no Defect, so the result is
- * never a `Defect`.
+ * `Success → Ok`, `Failure → Err`. Effect's `Result` carries no Defect, so the
+ * result is never a `Defect`.
  *
  * @typeParam T - the success value type.
  * @typeParam E - the modeled error type.
- * @param either - the either to convert.
+ * @param result - the Effect Result to convert.
  *
  * @example
  * ```ts
- * import { Either } from "effect";
- * import { fromEither } from "@unthrown/effect";
+ * import { Result as EffectResult } from "effect";
+ * import { fromResult } from "@unthrown/effect";
  *
- * const result = fromEither(Either.right(1));
+ * const result = fromResult(EffectResult.succeed(1));
  * result.isOk(); // => true
  * ```
  */
-export function fromEither<T, E>(either: Either.Either<T, E>): Result<T, E> {
-  return Either.match(either, {
-    onLeft: (error) => Err(error),
-    onRight: (value) => Ok(value),
+export function fromResult<T, E>(result: EffectResult.Result<T, E>): Result<T, E> {
+  return EffectResult.match(result, {
+    onFailure: (error) => Err(error),
+    onSuccess: (value) => Ok(value),
   });
 }
 

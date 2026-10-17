@@ -4,11 +4,11 @@
 > the neighbours in the errors-as-values space. Nothing to learn beyond "which
 > direction am I going."
 
-| Package                                    | Peer dependency    | Bridges                    |
-| ------------------------------------------ | ------------------ | -------------------------- |
-| [`@unthrown/effect`](/api/effect/)         | `effect`           | `Exit`, `Either`, `Effect` |
-| [`@unthrown/neverthrow`](/api/neverthrow/) | `neverthrow`       | `Result`, `ResultAsync`    |
-| [`@unthrown/boxed`](/api/boxed/)           | `@bloodyowl/boxed` | `Result`, `Future<Result>` |
+| Package                                    | Peer dependency    | Bridges                             |
+| ------------------------------------------ | ------------------ | ----------------------------------- |
+| [`@unthrown/effect`](/api/effect/)         | `effect@^4.0.1`    | `Exit`, Effect’s `Result`, `Effect` |
+| [`@unthrown/neverthrow`](/api/neverthrow/) | `neverthrow`       | `Result`, `ResultAsync`             |
+| [`@unthrown/boxed`](/api/boxed/)           | `@bloodyowl/boxed` | `Result`, `Future<Result>`          |
 
 For [Standard Schema](https://standardschema.dev) validators (Zod, Valibot,
 ArkType), see the dedicated
@@ -34,6 +34,11 @@ toNeverthrow(Ok(1), (cause) => ({ _tag: "Bug", cause }));
 ```
 
 ## Effect — a genuine bijection
+
+This bridge requires Effect `^4.0.1` and Node.js `^20.19.0 || >=22.12.0` (including
+CommonJS consumers, which load Effect's ESM distribution). Effect 4 renamed `Either` to `Result`,
+so the two-channel pair is now `toResult` / `fromResult` in place of
+`toEither` / `fromEither`. Keep `@unthrown/effect` 5.x when using Effect 3.
 
 Effect is the exception: it _does_ have a defect channel (`Cause.die`), so
 `Result ↔ Exit` round-trips losslessly.
@@ -65,7 +70,7 @@ await fromEffect(loadUser).match({
 });
 ```
 
-`toEffect` also accepts an `AsyncResult`, and `toEither` — since `Either` has no
+`toEffect` also accepts an `AsyncResult`, and `toResult` — since Effect’s `Result` has no
 defect channel — takes the same mandatory `onDefect`.
 
 ## Async pairs

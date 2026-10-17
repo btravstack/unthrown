@@ -14,7 +14,7 @@ export default defineConfig({
       include: ["src/**"],
       // The interop surface is fully exercised, including every Cause-reduction
       // branch of `fromExit` (fail, die, interrupt) and the forced-triage path
-      // of `toEither`.
+      // of `toResult`.
       thresholds: {
         statements: 95,
         branches: 90,
