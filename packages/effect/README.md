@@ -16,9 +16,9 @@ failure (`Cause.fail` ↔ `Err`) from an unexpected one (`Cause.die` ↔ `Defect
 So `Result ↔ Exit` is a genuine **bijection**.
 
 ```ts
-import { Ok, Err, P, TaggedError } from "unthrown";
 import { toExit, fromEffect, toEither } from "@unthrown/effect";
 import { Effect } from "effect";
+import { Ok, Err, P, TaggedError } from "unthrown";
 
 class NotFound extends TaggedError("NotFound") {}
 
@@ -42,7 +42,7 @@ await fromEffect(load("1")).match({
   a `Defect` **dominates** a modeled failure in a composite cause (same rule as
   `all`).
 - `toEither` / `fromEither` — `Either` has no defect channel, so `toEither(r,
-onDefect)` **forces** you to triage the defect into `E` (Thesis #3). `fromEither`
+  onDefect)` **forces** you to triage the defect into `E` (Thesis #3). `fromEither`
   never yields a `Defect`.
 - `toEffect` / `fromEffect` — `toEffect` lifts a `Result` **or** `AsyncResult`
   into an `Effect<T, E>` (`Defect → Effect.die`); `fromEffect` runs an

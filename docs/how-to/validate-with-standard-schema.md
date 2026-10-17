@@ -42,9 +42,9 @@ reduces it to per-field messages. (Everywhere `E` is a real union, name the case
 instead — see [Exhaustive error matching](../explanation/exhaustive-error-matching).)
 
 ```ts
+import { fromSchema, type SchemaIssues } from "@unthrown/standard-schema";
 import { P } from "unthrown";
 import { z } from "zod";
-import { fromSchema, type SchemaIssues } from "@unthrown/standard-schema";
 
 const signupSchema = z.object({
   email: z.email(),

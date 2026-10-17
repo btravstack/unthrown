@@ -402,8 +402,8 @@ was planned).
 - **`get()` / `getErr()` are type-gated.** `get()` compiles only when the
   error channel is empty; `getErr()` only when the success channel is empty.
   The gate is `getOrThrow`'s shape — `this: [E] extends [never] ? Result<T,
-never> : "unthrown: get() needs an empty error channel …"` (and `[T] extends
-[never]` for `getErr`) — so the compile error prints the fix rather than a
+  never> : "unthrown: get() needs an empty error channel …"` (and `[T] extends
+  [never]` for `getErr`) — so the compile error prints the fix rather than a
   `DefectView` mismatch; the `Result<T, never>` semantics (and a generic `T`
   with an empty `E`) are unchanged. Eliminate the opposite
   channel first (`match` / `recoverErrCases` / `flatMapErrCases`), or use the `getOr` /
@@ -460,7 +460,7 @@ async work re-enters via `fromPromise` / `fromSafePromise` and composes with
   where `M extends ExhaustiveMatch<…>` (the callback returns the un-terminated
   builder; the combinator runs `.run()`). Outgoing types are computed from the
   builder output `MatchOut<M>` — mapErrCases: `MatchErrOut<M>` (= `Exclude<MatchOut,
-Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on the
+  Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on the
   async surface — over it; recoverErrCases: `T | MatchErrOut<M>` with `E = never`.
   `flatTapErrCases` is the exception: it infers a plain `E2` from the builder output
   and returns `E | E2` (the `MatchOut<M>` shape unioned with the class `E`
@@ -538,7 +538,7 @@ Defect>`); flatMapErrCases: `OkOf`/`ErrOf` — plus `AsyncOkOf`/`AsyncErrOf` on 
   the same reason `ErrMatcher` and `@unthrown/prisma`'s `TransactionClient<C>`
   are: a helper factored out of the callback has to be able to name its
   parameter, and deriving it from the function (`Parameters<typeof
-fromExecutor<T, E>>[0]`) is the grotesque spelling that invites a hand-copied
+  fromExecutor<T, E>>[0]`) is the grotesque spelling that invites a hand-copied
   drifting duplicate instead.
   `ErrMatcher<E>` — the built-in match builder over the error
   (`ReturnType<typeof match<E>>`, i.e. `Matcher<E, E, never>`).
@@ -692,7 +692,7 @@ fromExecutor<T, E>>[0]`) is the grotesque spelling that invites a hand-copied
   `TaggedErrorConstructor` / `TaggedErrorInstance` are exported too — they type
   an `extends TaggedError(…)` site from the outside. **There is no `matchTags`** — a per-tag
   exhaustive fold over a tagged error union is `result.match({ ok, defect, errCases:
-(matcher) => matcher.with(P.tag("…"), …) })`, which generalises beyond `_tag` to
+  (matcher) => matcher.with(P.tag("…"), …) })`, which generalises beyond `_tag` to
   any discriminant.
 
 Deliberately **excluded** for now: **generator** do-notation (`gen`/`yield*`
@@ -770,7 +770,7 @@ library can be "done".
   `AsyncResultMethods` re-imposes the precision, the same pattern as `get`'s
   re-imposed `this` gate. `AsyncOkOf`/`AsyncErrOf` infer through the `Awaitable` `then`
   channel only (`R extends Awaitable<infer Res>`), NOT `R extends
-AsyncResult<infer T, …>` — structural inference over the whole method surface
+  AsyncResult<infer T, …>` — structural inference over the whole method surface
   would pick up junk candidates. The **plain async binds** (`flatMap` / `flatTap`
   / `bind`) hit the same hazard from the other direction: destructuring `U`/`E2`
   through an `AsyncResult<U, E2>` union member in the callback-return position
@@ -1031,7 +1031,7 @@ channel?**
   `all`). `toEither` has no defect target, so it takes a mandatory `onDefect`.
 - **neverthrow and Boxed do not.** Coming _in_, results are only `Ok`/`Err` —
   never a `Defect`. Going _out_, every `to*` takes a **mandatory `onDefect:
-(cause) => E`** (forced triage, Thesis #3): a defect is never silently folded
+  (cause) => E`** (forced triage, Thesis #3): a defect is never silently folded
   into `E`. There is no one-arg form.
 - The async-direction names are **deliberately asymmetric** —
   `toNeverthrowAsync` / `toBoxedFuture` — because each names the neighbour's

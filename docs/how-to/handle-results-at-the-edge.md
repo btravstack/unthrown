@@ -75,10 +75,10 @@ path param, `flatMap` feeds the parsed id into a repository call that returns it
 own `AsyncResult`, and `match`'s matcher folds every tag to a status code:
 
 ```ts
-import { Hono } from "hono";
-import { z } from "zod";
 import { fromSchema } from "@unthrown/standard-schema";
+import { Hono } from "hono";
 import { P, TaggedError, type AsyncResult } from "unthrown";
+import { z } from "zod";
 
 class InvalidId extends TaggedError("InvalidId") {}
 

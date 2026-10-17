@@ -98,6 +98,7 @@ move:
 import { toNeverthrowAsync } from "@unthrown/neverthrow";
 import type { ResultAsync } from "neverthrow";
 import { P } from "unthrown";
+
 import { findUser as migrated, type User } from "./user-service.migrated";
 
 const asError = (cause: unknown): Error =>

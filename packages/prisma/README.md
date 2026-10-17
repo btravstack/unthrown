@@ -19,8 +19,9 @@ type_. Qualification happens once, inside the extension: no raw Promise ever
 reaches your code.
 
 ```ts
-import { P } from "unthrown";
 import { unthrownPrisma } from "@unthrown/prisma";
+import { P } from "unthrown";
+
 import { PrismaClient } from "./generated/prisma/client.ts";
 
 const db = new PrismaClient({ adapter }).$extends(unthrownPrisma);

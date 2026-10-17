@@ -375,8 +375,8 @@ For a boundary of your own, `qualifyPgError` **is** a `qualify` in the
 `fromPromise`:
 
 ```ts
-import { fromPromise } from "unthrown";
 import { qualifyPgError } from "@unthrown/drizzle";
+import { fromPromise } from "unthrown";
 
 const rows = fromPromise(
   () => pool.query("insert into users values ($1)", [id]),
