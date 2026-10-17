@@ -60,10 +60,10 @@
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "effect": "^3",
+    "effect": "^4.0.1",
     "unthrown": "workspace:^"
   },
   "engines": {
-    "node": ">=20"
+    "node": "^20.19.0 || >=22.12.0"
   }
 }

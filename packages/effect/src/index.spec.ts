@@ -1,8 +1,8 @@
-import { Cause, Effect, Either, Exit, FiberId, Option } from "effect";
+import { Cause, Effect, Exit, Result as EffectResult } from "effect";
 import { Err, Ok, type Result, OkAsync } from "unthrown";
 import { describe, expect, it } from "vitest";
 
-import { fromEffect, fromEither, fromExit, toEffect, toEither, toExit } from "./index.js";
+import { fromEffect, fromResult, fromExit, toEffect, toResult, toExit } from "./index.js";
 
 // The fixtures' error channel, spelled as the concrete literal union it
 // actually is: `string` would be an ambiguous `E` (Thesis #1), and these
@@ -24,7 +24,7 @@ describe("toExit", () => {
     const exit = toExit(Err("nope") as Result<number, Boom>);
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      expect(Option.getOrNull(Cause.failureOption(exit.cause))).toBe("nope");
+      expect(EffectResult.getOrNull(Cause.findError(exit.cause))).toBe("nope");
     }
   });
 
@@ -32,7 +32,7 @@ describe("toExit", () => {
     const exit = toExit(aDefect);
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      expect(Option.getOrNull(Cause.dieOption(exit.cause))).toBe(boom);
+      expect(EffectResult.getOrNull(Cause.findDefect(exit.cause))).toBe(boom);
     }
   });
 });
@@ -51,16 +51,34 @@ describe("fromExit", () => {
   });
 
   it("maps a pure interruption to a Defect", () => {
-    const exit = Exit.failCause(Cause.interrupt(FiberId.none)) as Exit.Exit<number, string>;
+    const exit = Exit.failCause(Cause.interrupt()) as Exit.Exit<number, string>;
     expect(fromExit(exit).tag).toBe("Defect");
   });
 
   it("lets a Defect dominate a modeled failure in a composite cause", () => {
-    const exit = Exit.failCause(Cause.sequential(Cause.fail("nope"), Cause.die(boom)));
+    const exit = Exit.failCause(Cause.combine(Cause.fail("nope"), Cause.die(boom)));
     expect(fromExit(exit as Exit.Exit<number, string>)).toMatchObject({
       tag: "Defect",
       cause: boom,
     });
+  });
+
+  it("lets a Defect dominate when it precedes the modeled failure", () => {
+    const exit = Exit.failCause(Cause.combine(Cause.die(boom), Cause.fail("nope")));
+    expect(fromExit(exit)).toMatchObject({ tag: "Defect", cause: boom });
+  });
+
+  it("maps an empty cause to a Defect", () => {
+    expect(fromExit(Exit.failCause(Cause.empty)).tag).toBe("Defect");
+  });
+
+  it("preserves an undefined modeled error", () => {
+    expect(fromExit(Exit.fail(undefined))).toMatchObject({ tag: "Err", error: undefined });
+  });
+
+  it("lets an undefined Defect dominate a modeled failure", () => {
+    const exit = Exit.failCause(Cause.combine(Cause.fail("nope"), Cause.die(undefined)));
+    expect(fromExit(exit)).toMatchObject({ tag: "Defect", cause: undefined });
   });
 
   it("round-trips Ok/Err/Defect through toExit", () => {
@@ -73,23 +91,25 @@ describe("fromExit", () => {
   });
 });
 
-describe("toEither", () => {
-  it("maps Ok to Right and Err to Left", () => {
-    expect(Either.getOrNull(toEither(Ok(1), () => "x"))).toBe(1);
-    const left = toEither(Err("nope") as Result<number, Boom>, () => "x");
-    expect(Either.isLeft(left) ? left.left : undefined).toBe("nope");
+describe("toResult", () => {
+  it("maps Ok to Success and Err to Failure", () => {
+    expect(EffectResult.getOrNull(toResult(Ok(1), () => "x"))).toBe(1);
+    const failure = toResult(Err("nope") as Result<number, Boom>, () => "x");
+    expect(EffectResult.isFailure(failure) ? failure.failure : undefined).toBe("nope");
   });
 
   it("forces a Defect to be triaged into the error channel", () => {
-    const left = toEither(aDefect, (cause) => `bug:${String(cause)}`);
-    expect(Either.isLeft(left) ? left.left : undefined).toBe(`bug:${String(boom)}`);
+    const failure = toResult(aDefect, (cause) => `bug:${String(cause)}`);
+    expect(EffectResult.isFailure(failure) ? failure.failure : undefined).toBe(
+      `bug:${String(boom)}`,
+    );
   });
 });
 
-describe("fromEither", () => {
-  it("maps Right to Ok and Left to Err — never a Defect", () => {
-    expect(fromEither(Either.right(1))).toMatchObject({ tag: "Ok", value: 1 });
-    expect(fromEither(Either.left("nope"))).toMatchObject({ tag: "Err", error: "nope" });
+describe("fromResult", () => {
+  it("maps Success to Ok and Failure to Err — never a Defect", () => {
+    expect(fromResult(EffectResult.succeed(1))).toMatchObject({ tag: "Ok", value: 1 });
+    expect(fromResult(EffectResult.fail("nope"))).toMatchObject({ tag: "Err", error: "nope" });
   });
 });
 
@@ -100,13 +120,13 @@ describe("toEffect", () => {
       Exit.fail("nope"),
     );
     const exit = Effect.runSyncExit(toEffect(aDefect));
-    expect(Exit.isFailure(exit) && Option.getOrNull(Cause.dieOption(exit.cause))).toBe(boom);
+    expect(Exit.isFailure(exit) && EffectResult.getOrNull(Cause.findDefect(exit.cause))).toBe(boom);
   });
 
   it("accepts an AsyncResult (the AsyncResult -> Effect direction)", async () => {
     expect(await Effect.runPromise(toEffect(OkAsync(1)))).toBe(1);
     const exit = await Effect.runPromiseExit(toEffect(aDefect.toAsync()));
-    expect(Exit.isFailure(exit) && Option.getOrNull(Cause.dieOption(exit.cause))).toBe(boom);
+    expect(Exit.isFailure(exit) && EffectResult.getOrNull(Cause.findDefect(exit.cause))).toBe(boom);
   });
 });
 

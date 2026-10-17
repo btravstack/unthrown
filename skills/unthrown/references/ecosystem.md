@@ -291,7 +291,7 @@ channel?**
 
 - `@unthrown/effect` — Effect has one (`Cause.die`), so `Result ↔ Exit` is a
   bijection: `toExit`/`fromExit` (a die-cause defect dominates), plus
-  `toEffect`/`fromEffect` and `toEither`/`fromEither` (`toEither` has no
+  `toEffect`/`fromEffect` and `toResult`/`fromResult` (`toResult` has no
   defect target, so it takes a mandatory `onDefect`).
 - `@unthrown/neverthrow` — no defect channel: `fromNeverthrow` /
   `fromNeverthrowAsync` (only Ok/Err come in); `toNeverthrow` /

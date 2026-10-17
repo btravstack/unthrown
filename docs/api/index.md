@@ -21,7 +21,7 @@ This reference is generated from the source with
   compensating undos, unwound LIFO the moment one fails, with the failure
   returned unchanged.
 - [**@unthrown/effect**](./effect/) — bijective `Result ↔ Exit` bridges
-  (Effect has a genuine defect channel, `Cause.die`), plus `toEither` with a
+  (Effect has a genuine defect channel, `Cause.die`), plus `toResult` with a
   mandatory `onDefect`.
 - [**@unthrown/neverthrow**](./neverthrow/) — `to*`/`from*` bridges to
   neverthrow's `Result`/`ResultAsync`; every `to*` takes a mandatory `onDefect`
