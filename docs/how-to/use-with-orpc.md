@@ -42,9 +42,9 @@ defect even when it throws a declared `ORPCError`; only a returned `Err`
 answers a modeled failure:
 
 ```ts
-import { P } from "unthrown";
-import { handlerResult } from "@unthrown/orpc/server";
 import { os } from "@orpc/server";
+import { handlerResult } from "@unthrown/orpc/server";
+import { P } from "unthrown";
 import * as z from "zod";
 
 // repo.findPlanet: (id: string) => AsyncResult<Planet, NotFound | Conflict | Unavailable>
@@ -191,8 +191,8 @@ trusted; it is what validates `data` before it reaches `E`.
 `call(procedure, input)`:
 
 ```ts
-import { fromCall } from "@unthrown/orpc/client";
 import { call } from "@orpc/server";
+import { fromCall } from "@unthrown/orpc/client";
 
 const planet = await fromCall(client.planet.find({ id })); // a client call
 const seeded = await fromCall(call(find, { id: "1" })); // a server-side call

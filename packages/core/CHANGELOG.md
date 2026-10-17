@@ -709,7 +709,7 @@ No changes in this release.
   (unpinned, that combinator's constraint rejects the marker). Such a branch now
   behaves like the `throw` it is the expression-position form of: the resulting
   `Defect` carries an `AggregateError` of `[the branch's cause, the observed
-error]`, so observing a failure still never destroys it.
+  error]`, so observing a failure still never destroys it.
 
   Closes #152.
 
@@ -721,7 +721,7 @@ error]`, so observing a failure still never destroys it.
 
   `tapErrCases` now takes the throw route too: a `defect(…)` branch produces a
   `Defect` whose cause is an `AggregateError` of `[the branch's cause, the
-observed error]`, matching `throw`'s behaviour in the same position and the
+  observed error]`, matching `throw`'s behaviour in the same position and the
   load-bearing "a failure-observer throw preserves the original failure"
   invariant. Ordinary branch return values are still discarded — the `defect`
   marker never was one.
@@ -785,7 +785,7 @@ observed error]`, matching `throw`'s behaviour in the same position and the
   channel is already empty (`E = never`) `getOrThrow()` is unnecessary — there is
   nothing to throw, so `get()` is the tool. The gate previously surfaced as an
   opaque `The 'this' context of type '…' is not assignable to method's 'this' of
-type 'never'`. The `never` receiver now carries a message, so the diagnostic
+  type 'never'`. The `never` receiver now carries a message, so the diagnostic
   reads:
 
   > unthrown: getOrThrow is unnecessary here — the Err channel is empty (E =
@@ -899,7 +899,7 @@ type 'never'`. The `never` receiver now carries a message, so the diagnostic
   (unpinned, that combinator's constraint rejects the marker). Such a branch now
   behaves like the `throw` it is the expression-position form of: the resulting
   `Defect` carries an `AggregateError` of `[the branch's cause, the observed
-error]`, so observing a failure still never destroys it.
+  error]`, so observing a failure still never destroys it.
 
   Closes #152.
 
@@ -911,7 +911,7 @@ error]`, so observing a failure still never destroys it.
 
   `tapErrCases` now takes the throw route too: a `defect(…)` branch produces a
   `Defect` whose cause is an `AggregateError` of `[the branch's cause, the
-observed error]`, matching `throw`'s behaviour in the same position and the
+  observed error]`, matching `throw`'s behaviour in the same position and the
   load-bearing "a failure-observer throw preserves the original failure"
   invariant. Ordinary branch return values are still discarded — the `defect`
   marker never was one.
@@ -987,7 +987,7 @@ observed error]`, matching `throw`'s behaviour in the same position and the
   channel is already empty (`E = never`) `getOrThrow()` is unnecessary — there is
   nothing to throw, so `get()` is the tool. The gate previously surfaced as an
   opaque `The 'this' context of type '…' is not assignable to method's 'this' of
-type 'never'`. The `never` receiver now carries a message, so the diagnostic
+  type 'never'`. The `never` receiver now carries a message, so the diagnostic
   reads:
 
   > unthrown: getOrThrow is unnecessary here — the Err channel is empty (E =

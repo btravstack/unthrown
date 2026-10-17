@@ -16,9 +16,9 @@ Boxed's `Result` has two channels (`Ok`/`Error`) and no defect channel. Coming
 with `onDefect` — no defect is ever silently folded into your domain error type.
 
 ```ts
-import { Ok } from "unthrown";
-import { toBoxed, fromBoxed } from "@unthrown/boxed";
 import { Result } from "@bloodyowl/boxed";
+import { toBoxed, fromBoxed } from "@unthrown/boxed";
+import { Ok } from "unthrown";
 
 toBoxed(Ok(1), (cause) => ({ _tag: "Bug", cause })); // Result.Ok(1)
 fromBoxed(Result.Ok(1)); // Result<number, never>

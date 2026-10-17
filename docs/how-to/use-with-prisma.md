@@ -16,6 +16,7 @@ operations **alongside** the raw promise ones:
 
 ```ts
 import { unthrownPrisma } from "@unthrown/prisma";
+
 import { PrismaClient } from "./generated/prisma/client.ts";
 
 const db = new PrismaClient({ adapter }).$extends(unthrownPrisma);
@@ -366,8 +367,8 @@ runs, and raw SQL. Qualify raw SQL yourself at the boundary, reusing the exporte
 `qualifyPrismaError`:
 
 ```ts
-import { fromPromise } from "unthrown";
 import { qualifyPrismaError } from "@unthrown/prisma";
+import { fromPromise } from "unthrown";
 
 const rows = fromPromise(db.$queryRaw`SELECT 1`, qualifyPrismaError);
 //    ^? AsyncResult<unknown, UniqueConstraintViolation | ForeignKeyViolation | RecordNotFound>

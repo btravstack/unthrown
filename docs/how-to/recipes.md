@@ -11,6 +11,7 @@ public surface. The recipes below share this setup:
 
 ```ts
 import { setTimeout as sleep } from "node:timers/promises";
+
 import { fromSafePromise, TaggedError, type AsyncResult } from "unthrown";
 
 class RateLimited extends TaggedError("RateLimited") {}

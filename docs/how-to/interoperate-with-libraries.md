@@ -26,8 +26,8 @@ libraries have only two. That single difference decides every signature.
   triage it with a mandatory `onDefect: (cause) => E`. There is no one-arg form.
 
 ```ts
-import { Ok } from "unthrown";
 import { toNeverthrow } from "@unthrown/neverthrow";
+import { Ok } from "unthrown";
 
 // onDefect is required — the compiler will not let you drop a defect.
 toNeverthrow(Ok(1), (cause) => ({ _tag: "Bug", cause }));
@@ -39,9 +39,9 @@ Effect is the exception: it _does_ have a defect channel (`Cause.die`), so
 `Result ↔ Exit` round-trips losslessly.
 
 ```ts
-import { Ok, Err, P, TaggedError } from "unthrown";
 import { toExit, fromEffect } from "@unthrown/effect";
 import { Effect } from "effect";
+import { Ok, Err, P, TaggedError } from "unthrown";
 
 class NotFound extends TaggedError("NotFound") {}
 class Timeout extends TaggedError("Timeout") {}

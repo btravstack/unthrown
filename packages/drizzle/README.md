@@ -20,6 +20,7 @@ for.
 ```ts
 import { drizzle } from "@unthrown/drizzle/node-postgres";
 import { eq } from "drizzle-orm";
+
 import { usersTable } from "./schema.ts";
 
 const db = drizzle({ client: pool, relations });
