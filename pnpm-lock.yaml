@@ -237,8 +237,8 @@ catalogs:
       specifier: 1.0.0-rc.5-5935859
       version: 1.0.0-rc.5-5935859
     effect:
-      specifier: 4.0.1
-      version: 4.0.1
+      specifier: 4.0.3
+      version: 4.0.3
     graphql:
       specifier: 17.0.2
       version: 17.0.2
@@ -609,7 +609,7 @@ importers:
         version: 5.0.2(vitest@5.0.2)
       effect:
         specifier: 'catalog:'
-        version: 4.0.1
+        version: 4.0.3
       tsdown:
         specifier: 'catalog:'
         version: 0.23.0(oxc-resolver@11.24.2)(tsx@4.23.13)(typescript@7.0.2)
@@ -3877,6 +3877,9 @@ packages:
 
   effect@4.0.1:
     resolution: {integrity: sha512-b1VlQG9g8fwxE5QnIZuPoOP/0MsqHJSRKxUijjoM80E5q95FXrX5yWtY5XI8G+GJsBQAVSDbLS458z9a++uVvw==}
+
+  effect@4.0.3:
+    resolution: {integrity: sha512-LoWn/Uwwx0JjHSDmBAAahx8sB+klzM6vsZovnbYowBNw6B4QScJLRLBByO61plvNiycx7HPN8FnsWUCu0eXW5w==}
 
   elkjs@0.11.1:
     resolution: {integrity: sha512-zxxR9k+rx5ktMwT/FwyLdPCrq7xN6e4VGGHH8hA01vVYKjTFik7nHOxBnAYtrgYUB1RpAiLvA1/U2YraWxyKKg==}
@@ -7833,7 +7836,10 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       fast-check: 3.23.2
 
-  effect@4.0.1: {}
+  effect@4.0.1:
+    optional: true
+
+  effect@4.0.3: {}
 
   elkjs@0.11.1: {}
 
