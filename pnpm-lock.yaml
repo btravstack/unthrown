@@ -177,8 +177,8 @@ catalogs:
       specifier: 0.2.1
       version: 0.2.1
     '@btravstack/theme':
-      specifier: 2.0.0
-      version: 2.0.0
+      specifier: 2.0.1
+      version: 2.0.1
     '@btravstack/tsconfig':
       specifier: 0.4.0
       version: 0.4.0
@@ -365,7 +365,7 @@ importers:
     devDependencies:
       '@btravstack/theme':
         specifier: 'catalog:'
-        version: 2.0.0(vitepress@1.6.4(@algolia/client-search@5.57.0)(@types/node@26.6.4)(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.15)(typescript@6.0.3)(yaml@2.9.0))(vue@3.5.42(typescript@6.0.3))
+        version: 2.0.1(vitepress@1.6.4(@algolia/client-search@5.57.0)(@types/node@26.6.4)(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.15)(typescript@6.0.3)(yaml@2.9.0))(vue@3.5.42(typescript@6.0.3))
       '@btravstack/typedoc':
         specifier: 'catalog:'
         version: 0.1.0(typedoc-plugin-markdown@4.13.1(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3))
@@ -1013,8 +1013,8 @@ packages:
     peerDependencies:
       oxlint: '>=1'
 
-  '@btravstack/theme@2.0.0':
-    resolution: {integrity: sha512-tEhaBntwON0PpDWoSsp1cwxmFAXlBk4sLld2U3/MRKWFxAl8/E0ZHtUyy/Bd5rShi7caI7dwq4PzC0mqh7psJA==}
+  '@btravstack/theme@2.0.1':
+    resolution: {integrity: sha512-PYrNgsZCpqLVB4vqNji5sqcygJgEcsD46VyzooLiPXQaW3OWbao4JcXH89BT5Zmsl1HTeKEDs0GC4DXEBT4TfA==}
     peerDependencies:
       vitepress: ^1.6.0
       vue: ^3.3.0
@@ -5560,7 +5560,7 @@ snapshots:
     dependencies:
       oxlint: 1.87.0
 
-  '@btravstack/theme@2.0.0(vitepress@1.6.4(@algolia/client-search@5.57.0)(@types/node@26.6.4)(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.15)(typescript@6.0.3)(yaml@2.9.0))(vue@3.5.42(typescript@6.0.3))':
+  '@btravstack/theme@2.0.1(vitepress@1.6.4(@algolia/client-search@5.57.0)(@types/node@26.6.4)(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.15)(typescript@6.0.3)(yaml@2.9.0))(vue@3.5.42(typescript@6.0.3))':
     dependencies:
       vitepress: 1.6.4(@algolia/client-search@5.57.0)(@types/node@26.6.4)(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.15)(typescript@6.0.3)(yaml@2.9.0)
     optionalDependencies:
