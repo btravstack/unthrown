@@ -243,8 +243,8 @@ catalogs:
       specifier: 17.0.2
       version: 17.0.2
     graphql-yoga:
-      specifier: 5.24.2
-      version: 5.24.2
+      specifier: 5.24.4
+      version: 5.24.4
     knip:
       specifier: 6.41.0
       version: 6.41.0
@@ -745,7 +745,7 @@ importers:
         version: 17.0.2
       graphql-yoga:
         specifier: 'catalog:'
-        version: 5.24.2(graphql@17.0.2)
+        version: 5.24.4(graphql@17.0.2)
       tsdown:
         specifier: 'catalog:'
         version: 0.23.1(oxc-resolver@11.24.2)(tsx@4.23.15)(typescript@7.0.2)
@@ -4020,8 +4020,8 @@ packages:
   graphmatch@1.1.1:
     resolution: {integrity: sha512-5ykVn/EXM1hF0XCaWh05VbYvEiOL2lY1kBxZtaYsyvjp7cmWOU1XsAdfQBwClraEofXDT197lFbXOEVMHpvQOg==}
 
-  graphql-yoga@5.24.2:
-    resolution: {integrity: sha512-pQoCb4BjDF3ZccHugxm84EQcG4d0qK+r11hFylB4AncvIp1r6PZ450mLRwCv+5c7884/ppPJQPWdnIAIXSCQUA==}
+  graphql-yoga@5.24.4:
+    resolution: {integrity: sha512-jnpLm2g9BfnP18VKL+Yao8YRQYgDjXdAkFgZso/tnKFcRcAtOeUKLDVc1XnYiE3uooXzfIQzsvpKR+fC3we4QA==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       graphql: ^15.2.0 || ^16.0.0 || ^17.0.0
@@ -7967,7 +7967,7 @@ snapshots:
 
   graphmatch@1.1.1: {}
 
-  graphql-yoga@5.24.2(graphql@17.0.2):
+  graphql-yoga@5.24.4(graphql@17.0.2):
     dependencies:
       '@envelop/core': 5.6.1
       '@envelop/instrumentation': 1.0.1
