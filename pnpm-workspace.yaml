@@ -42,7 +42,7 @@ catalog:
   graphql: 17.0.2
   graphql-yoga: 5.24.2
   knip: 6.41.0
-  lefthook: 2.1.17
+  lefthook: 2.2.1
   neverthrow: 8.2.0
   oxfmt: 0.72.0
   oxlint: 1.87.0
