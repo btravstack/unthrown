@@ -28,7 +28,7 @@ catalog:
   "@prisma/adapter-better-sqlite3": 7.10.0
   "@prisma/client": 7.10.0
   "@testcontainers/postgresql": 12.2.0
-  "@types/node": 26.6.4
+  "@types/node": 26.6.5
   # 8.20.1/8.20.2/8.20.3 are all within the minimumReleaseAge window as of
   # pinning; 8.20.0 is the newest release past it.
   "@types/pg": 8.23.1
