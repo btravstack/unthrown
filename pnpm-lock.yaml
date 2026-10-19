@@ -219,8 +219,8 @@ catalogs:
       specifier: 12.2.0
       version: 12.2.0
     '@types/node':
-      specifier: 26.6.4
-      version: 26.6.4
+      specifier: 26.6.5
+      version: 26.6.5
     '@types/pg':
       specifier: 8.23.1
       version: 8.23.1
@@ -329,7 +329,7 @@ importers:
     devDependencies:
       '@btravstack/commitlint':
         specifier: 'catalog:'
-        version: 0.1.0(@commitlint/cli@21.2.3(@types/node@26.6.4)(conventional-commits-parser@7.1.2)(typescript@7.0.2))
+        version: 0.1.0(@commitlint/cli@21.2.3(@types/node@26.6.5)(conventional-commits-parser@7.1.2)(typescript@7.0.2))
       '@btravstack/lefthook':
         specifier: 'catalog:'
         version: 0.1.1(lefthook@2.2.1)
@@ -341,7 +341,7 @@ importers:
         version: 3.0.3
       '@commitlint/cli':
         specifier: 'catalog:'
-        version: 21.2.3(@types/node@26.6.4)(conventional-commits-parser@7.1.2)(typescript@7.0.2)
+        version: 21.2.3(@types/node@26.6.5)(conventional-commits-parser@7.1.2)(typescript@7.0.2)
       '@unthrown/oxlint':
         specifier: workspace:*
         version: link:packages/oxlint
@@ -365,13 +365,13 @@ importers:
     devDependencies:
       '@btravstack/theme':
         specifier: 'catalog:'
-        version: 2.0.1(vitepress@1.6.4(@algolia/client-search@5.57.0)(@types/node@26.6.4)(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.15)(typescript@6.0.3)(yaml@2.9.0))(vue@3.5.42(typescript@6.0.3))
+        version: 2.0.1(vitepress@1.6.4(@algolia/client-search@5.57.0)(@types/node@26.6.5)(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.15)(typescript@6.0.3)(yaml@2.9.0))(vue@3.5.42(typescript@6.0.3))
       '@btravstack/typedoc':
         specifier: 'catalog:'
         version: 0.1.0(typedoc-plugin-markdown@4.13.1(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3))
       '@types/node':
         specifier: 'catalog:'
-        version: 26.6.4
+        version: 26.6.5
       tsx:
         specifier: 'catalog:'
         version: 4.23.15
@@ -386,7 +386,7 @@ importers:
         version: 6.0.3
       vitepress:
         specifier: 'catalog:'
-        version: 1.6.4(@algolia/client-search@5.57.0)(@types/node@26.6.4)(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.15)(typescript@6.0.3)(yaml@2.9.0)
+        version: 1.6.4(@algolia/client-search@5.57.0)(@types/node@26.6.5)(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.15)(typescript@6.0.3)(yaml@2.9.0)
       vitepress-plugin-llms:
         specifier: 'catalog:'
         version: 1.14.0(supports-color@7.2.0)
@@ -417,13 +417,13 @@ importers:
         version: 0.4.0
       '@types/node':
         specifier: 'catalog:'
-        version: 26.6.4
+        version: 26.6.5
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.2(@types/node@26.6.4)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.2(@types/node@26.6.5)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
   examples/checkout-domain:
     dependencies:
@@ -436,7 +436,7 @@ importers:
         version: 0.4.0
       '@types/node':
         specifier: 'catalog:'
-        version: 26.6.4
+        version: 26.6.5
       '@unthrown/vitest':
         specifier: workspace:*
         version: link:../../packages/vitest
@@ -445,7 +445,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.2(@types/node@26.6.4)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.2(@types/node@26.6.5)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
   examples/checkout-persistence:
     dependencies:
@@ -467,10 +467,10 @@ importers:
         version: 7.10.0
       '@prisma/client':
         specifier: 'catalog:'
-        version: 7.10.0(prisma@7.10.0(@types/node@26.6.4)(@types/react@19.2.18)(better-sqlite3@13.0.3)(magicast@0.5.4)(typescript@7.0.2))(typescript@7.0.2)
+        version: 7.10.0(prisma@7.10.0(@types/node@26.6.5)(@types/react@19.2.18)(better-sqlite3@13.0.3)(magicast@0.5.4)(typescript@7.0.2))(typescript@7.0.2)
       '@types/node':
         specifier: 'catalog:'
-        version: 26.6.4
+        version: 26.6.5
       '@unthrown/vitest':
         specifier: workspace:*
         version: link:../../packages/vitest
@@ -479,13 +479,13 @@ importers:
         version: 13.0.3
       prisma:
         specifier: 'catalog:'
-        version: 7.10.0(@types/node@26.6.4)(@types/react@19.2.18)(better-sqlite3@13.0.3)(magicast@0.5.4)(typescript@7.0.2)
+        version: 7.10.0(@types/node@26.6.5)(@types/react@19.2.18)(better-sqlite3@13.0.3)(magicast@0.5.4)(typescript@7.0.2)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.2(@types/node@26.6.4)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.2(@types/node@26.6.5)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
   examples/existing-errors:
     dependencies:
@@ -498,7 +498,7 @@ importers:
         version: 0.4.0
       '@types/node':
         specifier: 'catalog:'
-        version: 26.6.4
+        version: 26.6.5
       '@unthrown/vitest':
         specifier: workspace:*
         version: link:../../packages/vitest
@@ -507,7 +507,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.2(@types/node@26.6.4)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.2(@types/node@26.6.5)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/boxed:
     devDependencies:
@@ -519,7 +519,7 @@ importers:
         version: 0.4.0
       '@types/node':
         specifier: 'catalog:'
-        version: 26.6.4
+        version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 5.0.2(vitest@5.0.2)
@@ -534,7 +534,7 @@ importers:
         version: link:../core
       vitest:
         specifier: 'catalog:'
-        version: 5.0.2(@types/node@26.6.4)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.2(@types/node@26.6.5)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/core:
     devDependencies:
@@ -543,7 +543,7 @@ importers:
         version: 0.4.0
       '@types/node':
         specifier: 'catalog:'
-        version: 26.6.4
+        version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 5.0.2(vitest@5.0.2)
@@ -555,7 +555,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 5.0.2(@types/node@26.6.4)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.2(@types/node@26.6.5)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/drizzle:
     devDependencies:
@@ -567,7 +567,7 @@ importers:
         version: 12.2.0(supports-color@7.2.0)
       '@types/node':
         specifier: 'catalog:'
-        version: 26.6.4
+        version: 26.6.5
       '@types/pg':
         specifier: 'catalog:'
         version: 8.23.1
@@ -579,7 +579,7 @@ importers:
         version: 5.0.2(vitest@5.0.2)
       drizzle-orm:
         specifier: 'catalog:'
-        version: 1.0.0-rc.5-5935859(@electric-sql/pglite@0.4.3)(@types/pg@8.23.1)(better-sqlite3@13.0.3)(effect@4.0.1)(mysql2@3.23.1(@types/node@26.6.4))(pg@8.23.1)(postgres@3.4.7)(valibot@1.4.2(typescript@7.0.2))(zod@4.5.4)
+        version: 1.0.0-rc.5-5935859(@electric-sql/pglite@0.4.3)(@types/pg@8.23.1)(better-sqlite3@13.0.3)(effect@4.0.1)(mysql2@3.23.1(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.7)(valibot@1.4.2(typescript@7.0.2))(zod@4.5.4)
       pg:
         specifier: 'catalog:'
         version: 8.23.1
@@ -594,7 +594,7 @@ importers:
         version: link:../core
       vitest:
         specifier: 'catalog:'
-        version: 5.0.2(@types/node@26.6.4)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.2(@types/node@26.6.5)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/effect:
     devDependencies:
@@ -603,7 +603,7 @@ importers:
         version: 0.4.0
       '@types/node':
         specifier: 'catalog:'
-        version: 26.6.4
+        version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 5.0.2(vitest@5.0.2)
@@ -621,7 +621,7 @@ importers:
         version: link:../core
       vitest:
         specifier: 'catalog:'
-        version: 5.0.2(@types/node@26.6.4)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.2(@types/node@26.6.5)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/neverthrow:
     devDependencies:
@@ -630,7 +630,7 @@ importers:
         version: 0.4.0
       '@types/node':
         specifier: 'catalog:'
-        version: 26.6.4
+        version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 5.0.2(vitest@5.0.2)
@@ -648,7 +648,7 @@ importers:
         version: link:../core
       vitest:
         specifier: 'catalog:'
-        version: 5.0.2(@types/node@26.6.4)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.2(@types/node@26.6.5)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/orpc:
     devDependencies:
@@ -666,7 +666,7 @@ importers:
         version: 2.0.0-beta.43
       '@types/node':
         specifier: 'catalog:'
-        version: 26.6.4
+        version: 26.6.5
       '@unthrown/vitest':
         specifier: workspace:*
         version: link:../vitest
@@ -684,7 +684,7 @@ importers:
         version: link:../core
       vitest:
         specifier: 'catalog:'
-        version: 5.0.2(@types/node@26.6.4)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.2(@types/node@26.6.5)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/oxlint:
     dependencies:
@@ -697,7 +697,7 @@ importers:
         version: 0.4.0
       '@types/node':
         specifier: 'catalog:'
-        version: 26.6.4
+        version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 5.0.2(vitest@5.0.2)
@@ -715,7 +715,7 @@ importers:
         version: link:../core
       vitest:
         specifier: 'catalog:'
-        version: 5.0.2(@types/node@26.6.4)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.2(@types/node@26.6.5)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/pothos:
     devDependencies:
@@ -733,7 +733,7 @@ importers:
         version: 4.8.1(@pothos/core@4.15.1(graphql@17.0.2))(graphql@17.0.2)
       '@types/node':
         specifier: 'catalog:'
-        version: 26.6.4
+        version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 5.0.2(vitest@5.0.2)
@@ -757,7 +757,7 @@ importers:
         version: link:../core
       vitest:
         specifier: 'catalog:'
-        version: 5.0.2(@types/node@26.6.4)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))
+        version: 5.0.2(@types/node@26.6.5)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))
 
   packages/prisma:
     devDependencies:
@@ -769,10 +769,10 @@ importers:
         version: 7.10.0
       '@prisma/client':
         specifier: 'catalog:'
-        version: 7.10.0(prisma@7.10.0(@types/node@26.6.4)(@types/react@19.2.18)(better-sqlite3@13.0.3)(magicast@0.5.4)(typescript@7.0.2))(typescript@7.0.2)
+        version: 7.10.0(prisma@7.10.0(@types/node@26.6.5)(@types/react@19.2.18)(better-sqlite3@13.0.3)(magicast@0.5.4)(typescript@7.0.2))(typescript@7.0.2)
       '@types/node':
         specifier: 'catalog:'
-        version: 26.6.4
+        version: 26.6.5
       '@unthrown/vitest':
         specifier: workspace:*
         version: link:../vitest
@@ -784,7 +784,7 @@ importers:
         version: 13.0.3
       prisma:
         specifier: 'catalog:'
-        version: 7.10.0(@types/node@26.6.4)(@types/react@19.2.18)(better-sqlite3@13.0.3)(magicast@0.5.4)(typescript@7.0.2)
+        version: 7.10.0(@types/node@26.6.5)(@types/react@19.2.18)(better-sqlite3@13.0.3)(magicast@0.5.4)(typescript@7.0.2)
       tsdown:
         specifier: 'catalog:'
         version: 0.23.1(oxc-resolver@11.24.2)(tsx@4.23.13)(typescript@7.0.2)
@@ -796,7 +796,7 @@ importers:
         version: link:../core
       vitest:
         specifier: 'catalog:'
-        version: 5.0.2(@types/node@26.6.4)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.2(@types/node@26.6.5)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/saga:
     devDependencies:
@@ -805,7 +805,7 @@ importers:
         version: 0.4.0
       '@types/node':
         specifier: 'catalog:'
-        version: 26.6.4
+        version: 26.6.5
       '@unthrown/vitest':
         specifier: workspace:^
         version: link:../vitest
@@ -823,7 +823,7 @@ importers:
         version: link:../core
       vitest:
         specifier: 'catalog:'
-        version: 5.0.2(@types/node@26.6.4)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.2(@types/node@26.6.5)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/standard-schema:
     dependencies:
@@ -836,7 +836,7 @@ importers:
         version: 0.4.0
       '@types/node':
         specifier: 'catalog:'
-        version: 26.6.4
+        version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 5.0.2(vitest@5.0.2)
@@ -851,7 +851,7 @@ importers:
         version: link:../core
       vitest:
         specifier: 'catalog:'
-        version: 5.0.2(@types/node@26.6.4)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.2(@types/node@26.6.5)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/vitest:
     devDependencies:
@@ -860,7 +860,7 @@ importers:
         version: 0.4.0
       '@types/node':
         specifier: 'catalog:'
-        version: 26.6.4
+        version: 26.6.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 5.0.2(vitest@5.0.2)
@@ -875,7 +875,7 @@ importers:
         version: link:../core
       vitest:
         specifier: 'catalog:'
-        version: 5.0.2(@types/node@26.6.4)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+        version: 5.0.2(@types/node@26.6.5)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
 packages:
 
@@ -2793,8 +2793,8 @@ packages:
   '@types/node@18.19.130':
     resolution: {integrity: sha512-GRaXQx6jGfL8sKfaIDD6OupbIHBr9jv7Jnaml9tB7l4v068PAOXqfcujMMo5PhbIs6ggR1XODELqahT2R8v0fg==}
 
-  '@types/node@26.6.4':
-    resolution: {integrity: sha512-ldVPDCzj7fsaGZrLB0NuHuTvJcsNasysBAqMolr/cgxrLd1xbqxIr3XJiPnHHJUCxj5sNF1vnRj9aWnrVh5Jcg==}
+  '@types/node@26.6.5':
+    resolution: {integrity: sha512-uMzsv9stDdofIZBx4UGh4Z9ZgXnGC9seRDscilBcTHAeOFk67MZg/k9bWVfO+bk4qZmG+l52hRnLwUiH2LnJTg==}
 
   '@types/pg@8.23.1':
     resolution: {integrity: sha512-fKVHpikPdg4GKks3JuLEhvwSyvwzF23hnabPy6DD8ljVbC7+6J5dQzdv4arV6jqq57djnMgs1HKBxX4P8aBI3A==}
@@ -5478,9 +5478,9 @@ snapshots:
     optionalDependencies:
       typescript: 7.0.2
 
-  '@btravstack/commitlint@0.1.0(@commitlint/cli@21.2.3(@types/node@26.6.4)(conventional-commits-parser@7.1.2)(typescript@7.0.2))':
+  '@btravstack/commitlint@0.1.0(@commitlint/cli@21.2.3(@types/node@26.6.5)(conventional-commits-parser@7.1.2)(typescript@7.0.2))':
     dependencies:
-      '@commitlint/cli': 21.2.3(@types/node@26.6.4)(conventional-commits-parser@7.1.2)(typescript@7.0.2)
+      '@commitlint/cli': 21.2.3(@types/node@26.6.5)(conventional-commits-parser@7.1.2)(typescript@7.0.2)
       '@commitlint/config-conventional': 21.2.0
 
   '@btravstack/lefthook@0.1.1(lefthook@2.2.1)':
@@ -5491,9 +5491,9 @@ snapshots:
     dependencies:
       oxlint: 1.87.0
 
-  '@btravstack/theme@2.0.1(vitepress@1.6.4(@algolia/client-search@5.57.0)(@types/node@26.6.4)(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.15)(typescript@6.0.3)(yaml@2.9.0))(vue@3.5.42(typescript@6.0.3))':
+  '@btravstack/theme@2.0.1(vitepress@1.6.4(@algolia/client-search@5.57.0)(@types/node@26.6.5)(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.15)(typescript@6.0.3)(yaml@2.9.0))(vue@3.5.42(typescript@6.0.3))':
     dependencies:
-      vitepress: 1.6.4(@algolia/client-search@5.57.0)(@types/node@26.6.4)(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.15)(typescript@6.0.3)(yaml@2.9.0)
+      vitepress: 1.6.4(@algolia/client-search@5.57.0)(@types/node@26.6.5)(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.15)(typescript@6.0.3)(yaml@2.9.0)
     optionalDependencies:
       vue: 3.5.42(typescript@6.0.3)
 
@@ -5620,12 +5620,12 @@ snapshots:
       fast-wrap-ansi: 0.2.2
       sisteransi: 1.0.5
 
-  '@commitlint/cli@21.2.3(@types/node@26.6.4)(conventional-commits-parser@7.1.2)(typescript@7.0.2)':
+  '@commitlint/cli@21.2.3(@types/node@26.6.5)(conventional-commits-parser@7.1.2)(typescript@7.0.2)':
     dependencies:
       '@commitlint/config-conventional': 21.2.3
       '@commitlint/format': 21.2.3
       '@commitlint/lint': 21.2.3
-      '@commitlint/load': 21.2.3(@types/node@26.6.4)(typescript@7.0.2)
+      '@commitlint/load': 21.2.3(@types/node@26.6.5)(typescript@7.0.2)
       '@commitlint/read': 21.2.3(conventional-commits-parser@7.1.2)
       '@commitlint/types': 21.2.3
       tinyexec: 1.3.1
@@ -5675,14 +5675,14 @@ snapshots:
       '@commitlint/rules': 21.2.3
       '@commitlint/types': 21.2.3
 
-  '@commitlint/load@21.2.3(@types/node@26.6.4)(typescript@7.0.2)':
+  '@commitlint/load@21.2.3(@types/node@26.6.5)(typescript@7.0.2)':
     dependencies:
       '@commitlint/config-validator': 21.2.3
       '@commitlint/execute-rule': 21.0.1
       '@commitlint/resolve-extends': 21.2.3
       '@commitlint/types': 21.2.3
       cosmiconfig: 9.0.2(typescript@7.0.2)
-      cosmiconfig-typescript-loader: 6.3.0(@types/node@26.6.4)(cosmiconfig@9.0.2(typescript@7.0.2))(typescript@7.0.2)
+      cosmiconfig-typescript-loader: 6.3.0(@types/node@26.6.5)(cosmiconfig@9.0.2(typescript@7.0.2))(typescript@7.0.2)
       es-toolkit: 1.52.0
       is-plain-obj: 4.1.0
       picocolors: 1.1.1
@@ -6402,11 +6402,11 @@ snapshots:
 
   '@prisma/client-runtime-utils@7.10.0': {}
 
-  '@prisma/client@7.10.0(prisma@7.10.0(@types/node@26.6.4)(@types/react@19.2.18)(better-sqlite3@13.0.3)(magicast@0.5.4)(typescript@7.0.2))(typescript@7.0.2)':
+  '@prisma/client@7.10.0(prisma@7.10.0(@types/node@26.6.5)(@types/react@19.2.18)(better-sqlite3@13.0.3)(magicast@0.5.4)(typescript@7.0.2))(typescript@7.0.2)':
     dependencies:
       '@prisma/client-runtime-utils': 7.10.0
     optionalDependencies:
-      prisma: 7.10.0(@types/node@26.6.4)(@types/react@19.2.18)(better-sqlite3@13.0.3)(magicast@0.5.4)(typescript@7.0.2)
+      prisma: 7.10.0(@types/node@26.6.5)(@types/react@19.2.18)(better-sqlite3@13.0.3)(magicast@0.5.4)(typescript@7.0.2)
       typescript: 7.0.2
 
   '@prisma/config@7.10.0(magicast@0.5.4)':
@@ -6861,13 +6861,13 @@ snapshots:
 
   '@types/docker-modem@3.0.6':
     dependencies:
-      '@types/node': 26.6.4
+      '@types/node': 26.6.5
       '@types/ssh2': 1.15.6
 
   '@types/dockerode@4.0.1':
     dependencies:
       '@types/docker-modem': 3.0.6
-      '@types/node': 26.6.4
+      '@types/node': 26.6.5
       '@types/ssh2': 1.15.6
 
   '@types/estree@1.0.9': {}
@@ -6899,13 +6899,13 @@ snapshots:
     dependencies:
       undici-types: 5.26.5
 
-  '@types/node@26.6.4':
+  '@types/node@26.6.5':
     dependencies:
       undici-types: 8.9.0
 
   '@types/pg@8.23.1':
     dependencies:
-      '@types/node': 26.6.4
+      '@types/node': 26.6.5
       pg-protocol: 1.16.0
       pg-types: 2.2.0
 
@@ -6915,11 +6915,11 @@ snapshots:
 
   '@types/ssh2-streams@0.1.13':
     dependencies:
-      '@types/node': 26.6.4
+      '@types/node': 26.6.5
 
   '@types/ssh2@0.5.52':
     dependencies:
-      '@types/node': 26.6.4
+      '@types/node': 26.6.5
       '@types/ssh2-streams': 0.1.13
 
   '@types/ssh2@1.15.6':
@@ -7065,9 +7065,9 @@ snapshots:
       d3-time-format: 4.1.0
       internmap: 2.0.3
 
-  '@vitejs/plugin-vue@5.2.4(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))(vue@3.5.42(typescript@6.0.3))':
+  '@vitejs/plugin-vue@5.2.4(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))(vue@3.5.42(typescript@6.0.3))':
     dependencies:
-      vite: 6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0)
+      vite: 6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0)
       vue: 3.5.42(typescript@6.0.3)
 
   '@vitest/coverage-v8@5.0.2(vitest@5.0.2)':
@@ -7080,7 +7080,7 @@ snapshots:
       obug: 2.1.4
       std-env: 4.2.0
       tinyrainbow: 3.1.1
-      vitest: 5.0.2(@types/node@26.6.4)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+      vitest: 5.0.2(@types/node@26.6.5)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
   '@vitest/istanbul-lib-coverage@1.0.1': {}
 
@@ -7088,23 +7088,23 @@ snapshots:
     dependencies:
       '@vitest/istanbul-lib-coverage': 1.0.1
 
-  '@vitest/mocker@5.0.2(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))':
+  '@vitest/mocker@5.0.2(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       '@vitest/spy': 5.0.2
       estree-walker: 3.0.3
       magic-string: 1.4.1
     optionalDependencies:
-      vite: 6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)
+      vite: 6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)
 
-  '@vitest/mocker@5.0.2(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))':
+  '@vitest/mocker@5.0.2(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       '@vitest/spy': 5.0.2
       estree-walker: 3.0.3
       magic-string: 1.4.1
     optionalDependencies:
-      vite: 6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0)
+      vite: 6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0)
 
   '@vitest/spy@5.0.2': {}
 
@@ -7554,9 +7554,9 @@ snapshots:
 
   core-util-is@1.0.3: {}
 
-  cosmiconfig-typescript-loader@6.3.0(@types/node@26.6.4)(cosmiconfig@9.0.2(typescript@7.0.2))(typescript@7.0.2):
+  cosmiconfig-typescript-loader@6.3.0(@types/node@26.6.5)(cosmiconfig@9.0.2(typescript@7.0.2))(typescript@7.0.2):
     dependencies:
-      '@types/node': 26.6.4
+      '@types/node': 26.6.5
       cosmiconfig: 9.0.2(typescript@7.0.2)
       jiti: 2.6.1
       typescript: 7.0.2
@@ -7705,13 +7705,13 @@ snapshots:
 
   dotenv@17.4.2: {}
 
-  drizzle-orm@1.0.0-rc.5-5935859(@electric-sql/pglite@0.4.3)(@types/pg@8.23.1)(better-sqlite3@13.0.3)(effect@4.0.1)(mysql2@3.23.1(@types/node@26.6.4))(pg@8.23.1)(postgres@3.4.7)(valibot@1.4.2(typescript@7.0.2))(zod@4.5.4):
+  drizzle-orm@1.0.0-rc.5-5935859(@electric-sql/pglite@0.4.3)(@types/pg@8.23.1)(better-sqlite3@13.0.3)(effect@4.0.1)(mysql2@3.23.1(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.7)(valibot@1.4.2(typescript@7.0.2))(zod@4.5.4):
     optionalDependencies:
       '@electric-sql/pglite': 0.4.3
       '@types/pg': 8.23.1
       better-sqlite3: 13.0.3
       effect: 4.0.1
-      mysql2: 3.23.1(@types/node@26.6.4)
+      mysql2: 3.23.1(@types/node@26.6.5)
       pg: 8.23.1
       postgres: 3.4.7
       valibot: 1.4.2(typescript@7.0.2)
@@ -8430,9 +8430,9 @@ snapshots:
 
   ms@2.1.3: {}
 
-  mysql2@3.23.1(@types/node@26.6.4):
+  mysql2@3.23.1(@types/node@26.6.5):
     dependencies:
-      '@types/node': 26.6.4
+      '@types/node': 26.6.5
       aws-ssl-profiles: 1.1.2
       denque: 2.1.0
       generate-function: 2.3.1
@@ -8687,13 +8687,13 @@ snapshots:
 
   pretty-bytes@7.1.3: {}
 
-  prisma@7.10.0(@types/node@26.6.4)(@types/react@19.2.18)(better-sqlite3@13.0.3)(magicast@0.5.4)(typescript@7.0.2):
+  prisma@7.10.0(@types/node@26.6.5)(@types/react@19.2.18)(better-sqlite3@13.0.3)(magicast@0.5.4)(typescript@7.0.2):
     dependencies:
       '@prisma/config': 7.10.0(magicast@0.5.4)
       '@prisma/dev': 0.24.17(typescript@7.0.2)
       '@prisma/engines': 7.10.0
       '@prisma/studio-core': 0.33.0(@types/react@19.2.18)
-      mysql2: 3.23.1(@types/node@26.6.4)
+      mysql2: 3.23.1(@types/node@26.6.5)
       postgres: 3.4.7
     optionalDependencies:
       better-sqlite3: 13.0.3
@@ -8736,7 +8736,7 @@ snapshots:
       '@protobufjs/path': 1.1.2
       '@protobufjs/pool': 1.1.0
       '@protobufjs/utf8': 1.1.2
-      '@types/node': 26.6.4
+      '@types/node': 26.6.5
       long: 5.3.2
 
   pump@3.0.4:
@@ -9370,7 +9370,7 @@ snapshots:
       '@types/unist': 3.0.3
       vfile-message: 4.0.3
 
-  vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0):
+  vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0):
     dependencies:
       esbuild: 0.25.12
       fdir: 6.5.0(picomatch@4.0.7)
@@ -9379,13 +9379,13 @@ snapshots:
       rollup: 4.63.1
       tinyglobby: 0.2.17
     optionalDependencies:
-      '@types/node': 26.6.4
+      '@types/node': 26.6.5
       fsevents: 2.3.3
       jiti: 2.7.0
       tsx: 4.23.13
       yaml: 2.9.0
 
-  vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0):
+  vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0):
     dependencies:
       esbuild: 0.25.12
       fdir: 6.5.0(picomatch@4.0.7)
@@ -9394,7 +9394,7 @@ snapshots:
       rollup: 4.63.1
       tinyglobby: 0.2.17
     optionalDependencies:
-      '@types/node': 26.6.4
+      '@types/node': 26.6.5
       fsevents: 2.3.3
       jiti: 2.7.0
       tsx: 4.23.15
@@ -9419,7 +9419,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  vitepress@1.6.4(@algolia/client-search@5.57.0)(@types/node@26.6.4)(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.15)(typescript@6.0.3)(yaml@2.9.0):
+  vitepress@1.6.4(@algolia/client-search@5.57.0)(@types/node@26.6.5)(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.15)(typescript@6.0.3)(yaml@2.9.0):
     dependencies:
       '@docsearch/css': 3.8.2
       '@docsearch/js': 3.8.2(@algolia/client-search@5.57.0)
@@ -9428,7 +9428,7 @@ snapshots:
       '@shikijs/transformers': 2.5.0
       '@shikijs/types': 2.5.0
       '@types/markdown-it': 14.2.0
-      '@vitejs/plugin-vue': 5.2.4(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))(vue@3.5.42(typescript@6.0.3))
+      '@vitejs/plugin-vue': 5.2.4(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))(vue@3.5.42(typescript@6.0.3))
       '@vue/devtools-api': 7.7.10
       '@vue/shared': 3.5.42
       '@vueuse/core': 12.8.2(typescript@6.0.3)
@@ -9437,7 +9437,7 @@ snapshots:
       mark.js: 8.11.1
       minisearch: 7.2.0
       shiki: 2.5.0
-      vite: 6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0)
+      vite: 6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0)
       vue: 3.5.42(typescript@6.0.3)
     optionalDependencies:
       postcss: 8.5.28
@@ -9472,10 +9472,10 @@ snapshots:
       - universal-cookie
       - yaml
 
-  vitest@5.0.2(@types/node@26.6.4)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)):
+  vitest@5.0.2(@types/node@26.6.5)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)):
     dependencies:
       '@types/chai': 5.2.3
-      '@vitest/mocker': 5.0.2(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+      '@vitest/mocker': 5.0.2(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
       chai: 6.2.2
       es-module-lexer: 2.3.2
       expect-type: 1.4.0
@@ -9486,18 +9486,18 @@ snapshots:
       tinybench: 6.1.4
       tinyexec: 1.3.1
       tinyglobby: 0.2.17
-      vite: 6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)
+      vite: 6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)
       why-is-node-running: 3.2.2
     optionalDependencies:
-      '@types/node': 26.6.4
+      '@types/node': 26.6.5
       '@vitest/coverage-v8': 5.0.2(vitest@5.0.2)
     transitivePeerDependencies:
       - msw
 
-  vitest@5.0.2(@types/node@26.6.4)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0)):
+  vitest@5.0.2(@types/node@26.6.5)(@vitest/coverage-v8@5.0.2)(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0)):
     dependencies:
       '@types/chai': 5.2.3
-      '@vitest/mocker': 5.0.2(vite@6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))
+      '@vitest/mocker': 5.0.2(vite@6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))
       chai: 6.2.2
       es-module-lexer: 2.3.2
       expect-type: 1.4.0
@@ -9508,10 +9508,10 @@ snapshots:
       tinybench: 6.1.4
       tinyexec: 1.3.1
       tinyglobby: 0.2.17
-      vite: 6.4.3(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0)
+      vite: 6.4.3(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0)
       why-is-node-running: 3.2.2
     optionalDependencies:
-      '@types/node': 26.6.4
+      '@types/node': 26.6.5
       '@vitest/coverage-v8': 5.0.2(vitest@5.0.2)
     transitivePeerDependencies:
       - msw
