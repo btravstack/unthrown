@@ -99,9 +99,10 @@ When a change is breaking, or a batch of changes needs to be validated in a real
 consumer before it becomes a stable major, publish it as a **beta** first instead
 of cutting the major straight to `latest`. This uses [changesets pre
 mode](https://github.com/changesets/changesets/blob/main/docs/prereleases.md); the
-seven packages in the `fixed` group move together to the same beta version
-(`@unthrown/prisma` and `@unthrown/orpc` sit outside it — their majors track
-Prisma's and oRPC's cadence, not the family's).
+seven packages in the `fixed` group move together to the same beta version.
+`@unthrown/effect` is versioned independently so breaking Effect upgrades do not
+force a major release of `unthrown`. Other adapters outside the fixed group are
+also versioned independently.
 
 The release pipeline needs **no changes** — while a `.changeset/pre.json` is
 present, `changeset publish` (run by `release.yml`) publishes under the `beta`
