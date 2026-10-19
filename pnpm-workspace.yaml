@@ -41,7 +41,7 @@ catalog:
   effect: 4.0.1
   graphql: 17.0.2
   graphql-yoga: 5.24.2
-  knip: 6.39.0
+  knip: 6.41.0
   lefthook: 2.1.17
   neverthrow: 8.2.0
   oxfmt: 0.72.0
