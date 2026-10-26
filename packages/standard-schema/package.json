@@ -1,6 +1,6 @@
 {
   "name": "@unthrown/standard-schema",
-  "version": "5.12.1",
+  "version": "5.12.2",
   "description": "Standard Schema (Zod, Valibot, ArkType, …) interop for unthrown",
   "keywords": [
     "arktype",

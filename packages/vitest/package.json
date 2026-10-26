@@ -1,6 +1,6 @@
 {
   "name": "@unthrown/vitest",
-  "version": "5.12.1",
+  "version": "5.12.2",
   "description": "Vitest matchers for unthrown",
   "keywords": [
     "errors-as-values",

@@ -1,5 +1,9 @@
 # @unthrown/standard-schema
 
+## 5.12.2
+
+No changes in this release.
+
 ## 5.12.1
 
 No changes in this release.

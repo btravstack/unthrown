@@ -1,5 +1,11 @@
 # @unthrown/oxlint
 
+## 5.12.2
+
+### Patch Changes
+
+- 86c85ca: Update the oxlint plugin helpers to 1.89.0 alongside the workspace dependency refresh and patched security resolutions.
+
 ## 5.12.1
 
 No changes in this release.
