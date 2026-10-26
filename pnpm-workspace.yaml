@@ -25,8 +25,8 @@ catalog:
   "@pothos/core": 4.15.1
   "@pothos/plugin-errors": 4.9.3
   "@pothos/plugin-relay": 4.8.1
-  "@prisma/adapter-better-sqlite3": 7.10.0
-  "@prisma/client": 7.10.0
+  "@prisma/adapter-better-sqlite3": 7.10.1
+  "@prisma/client": 7.10.1
   "@testcontainers/postgresql": 12.2.0
   "@types/node": 26.6.5
   # 8.20.1/8.20.2/8.20.3 are all within the minimumReleaseAge window as of
@@ -47,7 +47,7 @@ catalog:
   oxfmt: 0.72.0
   oxlint: 1.87.0
   pg: 8.23.1
-  prisma: 7.10.0
+  prisma: 7.10.1
   tsdown: 0.23.1
   tsx: 4.23.15
   turbo: 2.11.7
