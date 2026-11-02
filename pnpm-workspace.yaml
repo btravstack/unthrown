@@ -38,7 +38,7 @@ catalog:
   # Ranged peer, exact catalog pin: we subclass drizzle internals
   # (`_prepare`, the `entityKind` brand), so bumps are deliberate.
   drizzle-orm: 1.0.0-rc.5-5935859
-  effect: 4.0.5
+  effect: 4.0.6
   graphql: 17.0.2
   graphql-yoga: 5.24.6
   knip: 6.43.0
