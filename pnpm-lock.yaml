@@ -201,8 +201,8 @@ catalogs:
       specifier: 2.0.0-beta.46
       version: 2.0.0-beta.46
     '@pothos/core':
-      specifier: 4.15.1
-      version: 4.15.1
+      specifier: 4.16.0
+      version: 4.16.0
     '@pothos/plugin-errors':
       specifier: 4.9.3
       version: 4.9.3
@@ -728,13 +728,13 @@ importers:
         version: 0.4.0
       '@pothos/core':
         specifier: 'catalog:'
-        version: 4.15.1(graphql@17.0.2)
+        version: 4.16.0(graphql@17.0.2)
       '@pothos/plugin-errors':
         specifier: 'catalog:'
-        version: 4.9.3(@pothos/core@4.15.1(graphql@17.0.2))(graphql@17.0.2)
+        version: 4.9.3(@pothos/core@4.16.0(graphql@17.0.2))(graphql@17.0.2)
       '@pothos/plugin-relay':
         specifier: 'catalog:'
-        version: 4.8.1(@pothos/core@4.15.1(graphql@17.0.2))(graphql@17.0.2)
+        version: 4.8.1(@pothos/core@4.16.0(graphql@17.0.2))(graphql@17.0.2)
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
@@ -2200,8 +2200,8 @@ packages:
     resolution: {integrity: sha512-pOr5+q1fLYKwFN3LAJuGZEnfXDcQ73zqgDHMtGy+K+uIoUqyY+6MeDCWFwfu+4EFuq76I5EPFofoNAI+Bmmq4A==}
     engines: {node: '>=22.13'}
 
-  '@pothos/core@4.15.1':
-    resolution: {integrity: sha512-G0riOIbF6zer2SU7V1MmivkSdoKk+gYRf+Ru8JVcy3p9GhyJ8OzQj92RgCfCpEvkTgl6EdH8VueLe1Lm7lY4aA==}
+  '@pothos/core@4.16.0':
+    resolution: {integrity: sha512-csiYUWWgxdpw7drDAIPcsuFu4/FFCZpooa3OWsItwlbcYCfMzTr3//tRev6H7FivKanhX6c9TGwGEpDfppQb8g==}
     peerDependencies:
       graphql: ^16.10.0 || ^17.0.0
 
@@ -6368,18 +6368,18 @@ snapshots:
 
   '@pnpm/deps.graph-sequencer@1100.0.1': {}
 
-  '@pothos/core@4.15.1(graphql@17.0.2)':
+  '@pothos/core@4.16.0(graphql@17.0.2)':
     dependencies:
       graphql: 17.0.2
 
-  '@pothos/plugin-errors@4.9.3(@pothos/core@4.15.1(graphql@17.0.2))(graphql@17.0.2)':
+  '@pothos/plugin-errors@4.9.3(@pothos/core@4.16.0(graphql@17.0.2))(graphql@17.0.2)':
     dependencies:
-      '@pothos/core': 4.15.1(graphql@17.0.2)
+      '@pothos/core': 4.16.0(graphql@17.0.2)
       graphql: 17.0.2
 
-  '@pothos/plugin-relay@4.8.1(@pothos/core@4.15.1(graphql@17.0.2))(graphql@17.0.2)':
+  '@pothos/plugin-relay@4.8.1(@pothos/core@4.16.0(graphql@17.0.2))(graphql@17.0.2)':
     dependencies:
-      '@pothos/core': 4.15.1(graphql@17.0.2)
+      '@pothos/core': 4.16.0(graphql@17.0.2)
       graphql: 17.0.2
 
   '@prisma/adapter-better-sqlite3@7.10.1':

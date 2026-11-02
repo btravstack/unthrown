@@ -22,7 +22,7 @@ catalog:
   "@orpc/client": 2.0.0-beta.46
   "@orpc/contract": 2.0.0-beta.46
   "@orpc/server": 2.0.0-beta.46
-  "@pothos/core": 4.15.1
+  "@pothos/core": 4.16.0
   "@pothos/plugin-errors": 4.9.3
   "@pothos/plugin-relay": 4.8.1
   "@prisma/adapter-better-sqlite3": 7.10.1
