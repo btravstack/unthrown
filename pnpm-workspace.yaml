@@ -48,7 +48,7 @@ catalog:
   oxlint: 1.89.0
   pg: 8.23.1
   prisma: 7.10.1
-  tsdown: 0.23.1
+  tsdown: 0.23.4
   tsx: 4.23.15
   turbo: 2.11.10
   typedoc: 0.28.20
