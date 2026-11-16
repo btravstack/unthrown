@@ -240,8 +240,8 @@ catalogs:
       specifier: 4.1.2
       version: 4.1.2
     graphql:
-      specifier: 17.0.2
-      version: 17.0.2
+      specifier: 17.1.0
+      version: 17.1.0
     graphql-yoga:
       specifier: 6.0.1
       version: 6.0.1
@@ -728,13 +728,13 @@ importers:
         version: 0.4.0
       '@pothos/core':
         specifier: 'catalog:'
-        version: 4.16.0(graphql@17.0.2)
+        version: 4.16.0(graphql@17.1.0)
       '@pothos/plugin-errors':
         specifier: 'catalog:'
-        version: 4.9.3(@pothos/core@4.16.0(graphql@17.0.2))(graphql@17.0.2)
+        version: 4.9.3(@pothos/core@4.16.0(graphql@17.1.0))(graphql@17.1.0)
       '@pothos/plugin-relay':
         specifier: 'catalog:'
-        version: 4.8.1(@pothos/core@4.16.0(graphql@17.0.2))(graphql@17.0.2)
+        version: 4.8.1(@pothos/core@4.16.0(graphql@17.1.0))(graphql@17.1.0)
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.6
@@ -746,10 +746,10 @@ importers:
         version: 2.2.3
       graphql:
         specifier: 'catalog:'
-        version: 17.0.2
+        version: 17.1.0
       graphql-yoga:
         specifier: 'catalog:'
-        version: 6.0.1(graphql@17.0.2)
+        version: 6.0.1(graphql@17.1.0)
       tsdown:
         specifier: 'catalog:'
         version: 0.23.4(oxc-resolver@11.24.2)(tsx@4.23.15)(typescript@7.0.2)
@@ -4021,9 +4021,9 @@ packages:
     peerDependencies:
       graphql: ^16.0.0 || ^17.0.0
 
-  graphql@17.0.2:
-    resolution: {integrity: sha512-FRWbddMxfkjiB7z+aQDWIR+E34xo9I8c9mtK2RPv8PmMzKRvrdsreHL/Ui/TmwHJfhHChEtsFPyMHKI+xuarQQ==}
-    engines: {node: ^22.0.0 || ^24.0.0 || ^25.0.0 || >=26.0.0}
+  graphql@17.1.0:
+    resolution: {integrity: sha512-JKCOa7rSQNrket/JFhuua86hljUO+IIpyUHfKxlKD6FEfbrLX8jc1FDrA0KPKI+s8OspBCF/5npYccAICHXPpQ==}
+    engines: {node: ^22.0.0 || ^24.0.0 || >=26.0.0}
 
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
@@ -5966,39 +5966,39 @@ snapshots:
 
   '@graphql-hive/logger@1.1.1': {}
 
-  '@graphql-tools/executor@4.1.6(graphql@17.0.2)':
+  '@graphql-tools/executor@4.1.6(graphql@17.1.0)':
     dependencies:
-      '@graphql-tools/utils': 13.2.0(graphql@17.0.2)
-      '@graphql-typed-document-node/core': 3.2.0(graphql@17.0.2)
+      '@graphql-tools/utils': 13.2.0(graphql@17.1.0)
+      '@graphql-typed-document-node/core': 3.2.0(graphql@17.1.0)
       '@repeaterjs/repeater': 3.1.0
       '@whatwg-node/disposablestack': 0.1.0
       '@whatwg-node/promise-helpers': 2.0.0
-      graphql: 17.0.2
+      graphql: 17.1.0
       tslib: 2.8.1
 
-  '@graphql-tools/merge@10.0.7(graphql@17.0.2)':
+  '@graphql-tools/merge@10.0.7(graphql@17.1.0)':
     dependencies:
-      '@graphql-tools/utils': 13.2.0(graphql@17.0.2)
-      graphql: 17.0.2
+      '@graphql-tools/utils': 13.2.0(graphql@17.1.0)
+      graphql: 17.1.0
       tslib: 2.8.1
 
-  '@graphql-tools/schema@11.0.7(graphql@17.0.2)':
+  '@graphql-tools/schema@11.0.7(graphql@17.1.0)':
     dependencies:
-      '@graphql-tools/merge': 10.0.7(graphql@17.0.2)
-      '@graphql-tools/utils': 13.2.0(graphql@17.0.2)
-      graphql: 17.0.2
+      '@graphql-tools/merge': 10.0.7(graphql@17.1.0)
+      '@graphql-tools/utils': 13.2.0(graphql@17.1.0)
+      graphql: 17.1.0
       tslib: 2.8.1
 
-  '@graphql-tools/utils@13.2.0(graphql@17.0.2)':
+  '@graphql-tools/utils@13.2.0(graphql@17.1.0)':
     dependencies:
-      '@graphql-typed-document-node/core': 3.2.0(graphql@17.0.2)
+      '@graphql-typed-document-node/core': 3.2.0(graphql@17.1.0)
       '@whatwg-node/promise-helpers': 2.0.0
-      graphql: 17.0.2
+      graphql: 17.1.0
       tslib: 2.8.1
 
-  '@graphql-typed-document-node/core@3.2.0(graphql@17.0.2)':
+  '@graphql-typed-document-node/core@3.2.0(graphql@17.1.0)':
     dependencies:
-      graphql: 17.0.2
+      graphql: 17.1.0
 
   '@graphql-yoga/subscription@6.0.0':
     dependencies:
@@ -6362,19 +6362,19 @@ snapshots:
 
   '@pnpm/deps.graph-sequencer@1100.0.1': {}
 
-  '@pothos/core@4.16.0(graphql@17.0.2)':
+  '@pothos/core@4.16.0(graphql@17.1.0)':
     dependencies:
-      graphql: 17.0.2
+      graphql: 17.1.0
 
-  '@pothos/plugin-errors@4.9.3(@pothos/core@4.16.0(graphql@17.0.2))(graphql@17.0.2)':
+  '@pothos/plugin-errors@4.9.3(@pothos/core@4.16.0(graphql@17.1.0))(graphql@17.1.0)':
     dependencies:
-      '@pothos/core': 4.16.0(graphql@17.0.2)
-      graphql: 17.0.2
+      '@pothos/core': 4.16.0(graphql@17.1.0)
+      graphql: 17.1.0
 
-  '@pothos/plugin-relay@4.8.1(@pothos/core@4.16.0(graphql@17.0.2))(graphql@17.0.2)':
+  '@pothos/plugin-relay@4.8.1(@pothos/core@4.16.0(graphql@17.1.0))(graphql@17.1.0)':
     dependencies:
-      '@pothos/core': 4.16.0(graphql@17.0.2)
-      graphql: 17.0.2
+      '@pothos/core': 4.16.0(graphql@17.1.0)
+      graphql: 17.1.0
 
   '@prisma/adapter-better-sqlite3@7.10.1':
     dependencies:
@@ -7917,19 +7917,19 @@ snapshots:
 
   graphmatch@1.1.1: {}
 
-  graphql-yoga@6.0.1(graphql@17.0.2):
+  graphql-yoga@6.0.1(graphql@17.1.0):
     dependencies:
       '@envelop/core': 6.0.0
       '@envelop/instrumentation': 2.0.0
       '@graphql-hive/logger': 1.1.1
-      '@graphql-tools/executor': 4.1.6(graphql@17.0.2)
-      '@graphql-tools/schema': 11.0.7(graphql@17.0.2)
-      '@graphql-tools/utils': 13.2.0(graphql@17.0.2)
+      '@graphql-tools/executor': 4.1.6(graphql@17.1.0)
+      '@graphql-tools/schema': 11.0.7(graphql@17.1.0)
+      '@graphql-tools/utils': 13.2.0(graphql@17.1.0)
       '@graphql-yoga/subscription': 6.0.0
       '@whatwg-node/fetch': 0.12.1
       '@whatwg-node/promise-helpers': 2.0.0
       '@whatwg-node/server': 0.13.2
-      graphql: 17.0.2
+      graphql: 17.1.0
       lru-cache: 10.4.3
       tslib: 2.8.1
     transitivePeerDependencies:
@@ -7937,7 +7937,7 @@ snapshots:
       - pino
       - winston
 
-  graphql@17.0.2: {}
+  graphql@17.1.0: {}
 
   has-flag@4.0.0:
     optional: true
