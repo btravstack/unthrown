@@ -24,7 +24,7 @@ catalog:
   "@orpc/server": 2.0.0-beta.50
   "@pothos/core": 4.16.0
   "@pothos/plugin-errors": 4.9.3
-  "@pothos/plugin-relay": 4.8.1
+  "@pothos/plugin-relay": 4.8.2
   "@prisma/adapter-better-sqlite3": 7.10.1
   "@prisma/client": 7.10.1
   "@testcontainers/postgresql": 12.2.1
