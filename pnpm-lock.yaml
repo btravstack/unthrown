@@ -228,8 +228,8 @@ catalogs:
       specifier: 5.0.5
       version: 5.0.5
     better-sqlite3:
-      specifier: 13.0.3
-      version: 13.0.3
+      specifier: 13.2.0
+      version: 13.2.0
     dataloader:
       specifier: 2.2.3
       version: 2.2.3
@@ -471,7 +471,7 @@ importers:
         version: 7.10.1
       '@prisma/client':
         specifier: 'catalog:'
-        version: 7.10.1(prisma@7.10.1(@types/node@26.6.6)(@types/react@19.2.18)(better-sqlite3@13.0.3)(magicast@0.5.5)(typescript@7.0.2))(typescript@7.0.2)
+        version: 7.10.1(prisma@7.10.1(@types/node@26.6.6)(@types/react@19.2.18)(better-sqlite3@13.2.0)(magicast@0.5.5)(typescript@7.0.2))(typescript@7.0.2)
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.6
@@ -480,10 +480,10 @@ importers:
         version: link:../../packages/vitest
       better-sqlite3:
         specifier: 'catalog:'
-        version: 13.0.3
+        version: 13.2.0
       prisma:
         specifier: 'catalog:'
-        version: 7.10.1(@types/node@26.6.6)(@types/react@19.2.18)(better-sqlite3@13.0.3)(magicast@0.5.5)(typescript@7.0.2)
+        version: 7.10.1(@types/node@26.6.6)(@types/react@19.2.18)(better-sqlite3@13.2.0)(magicast@0.5.5)(typescript@7.0.2)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -583,7 +583,7 @@ importers:
         version: 5.0.5(vitest@5.0.5)
       drizzle-orm:
         specifier: 'catalog:'
-        version: 1.0.0-rc.5-5935859(@electric-sql/pglite@0.4.3)(@types/pg@8.23.1)(better-sqlite3@13.0.3)(effect@4.1.2)(mysql2@3.23.1(@types/node@26.6.6))(pg@8.23.1)(postgres@3.4.7)(valibot@1.4.2(typescript@7.0.2))(zod@4.6.7)
+        version: 1.0.0-rc.5-5935859(@electric-sql/pglite@0.4.3)(@types/pg@8.23.1)(better-sqlite3@13.2.0)(effect@4.1.2)(mysql2@3.23.1(@types/node@26.6.6))(pg@8.23.1)(postgres@3.4.7)(valibot@1.4.2(typescript@7.0.2))(zod@4.6.7)
       pg:
         specifier: 'catalog:'
         version: 8.23.1
@@ -773,7 +773,7 @@ importers:
         version: 7.10.1
       '@prisma/client':
         specifier: 'catalog:'
-        version: 7.10.1(prisma@7.10.1(@types/node@26.6.6)(@types/react@19.2.18)(better-sqlite3@13.0.3)(magicast@0.5.5)(typescript@7.0.2))(typescript@7.0.2)
+        version: 7.10.1(prisma@7.10.1(@types/node@26.6.6)(@types/react@19.2.18)(better-sqlite3@13.2.0)(magicast@0.5.5)(typescript@7.0.2))(typescript@7.0.2)
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.6
@@ -785,10 +785,10 @@ importers:
         version: 5.0.5(vitest@5.0.5)
       better-sqlite3:
         specifier: 'catalog:'
-        version: 13.0.3
+        version: 13.2.0
       prisma:
         specifier: 'catalog:'
-        version: 7.10.1(@types/node@26.6.6)(@types/react@19.2.18)(better-sqlite3@13.0.3)(magicast@0.5.5)(typescript@7.0.2)
+        version: 7.10.1(@types/node@26.6.6)(@types/react@19.2.18)(better-sqlite3@13.2.0)(magicast@0.5.5)(typescript@7.0.2)
       tsdown:
         specifier: 'catalog:'
         version: 0.23.7(oxc-resolver@11.24.2)(tsx@4.23.15)(typescript@7.0.2)
@@ -3322,8 +3322,8 @@ packages:
     resolution: {integrity: sha512-dq9AtApgg5PGFtBzPFSBl3HZQjHok5gaQCM6zh2Yk0aSmDCs1CbnVI8/HgASQkNKsWFpseIO9beg5xxpYhbIfA==}
     engines: {node: 20.x || 22.x || 23.x || 24.x || 25.x || 26.x}
 
-  better-sqlite3@13.0.3:
-    resolution: {integrity: sha512-RbOBxmLBG8uvFUc15X9+9SFemKcQ0WBuISBVkpuiaUB2qblC8UWlHEjdWVoZ8AdhSwmoEgsiXKfopX0CQxaACQ==}
+  better-sqlite3@13.2.0:
+    resolution: {integrity: sha512-Z8Q/9x/uNyKxA1v4FNodyItRVRw1TeKBrmj32JhxhR0ceNcBY+wMobt/Bv7M7TzwPAXjnZRtNaEsATnUZSKWZQ==}
     engines: {node: '>=22'}
 
   bindings@1.5.0:
@@ -6381,11 +6381,11 @@ snapshots:
 
   '@prisma/client-runtime-utils@7.10.1': {}
 
-  '@prisma/client@7.10.1(prisma@7.10.1(@types/node@26.6.6)(@types/react@19.2.18)(better-sqlite3@13.0.3)(magicast@0.5.5)(typescript@7.0.2))(typescript@7.0.2)':
+  '@prisma/client@7.10.1(prisma@7.10.1(@types/node@26.6.6)(@types/react@19.2.18)(better-sqlite3@13.2.0)(magicast@0.5.5)(typescript@7.0.2))(typescript@7.0.2)':
     dependencies:
       '@prisma/client-runtime-utils': 7.10.1
     optionalDependencies:
-      prisma: 7.10.1(@types/node@26.6.6)(@types/react@19.2.18)(better-sqlite3@13.0.3)(magicast@0.5.5)(typescript@7.0.2)
+      prisma: 7.10.1(@types/node@26.6.6)(@types/react@19.2.18)(better-sqlite3@13.2.0)(magicast@0.5.5)(typescript@7.0.2)
       typescript: 7.0.2
 
   '@prisma/config@7.10.1(magicast@0.5.5)':
@@ -7369,7 +7369,7 @@ snapshots:
       bindings: 1.5.0
       prebuild-install: 7.1.3
 
-  better-sqlite3@13.0.3:
+  better-sqlite3@13.2.0:
     dependencies:
       node-addon-api: 8.9.2
 
@@ -7643,11 +7643,11 @@ snapshots:
 
   dotenv@17.4.2: {}
 
-  drizzle-orm@1.0.0-rc.5-5935859(@electric-sql/pglite@0.4.3)(@types/pg@8.23.1)(better-sqlite3@13.0.3)(effect@4.1.2)(mysql2@3.23.1(@types/node@26.6.6))(pg@8.23.1)(postgres@3.4.7)(valibot@1.4.2(typescript@7.0.2))(zod@4.6.7):
+  drizzle-orm@1.0.0-rc.5-5935859(@electric-sql/pglite@0.4.3)(@types/pg@8.23.1)(better-sqlite3@13.2.0)(effect@4.1.2)(mysql2@3.23.1(@types/node@26.6.6))(pg@8.23.1)(postgres@3.4.7)(valibot@1.4.2(typescript@7.0.2))(zod@4.6.7):
     optionalDependencies:
       '@electric-sql/pglite': 0.4.3
       '@types/pg': 8.23.1
-      better-sqlite3: 13.0.3
+      better-sqlite3: 13.2.0
       effect: 4.1.2
       mysql2: 3.23.1(@types/node@26.6.6)
       pg: 8.23.1
@@ -8638,7 +8638,7 @@ snapshots:
 
   pretty-bytes@7.1.3: {}
 
-  prisma@7.10.1(@types/node@26.6.6)(@types/react@19.2.18)(better-sqlite3@13.0.3)(magicast@0.5.5)(typescript@7.0.2):
+  prisma@7.10.1(@types/node@26.6.6)(@types/react@19.2.18)(better-sqlite3@13.2.0)(magicast@0.5.5)(typescript@7.0.2):
     dependencies:
       '@prisma/config': 7.10.1(magicast@0.5.5)
       '@prisma/dev': 0.24.17(typescript@7.0.2)
@@ -8647,7 +8647,7 @@ snapshots:
       mysql2: 3.24.4(@types/node@26.6.6)
       postgres: 3.4.7
     optionalDependencies:
-      better-sqlite3: 13.0.3
+      better-sqlite3: 13.2.0
       typescript: 7.0.2
     transitivePeerDependencies:
       - '@types/node'
