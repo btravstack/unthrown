@@ -33,7 +33,7 @@ catalog:
   # pinning; 8.20.0 is the newest release past it.
   "@types/pg": 8.23.1
   "@vitest/coverage-v8": 5.0.5
-  better-sqlite3: 13.0.3
+  better-sqlite3: 13.2.0
   dataloader: 2.2.3
   # Ranged peer, exact catalog pin: we subclass drizzle internals
   # (`_prepare`, the `entityKind` brand), so bumps are deliberate.
